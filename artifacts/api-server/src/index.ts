@@ -583,7 +583,6 @@ async function runStartupFixes() {
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_candidates_unit_id ON candidates(unit_id)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_candidates_status ON candidates(status)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_candidates_program_id ON candidates(program_id)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_candidates_candidate_code ON candidates(candidate_code)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_candidates_full_name ON candidates(full_name)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_candidates_email ON candidates(email)`);

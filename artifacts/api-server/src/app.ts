@@ -35,10 +35,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+app.use("/", router);
 
 // GUARANTEED PRINT ROUTE (Directly on app to avoid router conflicts)
 app.get(
-  "/api/v2/generate-print/:id",
+  ["/api/v2/generate-print/:id", "/v2/generate-print/:id"],
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
   async (req, res) => {

@@ -16,15 +16,24 @@ const poolMin = process.env.DATABASE_POOL_MIN ? parseInt(process.env.DATABASE_PO
 const idleTimeout = process.env.DATABASE_IDLE_TIMEOUT ? parseInt(process.env.DATABASE_IDLE_TIMEOUT, 10) : 30000;
 const connectionTimeout = process.env.DATABASE_CONN_TIMEOUT ? parseInt(process.env.DATABASE_CONN_TIMEOUT, 10) : 2000;
 
+const useSsl =
+  process.env.DATABASE_SSL === "true" ||
+  (Boolean(process.env.DATABASE_URL) &&
+    (process.env.DATABASE_URL!.includes("neon.tech") ||
+      process.env.DATABASE_URL!.includes("sslmode=require") ||
+      process.env.DATABASE_URL!.includes("sslmode=no-verify")));
+
 // Primary database connection pool for write operations (INSERT, UPDATE, DELETE)
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: poolMax,
   idleTimeoutMillis: idleTimeout,
   connectionTimeoutMillis: connectionTimeout,
+  ssl: useSsl ? { rejectUnauthorized: false } : undefined,
 });
 
-pool.on("connect", () => {
+pool.on("connect", (client) => {
+  client.query("SET search_path TO public, neon_auth;").catch(() => {});
   console.log(`[Primary DB Pool] Client connected. Total: ${pool.totalCount}, Idle: ${pool.idleCount}, Waiting: ${pool.waitingCount}`);
 });
 
@@ -51,9 +60,11 @@ export const readPool = new Pool({
   max: poolMax,
   idleTimeoutMillis: idleTimeout,
   connectionTimeoutMillis: connectionTimeout,
+  ssl: useSsl ? { rejectUnauthorized: false } : undefined,
 });
 
-readPool.on("connect", () => {
+readPool.on("connect", (client) => {
+  client.query("SET search_path TO public, neon_auth;").catch(() => {});
   console.log(`[Replica DB Pool] Client connected. Total: ${readPool.totalCount}, Idle: ${readPool.idleCount}, Waiting: ${readPool.waitingCount}`);
 });
 
