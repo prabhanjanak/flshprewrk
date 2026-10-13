@@ -1,87 +1,55 @@
-import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { eq, and, ne } from "drizzle-orm";
-import { db, systemUsersTable } from "@workspace/db";
+import bcrypt from "bcryptjs";
+import { Request, Response, NextFunction } from "express";
 
-const SECRET = process.env.SESSION_SECRET || "vision2020_secret_key";
+const SECRET = process.env["SESSION_SECRET"] || "dev-secret-change-me";
 
-export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 10);
+export type JwtPayload = {
+  userId: number;
+  email: string;
+  role: string;
+};
+
+export function signToken(payload: JwtPayload): string {
+  return jwt.sign(payload, SECRET, { expiresIn: "30d" });
 }
 
-export async function comparePassword(password: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(password, hash);
+export function verifyToken(token: string): JwtPayload {
+  return jwt.verify(token, SECRET) as JwtPayload;
 }
 
-export function signToken(payload: object, expiresIn: string = "36500d"): string {
-  return jwt.sign(payload, SECRET, { expiresIn: "36500d" });
+export async function hashPassword(plain: string): Promise<string> {
+  return bcrypt.hash(plain, 10);
 }
 
-export function signLongLivedToken(payload: object): string {
-  return jwt.sign(payload, SECRET, { expiresIn: "36500d" });
+export async function comparePassword(plain: string, hash: string): Promise<boolean> {
+  return bcrypt.compare(plain, hash);
 }
 
-export function verifyToken(token: string): Record<string, unknown> | null {
+export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
+  const token = req.cookies["token"] || req.headers["authorization"]?.split(" ")[1] || (req.query?.["token"] as string);
+
+  if (!token) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
   try {
-    return jwt.verify(token, SECRET) as Record<string, unknown>;
-  } catch {
-    return null;
+    const decoded = verifyToken(token);
+    (req as any).user = decoded;
+    next();
+  } catch (e) {
+    res.status(401).json({ error: "Invalid token" });
   }
-}
+};
 
-export async function checkEmailOrMobileRegistered(options: {
-  email?: string | null;
-  mobile?: string | null;
-  excludeSystemUserId?: number;
-}): Promise<{ isDuplicate: boolean; reason: string } | null> {
-  const { email, mobile, excludeSystemUserId } = options;
-
-  const emailClean = email?.trim().toLowerCase();
-  const mobileClean = mobile?.trim().replace(/[^0-9]/g, "");
-
-  if (!emailClean && !mobileClean) {
-    return null;
-  }
-
-  // Check system_users table
-  if (emailClean) {
-    const condUser = [eq(systemUsersTable.email, emailClean)];
-    if (excludeSystemUserId !== undefined) {
-      condUser.push(ne(systemUsersTable.id, excludeSystemUserId));
+export const requireRole = (...roles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const user = (req as any).user as JwtPayload;
+    if (!user || !roles.includes(user.role)) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
     }
-    const [existingUser] = await db
-      .select({ name: systemUsersTable.name })
-      .from(systemUsersTable)
-      .where(and(...condUser))
-      .limit(1);
-
-    if (existingUser) {
-      return {
-        isDuplicate: true,
-        reason: `Email address '${emailClean}' is already in use by staff member '${existingUser.name}'.`
-      };
-    }
-  }
-
-  if (mobileClean) {
-    const condUser = [eq(systemUsersTable.mobile, mobileClean)];
-    if (excludeSystemUserId !== undefined) {
-      condUser.push(ne(systemUsersTable.id, excludeSystemUserId));
-    }
-    const [existingUser] = await db
-      .select({ name: systemUsersTable.name })
-      .from(systemUsersTable)
-      .where(and(...condUser))
-      .limit(1);
-
-    if (existingUser) {
-      return {
-        isDuplicate: true,
-        reason: `Mobile number '${mobileClean}' is already in use by staff member '${existingUser.name}'.`
-      };
-    }
-  }
-
-  return null;
-}
-
+    next();
+  };
+};

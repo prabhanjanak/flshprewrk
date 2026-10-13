@@ -1,0 +1,213 @@
+Build a full-stack Fellowship Entrance Exam and Seat Allocation System.
+
+Tech Stack:
+
+* Frontend: React (Vite)
+* Backend: Node.js + Express
+* Database: PostgreSQL
+* Auth: JWT
+
+---
+
+UI DESIGN:
+
+* White theme
+* Orange gradient primary color
+* Clean dashboards with sidebar
+* Particle.js animated login background
+* Logo (/public/logo.png):
+
+  * Login page (center)
+  * Dashboard top-right
+
+---
+
+USER ROLES:
+
+1. Super Admin
+2. Program Admin
+3. Exam Coordinator (unit-level)
+4. Doctor (Interview Panel)
+5. Student (Candidate)
+
+---
+
+ROLE-BASED ACCESS CONTROL:
+
+* Each role sees ONLY relevant data
+* Filter by:
+
+  * role
+  * program
+  * unit/location
+
+---
+
+STUDENT PORTAL:
+
+* Register/Login
+* Auto Candidate ID: SEH-YYYY-XXXX
+* Apply to multiple specialities
+* Set preference order
+* Upload documents
+* View exams
+* Take exams
+
+---
+
+PROGRAM ADMIN:
+
+* Create programs & specialities
+* Define seats per speciality
+* Manage candidates
+* Assign exam coordinators
+* Assign doctors
+* View rankings
+* Run allocation
+* Override allocation
+
+---
+
+EXAM COORDINATOR:
+
+* Manage candidates for assigned unit
+* Assign batches
+* Monitor exam progress
+
+---
+
+EXAM SYSTEM:
+
+* MCQ exams
+* Timer
+* Randomized questions
+* Auto-submit
+
+---
+
+QUESTION MANAGEMENT:
+
+* Manual entry UI
+* Bulk upload (Excel)
+* Separate modules:
+
+  * MCQ questions
+  * Psychometric questions
+
+---
+
+PSYCHOMETRIC SYSTEM:
+
+Support:
+
+1. MCQ
+2. Paired questions (Q1 + Q2 logic)
+3. Scale-based
+4. Conditional IF/ELSE scoring
+
+Store rules dynamically
+
+---
+
+DOCTOR DASHBOARD:
+
+* View assigned candidates
+* Enter marks
+* Add remarks
+* Multiple doctors per candidate
+
+---
+
+EVALUATION:
+
+* Combine:
+
+  * MCQ
+  * Psychometric
+  * Interview (avg + individual)
+
+---
+
+RANKING:
+
+* Rank candidates per program
+
+---
+
+SEAT MANAGEMENT:
+
+* Define seats per speciality
+
+---
+
+SEAT ALLOCATION:
+
+* Based on:
+
+  * Rank
+  * Preferences
+
+* Status:
+
+  * SELECTED
+  * WAITLISTED
+  * REJECTED
+
+* Auto move waitlist if vacancy arises
+
+---
+
+DOCTOR LOCATION MANAGEMENT:
+
+* Assign doctors to units (Shimoga, Hyderabad, etc.)
+* Allow reassignment
+
+---
+
+ALLOCATION LETTER:
+
+* Generate PDF
+* Include:
+
+  * Logo
+  * Candidate details
+  * Speciality
+  * Location
+* Download + Email
+
+---
+
+DATABASE TABLES:
+
+Include:
+
+* users, roles
+* programs, specialities
+* candidates
+* candidate_preferences
+* exams, questions, options
+* psychometric_rules
+* exam_attempts
+* interview_scores
+* rankings
+* allocations
+* doctor_locations
+* letter_templates
+
+---
+
+UI:
+
+* Clean dashboards
+* Tables for candidates
+* Forms for data entry
+* Role-based views (no duplication)
+
+---
+
+DELIVER:
+
+* Full backend APIs
+* Frontend UI
+* DB schema
+* Seed data

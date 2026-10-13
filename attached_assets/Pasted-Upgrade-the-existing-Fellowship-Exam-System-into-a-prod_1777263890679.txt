@@ -1,0 +1,181 @@
+Upgrade the existing Fellowship Exam System into a production-level application.
+
+---
+
+UI/UX:
+
+* White theme with orange gradient
+* Clean dashboards (no duplicate data)
+* Role-based UI filtering
+* Particle.js login background
+* Logo at center (login) and top-right (dashboard)
+
+---
+
+AUTH SYSTEM:
+
+* Admin/Doctor/Coordinator: Email + Password
+* Students: Reg Number + DOB + Password
+* First-time password setup
+* Forgot password
+
+---
+
+ROLES:
+
+* Super Admin (IS)
+* Program Admin
+* Exam Coordinator (unit-level)
+* Doctor
+* Student
+
+---
+
+STUDENT SYSTEM:
+
+* Apply via imported form data or internal form
+* Upload:
+
+  * Documents
+  * LOR
+  * Payment proof
+* Track application
+
+---
+
+PAYMENT SYSTEM:
+
+* Store UTR, screenshot
+* Coordinator verifies payment
+
+---
+
+EXAM SYSTEM:
+
+* Fullscreen enforcement
+* Disable copy/paste/right-click
+* Tab switch detection
+* Timer
+* Random questions
+
+---
+
+PROCTORING SYSTEM:
+
+* Webcam recording (WebRTC)
+* Screen recording
+* Store recordings per candidate
+
+---
+
+AI ALERT SYSTEM:
+
+* Face detection
+
+* Multiple faces detection
+
+* No face detection
+
+* Alert logic:
+
+  * 1 → warning
+  * 2 → final warning
+  * 3+ → flag
+
+* DO NOT exit exam automatically
+
+* Show alerts in coordinator dashboard
+
+---
+
+QUESTION SYSTEM:
+
+* Manual question entry
+* Bulk Excel upload
+* Psychometric question types:
+
+  * MCQ
+  * Paired logic
+  * Scale
+  * Conditional scoring
+
+---
+
+DOCTOR DASHBOARD:
+
+* View candidates
+* Enter marks
+* Add remarks
+* View alerts summary
+
+---
+
+COORDINATOR DASHBOARD:
+
+* Upload questions
+* Assign batches
+* Assign doctors
+* Monitor exam
+* View alerts
+* Verify payments
+
+---
+
+ADMIN DASHBOARD:
+
+* Full system control
+* Audit logs
+* Analytics
+
+---
+
+SEAT SYSTEM:
+
+* Enter seats per speciality + unit
+* Run allocation
+* Show simulation preview
+* Confirm allocation
+
+---
+
+WAITLIST SYSTEM:
+
+* Auto waiting list
+* Auto promotion
+* Priority ranking
+
+---
+
+ALLOCATION LETTER:
+
+* Generate PDF
+* Include logo, hospital header, QR code
+* Unique letter ID
+* Download + email
+
+---
+
+DATABASE ADDITIONS:
+
+* payments
+* proctoring_data
+* exam_violations
+* audit_logs
+* document_storage
+
+---
+
+ADDITIONAL:
+
+* Search & filters everywhere
+* Secure APIs
+* Modular structure
+* Clean UI components
+
+---
+
+DELIVER:
+
+* Improved backend
+* Clean UI dashboards
+* Fully working exam + allocation system

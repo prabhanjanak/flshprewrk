@@ -29,6 +29,10 @@ async function buildAll() {
     // - use path traversal to read files (e.g. @google-cloud/secret-manager loads sibling .proto files)
     external: [
       "*.node",
+      "pdfkit",
+      "fontkit",
+      "qrcode",
+      "@swc/helpers",
       "sharp",
       "better-sqlite3",
       "sqlite3",
@@ -100,6 +104,7 @@ async function buildAll() {
       "puppeteer",
       "puppeteer-core",
       "electron",
+      "razorpay",
     ],
     sourcemap: "linked",
     plugins: [

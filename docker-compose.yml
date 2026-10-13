@@ -1,58 +1,115 @@
-version: '3.8'
+# ==============================================================================
+# SANKARA ACADEMY OF VISION — FELLOWSHIP ADMISSIONS & EXAMINATION SYSTEM
+# Isolated Multi-Container Docker Compose Stack
+#
+# IMPORTANT SAFETY GUARANTEE:
+# - This stack runs completely isolated from existing host services.
+# - It uses its own dedicated PostgreSQL container and isolated Docker volume.
+# - Existing applications (e.g. learn.sankaraeye.in) and previous exam data
+#   are 100% untouched and unaffected.
+# ==============================================================================
 
 services:
-  # Express API Backend Server
-  api:
-    build:
-      context: .
-      target: api
-    container_name: retinopathy-api
-    restart: always
-    ports:
-      - "5000:5000"
-    environment:
-      - NODE_ENV=production
-      - PORT=5000
-      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@db:5432/netrartha_db}
-      - SESSION_SECRET=${SESSION_SECRET:-change-me-to-a-secure-random-secret}
-      - JWT_SECRET=${JWT_SECRET:-change-me-to-another-secure-random-secret}
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - uploads_data:/app/artifacts/api-server/uploads
-
-  # Nginx Frontend Web Application
-  web:
-    build:
-      context: .
-      target: web
-    container_name: retinopathy-web
-    restart: always
-    ports:
-      - "80:80"
-    depends_on:
-      - api
-
-  # PostgreSQL Database Service
-  db:
+  # ----------------------------------------------------------------------------
+  # 1. ISOLATED DATABASE SERVICE (PostgreSQL 16)
+  # ----------------------------------------------------------------------------
+  fellowship-db:
     image: postgres:16-alpine
-    container_name: retinopathy-db
-    restart: always
+    container_name: fellowship-postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-netrartha_db}
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${POSTGRES_DB:-fellowship_db}
+      POSTGRES_USER: ${POSTGRES_USER:-fellowship_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-FellowshipSecure2026!}
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # Isolated persistent volume — never touches host databases
+      - fellowship_pgdata:/var/lib/postgresql/data
+    ports:
+      # Maps to host port 5433 by default to avoid conflict with local postgres (5432)
+      - "${HOST_DB_PORT:-5433}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d netrartha_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fellowship_admin} -d ${POSTGRES_DB:-fellowship_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - fellowship_network
 
+  # ----------------------------------------------------------------------------
+  # 2. FELLOWSHIP APPLICATION SERVICE (Backend API + Admin & Candidate SPA)
+  # ----------------------------------------------------------------------------
+  fellowship-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fellowship-app
+    restart: unless-stopped
+    depends_on:
+      fellowship-db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fellowship_admin}:${POSTGRES_PASSWORD:-FellowshipSecure2026!}@fellowship-db:5432/${POSTGRES_DB:-fellowship_db}
+      SESSION_SECRET: ${SESSION_SECRET:-FellowshipSecretKey2026SuperSecureSessionToken}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-admissions@sankaraeye.com}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+    volumes:
+      # Persistent volume for candidate document uploads and photos
+      - fellowship_uploads:/app/uploads
+    ports:
+      # Published on host port 3002 (or custom port via APP_PORT)
+      - "${APP_PORT:-3002}:3002"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/api/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - fellowship_network
+
+  # ----------------------------------------------------------------------------
+  # 3. AUTOMATED DATABASE BACKUP SERVICE (5 Times Daily to ./backups/)
+  # ----------------------------------------------------------------------------
+  fellowship-backup:
+    image: postgres:16-alpine
+    container_name: fellowship-backup
+    restart: unless-stopped
+    depends_on:
+      fellowship-db:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fellowship_db}
+      POSTGRES_USER: ${POSTGRES_USER:-fellowship_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-FellowshipSecure2026!}
+      DB_HOST: fellowship-db
+      # Schedule: 5 times daily at 00:00, 05:00, 10:00, 15:00, 20:00
+      BACKUP_SCHEDULE: ${BACKUP_SCHEDULE:-0 0,5,10,15,20 * * *}
+    volumes:
+      # Direct Host Bind Mount: Backups appear directly inside the server git cloned folder
+      - ./backups:/backups
+      - ./scripts/backup-runner.sh:/scripts/backup-runner.sh:ro
+    entrypoint: ["/bin/sh", "/scripts/backup-runner.sh"]
+    networks:
+      - fellowship_network
+
+# ------------------------------------------------------------------------------
+# ISOLATED VOLUMES & NETWORKS
+# ------------------------------------------------------------------------------
 volumes:
-  postgres_data:
-  uploads_data:
+  fellowship_pgdata:
+    name: fellowship_postgres_volume
+  fellowship_uploads:
+    name: fellowship_uploads_volume
+
+networks:
+  fellowship_network:
+    name: fellowship_isolated_network
+    driver: bridge

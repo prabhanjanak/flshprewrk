@@ -1,63 +1,81 @@
 # ==============================================================================
-# Stage 1: Build stage
+# SANKARA ACADEMY OF VISION — FELLOWSHIP EXAM SYSTEM
+# Multi-stage Containerized Production Dockerfile
 # ==============================================================================
-FROM node:22-slim AS builder
+
+# --- Stage 1: Build Stage ---
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Enable Corepack for pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Install build tools for native binaries (if needed)
+RUN apk add --no-cache python3 make g++ git
 
-# Copy monorepo configuration files
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.json ./
+# Enable pnpm
+RUN npm install -g pnpm@11.13.0
 
-# Copy packages and workspace folders
-COPY lib ./lib
-COPY scripts ./scripts
-COPY artifacts ./artifacts
+# Copy workspace package manifests
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY artifacts/api-server/package.json ./artifacts/api-server/
+COPY artifacts/fellowship-exam/package.json ./artifacts/fellowship-exam/
+COPY artifacts/mockup-sandbox/package.json ./artifacts/mockup-sandbox/
+COPY lib/db/package.json ./lib/db/
+COPY lib/api-zod/package.json ./lib/api-zod/
+COPY scripts/package.json ./scripts/
 
-# Install dependencies and build monorepo packages
+# Install all workspace dependencies
 RUN pnpm install
-RUN pnpm run build
 
-# ==============================================================================
-# Stage 2: Production API Server
-# ==============================================================================
-FROM node:22-slim AS api
+# Copy source trees
+COPY . .
+
+# Build workspace libraries & frontend
+RUN pnpm run typecheck:libs
+RUN pnpm --filter @workspace/fellowship-exam run build
+
+# Build API server single-file production bundle
+WORKDIR /app/artifacts/api-server
+RUN node ./build.mjs
+
+# --- Stage 2: Minimal Production Runtime ---
+FROM node:20-alpine AS runner
 
 WORKDIR /app
-
-RUN corepack enable && corepack prepare pnpm@latest --activate
-
-# Copy workspace package manifests for production install
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.json ./
-COPY lib ./lib
-COPY artifacts/api-server/package.json ./artifacts/api-server/package.json
-
-RUN pnpm install --prod
-
-# Copy compiled backend output from builder
-COPY --from=builder /app/artifacts/api-server/dist ./artifacts/api-server/dist
 
 ENV NODE_ENV=production
-ENV PORT=5000
+ENV PORT=3002
 
-EXPOSE 5000
+# Install curl for container healthchecks
+RUN apk add --no-cache curl tzdata
 
-WORKDIR /app/artifacts/api-server
-CMD ["node", "--enable-source-maps", "./dist/index.mjs"]
+# Set timezone
+ENV TZ=Asia/Kolkata
 
-# ==============================================================================
-# Stage 3: Nginx Frontend Web Server
-# ==============================================================================
-FROM nginx:alpine AS web
+# Create directories for persistent uploads and static assets
+RUN mkdir -p /app/uploads /app/dist /app/artifacts/fellowship-exam/dist /app/public
 
-# Copy Nginx server configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy compiled backend bundle from builder
+COPY --from=builder /app/artifacts/api-server/dist ./dist
 
-# Copy built frontend assets from builder stage
-COPY --from=builder /app/artifacts/retina/dist /usr/share/nginx/html
+# Copy compiled frontend SPA bundle to static locations
+COPY --from=builder /app/artifacts/fellowship-exam/dist ./artifacts/fellowship-exam/dist
+COPY --from=builder /app/artifacts/fellowship-exam/dist ./public
 
-EXPOSE 80
+# Copy logo and required static assets
+COPY --from=builder /app/artifacts/fellowship-exam/src/assets ./artifacts/fellowship-exam/src/assets
 
-CMD ["nginx", "-g", "daemon off;"]
+# Copy node_modules needed for runtime external modules (e.g. sharp, pdfkit, pg, archiver)
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/artifacts/api-server/node_modules ./artifacts/api-server/node_modules
+
+# Ensure uploads directory has correct permissions
+RUN chmod -R 777 /app/uploads
+
+EXPOSE 3002
+
+# Docker Healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:3002/api/healthz || exit 1
+
+# Launch production server
+CMD ["node", "./dist/index.mjs"]

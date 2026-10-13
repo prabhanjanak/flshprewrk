@@ -1,0 +1,173 @@
+Continue refining the Fellowship Exam Management System.
+
+IMPORTANT:
+- Strictly follow previous instructions in this conversation
+- Do NOT change architecture
+- Only enhance UI, branding, and ensure Python backend is correctly used
+
+--------------------------------------------------
+TECH STACK ENFORCEMENT
+--------------------------------------------------
+
+Backend:
+- MUST use Python FastAPI
+- Proper modular structure:
+   routes/
+   services/
+   models/
+   schemas/
+
+- No dummy backend
+- All APIs must be functional
+
+Frontend:
+- React + Vite + TypeScript
+- TailwindCSS
+
+--------------------------------------------------
+BRANDING (VERY IMPORTANT)
+--------------------------------------------------
+
+Use Sankara branding:
+
+1. Logo:
+- Use uploaded Sankara logo
+- Place:
+   - Center in login page
+   - Top-right in dashboard
+
+2. Colors:
+
+Primary Gradient:
+- Orange: #ff7a00 → #ff9f43
+
+Secondary Theme:
+- Royal Dark Blue: #0b1f3a
+
+Apply:
+- Sidebar (dark blue)
+- Buttons (orange gradient)
+- Highlights (orange)
+- Background (white)
+
+--------------------------------------------------
+LOGIN PAGE (ENHANCED)
+--------------------------------------------------
+
+Create premium login UI:
+
+- Particle.js animated background
+- Center card layout
+- Sankara logo at center
+- Fields:
+   Email
+   Password
+
+- Toggle:
+   Show/Hide password
+
+- Validation:
+   Only allow @sankaraeye.com
+
+--------------------------------------------------
+THEME TOGGLE (LIGHT/DARK)
+--------------------------------------------------
+
+Add toggle button:
+
+Modes:
+1. Light Mode (default)
+   - White background
+   - Orange highlights
+
+2. Dark Mode
+   - Dark blue background (#0b1f3a)
+   - Light text
+   - Orange accents
+
+Persist:
+- Store in localStorage
+
+--------------------------------------------------
+UI ENHANCEMENTS
+--------------------------------------------------
+
+1. Add smooth transitions
+2. Add hover effects on buttons/cards
+3. Use rounded corners (2xl)
+4. Add shadows for depth
+5. Add loading spinners everywhere needed
+
+--------------------------------------------------
+COMPONENT STANDARDIZATION
+--------------------------------------------------
+
+Create reusable components:
+
+- Button
+- Card
+- Table
+- Modal
+- Input Field
+
+Ensure consistency across all pages
+
+--------------------------------------------------
+PARTICLE BACKGROUND
+--------------------------------------------------
+
+Use particle.js ONLY in login page
+
+Do NOT use in dashboard
+
+--------------------------------------------------
+FORM UX IMPROVEMENTS
+--------------------------------------------------
+
+- Inline validation messages
+- Disabled buttons when invalid
+- Loading state on submit
+
+--------------------------------------------------
+ERROR HANDLING UI
+--------------------------------------------------
+
+- Toast notifications:
+   Success (green)
+   Error (red)
+
+- Show backend errors clearly
+
+--------------------------------------------------
+DOCTOR DASHBOARD UI IMPROVEMENT
+--------------------------------------------------
+
+- Clean tabs:
+   Panel Duties
+   My Students
+
+- Cards for quick stats
+- Highlight pending evaluations
+
+--------------------------------------------------
+FINAL REQUIREMENTS
+--------------------------------------------------
+
+- Maintain all functionality from previous phases
+- Do NOT break any module
+- Ensure frontend fully connected to FastAPI backend
+- Ensure API calls are real (no mock data)
+
+--------------------------------------------------
+FINAL OUTPUT
+--------------------------------------------------
+
+1. Fully styled UI with Sankara branding
+2. Working login with domain restriction
+3. Functional backend (Python FastAPI)
+4. Smooth UX across all modules
+
+After completion:
+- Run preview
+- Ensure no UI glitches
+- Ensure backend + frontend integration works perfectly

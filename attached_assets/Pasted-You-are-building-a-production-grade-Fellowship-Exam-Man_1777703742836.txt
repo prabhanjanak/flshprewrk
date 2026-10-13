@@ -1,0 +1,358 @@
+You are building a production-grade Fellowship Exam Management System.
+
+IMPORTANT:
+- Refer to the connected GitHub repository as base UI/structure
+- Reuse existing UI components (cards, tables, layout)
+- REMOVE incorrect flows (student login, unused tabs)
+- DO NOT redesign UI unnecessarily
+- ONLY correct logic, data flow, and features
+
+--------------------------------------------------
+GLOBAL RULES
+--------------------------------------------------
+
+- No student login
+- Only @sankaraeye.com users allowed
+- Role-based UI rendering
+- Google Sheet = source of student data
+- Doctor = single account (no duplication)
+
+--------------------------------------------------
+ROLES
+--------------------------------------------------
+
+1. Admin
+2. Exam Coordinator
+3. Unit Coordinator
+4. Doctor
+
+--------------------------------------------------
+SIDEBAR NAVIGATION (STRICT)
+--------------------------------------------------
+
+ADMIN / EXAM COORDINATOR:
+
+- Dashboard
+- Students
+- Panels
+- Allocation
+- Ranking
+- Offer Letters
+- Settings
+
+UNIT COORDINATOR:
+
+- Unit Students
+- Doctor Assignment
+
+DOCTOR:
+
+- Dashboard
+- Panel Duties (ONLY if assigned)
+- My Students (ONLY if allocated)
+
+--------------------------------------------------
+DASHBOARD (UI + DATA)
+--------------------------------------------------
+
+Admin Dashboard:
+
+Cards:
+- Total Students (count from DB)
+- Approved Students
+- Pending Students
+- Panels Active
+- Seats Filled
+
+Live Panel Tracking Table:
+Room | Student | Status
+
+Doctor Dashboard:
+
+- Assigned Students Count
+- Panel Assignments List
+- Quick access → Marks Entry
+
+Unit Coordinator Dashboard:
+
+- Unit Student Count
+- Allocated Students List
+
+--------------------------------------------------
+STUDENTS MODULE (UI + FLOW)
+--------------------------------------------------
+
+Tabs:
+
+1. [Sync Students]
+- Button: "Sync from Google Sheets"
+- Action: fetch → clean → remove duplicates → insert DB
+
+2. [Student List]
+
+Table Columns:
+Name | Email | Specialization | Status | Actions
+
+Actions:
+- View Profile
+
+3. Student Profile Page (CRITICAL)
+
+Tabs inside:
+
+[Profile]
+- Basic details
+- Specialization
+- Preferred units
+
+[Documents]
+Buttons:
+- LOR1 (open link)
+- LOR2
+- Payment
+- Photo
+
+[Psychometric]
+- View PDF
+- Display score
+- Display recommendation
+
+[Marks Entry]
+- Doctor:
+   Marks input
+   Remarks textarea
+   Save button
+
+- Coordinator:
+   MCQ Total input
+   MCQ Marks input
+
+--------------------------------------------------
+PANEL SYSTEM (STRICT FLOW)
+--------------------------------------------------
+
+Page: Panels
+
+1. Create Panel Form:
+- Specialization dropdown
+- Room input
+- Time input
+
+Button: [Create Panel]
+
+2. Assign Doctors:
+- Multi-select doctors
+- Save → store in PANEL_DOCTORS
+
+3. Assign Students:
+- Select students
+- Map to panel
+
+4. Live Panel View:
+
+Table:
+Room | Student | Status
+
+Status:
+- Pending
+- Engaged
+- Completed
+
+--------------------------------------------------
+DOCTOR LOGIC (CRITICAL)
+--------------------------------------------------
+
+Doctor is SINGLE account.
+
+UI must be dynamic:
+
+IF doctor assigned to panel:
+→ Show "Panel Duties" tab
+
+IF doctor has allocated students:
+→ Show "My Students"
+
+Panel Duties Page:
+- List of assigned students
+- Enter marks
+
+My Students Page:
+- List of allocated students (read-only)
+
+--------------------------------------------------
+MARKS SYSTEM (STRICT)
+--------------------------------------------------
+
+Doctor:
+- Enter marks + remarks
+
+Restriction:
+- Only assigned students visible
+
+Coordinator:
+- Enter MCQ total
+- Enter MCQ marks
+
+System:
+- interview_avg = average of doctor marks
+- final_score = mcq_marks + interview_avg
+
+Reflect:
+- Update student record immediately
+
+--------------------------------------------------
+PSYCHOMETRIC MODULE
+--------------------------------------------------
+
+Coordinator UI:
+
+- Upload PDF
+- Enter score
+- Select recommendation:
+   Recommended
+   Cautiously Recommended
+   Not Recommended
+
+Doctor UI:
+- View PDF
+- View score + recommendation
+- Read-only
+
+--------------------------------------------------
+SEAT MATRIX
+--------------------------------------------------
+
+Page: Allocation → Seat Matrix
+
+Fields:
+- Unit dropdown
+- Specialization dropdown
+- Seats input
+
+Button: Save
+
+--------------------------------------------------
+ALLOCATION MODULE (STRICT FLOW)
+--------------------------------------------------
+
+Page: Allocation
+
+Table:
+Name | Specialization | Unit | Doctor | Action
+
+Button: [Run Auto Allocation]
+
+Logic:
+- Sort by final_score DESC
+- Assign unit based on preference + availability
+- Assign doctor (unit + specialization match)
+
+Manual Override:
+Button: [Override]
+
+Fields:
+- Unit dropdown
+- Doctor dropdown (filtered)
+
+--------------------------------------------------
+RANKING MODULE
+--------------------------------------------------
+
+Page: Ranking
+
+Dropdown:
+- Specialization
+
+Button:
+[Generate Rank List]
+
+Table:
+Rank | Name | Score | Unit
+
+Sort:
+final_score DESC
+
+Button:
+[Download Excel]
+
+--------------------------------------------------
+OFFER LETTER MODULE
+--------------------------------------------------
+
+Page: Student Profile
+
+Button:
+[Generate Offer Letter]
+
+Conditions:
+- allocated_unit exists
+- allocated_doctor exists
+
+Action:
+- Call backend API
+- Generate PDF
+- Auto download
+
+Backend:
+- Use template:
+  backend/templates/offer_letter.docx
+
+- Replace placeholders
+- Store in backend/generated/
+
+Also add:
+[Download Again]
+
+--------------------------------------------------
+SETTINGS MODULE
+--------------------------------------------------
+
+- Manage users
+- Create doctor accounts
+- Create unit coordinators
+- Reset passwords
+
+--------------------------------------------------
+DATABASE CONNECTION
+--------------------------------------------------
+
+- Connect all UI actions to PostgreSQL
+- No mock data
+- All updates reflect in DB
+
+--------------------------------------------------
+GITHUB INTEGRATION
+--------------------------------------------------
+
+- Use current repo as base
+- Preserve UI components
+- Remove unused code
+- Refactor logic cleanly
+
+--------------------------------------------------
+FINAL OUTPUT REQUIREMENTS
+--------------------------------------------------
+
+1. Fully working frontend + backend
+2. No broken routes
+3. No unused components
+4. All buttons functional
+5. All data flows correct
+
+--------------------------------------------------
+FINAL STEP
+--------------------------------------------------
+
+After building:
+
+- Provide preview (running app)
+- Provide option to download full project as ZIP
+- Ensure app runs locally without errors
+
+--------------------------------------------------
+DO NOT:
+- Add extra features
+- Change UI unnecessarily
+- Skip any module
+
+Build exactly as specified.

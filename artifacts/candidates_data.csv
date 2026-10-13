@@ -1,0 +1,3 @@
+id,user_id,candidate_code,full_name,email,phone,date_of_birth,gender,qualification,college_name,address,unit_id,status,created_at,updated_at
+2,,SAV-2026-7YOC,Test,prabh.bhat12@gmail.com,8951568286,2004-02-12,,,Test,Test,,allocated,2026-05-06 13:12:51.916115+05:30,2026-05-06 13:13:10.053+05:30
+3,,SAV-2026-419B,Prabhanjan K,prabhanjanakumaraswamy@gmail.com,8951568286,1990-02-12,,,Test College,Shivamogga Karnataka - 577202,,pending,2026-05-06 14:45:14.253327+05:30,2026-05-06 14:45:33.846+05:30

@@ -1,0 +1,345 @@
+Great — this is actually a **well-structured multi-page form**, so I’ll convert it into a **clean developer-ready format** for your Replit web app.
+
+I’ll give you:
+
+1. ✅ Clean structured sections
+2. ✅ Each field with **input type**
+3. ✅ **Mandatory (required) fields clearly marked**
+4. ✅ Notes for logic (conditional / multi-select / validation)
+
+---
+
+# 🧩 FORM STRUCTURE (READY FOR WEB APP)
+
+---
+
+# 🟦 SECTION 1: Subspecialty Selection
+
+**Type: Single Select (Dropdown / Radio)**
+
+* **Subspecialty** *(Required)*
+
+  * Type: `select`
+  * Options:
+
+    * IOL
+    * Cornea
+    * Glaucoma
+    * Oculoplasty
+    * Pediatric Ophthalmology
+    * Phaco Refractive
+
+---
+
+# 🟦 SECTION 2: Preferred Units (Multi-Select Based on Specialty)
+
+👉 **Important Logic:**
+
+* These are **multi-select checkboxes**
+* Each specialty has its own list
+* Include `"Not Applicable"`
+
+---
+
+### Cornea *(Required)*
+
+* Type: `checkbox group`
+* Options:
+
+  * Bangalore
+  * Guntur
+  * Shimoga
+  * Jaipur
+  * Not Applicable
+
+---
+
+### Glaucoma *(Required)*
+
+* Bangalore, Coimbatore, Guntur, Shimoga, Not Applicable
+
+---
+
+### IOL *(Required)*
+
+* Anand, Bangalore, Coimbatore, Guntur, Hyderabad, Indore, Jaipur, Kanpur, Krishnankoil, Ludhiana, Panvel, Shimoga, Varanasi, Not Applicable
+
+---
+
+### Oculoplasty *(Required)*
+
+* Bangalore, Varanasi, Not Applicable
+* **Other** *(Optional text field)* → `text`
+
+---
+
+### Pediatric *(Required)*
+
+* Bangalore, Coimbatore, Guntur, Shimoga, Not Applicable
+
+---
+
+### Phaco Refractive *(Required)*
+
+* Coimbatore, Not Applicable
+
+---
+
+# 🟦 SECTION 3: Source of Awareness
+
+* **Where did you hear about this Fellowship?** *(Required)*
+
+  * Type: `radio`
+  * Options:
+
+    * Sankara Website
+    * Word of Mouth
+    * Faculty/Existing Trainee *(conditional input)*
+    * IJO Advertisement
+    * Social Media *(conditional input)*
+
+👉 Conditional fields:
+
+* If **Referred** → Show text input
+* If **Social Media** → Show platform input
+
+---
+
+# 🟦 SECTION 4: Referral Information
+
+* **Referral Name** *(Required)*
+
+  * Type: `text`
+
+---
+
+# 🟦 SECTION 5: Personal Details
+
+* **Full Name** *(Required)* → `text`
+
+* **Permanent Address** *(Required)* → `textarea`
+
+* **Preferred Mailing Address** *(Required)* → `textarea`
+
+* **Mobile Number** *(Required)* → `tel` (10 digit validation)
+
+* **Email** *(Required)* → `email`
+
+* **Date of Birth** *(Required)* → `date`
+
+* **Marital Status** *(Required)* → `radio`
+
+  * Married / Unmarried
+
+* **Spouse Details** *(Required if Married)* → `text`
+
+---
+
+# 🟦 SECTION 6: Previous Attempt
+
+* **Appeared earlier?** → `radio (Yes/No)`
+* If Yes:
+
+  * Month & Year → `text` or `month input`
+
+---
+
+# 🟦 SECTION 7: Medical History
+
+* **Medical Conditions** *(Required)*
+
+  * Type: `checkbox group`
+  * Options:
+
+    * Asthma
+    * Hypertension
+    * Diabetes
+    * Skin Allergy
+    * Hearing Impairment
+    * Tuberculosis
+    * Post Covid
+    * None of the Above
+
+---
+
+# 🟦 SECTION 8: Educational Qualifications
+
+* **Degree Details** *(Required)* → `text`
+* **Medical College** *(Required)* → `text`
+* **University (MBBS)** *(Required)* → `text`
+* **Postgraduate Qualification** *(Required)* → `text`
+
+---
+
+### Qualification Type *(Required Matrix)*
+
+Type: `radio grid`
+
+| Qualification | Yes | No | NA |
+| ------------- | --- | -- | -- |
+| DO            | ○   | ○  | ○  |
+| MS/MD         | ○   | ○  | ○  |
+| DNB           | ○   | ○  | ○  |
+
+---
+
+### Conditional Inputs
+
+* If DO → College + Year → `text`
+* If MS → College + Year → `text`
+* If DNB → Institution + Year → `text`
+
+---
+
+* **Other Certifications** → `textarea`
+* **Medical Council Registration Number** *(Required)* → `text`
+
+---
+
+# 🟦 SECTION 9: Clinical Experience
+
+### Diagnostics Skill Matrix *(Required)*
+
+Type: `radio grid`
+
+Values:
+
+* Beginner
+* Intermittent
+* Expert
+
+Skills:
+
+* Slit Lamp
+* Fundus Exam
+* Indirect Ophthalmoscopy
+* Tonometry
+* Gonioscopy
+* Biometry
+* Ultrasound B Scan
+* Corneal Topography
+* Specular Microscopy
+* Visual Fields
+* FFA
+* OCT
+* YAG Laser
+* Argon Laser
+* Hess Charting
+
+---
+
+### Surgical Numbers *(ALL Required → number inputs)*
+
+* ECCE (Supervised)
+* ECCE (Independent)
+* SICS (Supervised)
+* SICS (Independent)
+* PHACO (Supervised)
+* PHACO (Independent)
+* Trabeculectomy (Supervised)
+* Trabeculectomy (Independent)
+* Retina Laser (Supervised)
+* Retina Laser (Independent)
+* DCR (Supervised)
+* DCR (Independent)
+* **Total Surgeries** *(Required)*
+
+---
+
+# 🟦 SECTION 10: Publications
+
+* **Journal Publications** *(Required)* → `textarea`
+* **Presentations** *(Required)* → `textarea`
+
+---
+
+# 🟦 SECTION 11: LOR Upload
+
+### LOR 1 *(Required)*
+
+* File Upload → `file (PDF, max 1MB)`
+* Name & Designation → `text`
+* Contact Number → `tel`
+* Email → `email`
+
+---
+
+### LOR 2 *(Required)*
+
+Same fields as above
+
+---
+
+# 🟦 SECTION 12: Final Declaration
+
+* **Additional Info** → `textarea`
+
+---
+
+### Declaration *(Required Checkbox)*
+
+* "I declare that the information is true..."
+
+---
+
+### Payment Proof *(Required)*
+
+* File Upload → `image (max 1MB)`
+
+---
+
+### Passport Photo *(Required)*
+
+* File Upload → `image (max 1MB)`
+
+---
+
+# 🟩 FINAL SUBMIT
+
+* Button: `Submit`
+
+---
+
+# ⚙️ DEV NOTES (IMPORTANT)
+
+### 🔹 Validations
+
+* Email format validation
+* Phone = exactly 10 digits
+* File size ≤ 1MB
+* Required fields must block submission
+
+---
+
+### 🔹 Conditional Logic
+
+* Spouse field → only if Married
+* Referral input → only if referred
+* Previous attempt → show date if Yes
+* Qualification details → dynamic
+
+---
+
+### 🔹 Database Structure Suggestion
+
+Split into:
+
+* user_basic
+* education
+* clinical_experience
+* documents
+* references
+
+---
+
+# 🚀 If you want next step
+
+I can generate for you:
+
+✅ Full **React form UI (ready for Replit)**
+✅ Backend schema (SQL tables)
+✅ API endpoints
+✅ File upload handling
+✅ OR full working project ZIP
+
+Just tell: **frontend / backend / full app**

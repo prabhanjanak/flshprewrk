@@ -1,388 +1,244 @@
 import { Router } from "express";
-import { eq, or } from "drizzle-orm";
-import { db, systemUsersTable, activeSessionsTable } from "@workspace/db";
-import { hashPassword, comparePassword, signToken } from "../lib/auth";
-import { parseDevice } from "../lib/parseDevice";
-import { requireAuth } from "../middlewares/requireAuth";
-import { dispatchOtp, verifyOtpCode } from "../lib/otp";
-import { getSystemSettings } from "../lib/settings";
+import { eq } from "drizzle-orm";
+import { db, usersTable, unitsTable, userSessionsTable, auditLogsTable } from "@workspace/db";
+import { signToken, hashPassword, comparePassword } from "../lib/auth";
+import { requireAuth, requireRole } from "../middleware/auth";
 
-const router = Router();
+const router: Router = Router();
 
-function getClientIp(req: any): string {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (forwarded) {
-    return (typeof forwarded === "string" ? forwarded : forwarded[0]).split(",")[0].trim();
+async function formatUser(user: typeof usersTable.$inferSelect) {
+  let unitName: string | null = null;
+  if (user.unitId) {
+    const [unit] = await db.select().from(unitsTable).where(eq(unitsTable.id, user.unitId));
+    unitName = unit?.name ?? null;
   }
-  return req.ip || req.socket?.remoteAddress || "unknown";
+  return {
+    id: user.id,
+    email: user.email,
+    salutation: user.salutation ?? null,
+    fullName: user.fullName,
+    employeeId: user.employeeId ?? null,
+    designation: (user as Record<string, unknown>)["designation"] as string | null ?? null,
+    gender: (user as Record<string, unknown>)["gender"] as string | null ?? null,
+    avatarSeed: (user as Record<string, unknown>)["avatarSeed"] as string | null ?? null,
+    role: user.role,
+    unitId: user.unitId,
+    unitName,
+    programId: user.programId,
+    forcePasswordReset: user.forcePasswordReset,
+  };
 }
 
-async function createSession(token: string, userId: number, userType: string, userName: string, req: any) {
-  const ip = getClientIp(req);
-  const ua = req.headers["user-agent"];
-  const { deviceType, deviceName } = parseDevice(ua);
-  const now = new Date();
-  const sessionDurationMs = 365 * 24 * 60 * 60 * 1000; // 365 days long-lived mobile and staff session
-  const expiresAt = new Date(now.getTime() + sessionDurationMs);
+router.post("/auth/login", async (req, res) => {
+  const { email, password, networkIp, deviceInfo: clientDeviceInfo } = req.body as {
+    email: string;
+    password: string;
+    networkIp?: string;
+    deviceInfo?: string;
+  };
+  if (!email || !password) {
+    res.status(400).json({ error: "Email and password required" });
+    return;
+  }
+  const lowered = email.toLowerCase().trim();
+  if (!lowered.endsWith("@sankaraeye.com")) {
+    res.status(403).json({ error: "Only @sankaraeye.com accounts are allowed" });
+    return;
+  }
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.email, lowered));
+  if (!user) {
+    res.status(401).json({ error: "Invalid email or password" });
+    return;
+  }
+  if (!user.active) {
+    res.status(403).json({ error: "Account is disabled" });
+    return;
+  }
+  const ok = await comparePassword(password, user.passwordHash);
+  if (!ok) {
+    res.status(401).json({ error: "Invalid email or password" });
+    return;
+  }
   
-  await db.insert(activeSessionsTable).values({
-    sessionToken: token,
-    userId,
-    userType,
-    userName,
-    ipAddress: ip,
-    userAgent: ua ?? null,
-    deviceType,
-    deviceName,
-    expiresAt,
+  const token = signToken({ userId: user.id, email: user.email, role: user.role });
+
+  // Store active session in database
+  const fallbackIp = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "127.0.0.1").split(",")[0]!.trim();
+  const ipAddress = (networkIp && networkIp.trim()) ? networkIp.trim() : fallbackIp;
+
+  const fallbackDeviceInfo = String(req.headers["user-agent"] || "Unknown Device");
+  const deviceInfo = (clientDeviceInfo && clientDeviceInfo.trim()) ? clientDeviceInfo.trim() : fallbackDeviceInfo;
+  
+  await db.insert(userSessionsTable).values({
+    userId: user.id,
+    token,
+    ipAddress,
+    deviceInfo,
+    isActive: true,
   });
-}
 
-// POST /api/auth/login - Unified login endpoint
-router.post("/auth/login", async (req, res): Promise<void> => {
-  const identifier: string = (req.body.identifier ?? req.body.username ?? "").toString().trim();
-  const password = req.body.password ?? "";
+  // Write Login Audit Log
+  await db.insert(auditLogsTable).values({
+    userId: user.id,
+    userEmail: user.email,
+    userName: user.fullName,
+    action: "LOGIN",
+    details: `Successfully logged in. IP: ${ipAddress}, Agent: ${deviceInfo}`,
+    ipAddress,
+  });
 
-  if (!identifier || !password) {
-    res.status(400).json({ error: "Username and password are required" });
-    return;
-  }
-
-  try {
-    const [user] = await db
-      .select()
-      .from(systemUsersTable)
-      .where(or(eq(systemUsersTable.empId, identifier), eq(systemUsersTable.email, identifier)));
-
-    if (!user || user.status !== "active") {
-      res.status(401).json({ error: "Invalid credentials or account is deactivated" });
-      return;
-    }
-
-    const valid = await comparePassword(password, user.passwordHash);
-    if (!valid) {
-      res.status(401).json({ error: "Invalid credentials" });
-      return;
-    }
-
-    const token = signToken({
-      id: user.id,
-      userType: user.userType,
-      email: user.email || undefined,
-      mobile: user.mobile || undefined,
-      assignedTrack: user.assignedTrack,
-      permissions: user.permissions || [],
-    });
-
-    await createSession(token, user.id, user.userType, user.name, req);
-
-    res.json({
-      token,
-      mustChangePassword: user.mustChangePassword,
-      user: {
-        id: user.id,
-        name: user.name,
-        empId: user.empId,
-        email: user.email,
-        mobile: user.mobile,
-        userType: user.userType,
-        assignedPlace: user.assignedPlace,
-        mustChangePassword: user.mustChangePassword,
-      },
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: "Login failed: " + err.message });
-  }
+  res.json({ token, user: await formatUser(user) });
 });
 
-// GET /api/auth/me - Validate session and get current user profile
-router.get("/auth/me", requireAuth(), async (req, res): Promise<void> => {
-  if (!req.user) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-
+router.post("/auth/logout", requireAuth, async (req, res) => {
   try {
-    const [user] = await db
-      .select()
-      .from(systemUsersTable)
-      .where(eq(systemUsersTable.id, req.user.id));
-
-    if (!user || user.status !== "active") {
-      res.status(401).json({ error: "Account deactivated or not found" });
-      return;
-    }
-
-    res.json({
-      id: user.id,
-      name: user.name,
-      empId: user.empId,
-      email: user.email,
-      mobile: user.mobile,
-      userType: user.userType,
-      assignedPlace: user.assignedPlace,
-      mustChangePassword: user.mustChangePassword,
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: "Failed to fetch user session: " + err.message });
-  }
-});
-
-// PATCH /api/auth/profile - Update personal profile details
-router.patch("/auth/profile", requireAuth(), async (req, res): Promise<void> => {
-  const { name, email, mobile } = req.body;
-
-  try {
-    const [user] = await db
-      .select()
-      .from(systemUsersTable)
-      .where(eq(systemUsersTable.id, req.user!.id));
-
-    if (!user) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-
-    await db
-      .update(systemUsersTable)
-      .set({
-        name: name !== undefined ? name.trim() : user.name,
-        email: email !== undefined ? email.trim() : user.email,
-        mobile: mobile !== undefined ? mobile.trim() : user.mobile,
-      })
-      .where(eq(systemUsersTable.id, user.id));
-
-    res.json({ success: true, message: "Profile updated successfully" });
-  } catch (err: any) {
-    res.status(500).json({ error: "Failed to update profile: " + err.message });
-  }
-});
-
-// POST /api/auth/send-otp - Dispatch OTP to registered Email and/or WhatsApp
-router.post("/auth/send-otp", async (req, res): Promise<void> => {
-  const { identifier, email, mobile, purpose } = req.body;
-
-  try {
-    let targetEmail = email;
-    let targetMobile = mobile;
-    let userId: number | undefined;
-
-    if (identifier) {
-      const [u] = await db
-        .select()
-        .from(systemUsersTable)
-        .where(or(eq(systemUsersTable.empId, identifier), eq(systemUsersTable.email, identifier)));
-
-      if (u) {
-        userId = u.id;
-        targetEmail = targetEmail || u.email;
-        targetMobile = targetMobile || u.mobile;
-      }
-    }
-
-    if (!targetEmail && !targetMobile) {
-      res.status(400).json({ error: "No email address or mobile number provided for OTP dispatch." });
-      return;
-    }
-
-    const result = await dispatchOtp({
-      userId,
-      email: targetEmail,
-      mobile: targetMobile,
-      purpose: purpose || "password_change",
-    });
-
-    res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: "Failed to send OTP: " + err.message });
-  }
-});
-
-// POST /api/auth/set-password-otp - Dedicated OTP request endpoint for first-time login passcode setup
-router.post("/auth/set-password-otp", async (req, res): Promise<void> => {
-  const { email } = req.body;
-  if (!email) {
-    res.status(400).json({ error: "Email address is required" });
-    return;
-  }
-
-  try {
-    const [user] = await db
-      .select()
-      .from(systemUsersTable)
-      .where(eq(systemUsersTable.email, email.trim()));
-
-    const result = await dispatchOtp({
-      userId: user?.id,
-      email: email.trim(),
-      mobile: user?.mobile || undefined,
-      purpose: "first_login",
-    });
-
-    res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: "Failed to send OTP: " + err.message });
-  }
-});
-
-// POST /api/auth/profile/reset-password-otp - Profile modal OTP request
-router.post("/auth/profile/reset-password-otp", requireAuth(), async (req, res): Promise<void> => {
-  try {
-    const [user] = await db
-      .select()
-      .from(systemUsersTable)
-      .where(eq(systemUsersTable.id, req.user!.id));
-
-    if (!user) {
-      res.status(404).json({ error: "User profile not found." });
-      return;
-    }
-
-    const targetEmail = req.body.email || user.email;
-    const targetMobile = user.mobile;
-
-    if (!targetEmail && !targetMobile) {
-      res.status(400).json({ error: "User profile has no email or mobile configured." });
-      return;
-    }
-
-    const result = await dispatchOtp({
-      userId: user.id,
-      email: targetEmail || undefined,
-      mobile: targetMobile || undefined,
-      purpose: "password_change",
-    });
-
-    res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: "Failed to send OTP: " + err.message });
-  }
-});
-
-// POST /api/auth/profile/reset-password-verify - Verify OTP and update user password
-router.post("/auth/profile/reset-password-verify", requireAuth(), async (req, res): Promise<void> => {
-  const { otp, newPassword } = req.body;
-
-  if (!otp || !newPassword) {
-    res.status(400).json({ error: "OTP code and new password are required." });
-    return;
-  }
-
-  if (newPassword.length < 6) {
-    res.status(400).json({ error: "New password must be at least 6 characters." });
-    return;
-  }
-
-  try {
-    const [user] = await db
-      .select()
-      .from(systemUsersTable)
-      .where(eq(systemUsersTable.id, req.user!.id));
-
-    if (!user) {
-      res.status(404).json({ error: "User not found." });
-      return;
-    }
-
-    const verification = await verifyOtpCode({
-      userId: user.id,
-      email: user.email || undefined,
-      mobile: user.mobile || undefined,
-      otpCode: otp,
-      purpose: "password_change",
-    });
-
-    if (!verification.valid) {
-      res.status(400).json({ error: verification.message });
-      return;
-    }
-
-    const hash = await hashPassword(newPassword);
-    await db
-      .update(systemUsersTable)
-      .set({ passwordHash: hash, mustChangePassword: false })
-      .where(eq(systemUsersTable.id, user.id));
-
-    res.json({ success: true, message: "Password successfully updated." });
-  } catch (err: any) {
-    res.status(500).json({ error: "Failed to update password: " + err.message });
-  }
-});
-
-// POST /api/auth/change-password - Change password with mandatory OTP check when required
-router.post("/auth/change-password", requireAuth(), async (req, res): Promise<void> => {
-  const { currentPassword, newPassword, otp } = req.body;
-  if (!currentPassword || !newPassword) {
-    res.status(400).json({ error: "Current and new password are required" });
-    return;
-  }
-
-  try {
-    const settings = await getSystemSettings();
-    const [user] = await db
-      .select()
-      .from(systemUsersTable)
-      .where(eq(systemUsersTable.id, req.user!.id));
-
-    if (!user) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-
-    const valid = await comparePassword(currentPassword, user.passwordHash);
-    if (!valid) {
-      res.status(400).json({ error: "Incorrect current password" });
-      return;
-    }
-
-    if (settings.require_otp_password_change || otp) {
-      if (!otp) {
-        res.status(400).json({ error: "Security Policy Enforcement: OTP code is required to change password." });
-        return;
-      }
-
-      const verification = await verifyOtpCode({
-        userId: user.id,
-        email: user.email || undefined,
-        mobile: user.mobile || undefined,
-        otpCode: otp,
-        purpose: "password_change",
+    const token = req.sessionToken;
+    if (token) {
+      await db.update(userSessionsTable).set({ isActive: false }).where(eq(userSessionsTable.token, token));
+      
+      // Log manual logout audit
+      const ipAddress = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "127.0.0.1").split(",")[0]!.trim();
+      await db.insert(auditLogsTable).values({
+        userId: req.user!.userId,
+        userEmail: req.user!.email,
+        action: "LOGOUT",
+        details: "User manually logged out.",
+        ipAddress,
       });
-
-      if (!verification.valid) {
-        res.status(400).json({ error: verification.message });
-        return;
-      }
     }
-
-    const hash = await hashPassword(newPassword);
-    await db
-      .update(systemUsersTable)
-      .set({ passwordHash: hash, mustChangePassword: false })
-      .where(eq(systemUsersTable.id, user.id));
-
-    res.json({ success: true, message: "Password updated successfully" });
+    res.json({ success: true });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to update password: " + err.message });
+    res.status(500).json({ error: err.message || "Failed to logout" });
   }
 });
 
-// POST /api/auth/logout - Revoke session token
-router.post("/auth/logout", async (req, res): Promise<void> => {
-  let token = "";
-  const authHeader = req.headers.authorization;
-  if (authHeader?.startsWith("Bearer ")) {
-    token = authHeader.slice(7);
-  }
+router.get("/auth/sessions", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+  try {
+    const sessions = await db.select().from(userSessionsTable).where(eq(userSessionsTable.isActive, true));
+    const users = await db.select().from(usersTable);
 
-  if (token) {
-    await db
-      .update(activeSessionsTable)
-      .set({ revokedAt: new Date() })
-      .where(eq(activeSessionsTable.sessionToken, token));
-  }
+    const result = sessions.map((s) => {
+      const u = users.find((x) => x.id === s.userId);
+      return {
+        id: s.id,
+        userId: s.userId,
+        userName: u?.fullName ?? "Unknown User",
+        userEmail: u?.email ?? "Unknown Email",
+        role: u?.role ?? "student",
+        ipAddress: s.ipAddress,
+        deviceInfo: s.deviceInfo,
+        createdAt: s.createdAt.toISOString(),
+        lastActivityAt: s.lastActivityAt.toISOString(),
+      };
+    });
 
-  res.json({ success: true, message: "Logged out successfully" });
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to fetch active sessions" });
+  }
+});
+
+router.post("/auth/sessions/terminate", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+  const { sessionId } = req.body as { sessionId: number };
+  if (!sessionId) {
+    res.status(400).json({ error: "sessionId is required" });
+    return;
+  }
+  try {
+    const [sess] = await db.select().from(userSessionsTable).where(eq(userSessionsTable.id, sessionId));
+    if (!sess) {
+      res.status(404).json({ error: "Session not found" });
+      return;
+    }
+
+    await db.update(userSessionsTable).set({ isActive: false }).where(eq(userSessionsTable.id, sessionId));
+
+    // Audit log
+    const [u] = await db.select().from(usersTable).where(eq(usersTable.id, sess.userId));
+    const ipAddress = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "127.0.0.1").split(",")[0]!.trim();
+    await db.insert(auditLogsTable).values({
+      userId: req.user!.userId,
+      userEmail: req.user!.email,
+      action: "SESSION_TERMINATE",
+      details: `Admin terminated active session for user: ${u?.email || "ID " + sess.userId}`,
+      ipAddress,
+    });
+
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to terminate session" });
+  }
+});
+
+router.get("/auth/me", requireAuth, async (req, res) => {
+  const userId = req.user!.userId;
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  res.json(await formatUser(user));
+});
+
+router.post("/auth/change-password", requireAuth, async (req, res) => {
+  const userId = req.user!.userId;
+  const { currentPassword, newPassword } = req.body as { currentPassword: string; newPassword: string };
+  if (!currentPassword || !newPassword) {
+    res.status(400).json({ error: "Both current and new password required" });
+    return;
+  }
+  if (newPassword.length < 8) {
+    res.status(400).json({ error: "New password must be at least 8 characters" });
+    return;
+  }
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  const ok = await comparePassword(currentPassword, user.passwordHash);
+  if (!ok) {
+    res.status(401).json({ error: "Current password is incorrect" });
+    return;
+  }
+  const passwordHash = await hashPassword(newPassword);
+  const [updated] = await db.update(usersTable)
+    .set({ passwordHash, forcePasswordReset: false })
+    .where(eq(usersTable.id, userId))
+    .returning();
+  if (!updated) {
+    res.status(500).json({ error: "Failed to update password" });
+    return;
+  }
+  res.json({ success: true, user: await formatUser(updated) });
+});
+
+// Admin: reset any user's password
+router.post("/auth/admin-reset-password", requireAuth, async (req, res) => {
+  const caller = req.user!;
+  if (caller.role !== "super_admin") {
+    res.status(403).json({ error: "Only super admins can reset passwords" });
+    return;
+  }
+  const { userId, newPassword } = req.body as { userId: number; newPassword: string };
+  if (!userId || !newPassword) {
+    res.status(400).json({ error: "userId and newPassword required" });
+    return;
+  }
+  if (newPassword.length < 8) {
+    res.status(400).json({ error: "Password must be at least 8 characters" });
+    return;
+  }
+  const passwordHash = await hashPassword(newPassword);
+  const [updated] = await db.update(usersTable)
+    .set({ passwordHash, forcePasswordReset: true })
+    .where(eq(usersTable.id, userId))
+    .returning();
+  if (!updated) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  res.json({ success: true });
 });
 
 export default router;

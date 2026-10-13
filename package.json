@@ -3,18 +3,22 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "preinstall": "npx only-allow pnpm",
-    "build": "pnpm --filter @workspace/retina run build && pnpm --filter @workspace/api-server run build",
-    "dev": "pnpm --parallel --filter @workspace/api-server --filter @workspace/retina run dev",
-    "start": "pnpm --filter @workspace/api-server run start",
-    "db:push": "pnpm --filter @workspace/db run push",
+    "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },
   "private": true,
   "devDependencies": {
-    "cross-env": "^7.0.3",
-    "prettier": "^3.8.3",
-    "typescript": "~5.9.3"
+    "prettier": "^3.8.1",
+    "typescript": "~5.9.2"
+  },
+  "dependencies": {
+    "@rollup/rollup-darwin-arm64": "^4.62.4",
+    "@rollup/rollup-win32-x64-msvc": "^4.60.2",
+    "@tailwindcss/oxide-darwin-arm64": "^4.3.3",
+    "@tailwindcss/oxide-win32-x64-msvc": "^4.2.4",
+    "lightningcss-darwin-arm64": "^1.33.0",
+    "lightningcss-win32-x64-msvc": "^1.32.0",
+    "xlsx": "^0.18.5"
   }
 }

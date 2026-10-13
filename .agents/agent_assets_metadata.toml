@@ -1,0 +1,32 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "3219OxRsiQyJcUEzHgTKa"
+uri = "file://exports/sankara-fellowship.zip"
+type = "unspecified"
+title = "Sankara Fellowship Platform — full source (zip)"
+
+[[outputs]]
+id = "K0d6G5G5rFgQa9LM1xdYp"
+uri = "file://LOCAL_SETUP.md"
+type = "text"
+title = "LOCAL_SETUP.md — Windows & Linux Localhost Guide"
+
+[[outputs]]
+id = "q4g2bOMHS1ZCgQQG0tpaK"
+uri = "file://DOMAIN_DEPLOYMENT.md"
+type = "text"
+title = "How to host on sankaraeye.com"
+
+[[outputs]]
+id = "vcRYaEmzXUb7Qa7p4A9Hp"
+uri = "file://fellowship-exam-deploy.zip"
+type = "unspecified"
+title = "fellowship-exam-deploy.zip — Full Source Code (239 files, 0.32 MB)"
+
+[[outputs]]
+id = "09P8fL-lbu0QHWZcYOine"
+uri = "file://SUBDOMAIN_DEPLOYMENT.md"
+type = "text"
+title = "SUBDOMAIN_DEPLOYMENT.md — exams.sankaraeye.com Deployment Guide"

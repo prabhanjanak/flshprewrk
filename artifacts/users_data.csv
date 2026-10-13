@@ -1,0 +1,5 @@
+id,email,password_hash,salutation,full_name,employee_id,designation,gender,avatar_seed,role,unit_id,program_id,active,force_password_reset,created_at,updated_at
+12,prabhanjan@sankaraeye.com,$2b$10$9zyPaIY1VdLyowiB3aFTaOZUQZIAs68Suij9ROz/NMJMZfKOdVQfu,,Prabhanjan,,,,,program_admin,,,t,f,2026-05-05 13:13:50.263666+05:30,2026-05-05 13:13:50.263666+05:30
+11,saravanan@sankaraeye.com,$2b$10$tzKB/Dj.bn.MPCUj5GJQz.V6.ijFrypzqkwSjMW458ni7dCAx0MuS,,Saravanan,,,,,super_admin,,,t,f,2026-05-05 13:13:50.263666+05:30,2026-05-05 13:14:25.69+05:30
+13,a@sankaraeye.com,$2b$10$alrS6DQ9H3IRREQWGVuaR.vPVK0aTVU9Px7G28ZN2XB9z9UAgqEqm,Dr.,a,212,SER,female,,doctor,2,,t,t,2026-05-06 13:10:29.288441+05:30,2026-05-06 13:10:29.288441+05:30
+14,b@sankaraeye.com,$2b$10$zuMY.nwpJOcc8cZymjKVMeWK1whKtt.rvulM4MQZ5JcfYqZyN.0cm,Dr.,B,23,SGH,male,,doctor,1,,t,t,2026-05-06 13:10:50.085753+05:30,2026-05-06 13:10:50.085753+05:30

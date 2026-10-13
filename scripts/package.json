@@ -5,22 +5,9 @@
   "type": "module",
   "scripts": {
     "hello": "tsx ./src/hello.ts",
-    "seed": "tsx ./src/seed.ts",
-    "seed-excel": "tsx ./src/seed-from-excel.ts",
-    "sync-paid": "tsx ./src/sync-paid-list.ts",
-    "sync-mobiles": "tsx ./src/sync-excel-mobiles.ts",
-    "backfill": "tsx ./src/backfill-clean-names.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
-  "dependencies": {
-    "@workspace/db": "workspace:*",
-    "bcryptjs": "catalog:",
-    "drizzle-orm": "catalog:",
-    "nodemailer": "^8.0.11",
-    "xlsx": "^0.18.5"
-  },
   "devDependencies": {
-    "@types/bcryptjs": "catalog:",
     "@types/node": "catalog:",
     "tsx": "catalog:"
   }

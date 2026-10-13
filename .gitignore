@@ -1,11 +1,20 @@
 # See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
+# Database Backups & Dumps
+*.sql
+*.sql.gz
+*.dump
+backups/*.sql
+backups/*.sql.gz
+backups/*.dump
+!backups/.gitkeep
+!lib/db/drizzle/*.sql
+
 # compiled output
 dist
 tmp
 out-tsc
 *.tsbuildinfo
-*.apk
 .expo
 .expo-shared
 
@@ -49,30 +58,12 @@ Thumbs.db
 .cache/
 .local/
 
-# local env files
+# Project Specific
+artifacts/api-server/uploads
 .env
-.env.local
-.env.production
-.env.development
-.env.staging
-.env.*
-
-# Custom ignores
-*.db
-*.xlsx
-*.pdf
-*.cjs
-scratch/
-artifacts/api-server/uploads/
-artifacts/api-server/scratch/
-artifacts/api-server/scripts/
-artifacts/api-server/check-users.*
-artifacts/api-server/inspect_db.*
-artifacts/api-server/inspect_pg.*
-artifacts/api-server/refactor.*
-artifacts/api-server/reset-pwd.*
-artifacts/api-server/reset.*
-artifacts/api-server/seed_master.*
-scripts/src/sync-paid-list.ts
-lib/db/insert.cjs
-lib/db/seed_master.cjs
+artifacts/screenshots
+artifacts/api-server/scripts/*.cjs
+!artifacts/api-server/scripts/force-create-july.cjs
+!artifacts/api-server/scripts/force-update-instructions.cjs
+!artifacts/api-server/scripts/force-config-fix.cjs
+!artifacts/api-server/scripts/force-cleanup.cjs

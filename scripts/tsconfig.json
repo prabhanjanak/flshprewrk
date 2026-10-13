@@ -5,9 +5,5 @@
     "rootDir": "src",
     "types": ["node"]
   },
-  "include": ["src"],
-  "exclude": [
-    "src/trigger-sync.ts",
-    "src/check-db-data.ts"
-  ]
+  "include": ["src"]
 }

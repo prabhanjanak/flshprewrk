@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/admin"
+title = "Fellowship Exam Management System"
+version = "1.0.0"
+id = "artifacts/fellowship-exam"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/admin" ]
+localPort = 24796
+
+[services.development]
+run = "pnpm --filter @workspace/fellowship-exam run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/fellowship-exam", "run", "build" ]
+publicDir = "artifacts/fellowship-exam/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/admin/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24796"
+BASE_PATH = "/admin"
