@@ -1,0 +1,15 @@
+*.py
+*.doc
+*.docx
+*.xlsx
+*.xls
+requirements.txt
+create_schema.py
+extract_logos.py
+sankara-mobile-app
+scratch
+scripts
+tmp_doc_extract
+backups
+deploy
+attached_assets
