@@ -67,3 +67,5 @@ artifacts/api-server/scripts/*.cjs
 !artifacts/api-server/scripts/force-update-instructions.cjs
 !artifacts/api-server/scripts/force-config-fix.cjs
 !artifacts/api-server/scripts/force-cleanup.cjs
+.vercel
+.env*
