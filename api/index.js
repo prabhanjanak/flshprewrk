@@ -1026326,16 +1026326,20 @@ Sankara Academy of Vision, Educational unit of Sankara Eye Foundation, India is 
         { lineGap: 1.5 }
       );
       const pages = doc.bufferedPageRange();
-      for (let i2 = 0; i2 < pages.count; i2++) {
+      const pageCount = pages.count;
+      for (let i2 = 0; i2 < pageCount; i2++) {
         doc.switchToPage(i2);
-        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(left, 800).lineTo(left + contentWidth, 800).stroke();
+        const oldBottom = doc.page.margins.bottom;
+        doc.page.margins.bottom = 0;
+        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(left, 785).lineTo(left + contentWidth, 785).stroke();
         doc.fillColor(colors.lightSlate).font("Helvetica").fontSize(7).text(
           `Sankara Academy of Vision \xB7 Fellowship Offer Letter \xB7 ${data.candidateCode}`,
           left,
-          806,
-          { width: 300 }
+          792,
+          { width: 320, lineBreak: false }
         );
-        doc.text(`Page ${i2 + 1} of ${pages.count}`, left + contentWidth - 100, 806, { width: 100, align: "right" });
+        doc.text(`Page ${i2 + 1} of ${pageCount}`, left + contentWidth - 100, 792, { width: 100, align: "right", lineBreak: false });
+        doc.page.margins.bottom = oldBottom;
       }
       doc.end();
     } catch (e2) {

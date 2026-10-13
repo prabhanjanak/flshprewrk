@@ -461,16 +461,22 @@ export async function generateOfferLetterPdf(data: OfferLetterData): Promise<Buf
         left, doc.y + 2, { lineGap: 1.5 }
       );
 
-      // Running Page Footers across both pages
+      // Running Page Footers across both pages (strictly 2 pages)
       const pages = doc.bufferedPageRange();
-      for (let i = 0; i < pages.count; i++) {
+      const pageCount = pages.count;
+      for (let i = 0; i < pageCount; i++) {
         doc.switchToPage(i);
-        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(left, 800).lineTo(left + contentWidth, 800).stroke();
+        const oldBottom = doc.page.margins.bottom;
+        doc.page.margins.bottom = 0; // Prevent PDFKit from auto-adding overflow pages when writing footer
+
+        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(left, 785).lineTo(left + contentWidth, 785).stroke();
         doc.fillColor(colors.lightSlate).font("Helvetica").fontSize(7).text(
           `Sankara Academy of Vision · Fellowship Offer Letter · ${data.candidateCode}`,
-          left, 806, { width: 300 }
+          left, 792, { width: 320, lineBreak: false }
         );
-        doc.text(`Page ${i + 1} of ${pages.count}`, left + contentWidth - 100, 806, { width: 100, align: "right" });
+        doc.text(`Page ${i + 1} of ${pageCount}`, left + contentWidth - 100, 792, { width: 100, align: "right", lineBreak: false });
+
+        doc.page.margins.bottom = oldBottom;
       }
 
       doc.end();
