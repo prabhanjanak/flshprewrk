@@ -318,34 +318,129 @@ export async function sendOfferLetterEmail(opts: {
   });
 }
 
-export async function sendOfferLetterWithAttachment(opts: {
-  toEmail: string; toName: string; pdfBuffer: Buffer; fileName: string;
+export async function sendCallLetterWithAttachment(opts: {
+  toEmail: string;
+  toName: string;
+  pdfBuffer: Buffer;
+  fileName: string;
+  interviewDate?: string;
+  reportingTime?: string;
+  venue?: string;
+  specialization?: string;
 }) {
   const cfg = await getTransporter();
-  if (!cfg) return;
+  if (!cfg) {
+    throw new Error(
+      "SMTP server is not configured. Please configure your hospital SMTP server in Settings → Email Settings, or download the Call Letter PDF directly."
+    );
+  }
 
-  await cfg.transporter.sendMail({
+  const isRetina = opts.specialization?.toLowerCase().includes("retina");
+  const defaultDate = isRetina ? "1st June 2026, Monday" : "8th June 2026, Monday";
+  const dateStr = opts.interviewDate || defaultDate;
+  const timeStr = opts.reportingTime || "8:00 AM Sharp";
+  const venueStr = opts.venue || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore – 560037";
+
+  const success = await sendMailSafely(cfg.transporter, {
     from: `"${cfg.fromName}" <${cfg.from}>`,
     to: opts.toEmail,
-    subject: `Admission Offer — Fellowship Program`,
+    subject: `Interview Call Letter — Sankara Academy of Vision Fellowship Program 2026`,
     attachments: [
       {
         filename: opts.fileName,
         content: opts.pdfBuffer,
-        contentType: 'application/pdf'
-      }
+        contentType: "application/pdf",
+      },
     ],
     html: `
-      <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:8px">
-        <h2 style="color:#1d4ed8;margin:0 0 8px">Admission Offer</h2>
-        <p style="color:#374151">Dear <strong>Dr. ${opts.toName}</strong>,</p>
-        <p style="color:#374151">Please find attached your formal offer letter for the Fellowship program at Sankara Academy of Vision.</p>
-        <p style="color:#374151">Kindly review the document and revert with your acceptance within 3 working days.</p>
-        <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0" />
-        <p style="color:#9ca3af;font-size:12px;margin:0">Sankara Academy of Vision &bull; This is an automated message.</p>
+      <div style="font-family: Arial, sans-serif; max-width: 620px; margin: auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: #0b4a8f; margin: 0 0 6px; font-size: 20px;">SANKARA ACADEMY OF VISION</h2>
+          <p style="color: #64748b; font-size: 13px; margin: 0;">Central Fellowship Admissions & Selection Board 2026</p>
+        </div>
+        <div style="background-color: #f8fafc; border-left: 4px solid #0b4a8f; padding: 14px; border-radius: 6px; margin-bottom: 20px;">
+          <p style="margin: 0; color: #1e293b; font-size: 14px;">Dear <strong>Dr. ${opts.toName}</strong>,</p>
+          <p style="margin: 8px 0 0; color: #475569; font-size: 13.5px; line-height: 1.5;">
+            Please find attached your official <strong>Interview Call Letter</strong> for the Fellowship Programme in <strong>${opts.specialization || "Ophthalmology"}</strong>.
+          </p>
+        </div>
+        <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 20px;">
+          <p style="margin: 0 0 8px; font-size: 13px; color: #334155;"><strong>Date & Day:</strong> ${dateStr}</p>
+          <p style="margin: 0 0 8px; font-size: 13px; color: #334155;"><strong>Reporting Time:</strong> ${timeStr}</p>
+          <p style="margin: 0; font-size: 13px; color: #334155;"><strong>Venue:</strong> ${venueStr}</p>
+        </div>
+        <p style="font-size: 13px; color: #475569; line-height: 1.5;">
+          Kindly print the attached Call Letter and carry all required original credentials and certificates for physical verification.
+        </p>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="color: #94a3b8; font-size: 11px; margin: 0; text-align: center;">
+          Sankara Academy of Vision &bull; Sri Kanchi Kamakoti Medical Trust &bull; Official Call Letter
+        </p>
       </div>
     `,
   });
+
+  if (!success) {
+    throw new Error(`Failed to dispatch email to ${opts.toEmail} via SMTP. Please verify your SMTP credentials.`);
+  }
 }
+
+export async function sendOfferLetterWithAttachment(opts: {
+  toEmail: string;
+  toName: string;
+  pdfBuffer: Buffer;
+  fileName: string;
+  specialization?: string;
+  unitName?: string;
+}) {
+  const cfg = await getTransporter();
+  if (!cfg) {
+    throw new Error(
+      "SMTP server is not configured. Please configure your hospital SMTP server in Settings → Email Settings, or download the Offer Letter PDF directly."
+    );
+  }
+
+  const success = await sendMailSafely(cfg.transporter, {
+    from: `"${cfg.fromName}" <${cfg.from}>`,
+    to: opts.toEmail,
+    subject: `Admission Offer — Fellowship in ${opts.specialization || "Ophthalmology"}`,
+    attachments: [
+      {
+        filename: opts.fileName,
+        content: opts.pdfBuffer,
+        contentType: "application/pdf",
+      },
+    ],
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 620px; margin: auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: #0b4a8f; margin: 0 0 6px; font-size: 20px;">SANKARA ACADEMY OF VISION</h2>
+          <p style="color: #64748b; font-size: 13px; margin: 0;">Central Fellowship Admissions & Selection Board 2026</p>
+        </div>
+        <div style="background-color: #f0fdf4; border-left: 4px solid #16a34a; padding: 14px; border-radius: 6px; margin-bottom: 20px;">
+          <p style="margin: 0; color: #166534; font-size: 14px;">Dear <strong>Dr. ${opts.toName}</strong>,</p>
+          <p style="margin: 8px 0 0; color: #166534; font-size: 13.5px; line-height: 1.5;">
+            Congratulations! We are pleased to extend this formal <strong>Fellowship Offer</strong> in <strong>${opts.specialization || "Ophthalmology"}</strong>${opts.unitName ? ` at Sankara Eye Hospital – ${opts.unitName}` : ""}.
+          </p>
+        </div>
+        <p style="font-size: 13px; color: #334155; line-height: 1.5;">
+          Please find attached your formal Fellowship Offer Letter containing full appointment details, tenure, monthly stipend, and joining regulations.
+        </p>
+        <p style="font-size: 13px; color: #475569; line-height: 1.5;">
+          Kindly review the document carefully and submit your acceptance within 3 working days.
+        </p>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="color: #94a3b8; font-size: 11px; margin: 0; text-align: center;">
+          Sankara Academy of Vision &bull; Sri Kanchi Kamakoti Medical Trust &bull; Official Appointment Document
+        </p>
+      </div>
+    `,
+  });
+
+  if (!success) {
+    throw new Error(`Failed to dispatch email to ${opts.toEmail} via SMTP. Please verify your SMTP credentials.`);
+  }
+}
+
 
 

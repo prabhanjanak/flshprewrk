@@ -22,7 +22,7 @@ import {
   applicationsTable,
 } from "@workspace/db";
 import { requireAuth, requireRole } from "../middleware/auth";
-import { sendOfferLetterEmail, sendOfferLetterWithAttachment } from "../lib/email";
+import { sendOfferLetterEmail, sendOfferLetterWithAttachment, sendCallLetterWithAttachment } from "../lib/email";
 import { processGoogleDocTemplate } from "../lib/google-docs";
 import { emailSettingsTable, applicationFormsTable, batchesTable, batchCandidatesTable } from "@workspace/db";
 import PDFDocument from "pdfkit";
@@ -2008,17 +2008,22 @@ router.post("/candidates/:id/send-call-letter", requireAuth, requireRole("super_
     const isRetina = isRetinaSpecialty(spec);
     const fileName = `Interview_Call_Letter_${isRetina ? "Retina" : "Anterior"}_${c.candidateCode}.pdf`;
 
-    await sendOfferLetterWithAttachment({
+    await sendCallLetterWithAttachment({
       toEmail: c.email,
       toName: c.fullName,
       pdfBuffer,
       fileName,
+      interviewDate: req.body.interviewDate,
+      reportingTime: req.body.reportingTime,
+      venue: req.body.venue,
+      specialization: spec,
     });
 
     res.json({ success: true, isRetina, fileName });
   } catch (err: any) {
     console.error("[send-call-letter] Error:", err);
-    res.status(500).json({ error: err.message || "Failed to send call letter" });
+    const status = err.message?.includes("SMTP") ? 400 : 500;
+    res.status(status).json({ error: err.message || "Failed to send call letter" });
   }
 });
 
@@ -2085,12 +2090,15 @@ router.post("/candidates/:id/send-offer-letter", requireAuth, requireRole("super
       toName: c.fullName,
       pdfBuffer,
       fileName,
+      specialization,
+      unitName,
     });
 
     res.json({ success: true, fileName });
   } catch (err: any) {
     console.error("[send-offer-letter] Error:", err);
-    res.status(500).json({ error: err.message || "Failed to send offer letter" });
+    const status = err.message?.includes("SMTP") ? 400 : 500;
+    res.status(status).json({ error: err.message || "Failed to send offer letter" });
   }
 });
 

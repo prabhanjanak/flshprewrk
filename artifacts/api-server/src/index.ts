@@ -1,3 +1,4 @@
+import "./lib/afm-fonts";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { db, usersTable, applicationFormsTable, programsTable, candidatesTable, applicationSubmissionsTable, specialitiesTable, candidatePreferencesTable, applicationsTable, globalSettingsTable } from "@workspace/db";

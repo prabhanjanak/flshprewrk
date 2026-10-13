@@ -1,3 +1,4 @@
+import "./afm-fonts";
 import PDFDocument from "pdfkit";
 import path from "path";
 import fs from "fs";
@@ -72,7 +73,12 @@ export function formatDoctorName(rawName: string | null | undefined): string {
 function getLogoPaths() {
   const root = process.cwd();
   const tryPaths = [
+    path.join(__dirname, "assets"),
+    path.join(__dirname, "../assets"),
+    path.join(__dirname, "../../assets"),
+    path.join(root, "api", "assets"),
     path.join(root, "assets"),
+    path.join(root, "artifacts", "api-server", "assets"),
     path.join(root, "..", "fellowship-exam", "public", "assets"),
     path.join(root, "extracted_logos"),
   ];

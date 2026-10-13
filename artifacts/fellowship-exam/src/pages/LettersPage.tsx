@@ -266,7 +266,7 @@ export default function LettersPage() {
       });
       qc.invalidateQueries({ queryKey: ["candidates"] });
     } catch (e: any) {
-      toast({ title: "Failed to Send Email", description: e.message, variant: "destructive" });
+      toast({ title: "Failed to Send Email", description: e.response?.data?.error || e.message, variant: "destructive" });
     } finally {
       setSendingEmailId(null);
     }
@@ -354,7 +354,7 @@ export default function LettersPage() {
       });
       qc.invalidateQueries({ queryKey: ["candidates"] });
     } catch (e: any) {
-      toast({ title: "Failed to Send Email", description: e.message, variant: "destructive" });
+      toast({ title: "Failed to Send Email", description: e.response?.data?.error || e.message, variant: "destructive" });
     } finally {
       setSendingEmailId(null);
     }

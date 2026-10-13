@@ -568,22 +568,68 @@ export default function CandidatesPage() {
     },
   });
 
-  const handleDownloadCallLetter = (c: Candidate) => {
-    const token = localStorage.getItem("fellowship_token") || "";
-    window.open(`/api/candidates/${c.id}/call-letter-pdf?token=${token}`, "_blank");
-    toast({
-      title: "Call Letter Generated",
-      description: `Opening Interview Call Letter for ${c.fullName}`,
-    });
+  const handleDownloadCallLetter = async (c: Candidate) => {
+    try {
+      const token = localStorage.getItem("fellowship_token") || "";
+      const res = await fetch(`/api/candidates/${c.id}/call-letter-pdf?token=${token}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: "Failed to download Call Letter" }));
+        throw new Error(data.error || "Failed to download Call Letter");
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Interview_Call_Letter_${c.candidateCode}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast({
+        title: "Call Letter Downloaded",
+        description: `Downloaded Interview Call Letter PDF for Dr. ${c.fullName}`,
+      });
+    } catch (e: any) {
+      toast({
+        title: "Download Failed",
+        description: e.response?.data?.error || e.message,
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDownloadOfferLetter = (c: Candidate) => {
-    const token = localStorage.getItem("fellowship_token") || "";
-    window.open(`/api/candidates/${c.id}/offer-letter-pdf?token=${token}`, "_blank");
-    toast({
-      title: "Offer Letter Generated",
-      description: `Opening Fellowship Offer Letter for ${c.fullName}`,
-    });
+  const handleDownloadOfferLetter = async (c: Candidate) => {
+    try {
+      const token = localStorage.getItem("fellowship_token") || "";
+      const res = await fetch(`/api/candidates/${c.id}/offer-letter-pdf?token=${token}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: "Failed to download Offer Letter" }));
+        throw new Error(data.error || "Failed to download Offer Letter");
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Fellowship_Offer_Letter_${c.candidateCode}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast({
+        title: "Offer Letter Downloaded",
+        description: `Downloaded Fellowship Offer Letter PDF for Dr. ${c.fullName}`,
+      });
+    } catch (e: any) {
+      toast({
+        title: "Download Failed",
+        description: e.response?.data?.error || e.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const downloadApprovedCandidates = async () => {

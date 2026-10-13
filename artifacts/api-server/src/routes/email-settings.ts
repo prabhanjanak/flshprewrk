@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db, emailSettingsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../middleware/auth";
+import { eq } from "drizzle-orm";
 import nodemailer from "nodemailer";
 
 const router = Router();
@@ -26,7 +27,7 @@ router.patch("/settings/email", requireAuth, requireRole("super_admin", "program
   if (existing) {
     const [updated] = await db.update(emailSettingsTable).set({
       ...data, updatedAt: new Date()
-    }).where({ id: existing.id } as any).returning(); // using any for ID shorthand
+    }).where(eq(emailSettingsTable.id, existing.id)).returning();
     res.json(updated);
   } else {
     const [inserted] = await db.insert(emailSettingsTable).values({

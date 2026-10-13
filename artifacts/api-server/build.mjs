@@ -3,7 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
-import { rm } from "node:fs/promises";
+import { rm, cp, mkdir } from "node:fs/promises";
+import fs from "node:fs";
 
 // Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
 globalThis.require = createRequire(import.meta.url);
@@ -143,6 +144,31 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     `,
     },
   });
+
+  // Copy PDFKit font metrics to api/data as a disk fallback
+  try {
+    const rootDir = path.resolve(artifactDir, "../..");
+    const pdfkitDataDir = path.resolve(rootDir, "node_modules/.pnpm/pdfkit@0.18.0/node_modules/pdfkit/js/data");
+    const targetDataDir = path.resolve(apiDir, "data");
+    if (fs.existsSync(pdfkitDataDir)) {
+      await cp(pdfkitDataDir, targetDataDir, { recursive: true, force: true });
+      console.log("Copied pdfkit data to api/data");
+    }
+  } catch (err) {
+    console.warn("Notice: pdfkit data copy error (handled by embedded afm-fonts):", err);
+  }
+
+  // Copy assets (logos) to api/assets
+  try {
+    const assetsDir = path.resolve(artifactDir, "assets");
+    const targetAssetsDir = path.resolve(apiDir, "assets");
+    if (fs.existsSync(assetsDir)) {
+      await cp(assetsDir, targetAssetsDir, { recursive: true, force: true });
+      console.log("Copied assets to api/assets");
+    }
+  } catch (err) {
+    console.warn("Notice: assets copy error:", err);
+  }
 }
 
 buildAll().catch((err) => {
