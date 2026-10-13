@@ -1129815,8 +1129815,8 @@ router2.post("/auth/login", async (req, res) => {
     return;
   }
   const lowered = email3.toLowerCase().trim();
-  if (!lowered.endsWith("@sankaraeye.com")) {
-    res.status(403).json({ error: "Only @sankaraeye.com accounts are allowed" });
+  if (!lowered.endsWith("@sankaraeye.com") && !lowered.endsWith("@fellowship.org")) {
+    res.status(403).json({ error: "Only @sankaraeye.com or @fellowship.org accounts are allowed" });
     return;
   }
   const [user] = await db.select().from(usersTable).where(eq(usersTable.email, lowered));
