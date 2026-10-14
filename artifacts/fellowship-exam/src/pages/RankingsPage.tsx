@@ -381,11 +381,11 @@ export default function RankingsPage() {
             <div className="flex items-center gap-2">
               <Trophy className="h-4 w-4 text-amber-500" />
               <CardTitle className="text-base font-black text-slate-900 tracking-tight">
-                {currentSpecName} — Merit Rank List ({sortedRankings.length} Candidates)
+                {currentSpecName} — Candidate Admissions Directory ({sortedRankings.length} Candidates)
               </CardTitle>
             </div>
             <span className="text-xs font-bold text-slate-500">
-              Sorted by Total Composite Score
+              Interview Evaluation & Fellowship Allocation Status
             </span>
           </CardHeader>
 
@@ -393,14 +393,12 @@ export default function RankingsPage() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200/80 text-xs uppercase font-extrabold text-slate-600 tracking-wider">
-                  <th className="px-5 py-3.5 text-left w-20">Rank</th>
+                  <th className="px-5 py-3.5 text-left w-20">#</th>
                   <th className="px-5 py-3.5 text-left">Candidate Dossier</th>
                   <th className="px-4 py-3.5 text-left">Specialization</th>
-                  <th className="px-3 py-3.5 text-right w-24">MCQ Score</th>
-                  <th className="px-3 py-3.5 text-right w-28 text-amber-800">Mind Matters</th>
-                  <th className="px-3 py-3.5 text-right w-24 text-indigo-800">Doctor Viva</th>
-                  <th className="px-5 py-3.5 text-right w-32 bg-slate-100 text-slate-900 font-black">Total Merit</th>
-                  <th className="px-5 py-3.5 text-right w-44">Actions</th>
+                  <th className="px-4 py-3.5 text-left">Admission Status</th>
+                  <th className="px-4 py-3.5 text-left">Assigned Hospital Unit</th>
+                  <th className="px-5 py-3.5 text-right w-56">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -458,49 +456,73 @@ export default function RankingsPage() {
                         </Badge>
                       </td>
 
-                      {/* MCQ Marks */}
-                      <td className="px-3 py-4 text-right tabular-nums text-slate-800 font-mono text-sm font-bold">
-                        {fmt(r.mcqScore)}
+                      {/* Admission Status */}
+                      <td className="px-4 py-4 text-left">
+                        {isAllocated ? (
+                          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 font-extrabold text-xs px-2.5 py-0.5">
+                            <CheckCircle2 className="h-3 w-3 mr-1 inline text-emerald-600" />
+                            Selected Fellow
+                          </Badge>
+                        ) : r.status === "interview_completed" ? (
+                          <Badge className="bg-blue-100 text-blue-800 border-blue-300 font-extrabold text-xs px-2.5 py-0.5">
+                            Interview Completed
+                          </Badge>
+                        ) : r.status === "waitlisted" ? (
+                          <Badge className="bg-amber-100 text-amber-800 border-amber-300 font-extrabold text-xs px-2.5 py-0.5">
+                            Waitlisted
+                          </Badge>
+                        ) : r.status === "rejected" ? (
+                          <Badge className="bg-rose-100 text-rose-800 border-rose-300 font-extrabold text-xs px-2.5 py-0.5">
+                            Not Selected
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-bold text-xs px-2.5 py-0.5">
+                            {r.status || "Under Review"}
+                          </Badge>
+                        )}
                       </td>
 
-                      {/* Mind Matters (Psychometric) */}
-                      <td className="px-3 py-4 text-right tabular-nums text-amber-800 font-mono text-sm font-bold bg-amber-50/30">
-                        {r.psychometricScore != null ? `${Number(r.psychometricScore).toFixed(1)} / 10` : "—"}
-                      </td>
-
-                      {/* Doctor Viva Interview */}
-                      <td className="px-3 py-4 text-right tabular-nums text-indigo-700 font-mono text-xs font-bold bg-indigo-50/20">
-                        {fmt(r.interviewScore)}
-                      </td>
-                      
-                      {/* Total Merit Score */}
-                      <td className="px-5 py-4 text-right bg-slate-100/50 border-l border-slate-200/80">
-                        <Badge className="bg-slate-900 text-white font-black text-xs h-7 px-3 shadow-xs border-none font-mono">
-                          {r.totalScore.toFixed(1)}
-                        </Badge>
+                      {/* Assigned Hospital Unit */}
+                      <td className="px-4 py-4 text-left text-xs font-bold text-slate-700">
+                        {r.unitName ? (
+                          <span className="text-indigo-700 font-extrabold">{r.unitName}</span>
+                        ) : (
+                          <span className="text-slate-400 italic">Not Assigned</span>
+                        )}
                       </td>
 
                       {/* Action Buttons */}
                       <td className="px-5 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end gap-1.5 flex-wrap">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => setSelectedCandidateId(r.candidateId)}
-                            className="h-7 text-[10px] font-bold uppercase gap-1 text-orange-700 border-orange-200 bg-orange-50/50 hover:bg-orange-100"
-                            title="Examine candidate & enter marks"
+                            className="h-7 text-[10px] font-bold uppercase gap-1 text-orange-700 border-orange-200 bg-orange-50/50 hover:bg-orange-100 rounded-lg"
+                            title="Review full dossier and record selection decision"
                           >
-                            <Stethoscope className="h-3 w-3 text-orange-600" /> Examine
+                            <Stethoscope className="h-3 w-3 text-orange-600" /> Review
                           </Button>
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
-                            onClick={() => window.open(`/api/candidates/${r.candidateId}/application-pdf?token=${token}`, "_blank")}
-                            className="h-7 w-7 p-0 text-slate-500 hover:text-slate-900"
-                            title="Download Application Dossier PDF"
+                            onClick={() => window.open(`/api/candidates/${r.candidateId}/call-letter-pdf?token=${token}`, "_blank")}
+                            className="h-7 text-[10px] font-bold uppercase gap-1 text-blue-700 border-blue-200 bg-blue-50/50 hover:bg-blue-100 rounded-lg"
+                            title="Download Interview Call Letter PDF"
                           >
-                            <FileText className="h-3.5 w-3.5" />
+                            <FileText className="h-3 w-3 text-blue-600" /> Call Letter
                           </Button>
+                          {isAllocated && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(`/api/candidates/${r.candidateId}/offer-letter-pdf?token=${token}`, "_blank")}
+                              className="h-7 text-[10px] font-bold uppercase gap-1 text-purple-700 border-purple-200 bg-purple-50/50 hover:bg-purple-100 rounded-lg"
+                              title="Download Fellowship Offer Letter PDF"
+                            >
+                              <Award className="h-3 w-3 text-purple-600" /> Offer Letter
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

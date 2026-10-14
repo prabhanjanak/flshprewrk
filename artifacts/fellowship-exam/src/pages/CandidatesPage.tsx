@@ -1226,7 +1226,7 @@ export default function CandidatesPage() {
                   )}
                   <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider">Candidate</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider">Specialization</th>
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider">Marks</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider">Interview & Selection</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider">Payment</th>
                   <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider">Actions</th>
                 </tr>
@@ -1372,27 +1372,62 @@ export default function CandidatesPage() {
                       })()}
                     </td>
                     <td className="px-6 py-5">
-                       <div className="flex flex-col gap-1.5 w-32 text-xs">
-                          <div className="flex items-center justify-between">
-                             <span className="font-bold text-slate-500 uppercase">MCQ</span>
-                             <span className={`font-black ${c.mcqScore ? 'text-slate-900 font-mono text-sm' : 'text-slate-400 italic'}`}>{c.mcqScore ?? '—'}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                             <span className="font-bold text-amber-700 uppercase">Mind Matters</span>
-                             <span className={`font-black ${c.psychometricScore ? 'text-amber-800 font-mono text-sm' : 'text-slate-400 italic'}`}>{c.psychometricScore != null ? `${c.psychometricScore}/10` : '—'}</span>
-                          </div>
-                          {c.interviewScore != null && (
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-indigo-700 uppercase">Viva Avg</span>
-                              <span className="font-black text-indigo-800 font-mono text-sm">{Number(c.interviewScore).toFixed(1)}</span>
-                            </div>
-                          )}
-                          {c.totalScore != null && (
-                            <div className="flex items-center justify-between pt-1 border-t border-slate-200">
-                              <span className="font-black text-slate-900 uppercase text-xs">Total</span>
-                              <span className="font-black text-emerald-600 font-mono text-sm">{Number(c.totalScore).toFixed(1)}</span>
-                            </div>
-                          )}
+                       <div className="flex flex-col gap-1.5 min-w-[145px] text-xs">
+                         {c.status === "allocated" ? (
+                           <div className="space-y-1">
+                             <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 font-extrabold text-[11px] px-2.5 py-0.5 shadow-2xs">
+                               <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-600 inline" />
+                               Selected Fellow
+                             </Badge>
+                             <div className="text-[11px] font-bold text-emerald-700 truncate">
+                               {c.unitName ? `Unit: ${c.unitName}` : "Fellowship Allocated"}
+                             </div>
+                             <button
+                               type="button"
+                               onClick={() => handleDownloadOfferLetter(c)}
+                               className="text-[10px] font-extrabold text-purple-700 hover:text-purple-900 underline flex items-center gap-1 mt-0.5"
+                             >
+                               <Award className="h-3 w-3 text-purple-600" /> Offer Letter Ready
+                             </button>
+                           </div>
+                         ) : c.status === "interview_completed" ? (
+                           <div className="space-y-0.5">
+                             <Badge className="bg-blue-100 text-blue-800 border-blue-300 font-extrabold text-[11px] px-2.5 py-0.5 shadow-2xs">
+                               Interview Completed
+                             </Badge>
+                             <span className="text-[10px] text-slate-500 font-semibold block">Panel Reviewed</span>
+                           </div>
+                         ) : c.status === "waitlisted" ? (
+                           <div className="space-y-0.5">
+                             <Badge className="bg-amber-100 text-amber-800 border-amber-300 font-extrabold text-[11px] px-2.5 py-0.5 shadow-2xs">
+                               Waitlisted
+                             </Badge>
+                             <span className="text-[10px] text-slate-500 font-semibold block">Under Consideration</span>
+                           </div>
+                         ) : c.status === "rejected" ? (
+                           <div className="space-y-0.5">
+                             <Badge className="bg-rose-100 text-rose-800 border-rose-300 font-extrabold text-[11px] px-2.5 py-0.5 shadow-2xs">
+                               Not Selected
+                             </Badge>
+                           </div>
+                         ) : c.status === "approved" ? (
+                           <div className="space-y-1">
+                             <Badge className="bg-indigo-100 text-indigo-800 border-indigo-300 font-extrabold text-[11px] px-2.5 py-0.5 shadow-2xs">
+                               Approved Dossier
+                             </Badge>
+                             <button
+                               type="button"
+                               onClick={() => handleDownloadCallLetter(c)}
+                               className="text-[10px] font-extrabold text-blue-700 hover:text-blue-900 underline flex items-center gap-1 mt-0.5"
+                             >
+                               <Mail className="h-3 w-3 text-blue-600" /> Call Letter Ready
+                             </button>
+                           </div>
+                         ) : (
+                           <Badge className="bg-slate-100 text-slate-600 border-slate-200 font-bold text-[10px] px-2 py-0.5">
+                             Under Scrutiny
+                           </Badge>
+                         )}
                        </div>
                     </td>
                     <td className="px-6 py-5">

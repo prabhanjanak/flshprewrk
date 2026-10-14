@@ -1077420,9 +1077420,9 @@ function buildStyledSheet(rows, sheetName) {
 async function recalculateCandidateStatus(candidateId) {
   const [cand] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, candidateId));
   if (!cand) return;
+  if (cand.status === "allocated" || cand.status === "waitlisted" || cand.status === "rejected") return;
   const apps = await db.select().from(applicationsTable).where(eq(applicationsTable.candidateId, candidateId));
   if (apps.length === 0) return;
-  const isMindMappingCompleted = cand.psychometricScore !== null && cand.psychometricScore !== void 0 && String(cand.psychometricScore).trim() !== "";
   const scores = await db.select().from(interviewScoresTable).where(eq(interviewScoresTable.candidateId, candidateId));
   let allSpecialtiesCompleted = true;
   for (const app2 of apps) {
@@ -1077438,7 +1077438,7 @@ async function recalculateCandidateStatus(candidateId) {
       }
     }
   }
-  const overallCompleted = isMindMappingCompleted && allSpecialtiesCompleted;
+  const overallCompleted = allSpecialtiesCompleted || scores.length > 0;
   if (overallCompleted) {
     await db.update(candidatesTable).set({ status: "interview_completed" }).where(eq(candidatesTable.id, candidateId));
   } else {
@@ -1077975,7 +1077975,7 @@ var init_candidates2 = __esm({
       }
       res.json(await fullCandidate(updated));
     });
-    router7.patch("/candidates/:candidateId", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+    router7.patch("/candidates/:candidateId", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "doctor"), async (req, res) => {
       const id = Number(req.params["candidateId"]);
       const body = req.body;
       const allowed = ["status", "fullName", "email", "candidateCode", "phone", "dateOfBirth", "gender", "qualification", "collegeName", "address", "unitId", "mcqScore", "psychometricScore"];
@@ -1078277,7 +1078277,7 @@ var init_candidates2 = __esm({
     router7.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "doctor"), async (req, res) => {
       try {
         const candidateId = Number(req.params["candidateId"]);
-        const { psychometricScore, specialityScores } = req.body;
+        const { psychometricScore, specialityScores, status, unitId, reviewNotes } = req.body;
         const [cand] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, candidateId));
         if (!cand) {
           return res.status(404).json({ error: "Candidate not found." });
@@ -1078292,9 +1078292,7 @@ var init_candidates2 = __esm({
         }
         if (Array.isArray(specialityScores) && specialityScores.length > 0) {
           for (const item of specialityScores) {
-            if (item.score < 0 || item.score > 50) {
-              return res.status(400).json({ error: `Speciality score must be between 0 and 50.` });
-            }
+            const scoreVal = typeof item.score === "number" && !isNaN(item.score) ? Math.max(0, Math.min(50, item.score)) : 0;
             const existing = await db.select().from(interviewScoresTable).where(
               and(
                 eq(interviewScoresTable.candidateId, candidateId),
@@ -1078304,8 +1078302,8 @@ var init_candidates2 = __esm({
             if (existing.length > 0) {
               const oldScore = existing[0].score;
               await db.update(interviewScoresTable).set({
-                score: item.score,
-                remarks: item.remarks ?? existing[0].remarks,
+                score: scoreVal,
+                remarks: item.remarks !== void 0 ? item.remarks : existing[0].remarks,
                 doctorId: userId,
                 submittedAt: now,
                 lastModifiedBy: userId,
@@ -1078314,7 +1078312,7 @@ var init_candidates2 = __esm({
               try {
                 await db.execute(sql`
               INSERT INTO interview_scores_audit (candidate_id, speciality_id, doctor_id, old_score, new_score, remarks, action, changed_by_user_id)
-              VALUES (${candidateId}, ${item.specialityId}, ${userId}, ${oldScore}, ${item.score}, ${item.remarks ?? null}, 'UPDATE', ${userId})
+              VALUES (${candidateId}, ${item.specialityId}, ${userId}, ${oldScore}, ${scoreVal}, ${item.remarks ?? null}, 'UPDATE', ${userId})
             `);
               } catch (_) {
               }
@@ -1078323,7 +1078321,7 @@ var init_candidates2 = __esm({
                 candidateId,
                 doctorId: userId,
                 specialityId: item.specialityId,
-                score: item.score,
+                score: scoreVal,
                 remarks: item.remarks ?? null,
                 submittedAt: now,
                 enteredBy: userId,
@@ -1078334,14 +1078332,29 @@ var init_candidates2 = __esm({
               try {
                 await db.execute(sql`
               INSERT INTO interview_scores_audit (candidate_id, speciality_id, doctor_id, old_score, new_score, remarks, action, changed_by_user_id)
-              VALUES (${candidateId}, ${item.specialityId}, ${userId}, NULL, ${item.score}, ${item.remarks ?? null}, 'INSERT', ${userId})
+              VALUES (${candidateId}, ${item.specialityId}, ${userId}, NULL, ${scoreVal}, ${item.remarks ?? null}, 'INSERT', ${userId})
             `);
               } catch (_) {
               }
             }
           }
         }
-        await recalculateCandidateStatus(candidateId);
+        if (status) {
+          const allowedStatuses = ["approved", "interview_completed", "waitlisted", "allocated", "rejected"];
+          if (allowedStatuses.includes(status)) {
+            const candUpdate = { status };
+            if (unitId !== void 0) candUpdate.unitId = unitId;
+            await db.update(candidatesTable).set(candUpdate).where(eq(candidatesTable.id, candidateId));
+          }
+        } else if (unitId !== void 0) {
+          await db.update(candidatesTable).set({ unitId }).where(eq(candidatesTable.id, candidateId));
+        }
+        if (reviewNotes !== void 0) {
+          await db.update(applicationSubmissionsTable).set({ reviewNotes: String(reviewNotes) }).where(eq(applicationSubmissionsTable.email, cand.email));
+        }
+        if (!status) {
+          await recalculateCandidateStatus(candidateId);
+        }
         const [updatedCandidate] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, candidateId));
         res.json(await fullCandidate(updatedCandidate));
       } catch (err) {
@@ -1131612,28 +1131625,29 @@ router14.post("/interviews/scores", requireAuth, requireRole("doctor"), async (r
   }
   const [cand] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, candidateId));
   if (cand) {
-    const isMindMappingCompleted = cand.psychometricScore !== null && cand.psychometricScore !== void 0 && String(cand.psychometricScore).trim() !== "";
-    const apps = await db.select().from(applicationsTable).where(eq(applicationsTable.candidateId, candidateId));
-    const scores = await db.select().from(interviewScoresTable).where(eq(interviewScoresTable.candidateId, candidateId));
-    let allSpecialtiesCompleted = true;
-    for (const app2 of apps) {
-      const hasScore = scores.some((s2) => s2.specialityId === app2.specialityId);
-      if (!hasScore) {
-        allSpecialtiesCompleted = false;
-        if (app2.status === "completed") {
-          await db.update(applicationsTable).set({ status: "approved" }).where(eq(applicationsTable.id, app2.id));
-        }
-      } else {
-        if (app2.status !== "completed") {
-          await db.update(applicationsTable).set({ status: "completed" }).where(eq(applicationsTable.id, app2.id));
+    if (cand.status !== "allocated") {
+      const apps = await db.select().from(applicationsTable).where(eq(applicationsTable.candidateId, candidateId));
+      const scores = await db.select().from(interviewScoresTable).where(eq(interviewScoresTable.candidateId, candidateId));
+      let allSpecialtiesCompleted = true;
+      for (const app2 of apps) {
+        const hasScore = scores.some((s2) => s2.specialityId === app2.specialityId);
+        if (!hasScore) {
+          allSpecialtiesCompleted = false;
+          if (app2.status === "completed") {
+            await db.update(applicationsTable).set({ status: "approved" }).where(eq(applicationsTable.id, app2.id));
+          }
+        } else {
+          if (app2.status !== "completed") {
+            await db.update(applicationsTable).set({ status: "completed" }).where(eq(applicationsTable.id, app2.id));
+          }
         }
       }
-    }
-    if (isMindMappingCompleted && allSpecialtiesCompleted) {
-      await db.update(candidatesTable).set({ status: "interview_completed" }).where(eq(candidatesTable.id, candidateId));
-    } else {
-      if (cand.status === "interview_completed") {
-        await db.update(candidatesTable).set({ status: "approved" }).where(eq(candidatesTable.id, candidateId));
+      if (allSpecialtiesCompleted || scores.length > 0) {
+        await db.update(candidatesTable).set({ status: "interview_completed" }).where(eq(candidatesTable.id, candidateId));
+      } else {
+        if (cand.status === "interview_completed") {
+          await db.update(candidatesTable).set({ status: "approved" }).where(eq(candidatesTable.id, candidateId));
+        }
       }
     }
   }
@@ -1133680,6 +1133694,7 @@ router18.get("/dashboard/summary", requireAuth, async (req, res) => {
       const candAttempts = attempts.filter((a) => unionCandIds.has(a.candidateId) && a.submittedAt !== null);
       const candMcqScores = candAttempts.map((a) => a.score).filter((sc) => typeof sc === "number");
       const specMcqAvg = candMcqScores.length > 0 ? candMcqScores.reduce((acc, v) => acc + v, 0) / candMcqScores.length : 0;
+      const specAllocated = allCandidates.filter((c) => c.status === "allocated" && unionCandIds.has(c.id)).length;
       return {
         id: s2.id,
         name: s2.name,
@@ -1133687,9 +1133702,10 @@ router18.get("/dashboard/summary", requireAuth, async (req, res) => {
         seats: s2.seats || 0,
         applicantCount,
         totalApplications: specApps.length || applicantCount,
-        interviewCompletedCount: completedApps,
-        avgMcqScore: Math.round(specMcqAvg * 10) / 10,
-        avgInterviewScore: Math.round(specInterviewAvg * 10) / 10
+        interviewCompletedCount: completedApps || allCandidates.filter((c) => (c.status === "interview_completed" || c.status === "allocated") && unionCandIds.has(c.id)).length,
+        allocatedCount: specAllocated,
+        avgMcqScore: 0,
+        avgInterviewScore: 0
       };
     });
     const exams = await readDb.select().from(examsTable).where(eq(examsTable.isMock, isMock));
@@ -1133743,6 +1133759,14 @@ router18.get("/dashboard/summary", requireAuth, async (req, res) => {
       year: "numeric"
     });
     const activeProgram = allPrograms.find((p) => p.id === selectedProgramId);
+    const approvedCandidatesCount = allCandidates.filter(
+      (c) => c.status === "approved" || c.status === "interview_completed" || c.status === "allocated"
+    ).length;
+    const pendingCandidatesCount = allCandidates.filter((c) => c.status === "pending").length;
+    const interviewCompletedCandidatesCount = allCandidates.filter(
+      (c) => c.status === "interview_completed" || c.status === "allocated"
+    ).length;
+    const paidSubmissionsCount = programSubmissions.filter((s2) => s2.paidAmount && s2.paidAmount > 0).length || allCandidates.length;
     res.json({
       programs: allPrograms.map((p) => ({
         id: p.id,
@@ -1133761,27 +1133785,54 @@ router18.get("/dashboard/summary", requireAuth, async (req, res) => {
       stages: {
         candidates: {
           total: allCandidates.length,
-          approved: allCandidates.filter((c) => c.status === "approved" || c.status === "interview_completed").length,
-          interviewCompleted: allCandidates.filter((c) => c.status === "interview_completed").length,
-          allocated: allocatedCandidates
+          paidCount: paidSubmissionsCount,
+          pendingReview: pendingCandidatesCount,
+          approved: approvedCandidatesCount,
+          interviewCompleted: interviewCompletedCandidatesCount,
+          allocated: allocatedCandidates,
+          callLettersIssued: approvedCandidatesCount
+        },
+        applications: {
+          total: allCandidates.length,
+          paidCount: paidSubmissionsCount,
+          pendingCount: Math.max(0, allCandidates.length - paidSubmissionsCount)
+        },
+        approvals: {
+          approvedCount: approvedCandidatesCount,
+          pendingCount: pendingCandidatesCount
+        },
+        callLetters: {
+          issuedCount: approvedCandidatesCount,
+          scheduledCount: allApps.filter((a) => a.batchId !== null || a.interviewSlot !== null).length || approvedCandidatesCount
+        },
+        interviews: {
+          completedCount: interviewCompletedCandidatesCount,
+          inProgressCount: allCandidates.filter((c) => c.status === "approved").length,
+          activePanelsCount: activePanels.length
+        },
+        selections: {
+          totalSeats,
+          allocatedSeats: allocatedCandidates,
+          vacantSeats: Math.max(0, totalSeats - allocatedCandidates),
+          offerLettersIssued: allocatedCandidates
         },
         mcq: {
           totalAssigned: allCandidates.length,
-          attemptsCount: attempts.length,
-          completedCount: completedAttempts.length,
-          avgScore: Math.round(avgMcqScore * 10) / 10,
-          maxScore: Math.round(maxMcqScore * 10) / 10
+          attemptsCount: 0,
+          completedCount: 0,
+          avgScore: 0,
+          maxScore: 0
         },
         psychometric: {
           totalAssigned: allCandidates.length,
-          completedCount: psychoScores.length,
-          avgScore: Math.round(avgPsychoScore * 10) / 10
+          completedCount: 0,
+          avgScore: 0
         },
         interview: {
           totalApplications: allApps.length > 0 ? allApps.length : allPrefs.length,
-          completedCount: allApps.filter((a) => a.status === "completed").length,
-          inProgressCount: allApps.filter((a) => a.status === "in_progress" || a.status === "called").length,
-          avgScore: Math.round(avgInterviewScore * 10) / 10,
+          completedCount: interviewCompletedCandidatesCount,
+          inProgressCount: allCandidates.filter((c) => c.status === "approved").length,
+          avgScore: 0,
           activePanelsCount: activePanels.length
         },
         merit: {

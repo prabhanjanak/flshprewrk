@@ -820,7 +820,7 @@ router.patch("/candidates/me", requireAuth, requireRole("student"), async (req, 
   res.json(await fullCandidate(updated));
 });
 
-router.patch("/candidates/:candidateId", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+router.patch("/candidates/:candidateId", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "doctor"), async (req, res) => {
   const id = Number(req.params["candidateId"]);
   const body = req.body as Record<string, unknown>;
   const allowed = ["status", "fullName", "email", "candidateCode", "phone", "dateOfBirth", "gender", "qualification", "collegeName", "address", "unitId", "mcqScore", "psychometricScore"];
@@ -973,10 +973,11 @@ export async function recalculateCandidateStatus(candidateId: number): Promise<v
   const [cand] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, candidateId));
   if (!cand) return;
 
+  // If candidate has an explicit outcome, never automatically demote or change
+  if (cand.status === "allocated" || cand.status === "waitlisted" || cand.status === "rejected") return;
+
   const apps = await db.select().from(applicationsTable).where(eq(applicationsTable.candidateId, candidateId));
   if (apps.length === 0) return;
-
-  const isMindMappingCompleted = cand.psychometricScore !== null && cand.psychometricScore !== undefined && String(cand.psychometricScore).trim() !== "";
 
   const scores = await db.select().from(interviewScoresTable).where(eq(interviewScoresTable.candidateId, candidateId));
 
@@ -996,7 +997,8 @@ export async function recalculateCandidateStatus(candidateId: number): Promise<v
     }
   }
 
-  const overallCompleted = isMindMappingCompleted && allSpecialtiesCompleted;
+  // Completed if specialties have interview evaluations recorded
+  const overallCompleted = allSpecialtiesCompleted || scores.length > 0;
 
   if (overallCompleted) {
     await db.update(candidatesTable).set({ status: "interview_completed" }).where(eq(candidatesTable.id, candidateId));
@@ -1207,13 +1209,16 @@ router.patch("/candidates/:candidateId/marks", requireAuth, requireRole("super_a
   }
 });
 
-// Doctor / Coordinator: unified marks entry for candidate (Psychometry mandatory + candidate applied specialities)
+// Doctor / Coordinator: unified interview assessment, remarks, and selection outcome
 router.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "doctor"), async (req, res) => {
   try {
     const candidateId = Number(req.params["candidateId"]);
-    const { psychometricScore, specialityScores } = req.body as {
+    const { psychometricScore, specialityScores, status, unitId, reviewNotes } = req.body as {
       psychometricScore?: number | null;
-      specialityScores?: Array<{ specialityId: number; score: number; remarks?: string }>;
+      specialityScores?: Array<{ specialityId: number; score?: number | null; remarks?: string }>;
+      status?: string;
+      unitId?: number | null;
+      reviewNotes?: string;
     };
 
     const [cand] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, candidateId));
@@ -1224,7 +1229,7 @@ router.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("s
     const userId = req.user!.userId;
     const now = new Date();
 
-    // 1. Validate & Save Psychometry Score (Mandatory examination component)
+    // 1. Optional Psychometry Score (if provided)
     if (psychometricScore !== undefined) {
       if (psychometricScore !== null && (psychometricScore < 0 || psychometricScore > 10)) {
         return res.status(400).json({ error: "Psychometry score must be between 0 and 10." });
@@ -1234,12 +1239,12 @@ router.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("s
         .where(eq(candidatesTable.id, candidateId));
     }
 
-    // 2. Validate & Save Speciality Scores (for applied specialities only)
+    // 2. Speciality Assessment & Remarks (scores optional, max 50)
     if (Array.isArray(specialityScores) && specialityScores.length > 0) {
       for (const item of specialityScores) {
-        if (item.score < 0 || item.score > 50) {
-          return res.status(400).json({ error: `Speciality score must be between 0 and 50.` });
-        }
+        const scoreVal = typeof item.score === "number" && !isNaN(item.score) 
+          ? Math.max(0, Math.min(50, item.score)) 
+          : 0;
 
         const existing = await db.select().from(interviewScoresTable).where(
           and(
@@ -1251,8 +1256,8 @@ router.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("s
         if (existing.length > 0) {
           const oldScore = existing[0]!.score;
           await db.update(interviewScoresTable).set({
-            score: item.score,
-            remarks: item.remarks ?? existing[0]!.remarks,
+            score: scoreVal,
+            remarks: item.remarks !== undefined ? item.remarks : existing[0]!.remarks,
             doctorId: userId,
             submittedAt: now,
             lastModifiedBy: userId,
@@ -1263,7 +1268,7 @@ router.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("s
           try {
             await db.execute(sql`
               INSERT INTO interview_scores_audit (candidate_id, speciality_id, doctor_id, old_score, new_score, remarks, action, changed_by_user_id)
-              VALUES (${candidateId}, ${item.specialityId}, ${userId}, ${oldScore}, ${item.score}, ${item.remarks ?? null}, 'UPDATE', ${userId})
+              VALUES (${candidateId}, ${item.specialityId}, ${userId}, ${oldScore}, ${scoreVal}, ${item.remarks ?? null}, 'UPDATE', ${userId})
             `);
           } catch (_) {}
         } else {
@@ -1271,7 +1276,7 @@ router.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("s
             candidateId,
             doctorId: userId,
             specialityId: item.specialityId,
-            score: item.score,
+            score: scoreVal,
             remarks: item.remarks ?? null,
             submittedAt: now,
             enteredBy: userId,
@@ -1284,14 +1289,35 @@ router.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("s
           try {
             await db.execute(sql`
               INSERT INTO interview_scores_audit (candidate_id, speciality_id, doctor_id, old_score, new_score, remarks, action, changed_by_user_id)
-              VALUES (${candidateId}, ${item.specialityId}, ${userId}, NULL, ${item.score}, ${item.remarks ?? null}, 'INSERT', ${userId})
+              VALUES (${candidateId}, ${item.specialityId}, ${userId}, NULL, ${scoreVal}, ${item.remarks ?? null}, 'INSERT', ${userId})
             `);
           } catch (_) {}
         }
       }
     }
 
-    await recalculateCandidateStatus(candidateId);
+    // 3. Selection / Interview Outcome & Unit Allocation
+    if (status) {
+      const allowedStatuses = ["approved", "interview_completed", "waitlisted", "allocated", "rejected"];
+      if (allowedStatuses.includes(status)) {
+        const candUpdate: Record<string, any> = { status };
+        if (unitId !== undefined) candUpdate.unitId = unitId;
+        await db.update(candidatesTable).set(candUpdate).where(eq(candidatesTable.id, candidateId));
+      }
+    } else if (unitId !== undefined) {
+      await db.update(candidatesTable).set({ unitId }).where(eq(candidatesTable.id, candidateId));
+    }
+
+    // 4. Update Review Notes if specified
+    if (reviewNotes !== undefined) {
+      await db.update(applicationSubmissionsTable)
+        .set({ reviewNotes: String(reviewNotes) })
+        .where(eq(applicationSubmissionsTable.email, cand.email));
+    }
+
+    if (!status) {
+      await recalculateCandidateStatus(candidateId);
+    }
 
     const [updatedCandidate] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, candidateId));
     res.json(await fullCandidate(updatedCandidate!));

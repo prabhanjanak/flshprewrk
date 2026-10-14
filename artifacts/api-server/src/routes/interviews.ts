@@ -397,30 +397,31 @@ router.post("/interviews/scores", requireAuth, requireRole("doctor"), async (req
   // Candidate is interview_completed if they have a Mind Mapping score AND all applied specialities have at least one score
   const [cand] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, candidateId));
   if (cand) {
-    const isMindMappingCompleted = cand.psychometricScore !== null && cand.psychometricScore !== undefined && String(cand.psychometricScore).trim() !== "";
-    const apps = await db.select().from(applicationsTable).where(eq(applicationsTable.candidateId, candidateId));
-    const scores = await db.select().from(interviewScoresTable).where(eq(interviewScoresTable.candidateId, candidateId));
+    if (cand.status !== "allocated") {
+      const apps = await db.select().from(applicationsTable).where(eq(applicationsTable.candidateId, candidateId));
+      const scores = await db.select().from(interviewScoresTable).where(eq(interviewScoresTable.candidateId, candidateId));
 
-    let allSpecialtiesCompleted = true;
-    for (const app of apps) {
-      const hasScore = scores.some(s => s.specialityId === app.specialityId);
-      if (!hasScore) {
-        allSpecialtiesCompleted = false;
-        if (app.status === "completed") {
-          await db.update(applicationsTable).set({ status: "approved" }).where(eq(applicationsTable.id, app.id));
-        }
-      } else {
-        if (app.status !== "completed") {
-          await db.update(applicationsTable).set({ status: "completed" }).where(eq(applicationsTable.id, app.id));
+      let allSpecialtiesCompleted = true;
+      for (const app of apps) {
+        const hasScore = scores.some(s => s.specialityId === app.specialityId);
+        if (!hasScore) {
+          allSpecialtiesCompleted = false;
+          if (app.status === "completed") {
+            await db.update(applicationsTable).set({ status: "approved" }).where(eq(applicationsTable.id, app.id));
+          }
+        } else {
+          if (app.status !== "completed") {
+            await db.update(applicationsTable).set({ status: "completed" }).where(eq(applicationsTable.id, app.id));
+          }
         }
       }
-    }
 
-    if (isMindMappingCompleted && allSpecialtiesCompleted) {
-      await db.update(candidatesTable).set({ status: "interview_completed" }).where(eq(candidatesTable.id, candidateId));
-    } else {
-      if (cand.status === "interview_completed") {
-        await db.update(candidatesTable).set({ status: "approved" }).where(eq(candidatesTable.id, candidateId));
+      if (allSpecialtiesCompleted || scores.length > 0) {
+        await db.update(candidatesTable).set({ status: "interview_completed" }).where(eq(candidatesTable.id, candidateId));
+      } else {
+        if (cand.status === "interview_completed") {
+          await db.update(candidatesTable).set({ status: "approved" }).where(eq(candidatesTable.id, candidateId));
+        }
       }
     }
   }

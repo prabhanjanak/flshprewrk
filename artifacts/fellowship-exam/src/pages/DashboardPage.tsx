@@ -38,6 +38,9 @@ import {
   ShieldAlert,
   FolderGit2,
   Sparkles,
+  CreditCard,
+  CheckCircle2,
+  Mail,
 } from "lucide-react";
 
 interface ProgramItem {
@@ -56,8 +59,9 @@ interface SpecialityMetric {
   applicantCount: number;
   totalApplications: number;
   interviewCompletedCount: number;
-  avgMcqScore: number;
-  avgInterviewScore: number;
+  allocatedCount?: number;
+  avgMcqScore?: number;
+  avgInterviewScore?: number;
 }
 
 interface ActivityItem {
@@ -84,27 +88,54 @@ interface DashboardSummaryData {
       approved: number;
       interviewCompleted: number;
       allocated: number;
+      paidCount?: number;
+      pendingReview?: number;
+      callLettersIssued?: number;
     };
-    mcq: {
+    applications?: {
+      total: number;
+      paidCount: number;
+      pendingCount: number;
+    };
+    approvals?: {
+      approvedCount: number;
+      pendingCount: number;
+    };
+    callLetters?: {
+      issuedCount: number;
+      scheduledCount: number;
+    };
+    interviews?: {
+      completedCount: number;
+      inProgressCount: number;
+      activePanelsCount: number;
+    };
+    selections?: {
+      totalSeats: number;
+      allocatedSeats: number;
+      vacantSeats: number;
+      offerLettersIssued: number;
+    };
+    mcq?: {
       totalAssigned: number;
       attemptsCount: number;
       completedCount: number;
       avgScore: number;
       maxScore: number;
     };
-    psychometric: {
+    psychometric?: {
       totalAssigned: number;
       completedCount: number;
       avgScore: number;
     };
-    interview: {
+    interview?: {
       totalApplications: number;
       completedCount: number;
       inProgressCount: number;
       avgScore: number;
       activePanelsCount: number;
     };
-    merit: {
+    merit?: {
       totalSeats: number;
       allocatedSeats: number;
       vacantSeats: number;
@@ -115,7 +146,7 @@ interface DashboardSummaryData {
 }
 
 const defaultStages = {
-  candidates: { total: 0, approved: 0, interviewCompleted: 0, allocated: 0 },
+  candidates: { total: 0, approved: 0, interviewCompleted: 0, allocated: 0, paidCount: 0, pendingReview: 0, callLettersIssued: 0 },
   mcq: { totalAssigned: 0, attemptsCount: 0, completedCount: 0, avgScore: 0, maxScore: 0 },
   psychometric: { totalAssigned: 0, completedCount: 0, avgScore: 0 },
   interview: { totalApplications: 0, completedCount: 0, inProgressCount: 0, avgScore: 0, activePanelsCount: 0 },
@@ -237,9 +268,9 @@ export default function DashboardPage() {
 
         <div className="grid gap-5 md:grid-cols-3">
           {[
-            { icon: <BookOpen className="h-6 w-6" />, label: "Assigned Exam", sub: "Take online MCQ & psychometric evaluations", path: "/exams", color: "orange" },
-            { icon: <ClipboardList className="h-6 w-6" />, label: "Exam Results", sub: "Check your test scores and evaluation status", path: "/results", color: "blue" },
-            { icon: <Award className="h-6 w-6" />, label: "Admission & Merit", sub: "View allocation & merit notifications", path: null, color: "emerald" },
+            { icon: <FileCheck2 className="h-6 w-6" />, label: "My Application & Payment", sub: "View submitted dossier, fee verification & admission status", path: "/admissions/status", color: "orange" },
+            { icon: <Mail className="h-6 w-6" />, label: "Interview Call Letter", sub: "Download official interview call letter and instructions", path: "/admissions/status", color: "blue" },
+            { icon: <Award className="h-6 w-6" />, label: "Fellowship Offer Letter", sub: "Download official admission & fellowship offer letter if selected", path: "/admissions/status", color: "emerald" },
           ].map(({ icon, label, sub, path, color }) => (
             <div
               key={label}
@@ -265,10 +296,20 @@ export default function DashboardPage() {
   const recentActivity = summary?.recentActivity ?? [];
   const programs = summary?.programs ?? [];
 
-  const mcqPct = stages.mcq?.totalAssigned ? Math.min(100, Math.round((stages.mcq.completedCount / stages.mcq.totalAssigned) * 100)) : 0;
-  const psychoPct = stages.psychometric?.totalAssigned ? Math.min(100, Math.round((stages.psychometric.completedCount / stages.psychometric.totalAssigned) * 100)) : 0;
-  const interviewPct = stages.interview?.totalApplications ? Math.min(100, Math.round((stages.interview.completedCount / stages.interview.totalApplications) * 100)) : 0;
-  const seatsAllocPct = stages.merit?.totalSeats ? Math.min(100, Math.round((stages.merit.allocatedSeats / stages.merit.totalSeats) * 100)) : 0;
+  const totalApplicants = stages.candidates?.total ?? 0;
+  const paidCount = stages.candidates?.paidCount ?? stages.applications?.paidCount ?? totalApplicants;
+  const approvedCount = stages.candidates?.approved ?? stages.approvals?.approvedCount ?? 0;
+  const pendingReviewCount = stages.candidates?.pendingReview ?? stages.approvals?.pendingCount ?? Math.max(0, totalApplicants - approvedCount);
+  const callLetterCount = stages.candidates?.callLettersIssued ?? stages.callLetters?.issuedCount ?? approvedCount;
+  const interviewCount = stages.candidates?.interviewCompleted ?? stages.interviews?.completedCount ?? 0;
+  const allocatedCount = stages.candidates?.allocated ?? stages.selections?.allocatedSeats ?? stages.merit?.allocatedSeats ?? 0;
+  const totalSeats = stages.selections?.totalSeats ?? stages.merit?.totalSeats ?? 0;
+
+  const paymentPct = totalApplicants > 0 ? Math.min(100, Math.round((paidCount / totalApplicants) * 100)) : 0;
+  const approvalPct = totalApplicants > 0 ? Math.min(100, Math.round((approvedCount / totalApplicants) * 100)) : 0;
+  const callLetterPct = approvedCount > 0 ? Math.min(100, Math.round((callLetterCount / approvedCount) * 100)) : (totalApplicants > 0 ? 100 : 0);
+  const interviewPct = approvedCount > 0 ? Math.min(100, Math.round((interviewCount / approvedCount) * 100)) : 0;
+  const seatsAllocPct = totalSeats > 0 ? Math.min(100, Math.round((allocatedCount / totalSeats) * 100)) : 0;
 
   return (
     <div className="min-h-screen bg-slate-50/60 p-4 md:p-8 space-y-8 animate-in fade-in duration-300">
@@ -373,10 +414,10 @@ export default function DashboardPage() {
       {/* ── 2. QUICK ACTION COMMAND SHORTCUTS ─────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: "Application Forms", sub: "Review & approve submissions", icon: <FileCheck2 className="h-5 w-5 text-blue-600" />, bg: "bg-white hover:bg-blue-50/50 border-slate-200/80 hover:border-blue-200", path: "/application-forms" },
-          { label: "Candidates & Schedule", sub: "Assign exam batches", icon: <CalendarDays className="h-5 w-5 text-orange-600" />, bg: "bg-white hover:bg-orange-50/50 border-slate-200/80 hover:border-orange-200", path: "/candidates" },
-          { label: "Doctor Evaluations", sub: "Manage scoring panels", icon: <Stethoscope className="h-5 w-5 text-emerald-600" />, bg: "bg-white hover:bg-emerald-50/50 border-slate-200/80 hover:border-emerald-200", path: "/interviews" },
-          { label: "Merit Rankings", sub: "Specialty rank list & seats", icon: <Award className="h-5 w-5 text-purple-600" />, bg: "bg-white hover:bg-purple-50/50 border-slate-200/80 hover:border-purple-200", path: "/rankings" },
+          { label: "Application Forms", sub: "Review & verify submissions", icon: <FileCheck2 className="h-5 w-5 text-blue-600" />, bg: "bg-white hover:bg-blue-50/50 border-slate-200/80 hover:border-blue-200", path: "/application-forms" },
+          { label: "Candidates Directory", sub: "Manage approvals & schedule", icon: <CalendarDays className="h-5 w-5 text-orange-600" />, bg: "bg-white hover:bg-orange-50/50 border-slate-200/80 hover:border-orange-200", path: "/candidates" },
+          { label: "Interview Evaluation", sub: "Doctor full dossier view", icon: <Stethoscope className="h-5 w-5 text-emerald-600" />, bg: "bg-white hover:bg-emerald-50/50 border-slate-200/80 hover:border-emerald-200", path: "/interviews" },
+          { label: "Call & Offer Letters", sub: "Generate & download letters", icon: <Award className="h-5 w-5 text-purple-600" />, bg: "bg-white hover:bg-purple-50/50 border-slate-200/80 hover:border-purple-200", path: "/letters" },
         ].map((act) => (
           <div
             key={act.label}
@@ -394,105 +435,123 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* ── 3. 5-STAGE PIPELINE FUNNEL CARDS ──────────────────────────────── */}
+      {/* ── 3. 5-STAGE ADMISSIONS PIPELINE FUNNEL CARDS ─────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         
-        {/* Stage 1: Applications */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 space-y-3 relative overflow-hidden group">
+        {/* Stage 1: Applications & Razorpay Payment */}
+        <div 
+          onClick={() => navigate("/candidates")}
+          className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 space-y-3 relative overflow-hidden group cursor-pointer"
+        >
           <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 to-indigo-500" />
           <div className="flex items-center justify-between pt-1">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-500">1. Applicants</span>
-            <div className="p-2 rounded-xl bg-blue-50 text-blue-600 group-hover:scale-105 transition-transform"><Users className="h-4 w-4" /></div>
+            <span className="text-xs font-black uppercase tracking-wider text-slate-500">1. Applications & Fee</span>
+            <div className="p-2 rounded-xl bg-blue-50 text-blue-600 group-hover:scale-105 transition-transform"><CreditCard className="h-4 w-4" /></div>
           </div>
           <div>
-            <div className="text-3xl font-black text-slate-900 tracking-tight">{stages.candidates?.total ?? 0}</div>
+            <div className="text-3xl font-black text-slate-900 tracking-tight">{totalApplicants}</div>
             <p className="text-xs text-slate-500 mt-1 font-medium">
-              <span className="font-bold text-blue-600">{stages.candidates?.approved ?? 0}</span> Approved Dossiers
-            </p>
-          </div>
-          <div className="pt-2 text-xs font-bold text-slate-600 border-t border-slate-100 flex items-center justify-between">
-            <span>Specialty Enrolled</span>
-            <Badge variant="secondary" className="text-xs font-black bg-blue-50 text-blue-700 border-none">{overall.totalApplications ?? 0}</Badge>
-          </div>
-        </div>
-
-        {/* Stage 2: MCQ Examination */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 space-y-3 relative overflow-hidden group">
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-500 to-orange-500" />
-          <div className="flex items-center justify-between pt-1">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-500">2. Online MCQ Exam</span>
-            <div className="p-2 rounded-xl bg-amber-50 text-amber-600 group-hover:scale-105 transition-transform"><BookOpen className="h-4 w-4" /></div>
-          </div>
-          <div>
-            <div className="text-3xl font-black text-slate-900 tracking-tight">{stages.mcq?.completedCount ?? 0} <span className="text-xs font-bold text-slate-400">/ {stages.mcq?.totalAssigned ?? 0}</span></div>
-            <p className="text-xs text-slate-500 mt-1 font-medium">
-              Avg: <span className="font-bold text-amber-600">{stages.mcq?.avgScore ?? 0}</span> • Max: <span className="font-bold text-slate-800">{stages.mcq?.maxScore ?? 0}</span>
+              <span className="font-bold text-emerald-600">{paidCount}</span> Paid via Razorpay
             </p>
           </div>
           <div className="space-y-1.5">
             <div className="flex justify-between text-xs font-bold text-slate-500">
-              <span>MCQ Progress</span>
-              <span className="text-amber-600">{mcqPct}%</span>
+              <span>Payment Completed</span>
+              <span className="text-blue-600">{paymentPct}%</span>
             </div>
-            <Progress value={mcqPct} className="h-2 bg-slate-100" />
+            <Progress value={paymentPct} className="h-2 bg-slate-100" />
           </div>
         </div>
 
-        {/* Stage 3: Psychometric / Mind Map */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 space-y-3 relative overflow-hidden group">
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 to-violet-500" />
-          <div className="flex items-center justify-between pt-1">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-500">3. Psychometric Test</span>
-            <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 group-hover:scale-105 transition-transform"><Brain className="h-4 w-4" /></div>
-          </div>
-          <div>
-            <div className="text-3xl font-black text-slate-900 tracking-tight">{stages.psychometric?.completedCount ?? 0} <span className="text-xs font-bold text-slate-400">/ {stages.psychometric?.totalAssigned ?? 0}</span></div>
-            <p className="text-xs text-slate-500 mt-1 font-medium">
-              Avg Score: <span className="font-bold text-indigo-600">{stages.psychometric?.avgScore ?? 0}</span> / 50
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            <div className="flex justify-between text-xs font-bold text-slate-500">
-              <span>Mind Map Done</span>
-              <span className="text-indigo-600">{psychoPct}%</span>
-            </div>
-            <Progress value={psychoPct} className="h-2 bg-slate-100" />
-          </div>
-        </div>
-
-        {/* Stage 4: Panel Interviews */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 space-y-3 relative overflow-hidden group">
+        {/* Stage 2: Scrutiny & Approval */}
+        <div 
+          onClick={() => navigate("/candidates")}
+          className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 space-y-3 relative overflow-hidden group cursor-pointer"
+        >
           <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-500" />
           <div className="flex items-center justify-between pt-1">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-500">4. Panel Interviews</span>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 group-hover:scale-105 transition-transform"><Stethoscope className="h-4 w-4" /></div>
+            <span className="text-xs font-black uppercase tracking-wider text-slate-500">2. Dossier Approval</span>
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 group-hover:scale-105 transition-transform"><CheckCircle2 className="h-4 w-4" /></div>
           </div>
           <div>
-            <div className="text-3xl font-black text-slate-900 tracking-tight">{stages.interview?.completedCount ?? 0} <span className="text-xs font-bold text-slate-400">/ {stages.interview?.totalApplications ?? 0}</span></div>
+            <div className="text-3xl font-black text-slate-900 tracking-tight">{approvedCount} <span className="text-xs font-bold text-slate-400">/ {totalApplicants}</span></div>
             <p className="text-xs text-slate-500 mt-1 font-medium">
-              Avg Score: <span className="font-bold text-emerald-600">{stages.interview?.avgScore ?? 0}</span> / 50
+              <span className="font-bold text-amber-600">{pendingReviewCount}</span> Pending Scrutiny
             </p>
           </div>
           <div className="space-y-1.5">
             <div className="flex justify-between text-xs font-bold text-slate-500">
-              <span>{stages.interview?.activePanelsCount ?? 0} Active Panels</span>
-              <span className="text-emerald-600">{interviewPct}%</span>
+              <span>Dossiers Approved</span>
+              <span className="text-emerald-600">{approvalPct}%</span>
+            </div>
+            <Progress value={approvalPct} className="h-2 bg-slate-100" />
+          </div>
+        </div>
+
+        {/* Stage 3: Interview Call Letters */}
+        <div 
+          onClick={() => navigate("/letters")}
+          className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 space-y-3 relative overflow-hidden group cursor-pointer"
+        >
+          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-500 to-orange-500" />
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-500">3. Interview Call Letters</span>
+            <div className="p-2 rounded-xl bg-amber-50 text-amber-600 group-hover:scale-105 transition-transform"><Mail className="h-4 w-4" /></div>
+          </div>
+          <div>
+            <div className="text-3xl font-black text-slate-900 tracking-tight">{callLetterCount} <span className="text-xs font-bold text-slate-400">/ {approvedCount}</span></div>
+            <p className="text-xs text-slate-500 mt-1 font-medium">
+              <span className="font-bold text-amber-600">Issued & Scheduled</span> for Interview
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-xs font-bold text-slate-500">
+              <span>Call Letters Ready</span>
+              <span className="text-amber-600">{callLetterPct}%</span>
+            </div>
+            <Progress value={callLetterPct} className="h-2 bg-slate-100" />
+          </div>
+        </div>
+
+        {/* Stage 4: Doctor Interview Evaluation */}
+        <div 
+          onClick={() => navigate("/interviews")}
+          className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 space-y-3 relative overflow-hidden group cursor-pointer"
+        >
+          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 to-violet-500" />
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-500">4. Doctor Interview</span>
+            <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 group-hover:scale-105 transition-transform"><Stethoscope className="h-4 w-4" /></div>
+          </div>
+          <div>
+            <div className="text-3xl font-black text-slate-900 tracking-tight">{interviewCount} <span className="text-xs font-bold text-slate-400">/ {approvedCount}</span></div>
+            <p className="text-xs text-slate-500 mt-1 font-medium">
+              <span className="font-bold text-indigo-600">Full Dossier Reviews</span> by Panels
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-xs font-bold text-slate-500">
+              <span>Interviews Completed</span>
+              <span className="text-indigo-600">{interviewPct}%</span>
             </div>
             <Progress value={interviewPct} className="h-2 bg-slate-100" />
           </div>
         </div>
 
-        {/* Stage 5: Merit & Seats */}
-        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 space-y-3 relative overflow-hidden group">
+        {/* Stage 5: Selection & Offer Letters */}
+        <div 
+          onClick={() => navigate("/letters")}
+          className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 space-y-3 relative overflow-hidden group cursor-pointer"
+        >
           <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-purple-500 to-pink-500" />
           <div className="flex items-center justify-between pt-1">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-500">5. Merit Allocation</span>
-            <div className="p-2 rounded-xl bg-purple-50 text-purple-600 group-hover:scale-105 transition-transform"><GraduationCap className="h-4 w-4" /></div>
+            <span className="text-xs font-black uppercase tracking-wider text-slate-500">5. Selection & Offer Letters</span>
+            <div className="p-2 rounded-xl bg-purple-50 text-purple-600 group-hover:scale-105 transition-transform"><Award className="h-4 w-4" /></div>
           </div>
           <div>
-            <div className="text-3xl font-black text-slate-900 tracking-tight">{stages.merit?.allocatedSeats ?? 0} <span className="text-xs font-bold text-slate-400">/ {stages.merit?.totalSeats ?? 0}</span></div>
+            <div className="text-3xl font-black text-slate-900 tracking-tight">{allocatedCount} <span className="text-xs font-bold text-slate-400">/ {totalSeats}</span></div>
             <p className="text-xs text-slate-500 mt-1 font-medium">
-              <span className="font-bold text-purple-600">{stages.merit?.vacantSeats ?? 0}</span> Seats Vacant
+              <span className="font-bold text-purple-600">{allocatedCount}</span> Fellows Selected & Offered
             </p>
           </div>
           <div className="space-y-1.5">
@@ -591,24 +650,24 @@ export default function DashboardPage() {
                       <div className="grid grid-cols-3 gap-2 bg-slate-50/80 p-3 rounded-2xl text-center border border-slate-100">
                         <div>
                           <div className="text-base font-black text-slate-900">{sp.applicantCount}</div>
-                          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Applicants</div>
+                          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Applied</div>
                         </div>
                         <div>
-                          <div className="text-base font-black text-amber-600">{sp.avgMcqScore || "—"}</div>
-                          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Avg MCQ</div>
+                          <div className="text-base font-black text-blue-600">{sp.interviewCompletedCount}</div>
+                          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Interviewed</div>
                         </div>
                         <div>
-                          <div className="text-base font-black text-emerald-600">{sp.avgInterviewScore || "—"}</div>
-                          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Avg Viva</div>
+                          <div className="text-base font-black text-emerald-600">{sp.allocatedCount ?? 0} / {sp.seats}</div>
+                          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Allocated</div>
                         </div>
                       </div>
 
                       <div className="space-y-1.5">
                         <div className="flex justify-between text-xs font-bold text-slate-600">
-                          <span>Interview Progress</span>
-                          <span className="text-slate-800">{compPct}% ({sp.interviewCompletedCount}/{sp.applicantCount})</span>
+                          <span>Selection & Allocation</span>
+                          <span className="text-slate-800">{sp.allocatedCount ?? 0} of {sp.seats} filled ({compPct}%)</span>
                         </div>
-                        <Progress value={compPct} className="h-2 bg-slate-100" />
+                        <Progress value={sp.seats > 0 ? Math.min(100, Math.round(((sp.allocatedCount ?? 0) / sp.seats) * 100)) : 0} className="h-2 bg-slate-100" />
                       </div>
                     </div>
                   );

@@ -12,11 +12,15 @@ import { Label } from "./ui/label";
 import { Badge } from "./ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from "./ui/select";
+import { Textarea } from "./ui/textarea";
+import {
   User, GraduationCap, Stethoscope, FileText,
   Star, ExternalLink, Loader2, CheckCircle2,
   AlertCircle, Building2, Phone, Mail,
   Calendar, MapPin, Award, BookOpen,
-  Sparkles, Check, X, ShieldAlert
+  Sparkles, Check, X, ShieldAlert, Download
 } from "lucide-react";
 
 interface AppliedSpeciality {
@@ -42,9 +46,18 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
 
   const [activeTab, setActiveTab] = useState<"profile" | "qualifications" | "clinical" | "lors" | "form">("profile");
   
-  // Marks state
+  // Selection decision and notes
+  const [decisionStatus, setDecisionStatus] = useState<string>("interview_completed");
+  const [selectedUnitId, setSelectedUnitId] = useState<number | null>(null);
+  const [overallRemarks, setOverallRemarks] = useState<string>("");
   const [psychometricScore, setPsychometricScore] = useState<string>("");
   const [specialityMarks, setSpecialityMarks] = useState<Record<number, { score: string; remarks: string }>>({});
+
+  const { data: units = [] } = useQuery<any[]>({
+    queryKey: ["units"],
+    queryFn: () => api.get("/units"),
+    enabled: open,
+  });
 
   const { data: candidate, isLoading, refetch } = useQuery<any>({
     queryKey: ["candidate-examination-detail", candidateId],
@@ -52,9 +65,12 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
     enabled: !!candidateId && open,
   });
 
-  // Populate marks when candidate details load
+  // Populate decision & remarks when candidate details load
   useEffect(() => {
     if (candidate) {
+      setDecisionStatus(candidate.status || "interview_completed");
+      setSelectedUnitId(candidate.unitId || null);
+      setOverallRemarks(candidate.reviewNotes || "");
       setPsychometricScore(
         candidate.psychometricScore != null ? String(candidate.psychometricScore) : ""
       );
@@ -72,41 +88,43 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
     }
   }, [candidate]);
 
-  const saveMarksMutation = useMutation({
+  const saveDecisionMutation = useMutation({
     mutationFn: async () => {
       if (!candidateId) throw new Error("No candidate selected");
 
-      // Validate psychometric score
-      if (psychometricScore.trim() === "") {
-        throw new Error("Psychometry score is mandatory. Please enter a score between 0 and 10.");
-      }
-
-      const psychoNum = parseFloat(psychometricScore);
-      if (isNaN(psychoNum) || psychoNum < 0 || psychoNum > 10) {
-        throw new Error("Psychometry score must be a number between 0 and 10.");
+      let psychoNum: number | null = null;
+      if (psychometricScore.trim() !== "") {
+        const parsed = parseFloat(psychometricScore);
+        if (!isNaN(parsed) && parsed >= 0 && parsed <= 10) {
+          psychoNum = parsed;
+        }
       }
 
       const specialityScores = Object.entries(specialityMarks).map(([specIdStr, data]) => {
         const specId = Number(specIdStr);
-        const scoreVal = data.score.trim() !== "" ? parseFloat(data.score) : null;
+        const scoreVal = data.score.trim() !== "" ? parseFloat(data.score) : 0;
         return {
           specialityId: specId,
-          score: scoreVal !== null ? scoreVal : 0,
+          score: !isNaN(scoreVal) ? scoreVal : 0,
           remarks: data.remarks.trim() || undefined,
         };
-      }).filter(item => item.score !== null && item.score >= 0);
+      });
 
       return api.post(`/candidates/${candidateId}/doctor-marks`, {
         psychometricScore: psychoNum,
         specialityScores,
+        status: decisionStatus,
+        unitId: selectedUnitId,
+        reviewNotes: overallRemarks ? overallRemarks : undefined,
       });
     },
     onSuccess: () => {
       toast({
-        title: "Marks Saved Successfully",
-        description: `Scores for ${candidate?.fullName || "Candidate"} updated.`,
+        title: "Interview Assessment Saved",
+        description: `Decision and notes for ${candidate?.fullName || "Candidate"} updated successfully.`,
       });
       qc.invalidateQueries({ queryKey: ["candidates"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["doctor-assignments"] });
       qc.invalidateQueries({ queryKey: ["interview-scores"] });
       qc.invalidateQueries({ queryKey: ["candidate-examination-detail", candidateId] });
@@ -115,7 +133,7 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
     },
     onError: (err: any) => {
       toast({
-        title: "Failed to Save Marks",
+        title: "Failed to Save Assessment",
         description: err.response?.data?.error || err.message,
         variant: "destructive",
       });
@@ -124,6 +142,53 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
 
   const sub = candidate?.submission;
   const token = typeof window !== "undefined" ? localStorage.getItem("fellowship_token") : "";
+
+  const handleDownloadCallLetter = async () => {
+    if (!candidateId) return;
+    try {
+      toast({ title: "Generating Call Letter...", description: `Preparing official PDF for ${candidate?.fullName}` });
+      const res = await fetch(`/api/candidates/${candidateId}/call-letter-pdf?token=${token}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Failed to generate Call Letter PDF");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Interview_Call_Letter_${candidate?.fullName?.replace(/\s+/g, "_") || candidateId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err: any) {
+      toast({ title: "Download Failed", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleDownloadOfferLetter = async () => {
+    if (!candidateId) return;
+    try {
+      toast({ title: "Generating Offer Letter...", description: `Preparing official Fellowship Admission Letter for ${candidate?.fullName}` });
+      const res = await fetch(`/api/candidates/${candidateId}/offer-letter-pdf?token=${token}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.error || "Failed to generate Offer Letter PDF");
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Fellowship_Offer_Letter_${candidate?.fullName?.replace(/\s+/g, "_") || candidateId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err: any) {
+      toast({ title: "Offer Letter Unavailable", description: err.message || "Candidate might not be marked as selected yet.", variant: "destructive" });
+    }
+  };
 
   // Helper to open secure files
   const openFile = (url?: string | null) => {
@@ -242,6 +307,26 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
             <Button
               variant="outline"
               size="sm"
+              onClick={handleDownloadCallLetter}
+              className="text-xs bg-blue-500/20 hover:bg-blue-500/30 text-blue-200 border-blue-400/30 font-bold gap-1.5 h-8 px-3 rounded-lg shadow-sm"
+              title="Download official Interview Call Letter PDF"
+            >
+              <Mail className="h-3.5 w-3.5 text-blue-300" />
+              Call Letter PDF
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadOfferLetter}
+              className="text-xs bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 border-purple-400/30 font-bold gap-1.5 h-8 px-3 rounded-lg shadow-sm"
+              title="Download official Fellowship Offer Letter PDF"
+            >
+              <Award className="h-3.5 w-3.5 text-purple-300" />
+              Offer Letter PDF
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => {
                 if (candidateId) {
                   window.open(`/api/candidates/${candidateId}/application-pdf?token=${token}`, "_blank");
@@ -251,7 +336,7 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
               title="Download official candidate application dossier as PDF"
             >
               <FileText className="h-3.5 w-3.5 text-orange-400" />
-              Download Application PDF
+              Dossier PDF
             </Button>
             {candidate?.submissionId && (
               <Button
@@ -261,7 +346,7 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
                 className="text-xs text-orange-300 hover:text-white hover:bg-white/10 font-bold gap-1.5 h-8 px-3 rounded-lg"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
-                Open Full Form Tab
+                Full Form Tab
               </Button>
             )}
             <Button
@@ -693,65 +778,156 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
               </div>
             </div>
 
-            {/* RIGHT COLUMN: SMART MARKS ENTRY PANEL (5 cols) */}
-            <div className="lg:col-span-5 bg-white flex flex-col overflow-hidden">
+            {/* RIGHT COLUMN: INTERVIEW ASSESSMENT & SELECTION PANEL (5 cols) */}
+            <div className="lg:col-span-5 bg-white flex flex-col overflow-hidden border-l border-slate-200">
               <div className="p-4 border-b border-slate-200 bg-slate-50/80 shrink-0 flex items-center justify-between">
                 <div>
                   <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
-                    <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
-                    Examination Marks Entry
+                    <Stethoscope className="h-4 w-4 text-orange-600" />
+                    Interview Evaluation & Decision
                   </h3>
                   <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
-                    Enter psychometry and candidate's applied specializations.
+                    Assess candidate dossier, record panel feedback & fellowship selection.
                   </p>
                 </div>
-                <Badge className="bg-amber-100 text-amber-900 border-amber-300 text-[10px] font-black uppercase">
-                  Candidate Exam
+                <Badge className={
+                  decisionStatus === "allocated"
+                    ? "bg-emerald-100 text-emerald-800 border-emerald-300 text-[10px] font-black uppercase"
+                    : decisionStatus === "interview_completed"
+                    ? "bg-blue-100 text-blue-800 border-blue-300 text-[10px] font-black uppercase"
+                    : decisionStatus === "waitlisted"
+                    ? "bg-amber-100 text-amber-800 border-amber-300 text-[10px] font-black uppercase"
+                    : "bg-slate-100 text-slate-800 border-slate-300 text-[10px] font-black uppercase"
+                }>
+                  {decisionStatus === "allocated" ? "Selected" : decisionStatus === "interview_completed" ? "Interviewed" : decisionStatus}
                 </Badge>
               </div>
 
               <div className="flex-1 overflow-y-auto p-5 space-y-5 fancy-scrollbar">
                 
-                {/* 1. MANDATORY PSYCHOMETRY SCORE */}
-                <div className="p-4 rounded-2xl bg-amber-50/70 border-2 border-amber-200 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-black uppercase text-amber-950 tracking-wider flex items-center gap-1.5">
-                      <Sparkles className="h-3.5 w-3.5 text-amber-600" />
-                      Psychometry Marks (Mind Matters)
-                    </Label>
-                    <Badge className="bg-amber-600 text-white text-[9px] font-black uppercase tracking-wider h-4.5 px-2">
-                      Mandatory
-                    </Badge>
+                {/* 1. SELECTION DECISION SELECTOR */}
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                  <Label className="text-xs font-black uppercase text-slate-900 tracking-wider flex items-center gap-1.5">
+                    <Award className="h-3.5 w-3.5 text-orange-600" />
+                    Interview Selection Outcome
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDecisionStatus("allocated")}
+                      className={`p-3 rounded-xl border text-left transition-all ${
+                        decisionStatus === "allocated"
+                          ? "bg-emerald-50 border-emerald-500 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-400/20"
+                          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-bold"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs">Selected (Allocate)</span>
+                        {decisionStatus === "allocated" && <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+                      </div>
+                      <p className="text-[10px] text-emerald-700 font-medium mt-0.5">Offer Letter Ready</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setDecisionStatus("interview_completed")}
+                      className={`p-3 rounded-xl border text-left transition-all ${
+                        decisionStatus === "interview_completed"
+                          ? "bg-blue-50 border-blue-500 text-blue-950 font-black shadow-xs ring-2 ring-blue-400/20"
+                          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-bold"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs">Interview Completed</span>
+                        {decisionStatus === "interview_completed" && <CheckCircle2 className="h-4 w-4 text-blue-600" />}
+                      </div>
+                      <p className="text-[10px] text-blue-700 font-medium mt-0.5">Reviewed by Panel</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setDecisionStatus("waitlisted")}
+                      className={`p-3 rounded-xl border text-left transition-all ${
+                        decisionStatus === "waitlisted"
+                          ? "bg-amber-50 border-amber-500 text-amber-950 font-black shadow-xs ring-2 ring-amber-400/20"
+                          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-bold"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs">Waitlisted</span>
+                        {decisionStatus === "waitlisted" && <CheckCircle2 className="h-4 w-4 text-amber-600" />}
+                      </div>
+                      <p className="text-[10px] text-amber-700 font-medium mt-0.5">Under Consideration</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setDecisionStatus("rejected")}
+                      className={`p-3 rounded-xl border text-left transition-all ${
+                        decisionStatus === "rejected"
+                          ? "bg-rose-50 border-rose-500 text-rose-950 font-black shadow-xs ring-2 ring-rose-400/20"
+                          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-bold"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs">Not Selected</span>
+                        {decisionStatus === "rejected" && <X className="h-4 w-4 text-rose-600" />}
+                      </div>
+                      <p className="text-[10px] text-rose-700 font-medium mt-0.5">Not Recommended</p>
+                    </button>
                   </div>
-                  <p className="text-[11px] text-amber-800 font-semibold">
-                    Mandatory psychometric evaluation score on a scale of <strong>0 to 10 marks</strong>.
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <Input
-                      type="number"
-                      min={0}
-                      max={10}
-                      step="0.5"
-                      value={psychometricScore}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === "" || (Number(val) >= 0 && Number(val) <= 10)) {
-                          setPsychometricScore(val);
-                        }
-                      }}
-                      placeholder="0 – 10"
-                      className="h-11 border-2 border-amber-300 focus:border-amber-500 rounded-xl font-mono font-black text-xl text-center bg-white"
-                    />
-                    <span className="text-xs font-bold text-amber-900 shrink-0">/ 10 Marks</span>
-                  </div>
+
+                  {/* If Allocated / Selected: Hospital Location / Unit Picker */}
+                  {decisionStatus === "allocated" && (
+                    <div className="pt-2 border-t border-slate-200 space-y-2 animate-in fade-in duration-200">
+                      <Label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                        <span>Assigned Hospital Unit / Location:</span>
+                        <span className="text-emerald-700 text-[10px] font-extrabold uppercase">Required for Offer Letter</span>
+                      </Label>
+                      <Select
+                        value={selectedUnitId ? String(selectedUnitId) : ""}
+                        onValueChange={(val) => setSelectedUnitId(Number(val))}
+                      >
+                        <SelectTrigger className="h-10 rounded-xl border-slate-300 bg-white text-xs font-bold">
+                          <SelectValue placeholder="Select Hospital Unit..." />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                          {units.map((u: any) => (
+                            <SelectItem key={u.id} value={String(u.id)} className="text-xs font-semibold">
+                              {u.name} {u.code ? `(${u.code})` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      {/* Offer Letter Ready Card */}
+                      <div className="p-3 bg-purple-50 rounded-xl border border-purple-200 flex items-center justify-between mt-2">
+                        <div>
+                          <p className="text-xs font-extrabold text-purple-950 flex items-center gap-1.5">
+                            <Award className="h-4 w-4 text-purple-600" />
+                            Official Offer Letter Generated
+                          </p>
+                          <p className="text-[10px] text-purple-700">Official 2-page fellowship appointment letter</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          type="button"
+                          onClick={handleDownloadOfferLetter}
+                          className="h-8 text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-lg gap-1.5 shadow-2xs"
+                        >
+                          <Download className="h-3 w-3" /> Download Offer Letter
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* 2. APPLIED SPECIALIZATION(S) MARKS */}
-                <div className="space-y-4">
+                {/* 2. SPECIALIZATION INTERVIEW OBSERVATIONS & FEEDBACK */}
+                <div className="space-y-3">
                   <div className="flex items-center justify-between border-b pb-2">
                     <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-1.5">
                       <Stethoscope className="h-3.5 w-3.5 text-indigo-600" />
-                      Applied Specialization Marks (Max 50)
+                      Specialization Interview Assessment
                     </h4>
                     <span className="text-[10px] font-bold text-slate-400">
                       {appliedList.length} Applied
@@ -766,7 +942,7 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
                     appliedList.map((spec, idx) => {
                       const current = specialityMarks[spec.specialityId] || { score: "", remarks: "" };
                       return (
-                        <div key={spec.specialityId} className="p-4 rounded-2xl bg-indigo-50/40 border border-indigo-200 space-y-3">
+                        <div key={spec.specialityId} className="p-4 rounded-2xl bg-indigo-50/40 border border-indigo-200 space-y-2.5">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <span className="h-5 w-5 rounded-full bg-indigo-600 text-white font-black text-[10px] flex items-center justify-center">
@@ -775,35 +951,12 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
                               <span className="font-black text-xs text-indigo-950">{spec.specialityName}</span>
                             </div>
                             <Badge variant="outline" className="text-[10px] font-bold border-indigo-300 text-indigo-800 bg-white">
-                              Max 50 Marks
+                              Preference {spec.preferenceOrder || idx + 1}
                             </Badge>
                           </div>
 
-                          <div className="flex items-center gap-3">
-                            <Input
-                              type="number"
-                              min={0}
-                              max={50}
-                              step="0.5"
-                              value={current.score}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                if (val === "" || (Number(val) >= 0 && Number(val) <= 50)) {
-                                  setSpecialityMarks(prev => ({
-                                    ...prev,
-                                    [spec.specialityId]: { ...prev[spec.specialityId], score: val, remarks: prev[spec.specialityId]?.remarks || "" }
-                                  }));
-                                }
-                              }}
-                              placeholder="0 – 50"
-                              className="h-11 border-2 border-indigo-200 focus:border-indigo-500 rounded-xl font-mono font-black text-xl text-center bg-white"
-                            />
-                            <span className="text-xs font-bold text-indigo-900 shrink-0">/ 50 Marks</span>
-                          </div>
-
-                          <Input
-                            type="text"
-                            placeholder="Viva feedback / remarks (optional)..."
+                          <Textarea
+                            placeholder="Doctor / Panel clinical & surgical remarks for this specialty..."
                             value={current.remarks}
                             onChange={(e) => {
                               const val = e.target.value;
@@ -812,7 +965,7 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
                                 [spec.specialityId]: { ...prev[spec.specialityId], remarks: val, score: prev[spec.specialityId]?.score || "" }
                               }));
                             }}
-                            className="h-9 text-xs rounded-xl border-indigo-100 bg-white"
+                            className="text-xs rounded-xl border-indigo-100 bg-white min-h-[60px]"
                           />
                         </div>
                       );
@@ -820,52 +973,68 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
                   )}
                 </div>
 
-                {/* 3. TOTAL SCORE SUMMARY PREVIEW */}
-                <div className="p-4 rounded-2xl bg-slate-900 text-white space-y-2.5 shadow-md">
-                  <div className="flex items-center justify-between text-xs font-bold text-slate-300">
-                    <span>MCQ Exam Score</span>
-                    <span className="font-mono text-white">{candidate?.mcqScore != null ? candidate.mcqScore : "—"}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs font-bold text-amber-300">
-                    <span>Psychometry (Mind Matters)</span>
-                    <span className="font-mono">{psychometricScore || "0"} / 10</span>
-                  </div>
-                  <div className="border-t border-white/10 pt-2 flex items-center justify-between">
-                    <span className="text-xs font-black uppercase tracking-wider text-orange-400">Total Merit Preview</span>
-                    <span className="text-xl font-black font-mono text-white">
-                      {(() => {
-                        const mcq = candidate?.mcqScore ? Number(candidate.mcqScore) : 0;
-                        const psy = psychometricScore ? Number(psychometricScore) : 0;
-                        const specVals = Object.values(specialityMarks).map(v => Number(v.score) || 0);
-                        const topSpec = specVals.length > 0 ? Math.max(...specVals) : 0;
-                        return (mcq + psy + topSpec).toFixed(1);
-                      })()}
-                    </span>
+                {/* 3. OVERALL INTERVIEW NOTES */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Overall Panel Decision Notes & Allocation Remarks
+                  </Label>
+                  <Textarea
+                    placeholder="Enter general candidate observations, panel agreement, or special instructions..."
+                    value={overallRemarks}
+                    onChange={(e) => setOverallRemarks(e.target.value)}
+                    className="text-xs rounded-xl border-slate-200 bg-white min-h-[70px]"
+                  />
+                </div>
+
+                {/* 4. CALL & OFFER LETTERS QUICK ACTIONS */}
+                <div className="p-4 rounded-2xl bg-slate-100/80 border border-slate-200 space-y-2.5">
+                  <span className="text-[11px] font-black uppercase text-slate-600 tracking-wider block">
+                    Official Admission Letters
+                  </span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownloadCallLetter}
+                      className="h-9 text-xs font-bold rounded-xl bg-white border-slate-300 hover:bg-slate-50 text-slate-800 justify-start gap-2"
+                    >
+                      <Mail className="h-3.5 w-3.5 text-blue-600" /> Call Letter PDF
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownloadOfferLetter}
+                      className="h-9 text-xs font-bold rounded-xl bg-white border-purple-300 hover:bg-purple-50 text-purple-900 justify-start gap-2"
+                    >
+                      <Award className="h-3.5 w-3.5 text-purple-600" /> Offer Letter PDF
+                    </Button>
                   </div>
                 </div>
 
               </div>
 
               {/* Bottom Action Footer */}
-              <div className="p-4 border-t border-slate-200 bg-slate-50 shrink-0 flex items-center justify-end gap-3">
+              <div className="p-4 border-t border-slate-200 bg-slate-50 shrink-0 flex items-center justify-between">
                 <Button
                   variant="outline"
                   onClick={onClose}
                   className="rounded-xl h-11 px-5 font-bold text-xs"
                 >
-                  Cancel
+                  Close
                 </Button>
                 <Button
-                  onClick={() => saveMarksMutation.mutate()}
-                  disabled={saveMarksMutation.isPending || !psychometricScore}
+                  onClick={() => saveDecisionMutation.mutate()}
+                  disabled={saveDecisionMutation.isPending}
                   className="rounded-xl h-11 px-6 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs uppercase tracking-wider gap-2 shadow-sm"
                 >
-                  {saveMarksMutation.isPending ? (
+                  {saveDecisionMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <CheckCircle2 className="h-4 w-4" />
                   )}
-                  Save & Confirm Marks
+                  Save Interview Decision
                 </Button>
               </div>
             </div>

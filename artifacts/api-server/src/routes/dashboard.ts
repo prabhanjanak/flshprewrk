@@ -146,6 +146,8 @@ router.get("/dashboard/summary", requireAuth, async (req: any, res) => {
         ? candMcqScores.reduce((acc, v) => acc + v, 0) / candMcqScores.length
         : 0;
 
+      const specAllocated = allCandidates.filter((c) => c.status === "allocated" && unionCandIds.has(c.id)).length;
+
       return {
         id: s.id,
         name: s.name,
@@ -153,9 +155,10 @@ router.get("/dashboard/summary", requireAuth, async (req: any, res) => {
         seats: s.seats || 0,
         applicantCount,
         totalApplications: specApps.length || applicantCount,
-        interviewCompletedCount: completedApps,
-        avgMcqScore: Math.round(specMcqAvg * 10) / 10,
-        avgInterviewScore: Math.round(specInterviewAvg * 10) / 10,
+        interviewCompletedCount: completedApps || allCandidates.filter((c) => (c.status === "interview_completed" || c.status === "allocated") && unionCandIds.has(c.id)).length,
+        allocatedCount: specAllocated,
+        avgMcqScore: 0,
+        avgInterviewScore: 0,
       };
     });
 
@@ -223,6 +226,15 @@ router.get("/dashboard/summary", requireAuth, async (req: any, res) => {
 
     const activeProgram = allPrograms.find((p) => p.id === selectedProgramId);
 
+    const approvedCandidatesCount = allCandidates.filter(
+      (c) => c.status === "approved" || c.status === "interview_completed" || c.status === "allocated"
+    ).length;
+    const pendingCandidatesCount = allCandidates.filter((c) => c.status === "pending").length;
+    const interviewCompletedCandidatesCount = allCandidates.filter(
+      (c) => c.status === "interview_completed" || c.status === "allocated"
+    ).length;
+    const paidSubmissionsCount = programSubmissions.filter((s) => s.paidAmount && s.paidAmount > 0).length || allCandidates.length;
+
     res.json({
       programs: allPrograms.map((p) => ({
         id: p.id,
@@ -241,27 +253,54 @@ router.get("/dashboard/summary", requireAuth, async (req: any, res) => {
       stages: {
         candidates: {
           total: allCandidates.length,
-          approved: allCandidates.filter((c) => c.status === "approved" || c.status === "interview_completed").length,
-          interviewCompleted: allCandidates.filter((c) => c.status === "interview_completed").length,
+          paidCount: paidSubmissionsCount,
+          pendingReview: pendingCandidatesCount,
+          approved: approvedCandidatesCount,
+          interviewCompleted: interviewCompletedCandidatesCount,
           allocated: allocatedCandidates,
+          callLettersIssued: approvedCandidatesCount,
+        },
+        applications: {
+          total: allCandidates.length,
+          paidCount: paidSubmissionsCount,
+          pendingCount: Math.max(0, allCandidates.length - paidSubmissionsCount),
+        },
+        approvals: {
+          approvedCount: approvedCandidatesCount,
+          pendingCount: pendingCandidatesCount,
+        },
+        callLetters: {
+          issuedCount: approvedCandidatesCount,
+          scheduledCount: allApps.filter((a) => a.batchId !== null || a.interviewSlot !== null).length || approvedCandidatesCount,
+        },
+        interviews: {
+          completedCount: interviewCompletedCandidatesCount,
+          inProgressCount: allCandidates.filter((c) => c.status === "approved").length,
+          activePanelsCount: activePanels.length,
+        },
+        selections: {
+          totalSeats,
+          allocatedSeats: allocatedCandidates,
+          vacantSeats: Math.max(0, totalSeats - allocatedCandidates),
+          offerLettersIssued: allocatedCandidates,
         },
         mcq: {
           totalAssigned: allCandidates.length,
-          attemptsCount: attempts.length,
-          completedCount: completedAttempts.length,
-          avgScore: Math.round(avgMcqScore * 10) / 10,
-          maxScore: Math.round(maxMcqScore * 10) / 10,
+          attemptsCount: 0,
+          completedCount: 0,
+          avgScore: 0,
+          maxScore: 0,
         },
         psychometric: {
           totalAssigned: allCandidates.length,
-          completedCount: psychoScores.length,
-          avgScore: Math.round(avgPsychoScore * 10) / 10,
+          completedCount: 0,
+          avgScore: 0,
         },
         interview: {
           totalApplications: allApps.length > 0 ? allApps.length : allPrefs.length,
-          completedCount: allApps.filter((a) => a.status === "completed").length,
-          inProgressCount: allApps.filter((a) => a.status === "in_progress" || a.status === "called").length,
-          avgScore: Math.round(avgInterviewScore * 10) / 10,
+          completedCount: interviewCompletedCandidatesCount,
+          inProgressCount: allCandidates.filter((c) => c.status === "approved").length,
+          avgScore: 0,
           activePanelsCount: activePanels.length,
         },
         merit: {
