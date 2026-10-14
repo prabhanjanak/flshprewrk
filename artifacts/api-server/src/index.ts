@@ -22,8 +22,10 @@ process.on("uncaughtException", (err) => {
   logger.error({ err }, "Uncaught Exception");
 });
 
-// Correct bcrypt hash for Saravanan@2026 — used to normalise both dev and prod
+// Canonical super admin password hashes
 const SARAVANAN_PASSWORD_HASH = "$2b$10$tzKB/Dj.bn.MPCUj5GJQz.V6.ijFrypzqkwSjMW458ni7dCAx0MuS";
+const PRABHANJAN_PASSWORD_HASH = "$2b$10$tvyctohFaAUQNOxzKEl41OJTpdw6oQkfP.ifNrrDHvN1QNUbuNnMq";
+const RADHIKA_PASSWORD_HASH = "$2b$10$b3rGkezYF6rCQHuAUnzWrOa6Q9N9sPAKaABpRyI.QYhZfJWY4ZtqG";
 
 async function runStartupFixes() {
   // Migration: global_settings table
@@ -279,24 +281,33 @@ async function runStartupFixes() {
     logger.info("Corrected super admin email + password (admin@ → saravanan@)");
   }
 
-  // Fix 2: ensure password hash is correct even if email was already updated
-  const [existing] = await db.select().from(usersTable).where(eq(usersTable.email, "saravanan@sankaraeye.com"));
-  if (existing) {
-    if (existing.passwordHash !== SARAVANAN_PASSWORD_HASH) {
-      await db.update(usersTable)
-        .set({ passwordHash: SARAVANAN_PASSWORD_HASH })
-        .where(eq(usersTable.id, existing.id));
-      logger.info("Corrected super admin password hash for saravanan@sankaraeye.com");
+  // Fix 2: ensure canonical super admins exist with correct roles & password hashes
+  const canonicalSuperAdmins = [
+    { email: "saravanan@sankaraeye.com", fullName: "Saravanan", hash: SARAVANAN_PASSWORD_HASH },
+    { email: "prabhanjan@sankaraeye.com", fullName: "Prabhanjan", hash: PRABHANJAN_PASSWORD_HASH },
+    { email: "radhika@sankaraeye.com", fullName: "Radhika Saranam", hash: RADHIKA_PASSWORD_HASH },
+  ];
+
+  for (const admin of canonicalSuperAdmins) {
+    const [existing] = await db.select().from(usersTable).where(eq(usersTable.email, admin.email));
+    if (existing) {
+      if (existing.role !== "super_admin" || existing.passwordHash !== admin.hash || !existing.active) {
+        await db.update(usersTable)
+          .set({ role: "super_admin", passwordHash: admin.hash, active: true, forcePasswordReset: false })
+          .where(eq(usersTable.id, existing.id));
+        logger.info(`Updated super admin credentials/role for ${admin.email}`);
+      }
+    } else {
+      await db.insert(usersTable).values({
+        email: admin.email,
+        passwordHash: admin.hash,
+        role: "super_admin",
+        fullName: admin.fullName,
+        active: true,
+        forcePasswordReset: false,
+      } as any);
+      logger.info(`Created super admin ${admin.email}`);
     }
-  } else {
-    // Fix 3: Create the user if they don't exist at all
-    await db.insert(usersTable).values({
-      email: "saravanan@sankaraeye.com",
-      passwordHash: SARAVANAN_PASSWORD_HASH,
-      role: "super_admin",
-      fullName: "Saravanan",
-    } as any);
-    logger.info("Created super admin saravanan@sankaraeye.com");
   }
 
   // Fix 4: Ensure the July 2026 Fellowship Program and Form exist
