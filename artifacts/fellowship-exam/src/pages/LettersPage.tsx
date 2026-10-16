@@ -709,6 +709,137 @@ export default function LettersPage() {
                   </Button>
                 </div>
               </div>
+
+              {/* Live Visual Call Letter Mockup Box (With Real Header Logos) */}
+              <div className="p-6 rounded-2xl bg-slate-50 border-2 border-slate-200/80 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                  <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <FileCheck className="w-4 h-4 text-[#0b4a8f]" />
+                    Official Call Letter Layout Preview
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-medium">Standard A4 Document Preview</span>
+                </div>
+
+                {/* Document Paper Mockup */}
+                <div className="bg-white p-6 md:p-8 rounded-xl border border-slate-200 shadow-sm space-y-4 max-w-3xl mx-auto font-sans text-slate-800 text-xs">
+                  {/* Logos Header Bar */}
+                  <div className="flex items-center justify-between border-b-2 border-[#0b4a8f] pb-3">
+                    <img src={sefLogoUrl} alt="Sankara Eye Foundation" className="h-10 object-contain" />
+                    <div className="text-center px-4">
+                      <h2 className="text-sm font-black text-[#0b4a8f] tracking-wide uppercase">
+                        Sankara Academy of Vision
+                      </h2>
+                      <p className="text-[9px] text-slate-600">
+                        Educational unit of Sankara Eye Foundation, India · Sri Kanchi Kamakoti Medical Trust
+                      </p>
+                      <p className="text-[8px] text-slate-400">
+                        www.sankaraeye.com · radhika@sankaraeye.com
+                      </p>
+                    </div>
+                    <img src={savLogoUrl} alt="Academy of Vision" className="h-12 object-contain" />
+                  </div>
+
+                  {/* Title Banner */}
+                  <div className="bg-[#0b4a8f] text-white text-center py-2 px-3 rounded-md font-bold text-xs uppercase tracking-wide">
+                    {customSpecialty.toLowerCase().includes("retina")
+                      ? "FELLOWSHIP INTERVIEW CALL LETTER — VITREO RETINA (VR) & MEDICAL RETINA (MR)"
+                      : "FELLOWSHIP INTERVIEW CALL LETTER — ANTERIOR SEGMENT & SUBSPECIALTIES"}
+                  </div>
+
+                  {/* Candidate Greeting Box */}
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
+                    <p className="font-bold text-sm text-[#0b4a8f]">
+                      Dear Dr. {cleanDoctorName(customName || activeCandidate?.fullName || "Tejaswini")},
+                    </p>
+                    <p className="text-[11px] text-slate-600 font-medium">
+                      Registration Code: <strong className="text-slate-900">{customCandidateCode}</strong> &bull; Subspecialty Stream: <strong className="text-slate-900">{customSpecialty}</strong> &bull; Email: <strong className="text-slate-900">{activeCandidate?.email || customEmail}</strong>
+                    </p>
+                  </div>
+
+                  {/* Intro text */}
+                  <div className="space-y-2 text-[11px] text-slate-700 leading-relaxed">
+                    <p>
+                      Thank you for your interest in the Fellowship programme at Sankara Eye Foundation, India (www.sankaraeye.com).
+                    </p>
+                    <p>
+                      Sankara Eye Foundation is a group of 13 hospitals across the country with a medical and support team of 3000, performing over 200,000 vision restoring surgeries every year. Training at Sankara is coordinated by the Sankara Academy of Vision with state of the art diagnostic and surgical facilities.
+                    </p>
+                  </div>
+
+                  {/* Subspecialty Phase Structure Table */}
+                  <div className="rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+                    <div className="bg-slate-100 px-3 py-1.5 border-b border-slate-200 font-bold text-[11px] text-[#0b4a8f] uppercase tracking-wider">
+                      Subspecialty Training Structure & Timeline
+                    </div>
+                    <table className="w-full text-left text-[11px]">
+                      <thead>
+                        <tr className="bg-slate-50 text-[10px] font-black text-slate-600 uppercase border-b border-slate-200">
+                          <th className="py-1.5 px-3">Subspecialty</th>
+                          <th className="py-1.5 px-3">Phase#1 (IOL) Duration</th>
+                          <th className="py-1.5 px-3">Phase#2 Speciality</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        <tr className="bg-white"><td className="py-1 px-3 font-semibold">Cataract & IOL</td><td className="py-1 px-3">18 Months</td><td className="py-1 px-3 text-slate-400">Not applicable</td></tr>
+                        <tr className="bg-slate-50/50"><td className="py-1 px-3 font-semibold">Medical Retina*</td><td className="py-1 px-3">18 months</td><td className="py-1 px-3 text-slate-400">Not applicable</td></tr>
+                        <tr className="bg-white"><td className="py-1 px-3 font-semibold">Vitreo Retina</td><td className="py-1 px-3 text-slate-400">Not applicable</td><td className="py-1 px-3 font-bold text-[#0b4a8f]">24 months</td></tr>
+                        <tr className="bg-slate-50/50"><td className="py-1 px-3 font-semibold">Glaucoma</td><td className="py-1 px-3">6 months</td><td className="py-1 px-3 font-bold text-[#0b4a8f]">18 months</td></tr>
+                        <tr className="bg-white"><td className="py-1 px-3 font-semibold">Pediatric Ophthalmology & Strabismus</td><td className="py-1 px-3">6 months</td><td className="py-1 px-3 font-bold text-[#0b4a8f]">18 months</td></tr>
+                        <tr className="bg-slate-50/50"><td className="py-1 px-3 font-semibold">Cornea</td><td className="py-1 px-3">6 months</td><td className="py-1 px-3 font-bold text-[#0b4a8f]">18 months</td></tr>
+                        <tr className="bg-white"><td className="py-1 px-3 font-semibold">Phaco Refractive</td><td className="py-1 px-3">6 months</td><td className="py-1 px-3 font-bold text-[#0b4a8f]">18 months</td></tr>
+                        <tr className="bg-slate-50/50"><td className="py-1 px-3 font-semibold">Oculoplasty</td><td className="py-1 px-3">6 months</td><td className="py-1 px-3 font-bold text-[#0b4a8f]">18 months</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Selection Assessment & Interview Schedule Card */}
+                  <div className="rounded-xl border-2 border-[#0b4a8f] overflow-hidden bg-slate-50/60 shadow-xs">
+                    <div className="bg-[#0b4a8f] text-white px-3 py-1.5 font-bold text-xs uppercase tracking-wider flex items-center justify-between">
+                      <span>Selection Assessment & Interview Schedule</span>
+                      <span className="text-[10px] text-blue-200">Mandatory In-Person Presence</span>
+                    </div>
+                    <div className="p-3 space-y-2 text-xs">
+                      <div className="flex items-center gap-3">
+                        <span className="font-bold text-slate-500 w-28 uppercase text-[10px]">Date & Day:</span>
+                        <span className="font-black text-sm text-[#0b4a8f]">{customInterviewDate}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="font-bold text-slate-500 w-28 uppercase text-[10px]">Reporting Time:</span>
+                        <span className="font-bold text-slate-900">{customReportingTime}</span>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <span className="font-bold text-slate-500 w-28 uppercase text-[10px] shrink-0">Venue Address:</span>
+                        <span className="font-medium text-slate-800">{customVenue}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Key Updates */}
+                  <div className="space-y-1 text-[11px] text-slate-700">
+                    <p className="font-bold text-xs text-[#0b4a8f] uppercase tracking-wide">
+                      Key Updates & Mandatory Regulations
+                    </p>
+                    <ol className="list-decimal pl-5 space-y-1 text-slate-600">
+                      <li>PG (MS/MD/DNB) results must be cleared prior to final fellowship admission.</li>
+                      <li>Applicants under Government bond or Compulsory Rural Service must submit 'No Objection Certificate' (NOC).</li>
+                      <li>Selected fellows must submit State Medical Council NOC within 3 days of accepting the offer.</li>
+                      <li>Mandatory 2-day induction program scheduled at Bangalore on 2nd & 3rd January 2027.</li>
+                      <li>Unit reporting scheduled for 6th January 2027 with applicable monthly stipend.</li>
+                    </ol>
+                  </div>
+
+                  {/* Coordinator Clarification banner */}
+                  <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-center font-bold text-xs text-amber-900">
+                    For clarifications contact Radhika (Course Coordinator) on 9666677505.
+                  </div>
+
+                  {/* Document Footer */}
+                  <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-400">
+                    <span>Sankara Academy of Vision · Educational unit of Sankara Eye Foundation, India</span>
+                    <span>Official Institutional Document</span>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 

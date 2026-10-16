@@ -427,7 +427,7 @@ export async function generateOfferLetterPdf(data: OfferLetterData): Promise<Buf
       const inductionDates = data.inductionDate || "2nd & 3rd July 2026 at Bangalore Main Hospital (For Testing Only)";
 
       // ═══════════════════════════════════════════════════════════════════════
-      // PAGE 1: Header, Recipient, Subject & Core Offer Terms
+      // PAGE 1: Header, Recipient, Subject, Intro, Table & Section A
       // ═══════════════════════════════════════════════════════════════════════
       doc.addPage();
 
@@ -445,47 +445,82 @@ export async function generateOfferLetterPdf(data: OfferLetterData): Promise<Buf
       doc.strokeColor(colors.navy).lineWidth(1.2).moveTo(left, 68).lineTo(left + contentWidth, 68).stroke();
 
       // Date Top Right
-      doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(9.5).text(`Date: ${issueDate}`, left, 78, { width: contentWidth, align: "right" });
+      doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(9).text(`Date: ${issueDate}`, left, 76, { width: contentWidth, align: "right" });
 
       // Recipient Greeting & Address
-      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(10.5).text(`Dear Dr. ${cleanName}`, left, 78);
+      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(10).text(`Dear Dr. ${cleanName}`, left, 76);
       if (data.address) {
-        doc.fillColor(colors.slate).font("Helvetica").fontSize(8.5).text(data.address.toUpperCase(), left, 93, { width: 340, lineGap: 1.5 });
+        doc.fillColor(colors.slate).font("Helvetica").fontSize(8.2).text(data.address.toUpperCase(), left, 90, { width: 340, lineGap: 1.5 });
       }
 
       // Subject
-      const subY = data.address ? Math.max(122, doc.y + 6) : 108;
-      doc.fillColor(colors.darkNavy).font("Helvetica-Bold").fontSize(10.5).text("Sub: Fellowship Offer Letter", left, subY);
+      const subY = data.address ? Math.max(118, doc.y + 4) : 100;
+      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(10).text("Sub: Fellowship Offer Letter", left, subY, { underline: true });
 
       // Opening Offer Paragraphs
-      let curY = subY + 20;
-      doc.fillColor(colors.dark).font("Helvetica").fontSize(9).text(
-        `This refers to your interview dated ${interviewDate} for our Fellowship program.\n\n` +
+      let curY = subY + 16;
+      doc.fillColor(colors.dark).font("Helvetica").fontSize(8.6).text(
+        `This refers to your interview dated for our Fellowship program on ${interviewDate}.\n\n` +
         `Sankara Academy of Vision, Educational unit of Sankara Eye Foundation, India is pleased to offer you fellowship in ${data.specialization} at Sankara Eye Hospital – ${unit} for a period of ${durationText} effective ${effectiveDate}. You shall report to duty on ${effectiveDate}.`,
-        left, curY, { width: contentWidth, lineGap: 2.5 }
+        left, curY, { width: contentWidth, lineGap: 2.2 }
       );
 
-      // Core Offer Terms (9 Exact Bullets from shared institutional doc)
-      const page1Bullets = [
-        `You shall be attending mandatory two-day induction program scheduled at Sankara Eye Hospital, Bangalore on ${inductionDates}`,
-        `You shall be paid a stipend of Rs ${stipendNum.toLocaleString("en-IN")} (${stipendWords} Only) per month subject to income tax and other statutory deductions as applicable.`,
-        `Your entire first month stipend and 15 days of second & third months' stipend would be held as a deposit which would be paid back interest free only after the successful completion of the fellowship.`,
-        `You would be eligible for 1-day leave of earned for each month of your tenure apart from the declared holidays.`,
-        `Your Fellowship Appointment letter together with the terms and conditions shall be handed to you on your date of joining duty.`,
-        `You will adhere to the policies of Sankara Eye Foundation, India.`,
-        `You shall be reporting to Dr. ${reportingDoctor} - Chief Medical Officer`,
-        `You may be deputed to other units of Sankara hospitals during your fellowship tenure.`,
-        `Extension of Fellowship Course is not possible except under rare approvals.`,
+      // ─────────────────────────────────────────────────────────────────
+      // Table: Fellowship Appointment & Reporting Details
+      // ─────────────────────────────────────────────────────────────────
+      curY = doc.y + 8;
+      const tableW = contentWidth;
+      const headerH = 17;
+      doc.rect(left, curY, tableW, headerH).fill(colors.navy);
+      doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(8.2).text("FELLOWSHIP APPOINTMENT & REPORTING DETAILS", left + 8, curY + 4.5);
+
+      curY += headerH;
+      const apptRows: [string, string, string?][] = [
+        ["Selected Doctor", `Dr. ${cleanName}`],
+        ["Allocated Subspecialty", data.specialization || "Vitreo Retina", colors.navy],
+        ["Assigned Hospital Unit", `Sankara Eye Hospital – ${unit}`],
+        ["Reporting Authority", `Dr. ${reportingDoctor} - Chief Medical Officer`],
+        ["Tenure & Start Date", `${durationText} (Effective from ${effectiveDate})`],
+        ["Monthly Stipend", `Rs ${stipendNum.toLocaleString("en-IN")}/- per month (${stipendWords} Only)`],
+        ["Mandatory Induction", `${inductionDates}`],
       ];
 
-      curY = doc.y + 12;
-      page1Bullets.forEach((bullet) => {
-        doc.fillColor(colors.bullet).font("Helvetica-Bold").fontSize(10).text("•", left + 4, curY, { continued: false });
-        doc.fillColor(colors.dark).font("Helvetica").fontSize(8.8).text(bullet, left + 18, curY, {
+      const col1W = 155;
+      const col2W = tableW - col1W;
+
+      apptRows.forEach(([label, val, customCol], idx) => {
+        const rowBg = idx % 2 === 0 ? "#ffffff" : "#f8fafc";
+        const rowH = 15;
+        doc.rect(left, curY, tableW, rowH).fill(rowBg);
+        doc.strokeColor(colors.border).lineWidth(0.4).rect(left, curY, tableW, rowH).stroke();
+
+        doc.fillColor(colors.slate).font("Helvetica-Bold").fontSize(7.8).text(label, left + 8, curY + 3.5, { width: col1W - 12 });
+        doc.fillColor(customCol || colors.dark).font(customCol ? "Helvetica-Bold" : "Helvetica").fontSize(7.8).text(val, left + col1W, curY + 3.5, { width: col2W - 10 });
+        curY += rowH;
+      });
+
+      // ─────────────────────────────────────────────────────────────────
+      // Section A: Stipend, Deposit & Core Leave Rules
+      // ─────────────────────────────────────────────────────────────────
+      curY += 8;
+      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(8.8).text("SECTION A: STIPEND, DEPOSIT & CORE LEAVE RULES", left, curY);
+
+      const sectionAPoints = [
+        `Induction Program: Mandatory 2-day induction program scheduled at Sankara Eye Hospital, Bangalore on ${inductionDates}.`,
+        `Monthly Stipend: Stipend of Rs ${stipendNum.toLocaleString("en-IN")} (${stipendWords} Only) per month subject to statutory deductions as applicable.`,
+        `Security Deposit: Entire first month stipend and 15 days of second & third months' stipend held interest-free only after the successful completion of the fellowship.`,
+        `Earned Leave: You would be eligible for 1-day leave of earned for each month of your tenure apart from the declared holidays.`,
+        `Compliance: Strict adherence to the policies and code of conduct of Sankara Eye Foundation, India.`,
+      ];
+
+      curY = doc.y + 4;
+      sectionAPoints.forEach((pt, idx) => {
+        doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(8).text(`${idx + 1}.`, left + 4, curY);
+        doc.fillColor(colors.dark).font("Helvetica").fontSize(8).text(pt, left + 18, curY, {
           width: contentWidth - 18,
-          lineGap: 2,
+          lineGap: 1.8,
         });
-        curY = doc.y + 6;
+        curY = doc.y + 4;
       });
 
       // Page 1 Footer
@@ -496,7 +531,7 @@ export async function generateOfferLetterPdf(data: OfferLetterData): Promise<Buf
       );
 
       // ═══════════════════════════════════════════════════════════════════════
-      // PAGE 2: Documents Required, Due Diligence, Compliance & Signatory
+      // PAGE 2: Section B, Institutional Compliance & Signatory
       // ═══════════════════════════════════════════════════════════════════════
       doc.addPage();
 
@@ -508,65 +543,58 @@ export async function generateOfferLetterPdf(data: OfferLetterData): Promise<Buf
       );
       doc.strokeColor(colors.border).lineWidth(0.8).moveTo(left, 39).lineTo(left + contentWidth, 39).stroke();
 
-      curY = 48;
-      doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(9).text("On the date of joining you are requested to bring:", left, curY);
-      curY = doc.y + 3;
-      doc.fillColor(colors.bullet).font("Helvetica-Bold").fontSize(10).text("•", left + 4, curY, { continued: false });
-      doc.fillColor(colors.dark).font("Helvetica").fontSize(8.8).text("3 passport-size color photographs.", left + 16, curY);
+      // Section B
+      curY = 46;
+      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(8.8).text("SECTION B: HOSPITAL REGULATIONS & MANDATORY DOCUMENTS", left, curY);
 
-      curY = doc.y + 8;
-      doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(9).text("Also carry the Originals and photocopies of the following documents:", left, curY);
-
-      const requiredDocuments = [
-        "1. MBBS Degree Certificate.",
-        "2. DOMS/MS and Dip. NB Certificate",
-        "3. Medical Council Registration Certificate",
-        "4. Medical Fitness Certificate",
-        "5. PAN card, Residential Proof & Age Proof",
+      const sectionBPoints = [
+        `Reporting CMO: Report to Dr. ${reportingDoctor} - Chief Medical Officer at Sankara Eye Hospital – ${unit}.`,
+        `Deputation: Possible deputation to other units of Sankara hospitals during your fellowship tenure to maximize surgical volume.`,
+        `SAV Uniform Policy: Mandatory wearing of institute-issued apron or scrubs while on duty across all clinical and surgical suites.`,
+        `Mandatory Documents: On the date of joining you are requested to bring 3 passport-size color photographs along with Originals and photocopies of: 1. MBBS Degree Certificate, 2. DOMS/MS/DNB Certificate, 3. State Medical Council Registration Certificate, 4. Medical Fitness Certificate, 5. PAN card, Residential Proof & Age Proof.`,
+        `Acceptance Validation: Validate acceptance within 3 days on receipt of this letter by sending an email to radhika@sankaraeye.com. Receiving no response will invalidate this offer granted to you.`,
       ];
 
       curY = doc.y + 4;
-      requiredDocuments.forEach((docItem) => {
-        doc.fillColor(colors.dark).font("Helvetica").fontSize(8.8).text(docItem, left + 14, curY);
-        curY = doc.y + 2.5;
+      sectionBPoints.forEach((pt, idx) => {
+        doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(8).text(`${idx + 6}.`, left + 4, curY);
+        doc.fillColor(colors.dark).font("Helvetica").fontSize(8).text(pt, left + 18, curY, {
+          width: contentWidth - 18,
+          lineGap: 1.8,
+        });
+        curY = doc.y + 4;
       });
 
-      curY = doc.y + 5;
-      doc.fillColor(colors.darkNavy).font("Helvetica-Bold").fontSize(8.8).text(
-        "Submission of the photocopied documents mentioned above is mandatory on the date of Joining.",
-        left, curY, { width: contentWidth }
-      );
-
-      const page2Clauses = [
+      // Additional Compliance Clauses
+      const complianceClauses = [
         "Your joining shall be subject to the clearance of your PG result where applicable or submission of relieving order from your previous employment.",
         "Please be informed that due diligence shall be initiated in the first six months of your reporting. In this process of verification, if there are confirmed unfavorable reports of your academic credentials, past experience, banking transactions or social standing, your services shall be discontinued with immediate effect.",
         "Sankara Eye Foundation, India follows an equal opportunity policy and a policy of zero tolerance to any form of harassment. Please update yourself on the grievance redressal policy as part of your induction.",
         "Your Fellowship with Sankara Academy of Vision can be discontinued if found non-conforming to the rules of the organization or on disciplinary grounds or your action is shown to have maligned the reputation of the organization.",
-        "Please validate your acceptance within 3 days on receipt of this letter by sending an email to radhika@sankaraeye.com. Receiving no response from your end will invalidate this offer granted to you. The fellowship would then be offered to the next candidate on the merit list.",
       ];
 
-      curY = doc.y + 7;
-      page2Clauses.forEach((clause) => {
-        doc.fillColor(colors.dark).font("Helvetica").fontSize(8.8).text(clause, left, curY, {
+      curY = doc.y + 6;
+      complianceClauses.forEach((clause) => {
+        doc.fillColor(colors.dark).font("Helvetica").fontSize(8).text(clause, left, curY, {
           width: contentWidth,
           lineGap: 2,
         });
-        curY = doc.y + 5.5;
+        curY = doc.y + 4.5;
       });
 
-      curY = doc.y + 4;
-      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(9).text(
+      curY = doc.y + 6;
+      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(8.8).text(
         "Our journey together will certainly be inspiring, challenging, rewarding and satisfying.",
         left, curY, { width: contentWidth }
       );
 
-      curY = doc.y + 6;
-      doc.fillColor(colors.dark).font("Helvetica").fontSize(9).text("Wishing you the very best", left, curY);
+      curY = doc.y + 8;
+      doc.fillColor(colors.dark).font("Helvetica").fontSize(8.8).text("Wishing you the very best,", left, curY);
 
-      curY = doc.y + 14;
+      curY = doc.y + 16;
       doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(10.5).text("Dr. Kaushik Murali", left, curY);
       curY = doc.y + 2;
-      doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(8.5).text(
+      doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(8.2).text(
         "President\nMedical Administration, Quality & Education\nSankara Eye Foundation, India",
         left, curY, { lineGap: 1.5 }
       );
