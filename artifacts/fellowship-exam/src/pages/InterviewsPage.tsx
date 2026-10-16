@@ -16,11 +16,12 @@ import {
   LayoutGrid, Plus, Settings, Users, ArrowRight, CheckCircle2,
   Clock, DoorOpen, UserCheck, X, FileText, Loader2,
   GripVertical, ExternalLink, ShieldAlert,
-  AlertTriangle, HelpCircle
+  AlertTriangle, HelpCircle, Grid3x3
 } from "lucide-react";
 import { useToast } from "../hooks/use-toast";
 import { getCleanObjectPath } from "../lib/utils";
 import { CandidateExamDialog } from "../components/CandidateExamDialog";
+import { SeatMatrixModal } from "../components/SeatMatrixModal";
 
 interface DoctorRow {
   doctorId: number; doctorName: string; doctorEmail: string;
@@ -82,12 +83,12 @@ export default function InterviewsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const isCEC = user?.role === "central_exam_coordinator";
+  const isCoordinator = user?.role === "central_exam_coordinator" || user?.role === "exam_coordinator" || user?.role === "unit_coordinator";
   const isAdmin = user?.role === "super_admin" || user?.role === "program_admin";
   const isDoctor = user?.role === "doctor";
 
   if (isDoctor) return <DoctorView toast={toast} qc={qc} />;
-  if (isCEC || isAdmin) return <AdminView toast={toast} qc={qc} isCEC={isCEC} />;
+  if (isCoordinator || isAdmin) return <AdminView toast={toast} qc={qc} isCEC={isCoordinator} />;
   return null;
 }
 
@@ -96,6 +97,7 @@ function DoctorView({ toast, qc }: { toast: ReturnType<typeof import("../hooks/u
   const [dossierOpen, setDossierOpen] = useState<DoctorAssignment | null>(null);
   const [scoreOpen, setScoreOpen] = useState<DoctorAssignment | null>(null);
   const [examCandidateId, setExamCandidateId] = useState<number | null>(null);
+  const [seatMatrixOpen, setSeatMatrixOpen] = useState(false);
   const [activeDossierTab, setActiveDossierTab] = useState<"profile" | "pdf" | "lors" | "docs">("profile");
   const [searchTerm, setSearchTerm] = useState("");
   const [score, setScore] = useState("");
@@ -243,13 +245,21 @@ function DoctorView({ toast, qc }: { toast: ReturnType<typeof import("../hooks/u
             onChange={(e) => setSearchTerm(e.target.value)}
             className="h-9 w-52 text-xs rounded-xl border-slate-200 bg-slate-50 font-semibold"
           />
+          <Button
+            variant="outline"
+            onClick={() => setSeatMatrixOpen(true)}
+            className="gap-2 border-indigo-200 text-indigo-750 hover:bg-indigo-50 font-bold h-9 px-4 rounded-xl text-xs uppercase tracking-wider shadow-sm"
+            title="View Live Fellowship Seat Matrix & Vacancies"
+          >
+            <Grid3x3 className="h-4 w-4 text-indigo-600" /> Seat Matrix
+          </Button>
           {assignments.length > 0 && (
             <Button
               variant="outline"
               onClick={() => window.open(`/api/interviews/my-scores/export?token=${localStorage.getItem("fellowship_token")}`, "_blank")}
-              className="gap-2 border-indigo-200 text-indigo-750 hover:bg-indigo-50 font-bold h-9 px-4 rounded-xl text-xs uppercase tracking-wider shadow-sm"
+              className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 font-bold h-9 px-4 rounded-xl text-xs uppercase tracking-wider shadow-sm"
             >
-              <FileText className="h-4 w-4 text-indigo-500" /> Export
+              <FileText className="h-4 w-4 text-slate-500" /> Export
             </Button>
           )}
         </div>
@@ -334,6 +344,12 @@ function DoctorView({ toast, qc }: { toast: ReturnType<typeof import("../hooks/u
         candidateId={examCandidateId}
         open={!!examCandidateId}
         onClose={() => setExamCandidateId(null)}
+      />
+
+      {/* ─── Live Seat Matrix Modal ─── */}
+      <SeatMatrixModal
+        open={seatMatrixOpen}
+        onClose={() => setSeatMatrixOpen(false)}
       />
       {myStatus?.marksEntryEnabled && (
         <Dialog open={!!scoreOpen} onOpenChange={(o) => { if (!o) { setScoreOpen(null); setScore(""); setRemarks(""); } }}>

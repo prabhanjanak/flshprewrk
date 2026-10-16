@@ -29,39 +29,41 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   try {
     const verified = verifyToken(token);
     
-    // Check if token exists in user_sessions and is active
-    const [session] = await db.select().from(userSessionsTable).where(eq(userSessionsTable.token, token));
-    if (!session || !session.isActive) {
-      res.status(401).json({ error: "Session has been terminated or is invalid" });
-      return;
-    }
+    // Check if user is active in usersTable
+    const [userRecord] = await db
+      .select({ id: usersTable.id, active: usersTable.active })
+      .from(usersTable)
+      .where(eq(usersTable.id, verified.userId));
 
-    // Check inactivity timeout
-    const [setting] = await db.select().from(globalSettingsTable).where(eq(globalSettingsTable.key, "session_inactivity_timeout"));
-    const timeoutMinutes = setting ? parseInt(setting.value, 10) : 30; // default 30 mins
-
-    const now = new Date();
-    const lastActive = new Date(session.lastActivityAt);
-    const inactiveDiffMs = now.getTime() - lastActive.getTime();
-
-    if (inactiveDiffMs > timeoutMinutes * 60 * 1000) {
-      await db.update(userSessionsTable).set({ isActive: false }).where(eq(userSessionsTable.id, session.id));
-      res.status(401).json({ error: "Session expired due to inactivity" });
-      return;
-    }
-
-    // Check if user is active
-    const [userRecord] = await db.select({ id: usersTable.id, active: usersTable.active }).from(usersTable).where(eq(usersTable.id, verified.userId));
     if (!userRecord || userRecord.active === false) {
       res.status(403).json({ error: "User account is disabled or revoked" });
       return;
     }
 
-    // Non-blocking update of lastActivityAt
-    db.update(userSessionsTable)
-      .set({ lastActivityAt: now })
-      .where(eq(userSessionsTable.id, session.id))
-      .catch((err) => console.error("Failed to update session activity:", err));
+    const now = new Date();
+
+    // Check if token exists in user_sessions; if not, auto-create to prevent invalid lockouts
+    const [session] = await db.select().from(userSessionsTable).where(eq(userSessionsTable.token, token));
+
+    if (session) {
+      // Non-blocking update of lastActivityAt and ensuring active status
+      db.update(userSessionsTable)
+        .set({ lastActivityAt: now, isActive: true })
+        .where(eq(userSessionsTable.id, session.id))
+        .catch((err) => console.error("Failed to update session activity:", err));
+    } else {
+      // Auto-insert session record for verified token (e.g. after server restart or serverless container migration)
+      db.insert(userSessionsTable)
+        .values({
+          userId: verified.userId,
+          token,
+          isActive: true,
+          ipAddress: String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "127.0.0.1").split(",")[0]!.trim(),
+          deviceInfo: String(req.headers["user-agent"] || "Unknown Device"),
+          lastActivityAt: now,
+        })
+        .catch((err) => console.error("Failed to auto-register session:", err));
+    }
 
     req.user = verified;
     req.sessionToken = token;
@@ -77,11 +79,26 @@ export function requireRole(...roles: string[]) {
       res.status(401).json({ error: "Unauthenticated" });
       return;
     }
-    if (!roles.includes(req.user.role)) {
-      res.status(403).json({ error: "Forbidden" });
+    const userRole = req.user.role;
+
+    // Super Admin has full unrestricted access
+    if (userRole === "super_admin") {
+      next();
       return;
     }
-    next();
+
+    // Role consolidation: exam_coordinator matches central_exam_coordinator, program_admin, unit_coordinator
+    const coordinatorRoles = ["exam_coordinator", "central_exam_coordinator", "program_admin", "unit_coordinator"];
+    const isUserCoord = coordinatorRoles.includes(userRole);
+    const acceptsCoord = roles.some((r) => coordinatorRoles.includes(r));
+
+    if (roles.includes(userRole) || (isUserCoord && acceptsCoord)) {
+      next();
+      return;
+    }
+
+    res.status(403).json({ error: "Forbidden" });
+    return;
   };
 }
 

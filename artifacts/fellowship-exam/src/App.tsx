@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "./components/ui/toaster";
 import { TooltipProvider } from "./components/ui/tooltip";
@@ -28,7 +28,6 @@ import PaymentsPage from "./pages/PaymentsPage";
 import BatchesPage from "./pages/BatchesPage";
 import ReportsPage from "./pages/ReportsPage";
 import ApplyPage from "./pages/ApplyPage";
-import HallTicketPage from "./pages/HallTicketPage";
 import NotFound from "./pages/not-found";
 import { Loader2 } from "lucide-react";
 import EmailSettingsPage from "./pages/EmailSettingsPage";
@@ -75,7 +74,7 @@ function AppRouter() {
             </Route>
             <Route path="/programs" component={ProgramsPage} />
             <Route path="/users" component={UsersPage} />
-            <Route path="/candidates" component={CandidatesPage} />
+            <Route path="/candidates">{() => <Redirect to="/application-forms" />}</Route>
             <Route path="/exams" component={ExamsPage} />
             <Route path="/exams/:id" component={ExamDashboardPage} />
             <Route path="/interviews" component={InterviewsPage} />
@@ -115,8 +114,6 @@ function App() {
               <Route path="/apply/:token">
                 {(params) => <ApplyPage token={params.token} />}
               </Route>
-              <Route path="/hall-ticket" component={HallTicketPage} />
-              <Route path="/hall-tickets" component={HallTicketPage} />
               
               {/* Auth Routes */}
               <Route>

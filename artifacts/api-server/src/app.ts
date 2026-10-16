@@ -2,13 +2,14 @@ import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import path from "path";
+import os from "os";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
 import { db, applicationSubmissionsTable, applicationFormsTable, programsTable, candidatesTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import { requireAuth, requireRole } from "./middleware/auth";
 import { attachMockMode } from "./middleware/mock";
@@ -278,6 +279,48 @@ app.get(
     }
   }
 );
+
+app.use(["/objects", "/api/objects"], async (req, res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    return next();
+  }
+  const fullPath = (req.baseUrl || "") + (req.url || "");
+  const cleanPath = fullPath.replace(/^\/api/, "").split("?")[0];
+
+  const candidatePaths = [
+    path.join(process.cwd(), "uploads", cleanPath.replace("/objects/uploads/", "")),
+    path.join(os.tmpdir(), "uploads", cleanPath.replace("/objects/uploads/", "")),
+    path.join(process.cwd(), "uploads", cleanPath.replace("/objects/", "")),
+    path.join(os.tmpdir(), "uploads", cleanPath.replace("/objects/", "")),
+  ];
+  for (const cp of candidatePaths) {
+    try {
+      if (fs.existsSync(cp) && fs.statSync(cp).isFile()) {
+        return res.sendFile(cp);
+      }
+    } catch (_) {}
+  }
+
+  try {
+    const normalizedPath = "/objects/uploads/" + cleanPath.replace(/^\/objects\/(uploads\/)?/, "");
+    const result = await db.execute(sql`
+      SELECT file_name, content_type, file_data, file_size 
+      FROM uploaded_files 
+      WHERE file_path = ${cleanPath} OR file_path = ${normalizedPath}
+      LIMIT 1
+    `);
+    if (result.rows.length > 0) {
+      const row = result.rows[0] as any;
+      res.setHeader("Content-Type", row.content_type || "application/octet-stream");
+      res.setHeader("Content-Length", row.file_size);
+      res.setHeader("Content-Disposition", `inline; filename="${row.file_name}"`);
+      return res.end(row.file_data);
+    }
+  } catch (e) {
+    console.error("[objects serving error]:", e);
+  }
+  next();
+});
 
 app.use("/objects", express.static(path.join(process.cwd(), "uploads")));
 

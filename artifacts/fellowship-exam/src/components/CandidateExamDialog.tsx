@@ -20,8 +20,10 @@ import {
   Star, ExternalLink, Loader2, CheckCircle2,
   AlertCircle, Building2, Phone, Mail,
   Calendar, MapPin, Award, BookOpen,
-  Sparkles, Check, X, ShieldAlert, Download
+  Sparkles, Check, X, ShieldAlert, Download,
+  Heart, HeartPulse, Activity, Grid3x3
 } from "lucide-react";
+import { SeatMatrixModal } from "./SeatMatrixModal";
 
 interface AppliedSpeciality {
   specialityId: number;
@@ -45,6 +47,7 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
   const qc = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<"profile" | "qualifications" | "clinical" | "lors" | "form">("profile");
+  const [seatMatrixOpen, setSeatMatrixOpen] = useState(false);
   
   // Selection decision and notes
   const [decisionStatus, setDecisionStatus] = useState<string>("interview_completed");
@@ -307,6 +310,16 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
             <Button
               variant="outline"
               size="sm"
+              onClick={() => setSeatMatrixOpen(true)}
+              className="text-xs bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border-emerald-400/30 font-bold gap-1.5 h-8 px-3 rounded-lg shadow-sm"
+              title="View live fellowship seat matrix and vacancies"
+            >
+              <Grid3x3 className="h-3.5 w-3.5 text-emerald-300" />
+              Seat Matrix
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleDownloadCallLetter}
               className="text-xs bg-blue-500/20 hover:bg-blue-500/30 text-blue-200 border-blue-400/30 font-bold gap-1.5 h-8 px-3 rounded-lg shadow-sm"
               title="Download official Interview Call Letter PDF"
@@ -465,6 +478,112 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
                         </div>
                       )}
                     </div>
+
+                    {/* Medical History & Health Disclosures (Prominent Heart / Liver / Ailments) */}
+                    {(() => {
+                      const rawConditions = sub?.medicalConditions || candidate?.medicalConditions || "";
+                      let conditionsList: string[] = [];
+                      if (Array.isArray(rawConditions)) {
+                        conditionsList = rawConditions;
+                      } else if (typeof rawConditions === "string") {
+                        try {
+                          const parsed = JSON.parse(rawConditions);
+                          if (Array.isArray(parsed)) conditionsList = parsed;
+                          else conditionsList = rawConditions.split(",").map((s: string) => s.trim()).filter(Boolean);
+                        } catch {
+                          conditionsList = rawConditions.split(",").map((s: string) => s.trim()).filter(Boolean);
+                        }
+                      }
+
+                      const hasHeartIssues = conditionsList.some((c) => /heart/i.test(c)) || /heart/i.test(sub?.healthDetails || "");
+                      const hasLiverIssues = conditionsList.some((c) => /liver/i.test(c)) || /liver/i.test(sub?.healthDetails || "");
+
+                      return (
+                        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+                          <div className="flex items-center justify-between border-b pb-2">
+                            <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-1.5">
+                              <HeartPulse className="h-3.5 w-3.5 text-rose-500" />
+                              Medical History & Health Disclosures
+                            </h4>
+                            {hasHeartIssues || hasLiverIssues ? (
+                              <Badge className="bg-rose-100 text-rose-800 border-rose-300 text-[10px] font-black uppercase">
+                                Medical Issue Declared
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[10px] font-black uppercase">
+                                Medically Fit
+                              </Badge>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                            <div className={`p-3 rounded-xl border flex items-center justify-between ${
+                              hasHeartIssues
+                                ? "bg-rose-50 border-rose-300 text-rose-950 shadow-xs"
+                                : "bg-slate-50 border-slate-200 text-slate-700"
+                            }`}>
+                              <div>
+                                <span className="text-[10px] font-black uppercase tracking-wider block">Heart Related Issues</span>
+                                <p className="text-xs font-bold mt-0.5">
+                                  {hasHeartIssues ? "⚠️ Declared by Candidate" : "None Reported"}
+                                </p>
+                              </div>
+                              <Heart className={`h-5 w-5 ${hasHeartIssues ? "text-rose-600 animate-pulse" : "text-slate-300"}`} />
+                            </div>
+
+                            <div className={`p-3 rounded-xl border flex items-center justify-between ${
+                              hasLiverIssues
+                                ? "bg-amber-50 border-amber-300 text-amber-950 shadow-xs"
+                                : "bg-slate-50 border-slate-200 text-slate-700"
+                            }`}>
+                              <div>
+                                <span className="text-[10px] font-black uppercase tracking-wider block">Liver Related Issues</span>
+                                <p className="text-xs font-bold mt-0.5">
+                                  {hasLiverIssues ? "⚠️ Declared by Candidate" : "None Reported"}
+                                </p>
+                              </div>
+                              <Activity className={`h-5 w-5 ${hasLiverIssues ? "text-amber-600 animate-pulse" : "text-slate-300"}`} />
+                            </div>
+                          </div>
+
+                          <div className="pt-1">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1.5">
+                              Declared Ailments / Medical Conditions
+                            </span>
+                            {conditionsList.length > 0 ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                {conditionsList.map((cond, idx) => (
+                                  <Badge
+                                    key={idx}
+                                    variant="outline"
+                                    className={`text-xs font-bold px-2.5 py-1 ${
+                                      /heart/i.test(cond)
+                                        ? "bg-rose-50 text-rose-800 border-rose-300 font-black"
+                                        : /liver/i.test(cond)
+                                        ? "bg-amber-50 text-amber-800 border-amber-300 font-black"
+                                        : cond === "None of the Above"
+                                        ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                        : "bg-slate-100 text-slate-800 border-slate-300"
+                                    }`}
+                                  >
+                                    {cond}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-slate-400 italic">No specific ailments recorded.</p>
+                            )}
+                          </div>
+
+                          {sub?.healthDetails && (
+                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase block">Additional Health Details</span>
+                              <p className="font-semibold text-slate-800 mt-0.5">{sub.healthDetails}</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 
@@ -1042,6 +1161,11 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
           </div>
         )}
       </DialogContent>
+
+      <SeatMatrixModal
+        open={seatMatrixOpen}
+        onClose={() => setSeatMatrixOpen(false)}
+      />
     </Dialog>
   );
 }

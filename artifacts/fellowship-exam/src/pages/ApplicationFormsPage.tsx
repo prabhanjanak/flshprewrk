@@ -15,12 +15,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
 import { Separator } from "../components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import {
   Plus, Link2, Copy, Check, Eye, Users, Clock, ChevronRight, ArrowLeft, ExternalLink,
   FileCheck, FileX, Loader2, Trash2, Download, CreditCard, GripVertical, Settings2, X,
   RefreshCw, CheckCheck, Ban, FileText, ImageIcon, ChevronDown, ChevronUp, Building2, Printer,
   Edit3 as Edit, Save, AlertCircle, FileJson, CheckCircle2, LayoutDashboard, CalendarDays,
-  FileSignature, ExternalLink as ExtLink, FileType, CheckCircle, UserPlus, GitMerge
+  FileSignature, ExternalLink as ExtLink, FileType, CheckCircle, UserPlus, GitMerge,
+  Mail, Send, Search, Phone
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { motion, AnimatePresence } from "framer-motion";
@@ -1094,6 +1096,21 @@ export default function ApplicationFormsPage() {
   const [mergeDeleteSecondary, setMergeDeleteSecondary] = useState(false);
 
 
+  // Admissions pipeline main sub-tab & letter states
+  const [admissionsTab, setAdmissionsTab] = useState<"applications" | "call_letters" | "offer_letters" | "settings">("applications");
+  const [callLetterSearch, setCallLetterSearch] = useState("");
+  const [offerLetterSearch, setOfferLetterSearch] = useState("");
+  const [callStreamFilter, setCallStreamFilter] = useState<"all" | "retina" | "anterior">("all");
+  const [offerUnitOverrides, setOfferUnitOverrides] = useState<Record<number, string>>({});
+  const [downloadingLetterId, setDownloadingLetterId] = useState<number | null>(null);
+  const [sendingEmailId, setSendingEmailId] = useState<number | null>(null);
+  const [downloadingDirectoryPdf, setDownloadingDirectoryPdf] = useState(false);
+
+  const { data: units = [] } = useQuery<any[]>({
+    queryKey: ["units"],
+    queryFn: () => api.get("/units"),
+  });
+
   const { data: specialities = [] } = useQuery<any[]>({
     queryKey: ["specialities"],
     queryFn: () => api.get("/specialities"),
@@ -1113,6 +1130,14 @@ export default function ApplicationFormsPage() {
     queryFn: () => api.get<Submission[]>(`/application-forms/${viewFormId}/submissions`),
     enabled: viewFormId !== null,
   });
+
+  // Auto-select active form if none selected
+  useEffect(() => {
+    if (viewFormId === null && filteredForms.length > 0) {
+      const active = filteredForms.find((f) => f.isActive) || filteredForms[0];
+      if (active) setViewFormId(active.id);
+    }
+  }, [filteredForms, viewFormId]);
 
   const createMutation = useMutation({
     mutationFn: (data: { programId: number; title: string; description?: string; deadline?: string; customFields: CustomField[]; loadDefaults?: boolean; customToken?: string }) =>
@@ -1337,6 +1362,100 @@ export default function ApplicationFormsPage() {
       toast({ title: "Export failed", variant: "destructive" });
     } finally {
       setExporting(false);
+    }
+  };
+
+  const downloadStudentListPdf = async (formId: number) => {
+    setDownloadingDirectoryPdf(true);
+    try {
+      const token = localStorage.getItem("fellowship_token");
+      const res = await fetch(`/api/application-forms/${formId}/student-list-pdf`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Failed to download Student List PDF");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Student_Directory_December_2026.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Downloaded Roster", description: "Official December 2026 Candidate Directory PDF saved." });
+    } catch (e: any) {
+      toast({ title: "Download Failed", description: e.message || "Failed to download", variant: "destructive" });
+    } finally {
+      setDownloadingDirectoryPdf(false);
+    }
+  };
+
+  const downloadCallLetter = async (submissionId: number, candidateCode: string) => {
+    setDownloadingLetterId(submissionId);
+    try {
+      const token = localStorage.getItem("fellowship_token");
+      const res = await fetch(`/api/application-forms/submissions/${submissionId}/call-letter-pdf`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Failed to download Call Letter PDF");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Interview_Call_Letter_${candidateCode}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Call Letter Downloaded", description: `Official Call Letter for ${candidateCode} downloaded.` });
+    } catch (e: any) {
+      toast({ title: "Download Failed", description: e.message || "Failed to download", variant: "destructive" });
+    } finally {
+      setDownloadingLetterId(null);
+    }
+  };
+
+  const sendCallLetterEmail = async (submissionId: number, candidateName: string) => {
+    setSendingEmailId(submissionId);
+    try {
+      await api.post(`/application-forms/submissions/${submissionId}/send-call-letter`, {});
+      toast({ title: "Call Letter Dispatched", description: `Call Letter with PDF attachment emailed to ${candidateName}.` });
+    } catch (e: any) {
+      toast({ title: "Email Failed", description: e.message || "Failed to send email", variant: "destructive" });
+    } finally {
+      setSendingEmailId(null);
+    }
+  };
+
+  const downloadOfferLetter = async (submissionId: number, candidateCode: string, unitName?: string) => {
+    setDownloadingLetterId(submissionId);
+    try {
+      const token = localStorage.getItem("fellowship_token");
+      const q = unitName ? `?unitName=${encodeURIComponent(unitName)}` : "";
+      const res = await fetch(`/api/application-forms/submissions/${submissionId}/offer-letter-pdf${q}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Failed to download Offer Letter PDF");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Fellowship_Offer_Letter_${candidateCode}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Offer Letter Downloaded", description: `Official 2-Page Offer Letter for ${candidateCode} downloaded.` });
+    } catch (e: any) {
+      toast({ title: "Download Failed", description: e.message || "Failed to download", variant: "destructive" });
+    } finally {
+      setDownloadingLetterId(null);
+    }
+  };
+
+  const sendOfferLetterEmail = async (submissionId: number, candidateName: string, unitName?: string) => {
+    setSendingEmailId(submissionId);
+    try {
+      await api.post(`/application-forms/submissions/${submissionId}/send-offer-letter`, { unitName });
+      toast({ title: "Offer Letter Dispatched", description: `Official 2-Page Offer Letter emailed to ${candidateName}.` });
+    } catch (e: any) {
+      toast({ title: "Email Failed", description: e.message || "Failed to send email", variant: "destructive" });
+    } finally {
+      setSendingEmailId(null);
     }
   };
 
@@ -2188,18 +2307,28 @@ export default function ApplicationFormsPage() {
             </Button>
             <div>
                <div className="flex items-center gap-2 mb-1">
-                  <Badge className="bg-slate-900 text-white border-none rounded-full px-3 py-0.5 text-[10px] font-black uppercase tracking-widest">
-                     Management
+                  <Badge className="bg-orange-500 text-white border-none rounded-full px-3 py-0.5 text-[10px] font-black uppercase tracking-widest">
+                     December 2026 Intake
                   </Badge>
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
                      <FileText className="w-3 h-3" /> {viewedForm?.title}
                   </span>
                </div>
-               <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none">Submissions Queue</h1>
+               <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none">Applications & Admissions</h1>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl border-indigo-200 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-900 font-bold px-4 shadow-sm"
+              onClick={() => viewFormId && downloadStudentListPdf(viewFormId)}
+              disabled={downloadingDirectoryPdf || submissions.length === 0}
+            >
+              {downloadingDirectoryPdf ? <Loader2 className="w-4 h-4 mr-2 animate-spin text-indigo-600" /> : <Printer className="w-4 h-4 mr-2 text-indigo-600" />}
+              Download Student List (PDF)
+            </Button>
             <Button variant="outline" size="sm" className="rounded-xl border-slate-200 font-bold px-4"
                onClick={() => syncGoogleSheets.mutate(viewFormId)}
                disabled={syncGoogleSheets.isPending}>
@@ -2460,248 +2589,824 @@ export default function ApplicationFormsPage() {
         </div>
 
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-           <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex gap-1.5 p-1 bg-slate-100 rounded-2xl w-fit">
-              {(["all", "pending", "approved", "rejected"] as const).map((f) => (
-                <Button 
-                  key={f} 
-                  size="sm" 
-                  variant={statusFilter === f ? "default" : "ghost"}
-                  className={`rounded-xl text-[10px] font-black uppercase tracking-widest px-4 h-9 ${statusFilter === f ? 'bg-white text-slate-900 shadow-sm hover:bg-white' : 'text-slate-500 hover:text-slate-900'}`}
-                  onClick={() => { setStatusFilter(f); setSelectedIds([]); }}>
-                  {f}
-                  <Badge className="ml-2 bg-slate-200 text-slate-600 border-none group-hover:bg-slate-300">
-                     {f === "all" ? submissions.length : submissions.filter((s) => s.status === f).length}
-                  </Badge>
-                </Button>
-              ))}
-            </div>
+        <Tabs value={admissionsTab} onValueChange={(v: any) => setAdmissionsTab(v)} className="space-y-6">
+          <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-3 flex-wrap">
+            <TabsList className="bg-slate-100 p-1 rounded-2xl h-12 gap-1 border border-slate-200/60 shadow-inner">
+              <TabsTrigger 
+                value="applications" 
+                className="rounded-xl px-5 h-10 font-bold text-xs data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-md transition-all gap-2"
+              >
+                <ClipboardList className="w-4 h-4 text-orange-500" />
+                Applications & Scrutiny
+                <Badge className="ml-1 bg-slate-200 text-slate-700 hover:bg-slate-200 rounded-full text-[10px] px-2 py-0 border-none font-black">
+                  {submissions.length}
+                </Badge>
+              </TabsTrigger>
 
-            <div className="flex items-center gap-2 bg-white/50 border border-slate-200 p-1.5 rounded-2xl shadow-sm">
-               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Filter Specialty</span>
-               <Select value={specFilter} onValueChange={setSpecFilter}>
-                 <SelectTrigger className="h-8 min-w-[180px] rounded-xl border-none bg-slate-100 hover:bg-slate-200 transition-all text-[10px] font-black uppercase tracking-widest focus:ring-0">
-                    <SelectValue placeholder="All Specializations" />
-                 </SelectTrigger>
-                 <SelectContent className="rounded-2xl border-slate-100 shadow-2xl">
-                    <SelectItem value="all" className="text-[10px] font-black uppercase tracking-widest">All Specializations</SelectItem>
-                    {allSpecs.map(spec => (
-                      <SelectItem key={spec} value={spec} className="text-[10px] font-black uppercase tracking-widest">{spec}</SelectItem>
-                    ))}
-                 </SelectContent>
-               </Select>
-            </div>
+              <TabsTrigger 
+                value="call_letters" 
+                className="rounded-xl px-5 h-10 font-bold text-xs data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-md transition-all gap-2"
+              >
+                <Award className="w-4 h-4 text-indigo-500" />
+                Approved (Call Letters)
+                <Badge className="ml-1 bg-indigo-100 text-indigo-800 hover:bg-indigo-100 rounded-full text-[10px] px-2 py-0 border-none font-black">
+                  {approvedCandidatesCount}
+                </Badge>
+              </TabsTrigger>
 
-            <div className="flex items-center gap-2 bg-white/50 border border-slate-200 p-1.5 rounded-2xl shadow-sm">
-               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Sort By</span>
-               <Select value={sortFilter} onValueChange={(val: any) => setSortFilter(val)}>
-                 <SelectTrigger className="h-8 min-w-[160px] rounded-xl border-none bg-slate-100 hover:bg-slate-200 transition-all text-[10px] font-black uppercase tracking-widest focus:ring-0">
-                    <SelectValue placeholder="Sort Order" />
-                 </SelectTrigger>
-                 <SelectContent className="rounded-2xl border-slate-100 shadow-2xl">
-                    <SelectItem value="time_desc" className="text-[10px] font-black uppercase tracking-widest">Time Applied: Newest</SelectItem>
-                    <SelectItem value="time_asc" className="text-[10px] font-black uppercase tracking-widest">Time Applied: Oldest</SelectItem>
-                    <SelectItem value="name_asc" className="text-[10px] font-black uppercase tracking-widest">Name: A to Z</SelectItem>
-                    <SelectItem value="name_desc" className="text-[10px] font-black uppercase tracking-widest">Name: Z to A</SelectItem>
-                 </SelectContent>
-               </Select>
-            </div>
+              <TabsTrigger 
+                value="offer_letters" 
+                className="rounded-xl px-5 h-10 font-bold text-xs data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-md transition-all gap-2"
+              >
+                <Sparkles className="w-4 h-4 text-emerald-500" />
+                Selected Fellows (Offer Letters)
+                <Badge className="ml-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-100 rounded-full text-[10px] px-2 py-0 border-none font-black">
+                  {submissions.filter(s => s.status === 'allocated' || (s.reviewNotes && s.reviewNotes.includes('Allocated'))).length || approvedCandidatesCount}
+                </Badge>
+              </TabsTrigger>
 
-            <Button
-              size="sm"
-              onClick={() => {
-                const subList = (submissions || []).filter(Boolean);
-                if (subList.length < 2) {
-                  toast({
-                    title: "Cannot Merge Applications",
-                    description: "At least 2 application submissions are required to perform a merge.",
-                    variant: "destructive"
-                  });
-                  return;
-                }
-                const cand1 = subList[0];
-                const cand2 = subList.find(x => x.id !== cand1.id) || subList[1] || cand1;
-                setMergePair({ subA: cand1, subB: cand2 });
-                setMergePrimaryId(cand1.id);
-                setMergeDeleteSecondary(true);
-                setMergeDialogOpen(true);
-              }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest h-11 px-4 gap-2 shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all"
-            >
-              <GitMerge className="w-3.5 h-3.5" />
-              Merge Applications
-            </Button>
+              <TabsTrigger 
+                value="settings" 
+                className="rounded-xl px-5 h-10 font-bold text-xs data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-md transition-all gap-2"
+              >
+                <Settings2 className="w-4 h-4 text-slate-500" />
+                Form & Public Link
+              </TabsTrigger>
+            </TabsList>
+            
+            <div className="flex items-center gap-2">
+              <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full">
+                Session: December 2026
+              </Badge>
+            </div>
           </div>
 
-         {selectedIds.length > 0 && (
-             <motion.div 
-               initial={{ opacity: 0, x: 20 }}
-               animate={{ opacity: 1, x: 0 }}
-               className="flex items-center gap-3 bg-slate-900 text-white rounded-2xl px-5 py-2 shadow-xl"
-             >
-               <span className="text-xs font-bold mr-2">{selectedIds.length} Selected</span>
-               {selectedIds.length === 2 && (
-                 <Button 
-                   size="sm" 
-                   className="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase h-8 px-3 gap-1.5 shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all"
-                   onClick={() => {
-                     const idA = Number(selectedIds[0]);
-                     const idB = Number(selectedIds[1]);
-                     const subA = submissions.find(s => Number(s.id) === idA);
-                     const subB = submissions.find(s => Number(s.id) === idB);
-                     if (subA && subB) {
-                       setMergePair({ subA, subB });
-                       setMergePrimaryId(subA.id);
-                       setMergeDeleteSecondary(true);
-                       setMergeDialogOpen(true);
-                     } else {
-                       toast({
-                         title: "Cannot find selected applications",
-                         description: "Please ensure both selected applications belong to the current list.",
-                         variant: "destructive"
-                       });
-                     }
-                   }}
-                 >
-                   <GitMerge className="w-3.5 h-3.5" />
-                   Merge 2 Applications
-                 </Button>
-               )}
-               <Button size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-[10px] font-black uppercase h-8 px-3"
-                 onClick={() => bulkAction.mutate({ formId: viewFormId, action: "approve", ids: selectedIds })}
-                 disabled={bulkAction.isPending}>
-                 Approve
-               </Button>
-               <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-300 text-[10px] font-black uppercase h-8 px-3"
-                 onClick={() => {
-                   if (confirm(`Delete ${selectedIds.length} submissions?`)) bulkDeleteSubsMutation.mutate(selectedIds);
-                 }}
-                 disabled={bulkDeleteSubsMutation.isPending}>
-                 Delete
-               </Button>
-             </motion.div>
-           )}
-        </div>
-
-        <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white">
-          <div className="overflow-x-auto fancy-scrollbar">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50/50 border-b border-slate-100">
-                  <th className="px-6 py-5 w-10">
-                    <Checkbox checked={allFilteredSelected} onCheckedChange={toggleSelectAll} className="rounded-md border-slate-300" />
-                  </th>
-                  <th className="text-left px-6 py-5 font-black text-slate-400 uppercase tracking-widest text-[10px]">Candidate</th>
-                  <th className="text-left px-6 py-5 font-black text-slate-400 uppercase tracking-widest text-[10px]">Applied For</th>
-                  <th className="text-left px-6 py-5 font-black text-slate-400 uppercase tracking-widest text-[10px]">Status</th>
-                  <th className="text-left px-6 py-5 font-black text-slate-400 uppercase tracking-widest text-[10px]">Payment Ref</th>
-                  <th className="text-left px-6 py-5 font-black text-slate-400 uppercase tracking-widest text-[10px]">Submitted</th>
-                  <th className="text-right px-6 py-5 font-black text-slate-400 uppercase tracking-widest text-[10px]">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {sortedSubs.map((s) => (
-                  <tr key={s.id} className={`group hover:bg-slate-50/50 transition-colors ${selectedIds.includes(s.id) ? "bg-orange-50/30" : ""}`}>
-                    <td className="px-6 py-5">
-                      <Checkbox checked={selectedIds.includes(s.id)} onCheckedChange={() => toggleSelect(s.id)} className="rounded-md border-slate-300" />
-                    </td>
-                    <td className="px-6 py-5">
-                      <div className="flex flex-col">
-                        <span className="font-black text-slate-900 text-base leading-tight group-hover:text-orange-600 transition-colors cursor-pointer flex items-center gap-2" onClick={() => setViewSubId(s.id)}>
-                           {s.fullName}
-                           {s.readyForReview && <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />}
-                        </span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{s.email}</span>
-                        {(() => {
-                          const dupes = s.email ? submissions.filter(other => other.email?.toLowerCase().trim() === s.email?.toLowerCase().trim() && other.id !== s.id) : [];
-                          if (dupes.length > 0) {
-                            return (
-                              <div className="mt-1 flex items-center gap-1.5">
-                                <span className="text-[9px] font-black uppercase tracking-wider text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-md flex items-center gap-1">
-                                  <span>🔁</span> {dupes.length + 1} Submissions for Applicant
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setMergePair({ subA: s, subB: dupes[0] });
-                                    setMergePrimaryId(s.id);
-                                    setMergeDeleteSecondary(false);
-                                    setMergeDialogOpen(true);
-                                  }}
-                                  className="text-[9px] font-black uppercase tracking-wider text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer"
-                                >
-                                  <GitMerge className="w-2.5 h-2.5" />
-                                  Merge
-                                </button>
-                              </div>
-                            );
-                          }
-                          return null;
-                        })()}
-                        {(() => {
-                          const prefs = getFormattedSpecialityPrefs(s.specialization, s.centerPreference, s.formData, s.customAnswers, viewedForm?.sectionsConfig);
-                          if (prefs.length > 0) {
-                            return (
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {prefs.map(({ spec, location }) => (
-                                  <span key={spec} className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100 rounded-full px-2 py-0.5">
-                                    {location ? `${spec}: ${location}` : spec}
-                                  </span>
-                                ))}
-                              </div>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </div>
-                    </td>
-                    <td className="px-6 py-5">
-                      {(() => {
-                        const prefs = getFormattedSpecialityPrefs(s.specialization, s.centerPreference, s.formData, s.customAnswers, viewedForm?.sectionsConfig);
-                        if (prefs.length > 0) {
-                          return (
-                            <div className="flex flex-wrap gap-1.5">
-                              {prefs.map(({ spec, location }) => (
-                                <Badge key={spec} className={`${getSpecColorClass(spec)} rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-tight border-none`}>
-                                   {location ? `${spec}: ${location}` : spec}
-                                </Badge>
-                              ))}
-                            </div>
-                          );
-                        }
-                        return <span className="text-slate-400 text-xs">-</span>;
-                      })()}
-                    </td>
-                    <td className="px-6 py-5">
-                      <Badge className={`${STATUS_COLORS[s.status] ?? "bg-slate-100"} rounded-full px-3 py-0.5 text-[9px] font-black uppercase tracking-widest border-none`}>
-                        {s.status}
+          {/* Sub-tab 1: Applications & Scrutiny */}
+          <TabsContent value="applications" className="space-y-6 focus:outline-none">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+               <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex gap-1.5 p-1 bg-slate-100 rounded-2xl w-fit">
+                  {(["all", "pending", "approved", "rejected"] as const).map((f) => (
+                    <Button 
+                      key={f} 
+                      size="sm" 
+                      variant={statusFilter === f ? "default" : "ghost"}
+                      className={`rounded-xl text-[10px] font-black uppercase tracking-widest px-4 h-9 ${statusFilter === f ? 'bg-white text-slate-900 shadow-sm hover:bg-white' : 'text-slate-500 hover:text-slate-900'}`}
+                      onClick={() => { setStatusFilter(f); setSelectedIds([]); }}>
+                      {f}
+                      <Badge className="ml-2 bg-slate-200 text-slate-600 border-none group-hover:bg-slate-300">
+                         {f === "all" ? submissions.length : submissions.filter((s) => s.status === f).length}
                       </Badge>
-                    </td>
-                    <td className="px-6 py-5">
-                      <DocValue label="Payment" url={(s.paymentUrl || s.paymentId) ?? null} />
-                    </td>
-                    <td className="px-6 py-5">
-                        <p className="text-xs font-bold text-slate-700">{fmtDate(s.submittedAt)}</p>
-                        <p className="text-[10px] font-medium text-slate-400">{fmtTime(s.submittedAt)}</p>
-                    </td>
-                    <td className="px-6 py-5 text-right">
-                       <Button 
-                         variant="ghost" 
-                         size="sm" 
-                         onClick={() => setViewSubId(s.id)}
-                         className="rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-900 hover:text-white"
-                       >
-                          View Detail
-                       </Button>
-                     </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+                    </Button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2 bg-white/50 border border-slate-200 p-1.5 rounded-2xl shadow-sm">
+                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Filter Specialty</span>
+                   <Select value={specFilter} onValueChange={setSpecFilter}>
+                     <SelectTrigger className="h-8 min-w-[180px] rounded-xl border-none bg-slate-100 hover:bg-slate-200 transition-all text-[10px] font-black uppercase tracking-widest focus:ring-0">
+                        <SelectValue placeholder="All Specializations" />
+                     </SelectTrigger>
+                     <SelectContent className="rounded-2xl border-slate-100 shadow-2xl">
+                        <SelectItem value="all" className="text-[10px] font-black uppercase tracking-widest">All Specializations</SelectItem>
+                        {allSpecs.map(spec => (
+                          <SelectItem key={spec} value={spec} className="text-[10px] font-black uppercase tracking-widest">{spec}</SelectItem>
+                        ))}
+                     </SelectContent>
+                   </Select>
+                </div>
+
+                <div className="flex items-center gap-2 bg-white/50 border border-slate-200 p-1.5 rounded-2xl shadow-sm">
+                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Sort By</span>
+                   <Select value={sortFilter} onValueChange={(val: any) => setSortFilter(val)}>
+                     <SelectTrigger className="h-8 min-w-[160px] rounded-xl border-none bg-slate-100 hover:bg-slate-200 transition-all text-[10px] font-black uppercase tracking-widest focus:ring-0">
+                        <SelectValue placeholder="Sort Order" />
+                     </SelectTrigger>
+                     <SelectContent className="rounded-2xl border-slate-100 shadow-2xl">
+                        <SelectItem value="time_desc" className="text-[10px] font-black uppercase tracking-widest">Time Applied: Newest</SelectItem>
+                        <SelectItem value="time_asc" className="text-[10px] font-black uppercase tracking-widest">Time Applied: Oldest</SelectItem>
+                        <SelectItem value="name_asc" className="text-[10px] font-black uppercase tracking-widest">Name: A to Z</SelectItem>
+                        <SelectItem value="name_desc" className="text-[10px] font-black uppercase tracking-widest">Name: Z to A</SelectItem>
+                     </SelectContent>
+                   </Select>
+                </div>
+
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const subList = (submissions || []).filter(Boolean);
+                    if (subList.length < 2) {
+                      toast({
+                        title: "Cannot Merge Applications",
+                        description: "At least 2 application submissions are required to perform a merge.",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+                    const cand1 = subList[0];
+                    const cand2 = subList.find(x => x.id !== cand1.id) || subList[1] || cand1;
+                    setMergePair({ subA: cand1, subB: cand2 });
+                    setMergePrimaryId(cand1.id);
+                    setMergeDeleteSecondary(true);
+                    setMergeDialogOpen(true);
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest h-11 px-4 gap-2 shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  <GitMerge className="w-3.5 h-3.5" />
+                  Merge Applications
+                </Button>
+              </div>
+
+             {selectedIds.length > 0 && (
+                 <motion.div 
+                   initial={{ opacity: 0, x: 20 }}
+                   animate={{ opacity: 1, x: 0 }}
+                   className="flex items-center gap-3 bg-slate-900 text-white rounded-2xl px-5 py-2 shadow-xl"
+                 >
+                   <span className="text-xs font-bold mr-2">{selectedIds.length} Selected</span>
+                   {selectedIds.length === 2 && (
+                     <Button 
+                       size="sm" 
+                       className="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase h-8 px-3 gap-1.5 shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all"
+                       onClick={() => {
+                         const idA = Number(selectedIds[0]);
+                         const idB = Number(selectedIds[1]);
+                         const subA = submissions.find(s => Number(s.id) === idA);
+                         const subB = submissions.find(s => Number(s.id) === idB);
+                         if (subA && subB) {
+                           setMergePair({ subA, subB });
+                           setMergePrimaryId(subA.id);
+                           setMergeDeleteSecondary(true);
+                           setMergeDialogOpen(true);
+                         } else {
+                           toast({
+                             title: "Cannot find selected applications",
+                             description: "Please ensure both selected applications belong to the current list.",
+                             variant: "destructive"
+                           });
+                         }
+                       }}
+                     >
+                       <GitMerge className="w-3.5 h-3.5" />
+                       Merge 2 Applications
+                     </Button>
+                   )}
+                   <Button size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-[10px] font-black uppercase h-8 px-3"
+                     onClick={() => bulkAction.mutate({ formId: viewFormId, action: "approve", ids: selectedIds })}
+                     disabled={bulkAction.isPending}>
+                     Approve
+                   </Button>
+                   <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-300 text-[10px] font-black uppercase h-8 px-3"
+                     onClick={() => {
+                       if (confirm(`Delete ${selectedIds.length} submissions?`)) bulkDeleteSubsMutation.mutate(selectedIds);
+                     }}
+                     disabled={bulkDeleteSubsMutation.isPending}>
+                     Delete
+                   </Button>
+                 </motion.div>
+               )}
+            </div>
+
+            <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white">
+              <div className="overflow-x-auto fancy-scrollbar">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50/50 border-b border-slate-100">
+                      <th className="px-6 py-5 w-10">
+                        <Checkbox checked={allFilteredSelected} onCheckedChange={toggleSelectAll} className="rounded-md border-slate-300" />
+                      </th>
+                      <th className="text-left px-6 py-5 font-black text-slate-400 uppercase tracking-widest text-[10px]">Candidate</th>
+                      <th className="text-left px-6 py-5 font-black text-slate-400 uppercase tracking-widest text-[10px]">Applied For</th>
+                      <th className="text-left px-6 py-5 font-black text-slate-400 uppercase tracking-widest text-[10px]">Status</th>
+                      <th className="text-left px-6 py-5 font-black text-slate-400 uppercase tracking-widest text-[10px]">Payment Ref</th>
+                      <th className="text-left px-6 py-5 font-black text-slate-400 uppercase tracking-widest text-[10px]">Submitted</th>
+                      <th className="text-right px-6 py-5 font-black text-slate-400 uppercase tracking-widest text-[10px]">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {sortedSubs.map((s) => (
+                      <tr key={s.id} className={`group hover:bg-slate-50/50 transition-colors ${selectedIds.includes(s.id) ? "bg-orange-50/30" : ""}`}>
+                        <td className="px-6 py-5">
+                          <Checkbox checked={selectedIds.includes(s.id)} onCheckedChange={() => toggleSelect(s.id)} className="rounded-md border-slate-300" />
+                        </td>
+                        <td className="px-6 py-5">
+                          <div className="flex flex-col">
+                            <span className="font-black text-slate-900 text-base leading-tight group-hover:text-orange-600 transition-colors cursor-pointer flex items-center gap-2" onClick={() => setViewSubId(s.id)}>
+                               {s.fullName}
+                               {s.readyForReview && <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{s.email}</span>
+                            {(() => {
+                              const dupes = s.email ? submissions.filter(other => other.email?.toLowerCase().trim() === s.email?.toLowerCase().trim() && other.id !== s.id) : [];
+                              if (dupes.length > 0) {
+                                return (
+                                  <div className="mt-1 flex items-center gap-1.5">
+                                    <span className="text-[9px] font-black uppercase tracking-wider text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                      <span>🔁</span> {dupes.length + 1} Submissions for Applicant
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setMergePair({ subA: s, subB: dupes[0] });
+                                        setMergePrimaryId(s.id);
+                                        setMergeDeleteSecondary(false);
+                                        setMergeDialogOpen(true);
+                                      }}
+                                      className="text-[9px] font-black uppercase tracking-wider text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <GitMerge className="w-2.5 h-2.5" />
+                                      Merge
+                                    </button>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+                            {(() => {
+                              const prefs = getFormattedSpecialityPrefs(s.specialization, s.centerPreference, s.formData, s.customAnswers, viewedForm?.sectionsConfig);
+                              if (prefs.length > 0) {
+                                return (
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {prefs.map(({ spec, location }) => (
+                                      <span key={spec} className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100 rounded-full px-2 py-0.5">
+                                        {location ? `${spec}: ${location}` : spec}
+                                      </span>
+                                    ))}
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+                        </td>
+                        <td className="px-6 py-5">
+                          {(() => {
+                            const prefs = getFormattedSpecialityPrefs(s.specialization, s.centerPreference, s.formData, s.customAnswers, viewedForm?.sectionsConfig);
+                            if (prefs.length > 0) {
+                              return (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {prefs.map(({ spec, location }) => (
+                                    <Badge key={spec} className={`${getSpecColorClass(spec)} rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-tight border-none`}>
+                                       {location ? `${spec}: ${location}` : spec}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              );
+                            }
+                            return <span className="text-slate-400 text-xs">-</span>;
+                          })()}
+                        </td>
+                        <td className="px-6 py-5">
+                          <Badge className={`${STATUS_COLORS[s.status] ?? "bg-slate-100"} rounded-full px-3 py-0.5 text-[9px] font-black uppercase tracking-widest border-none`}>
+                            {s.status}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-5">
+                          <DocValue label="Payment" url={(s.paymentUrl || s.paymentId) ?? null} />
+                        </td>
+                        <td className="px-6 py-5">
+                            <p className="text-xs font-bold text-slate-700">{fmtDate(s.submittedAt)}</p>
+                            <p className="text-[10px] font-medium text-slate-400">{fmtTime(s.submittedAt)}</p>
+                        </td>
+                        <td className="px-6 py-5 text-right">
+                           <Button 
+                             variant="ghost" 
+                             size="sm" 
+                             onClick={() => setViewSubId(s.id)}
+                             className="rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-900 hover:text-white"
+                           >
+                              View Detail
+                           </Button>
+                         </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </TabsContent>
+
+          {/* Sub-tab 2: Approved Candidates (Call Letters) */}
+          <TabsContent value="call_letters" className="space-y-6 focus:outline-none">
+            {/* Call Letter Notice Banner */}
+            <div className="bg-gradient-to-r from-[#0b4a8f] via-[#103b70] to-[#0a2540] text-white rounded-[28px] p-6 shadow-xl border border-blue-400/20 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-blue-400/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge className="bg-amber-400 text-slate-950 font-black text-[9px] uppercase tracking-wider px-2.5 py-0.5 border-none">
+                      Central Selection Board
+                    </Badge>
+                    <span className="text-[10px] font-bold text-blue-200 uppercase tracking-widest">
+                      December 2026 Intake
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
+                    <Award className="w-5 h-5 text-amber-400" />
+                    Interview Call Letters Hub (Approved Only)
+                  </h3>
+                  <p className="text-xs text-blue-100/80 max-w-2xl font-medium leading-relaxed">
+                    Official call letters for physical scrutiny and faculty interviews at Sankara Eye Hospital, Bangalore. Download official PDF or dispatch directly to candidate email.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 bg-white/10 p-3 rounded-2xl border border-white/10 shrink-0">
+                  <div className="text-left">
+                    <p className="text-[9px] font-black uppercase tracking-wider text-amber-300">Retina (VR & MR)</p>
+                    <p className="text-xs font-bold text-white">7 Dec 2026 (Mon)</p>
+                  </div>
+                  <div className="w-px h-8 bg-white/20" />
+                  <div className="text-left">
+                    <p className="text-[9px] font-black uppercase tracking-wider text-emerald-300">Other Specialities</p>
+                    <p className="text-xs font-bold text-white">8 Dec 2026 (Tue)</p>
+                  </div>
+                  <div className="w-px h-8 bg-white/20" />
+                  <div className="text-left">
+                    <p className="text-[9px] font-black uppercase tracking-wider text-blue-200">Reporting Time</p>
+                    <p className="text-xs font-bold text-white">8:00 AM Sharp</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter toolbar */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+              <div className="relative flex-1 max-w-md">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Input
+                  placeholder="Search approved candidates by name, code, email..."
+                  value={callLetterSearch}
+                  onChange={(e) => setCallLetterSearch(e.target.value)}
+                  className="pl-10 h-10 rounded-2xl bg-white border-slate-200 text-xs font-semibold"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Stream:</span>
+                <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
+                  {(["all", "retina", "anterior"] as const).map((mode) => (
+                    <Button
+                      key={mode}
+                      size="sm"
+                      variant={callStreamFilter === mode ? "default" : "ghost"}
+                      onClick={() => setCallStreamFilter(mode)}
+                      className={`h-8 rounded-lg text-[10px] font-black uppercase tracking-wider px-3 ${callStreamFilter === mode ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+                    >
+                      {mode === "all" ? "All Streams" : mode === "retina" ? "Retina VR & MR (7 Dec)" : "Other Specialities (8 Dec)"}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Approved Candidates Table */}
+            {(() => {
+              const approvedCandidates = submissions.filter(s => ['approved', 'verified', 'scheduled', 'interviewed', 'completed', 'allocated'].includes(s.status));
+              const filteredList = approvedCandidates.filter(s => {
+                const matchSearch = !callLetterSearch ||
+                  s.fullName?.toLowerCase().includes(callLetterSearch.toLowerCase()) ||
+                  s.email?.toLowerCase().includes(callLetterSearch.toLowerCase()) ||
+                  (s.candidateCode && s.candidateCode.toLowerCase().includes(callLetterSearch.toLowerCase()));
+                const isRet = parseActualSpecializations(s).some(sp => isRetinaSpecialty(sp));
+                const matchStream = callStreamFilter === "all" ? true : (callStreamFilter === "retina" ? isRet : !isRet);
+                return matchSearch && matchStream;
+              });
+
+              if (filteredList.length === 0) {
+                return (
+                  <Card className="border-none shadow-premium rounded-3xl p-12 text-center bg-white">
+                    <Award className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <h3 className="font-bold text-slate-800 text-base">No Approved Candidates Match Filters</h3>
+                    <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto font-medium">
+                      {approvedCandidates.length === 0 
+                        ? "No candidates have been approved yet. Review submissions in the Applications tab and click Approve to generate Call Letters."
+                        : "Try adjusting your search query or stream filter to find approved candidates."}
+                    </p>
+                  </Card>
+                );
+              }
+
+              return (
+                <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white">
+                  <div className="overflow-x-auto fancy-scrollbar">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-50/70 border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">
+                          <th className="px-6 py-4 w-12">#</th>
+                          <th className="px-6 py-4">Reg Code</th>
+                          <th className="px-6 py-4">Candidate Doctor</th>
+                          <th className="px-6 py-4">Specialization</th>
+                          <th className="px-6 py-4">Interview Schedule</th>
+                          <th className="px-6 py-4">Contact</th>
+                          <th className="px-6 py-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredList.map((s, idx) => {
+                          const isRet = parseActualSpecializations(s).some(sp => isRetinaSpecialty(sp));
+                          const schedDate = isRet ? "7th Dec 2026 (Mon)" : "8th Dec 2026 (Tue)";
+                          const candidateCode = s.candidateCode || `APP-${String(s.id).padStart(4, "0")}`;
+                          const qual = [s.degree, s.medicalCollege].filter(Boolean).join(" · ") || "MBBS / MS";
+
+                          return (
+                            <tr key={s.id} className="hover:bg-slate-50/60 transition-colors group">
+                              <td className="px-6 py-4 font-bold text-slate-400 text-xs">{idx + 1}</td>
+                              <td className="px-6 py-4">
+                                <Badge className="bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono text-[10px] font-black px-2.5 py-0.5 rounded-lg">
+                                  {candidateCode}
+                                </Badge>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex flex-col">
+                                  <span className="font-black text-slate-900 group-hover:text-indigo-600 transition-colors cursor-pointer text-sm" onClick={() => setViewSubId(s.id)}>
+                                    Dr. {cleanDoctorName(s.fullName)}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 font-medium truncate max-w-xs">{qual}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex flex-wrap gap-1">
+                                  {parseActualSpecializations(s).map(sp => (
+                                    <Badge key={sp} className={`${getSpecColorClass(sp)} rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-tight border-none`}>
+                                      {sp}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-slate-800 text-xs flex items-center gap-1">
+                                    <CalendarDays className="w-3 h-3 text-indigo-500" /> {schedDate}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 font-medium">8:00 AM · SEH Bangalore</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex flex-col">
+                                  <span className="text-xs font-semibold text-slate-700 truncate max-w-[180px]">{s.email}</span>
+                                  <span className="text-[10px] text-slate-400 font-mono">{s.phone || "—"}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => downloadCallLetter(s.id, candidateCode)}
+                                    disabled={downloadingLetterId === s.id}
+                                    className="rounded-xl border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100 text-indigo-900 font-bold text-xs h-8 gap-1 shadow-sm"
+                                  >
+                                    {downloadingLetterId === s.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                                    Call Letter PDF
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => sendCallLetterEmail(s.id, s.fullName)}
+                                    disabled={sendingEmailId === s.id}
+                                    className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-8 gap-1 shadow-sm"
+                                  >
+                                    {sendingEmailId === s.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                                    Send Email
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setViewSubId(s.id)}
+                                    className="rounded-xl text-slate-600 hover:text-slate-900 font-bold text-xs h-8 gap-1"
+                                    title="View Full Application"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              );
+            })()}
+          </TabsContent>
+
+          {/* Sub-tab 3: Selected Fellows (Offer Letters) */}
+          <TabsContent value="offer_letters" className="space-y-6 focus:outline-none">
+            {/* Offer Letter Notice Banner */}
+            <div className="bg-gradient-to-r from-[#064e3b] via-[#065f46] to-[#042f2e] text-white rounded-[28px] p-6 shadow-xl border border-emerald-400/20 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-400/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge className="bg-emerald-400 text-slate-950 font-black text-[9px] uppercase tracking-wider px-2.5 py-0.5 border-none">
+                      Fellowship Appointments
+                    </Badge>
+                    <span className="text-[10px] font-bold text-emerald-200 uppercase tracking-widest">
+                      December 2026 Intake
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-emerald-300" />
+                    Selected Fellows · Official Offer Letters Hub
+                  </h3>
+                  <p className="text-xs text-emerald-100/80 max-w-2xl font-medium leading-relaxed">
+                    Generate standard 2-page Fellowship Appointment & Offer Letters with monthly stipend (Rs 40,000/-), assigned hospital unit, Phase 1 & Phase 2 duration breakdown, and mandatory induction dates (2nd & 3rd January 2027). For clarifications contact Radhika (Course Coordinator) on 9666677505.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 bg-white/10 p-3 rounded-2xl border border-white/10 shrink-0">
+                  <div className="text-left">
+                    <p className="text-[9px] font-black uppercase tracking-wider text-emerald-300">Effective Date</p>
+                    <p className="text-xs font-bold text-white">6th Jan 2027</p>
+                  </div>
+                  <div className="w-px h-8 bg-white/20" />
+                  <div className="text-left">
+                    <p className="text-[9px] font-black uppercase tracking-wider text-amber-300">Induction Program</p>
+                    <p className="text-xs font-bold text-white">2nd & 3rd Jan 2027</p>
+                  </div>
+                  <div className="w-px h-8 bg-white/20" />
+                  <div className="text-left">
+                    <p className="text-[9px] font-black uppercase tracking-wider text-teal-200">Monthly Stipend</p>
+                    <p className="text-xs font-bold text-white">Rs 40,000/-</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Search bar */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+              <div className="relative flex-1 max-w-md">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Input
+                  placeholder="Search selected candidates by name, code, or email..."
+                  value={offerLetterSearch}
+                  onChange={(e) => setOfferLetterSearch(e.target.value)}
+                  className="pl-10 h-10 rounded-2xl bg-white border-slate-200 text-xs font-semibold"
+                />
+              </div>
+
+              <div className="text-xs font-bold text-slate-500">
+                Total Allocated / Eligible: <span className="text-slate-900 font-black">{approvedCandidatesCount} Fellows</span>
+              </div>
+            </div>
+
+            {/* Selected Fellows Table */}
+            {(() => {
+              const eligibleSubs = submissions.filter(s => ['approved', 'verified', 'scheduled', 'interviewed', 'completed', 'allocated'].includes(s.status));
+              const filteredList = eligibleSubs.filter(s => {
+                if (!offerLetterSearch) return true;
+                const q = offerLetterSearch.toLowerCase();
+                return s.fullName?.toLowerCase().includes(q) ||
+                  s.email?.toLowerCase().includes(q) ||
+                  (s.candidateCode && s.candidateCode.toLowerCase().includes(q));
+              });
+
+              if (filteredList.length === 0) {
+                return (
+                  <Card className="border-none shadow-premium rounded-3xl p-12 text-center bg-white">
+                    <Sparkles className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <h3 className="font-bold text-slate-800 text-base">No Selected Candidates Found</h3>
+                    <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto font-medium">
+                      Approve candidates from the Applications queue to generate and issue their 2-page Offer Letters.
+                    </p>
+                  </Card>
+                );
+              }
+
+              return (
+                <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white">
+                  <div className="overflow-x-auto fancy-scrollbar">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-50/70 border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">
+                          <th className="px-6 py-4 w-12">#</th>
+                          <th className="px-6 py-4">Reg Code</th>
+                          <th className="px-6 py-4">Fellow Doctor</th>
+                          <th className="px-6 py-4">Specialization</th>
+                          <th className="px-6 py-4">Assigned Hospital Unit</th>
+                          <th className="px-6 py-4">Stipend & Joining</th>
+                          <th className="px-6 py-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredList.map((s, idx) => {
+                          const candidateCode = s.candidateCode || `APP-${String(s.id).padStart(4, "0")}`;
+                          const defaultPrefUnit = s.centerPreference ? String(s.centerPreference).replace(/[{}"[\]]/g, "").trim().split(",")[0] : "";
+                          const assignedUnit = offerUnitOverrides[s.id] || defaultPrefUnit || "Bangalore";
+
+                          return (
+                            <tr key={s.id} className="hover:bg-slate-50/60 transition-colors group">
+                              <td className="px-6 py-4 font-bold text-slate-400 text-xs">{idx + 1}</td>
+                              <td className="px-6 py-4">
+                                <Badge className="bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono text-[10px] font-black px-2.5 py-0.5 rounded-lg">
+                                  {candidateCode}
+                                </Badge>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex flex-col">
+                                  <span className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors cursor-pointer text-sm" onClick={() => setViewSubId(s.id)}>
+                                    Dr. {cleanDoctorName(s.fullName)}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 font-semibold">{s.email}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex flex-wrap gap-1">
+                                  {parseActualSpecializations(s).map(sp => (
+                                    <Badge key={sp} className={`${getSpecColorClass(sp)} rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-tight border-none`}>
+                                      {sp}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="min-w-[190px]">
+                                  <Select
+                                    value={assignedUnit}
+                                    onValueChange={(val) => setOfferUnitOverrides(prev => ({ ...prev, [s.id]: val }))}
+                                  >
+                                    <SelectTrigger className="h-8 rounded-xl border-slate-200 bg-slate-50 text-xs font-bold">
+                                      <SelectValue placeholder="Select Unit" />
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-2xl border-slate-100 shadow-2xl">
+                                      {units.length > 0 ? (
+                                        units.map((u: any) => (
+                                          <SelectItem key={u.id} value={u.name} className="text-xs font-bold">
+                                            {u.name}
+                                          </SelectItem>
+                                        ))
+                                      ) : (
+                                        ["Bangalore", "Jaipur", "Coimbatore", "Kanpur", "Shimoga", "Guntur", "Ludhiana", "Chennai", "Anand", "Varanasi", "Panvel", "Indore", "Hyderabad"].map((city) => (
+                                          <SelectItem key={city} value={`Sankara Eye Hospital, ${city}`} className="text-xs font-bold">
+                                            Sankara Eye Hospital, {city}
+                                          </SelectItem>
+                                        ))
+                                      )}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex flex-col">
+                                  <span className="font-extrabold text-slate-900 text-xs">Rs 40,000 / month</span>
+                                  <span className="text-[10px] text-emerald-700 font-bold">Joining: 6th Jan 2027</span>
+                                  {(() => {
+                                    const actualSpecs = parseActualSpecializations(s);
+                                    const isRetinaCand = actualSpecs.some(sp => isRetinaSpecialty(sp));
+                                    const isCataractCand = actualSpecs.some(sp => sp.toLowerCase().includes("cataract") || sp.toLowerCase().includes("iol"));
+                                    const phaseLabel = isCataractCand 
+                                      ? "Phase 1: 18M (IOL)" 
+                                      : actualSpecs.some(sp => sp.toLowerCase().includes("medical retina") || sp.toLowerCase().includes("mr"))
+                                      ? "Phase 1: 18M (MR)"
+                                      : isRetinaCand 
+                                      ? "Phase 2: 24M (VR)"
+                                      : "Phase 1: 6M (IOL) + Phase 2: 18M";
+                                    return (
+                                      <span className="text-[9px] text-slate-500 font-semibold mt-0.5">
+                                        {phaseLabel}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => downloadOfferLetter(s.id, candidateCode, assignedUnit)}
+                                    disabled={downloadingLetterId === s.id}
+                                    className="rounded-xl border-emerald-300 bg-emerald-50/60 hover:bg-emerald-100 text-emerald-900 font-bold text-xs h-8 gap-1 shadow-sm"
+                                  >
+                                    {downloadingLetterId === s.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                                    Offer Letter (PDF)
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => sendOfferLetterEmail(s.id, s.fullName, assignedUnit)}
+                                    disabled={sendingEmailId === s.id}
+                                    className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-8 gap-1 shadow-sm"
+                                  >
+                                    {sendingEmailId === s.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                                    Send Email
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setViewSubId(s.id)}
+                                    className="rounded-xl text-slate-600 hover:text-slate-900 font-bold text-xs h-8 gap-1"
+                                    title="View Full Application"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              );
+            })()}
+          </TabsContent>
+
+          {/* Sub-tab 4: Form & Public Link */}
+          <TabsContent value="settings" className="space-y-6 focus:outline-none">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="md:col-span-2 border-none shadow-premium rounded-3xl p-8 bg-white space-y-6">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge className={viewedForm?.isActive ? "bg-emerald-500" : "bg-slate-400"}>
+                      {viewedForm?.isActive ? "Intake Active" : "Paused"}
+                    </Badge>
+                    <Badge className="bg-orange-500 text-white font-bold text-[9px] uppercase tracking-wider">
+                      December 2026 Cycle
+                    </Badge>
+                  </div>
+                  <h3 className="text-2xl font-black text-slate-900">{viewedForm?.title}</h3>
+                  <p className="text-sm text-slate-500 font-medium mt-1">
+                    {viewedForm?.description || "Official candidate registration and admissions form for December 2026 fellowship intake."}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-slate-700">Public Applicant Entry Link</Label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2.5 font-mono text-xs text-slate-700 truncate">
+                      {viewedForm ? buildFormLink(viewedForm.token) : "—"}
+                    </div>
+                    {viewedForm && (
+                      <Button
+                        variant="outline"
+                        onClick={() => copyLink(viewedForm)}
+                        className="rounded-2xl border-slate-200 font-bold text-xs h-10 px-4"
+                      >
+                        {copiedId === viewedForm.id ? <Check className="w-4 h-4 mr-1 text-emerald-600" /> : <Copy className="w-4 h-4 mr-1" />}
+                        {copiedId === viewedForm.id ? "Copied" : "Copy Link"}
+                      </Button>
+                    )}
+                    {viewedForm?.token && (
+                      <Button
+                        variant="ghost"
+                        onClick={() => window.open(buildFormLink(viewedForm.token), "_blank")}
+                        className="rounded-2xl font-bold text-xs h-10 px-3 hover:bg-slate-100"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total Applicants</span>
+                    <p className="text-xl font-black text-slate-900">{totalApplicants}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Application Deadline</span>
+                    <p className="text-sm font-bold text-slate-700">
+                      {viewedForm?.deadline ? new Date(viewedForm.deadline).toLocaleDateString("en-IN") : "Open Registration"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center gap-3">
+                  <Button
+                    variant="outline"
+                    className="rounded-2xl border-slate-200 font-bold text-xs"
+                    onClick={() => {
+                      if (viewedForm) {
+                        setEditForm(viewedForm);
+                        setEditCustomFields(viewedForm.customFields ?? []);
+                        setEditSectionsConfig(viewedForm.sectionsConfig ?? []);
+                      }
+                    }}
+                  >
+                    <Settings2 className="w-4 h-4 mr-2 text-slate-500" /> Edit Form Config & Fields
+                  </Button>
+                </div>
+              </Card>
+
+              {/* QR Code Card */}
+              <Card className="border-none shadow-premium rounded-3xl p-8 bg-white flex flex-col items-center justify-center text-center space-y-4">
+                <div className="p-4 bg-slate-50 border border-slate-100 rounded-3xl shadow-inner">
+                  {viewedForm ? (
+                    <QRCode value={buildFormLink(viewedForm.token)} size={160} />
+                  ) : (
+                    <div className="w-40 h-40 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 text-xs">No Form</div>
+                  )}
+                </div>
+                <div>
+                  <h4 className="font-black text-slate-900 text-sm">Scan to Apply</h4>
+                  <p className="text-[11px] text-slate-400 font-medium mt-0.5">Mobile-friendly applicant entry portal</p>
+                </div>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
 
         {/* Merge Applications Dialog */}
         <Dialog open={mergeDialogOpen} onOpenChange={setMergeDialogOpen}>

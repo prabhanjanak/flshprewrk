@@ -5,6 +5,8 @@ import { requireAuth, requireRole } from "../middleware/auth";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import path from "path";
+import os from "os";
+import fs from "fs";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -38,36 +40,55 @@ router.post("/storage/uploads/request-url", requireAuth, async (req: Request, re
   }
 });
 
-import { createWriteStream } from "fs";
-
 router.put("/storage/local-upload/:filename", requireAuth, async (req: Request, res: Response) => {
   try {
-    const uploadDir = path.join(process.cwd(), "uploads");
-    const fsPromises = await import("fs/promises");
-    await fsPromises.mkdir(uploadDir, { recursive: true });
-
-    const filePath = path.join(uploadDir, req.params.filename as string);
-    const writeStream = createWriteStream(filePath);
-
-    req.pipe(writeStream);
-
-    writeStream.on("finish", async () => {
-      let finalFilename = req.params.filename as string;
-      try {
-        const { normalizeUploadedFile } = await import("../lib/image-normalizer");
-        const normResult = await normalizeUploadedFile(filePath, req.params.filename as string);
-        if (normResult?.normalizedPath) {
-          finalFilename = path.basename(normResult.normalizedPath);
-        }
-      } catch (normErr) {
-        console.warn("[storage-normalizer] Post-upload normalization skipped:", normErr);
-      }
-      res.json({ success: true, path: `/objects/uploads/${finalFilename}` });
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk) => {
+      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
     });
 
-    writeStream.on("error", (err) => {
-      req.log?.error?.({ err }, "Error writing file");
-      res.status(500).json({ error: "Failed to upload file" });
+    req.on("end", async () => {
+      try {
+        const buffer = Buffer.concat(chunks);
+        const filename = req.params.filename as string;
+        const objectPath = `/objects/uploads/${filename}`;
+        const contentType = (req.headers["content-type"] as string) || "application/octet-stream";
+
+        // 1. Write to /tmp disk cache (safe and writable on Vercel)
+        try {
+          const tmpUploadDir = path.join(os.tmpdir(), "uploads");
+          await fs.promises.mkdir(tmpUploadDir, { recursive: true });
+          await fs.promises.writeFile(path.join(tmpUploadDir, filename), buffer);
+        } catch (_) {}
+
+        // 2. Try writing to process.cwd() (works locally on dev)
+        try {
+          const localUploadDir = path.join(process.cwd(), "uploads");
+          await fs.promises.mkdir(localUploadDir, { recursive: true });
+          await fs.promises.writeFile(path.join(localUploadDir, filename), buffer);
+        } catch (_) {}
+
+        // 3. Persist permanently to Neon Postgres DB
+        await db.execute(sql`
+          INSERT INTO uploaded_files (file_path, file_name, content_type, file_data, file_size)
+          VALUES (${objectPath}, ${filename}, ${contentType}, ${buffer}, ${buffer.length})
+          ON CONFLICT (file_path) DO UPDATE SET
+            file_data = EXCLUDED.file_data,
+            file_size = EXCLUDED.file_size,
+            content_type = EXCLUDED.content_type,
+            created_at = NOW()
+        `);
+
+        res.json({ success: true, path: objectPath });
+      } catch (saveErr: any) {
+        req.log?.error?.({ err: saveErr }, "Error saving uploaded file");
+        res.status(500).json({ error: saveErr.message || "Failed to save file" });
+      }
+    });
+
+    req.on("error", (err) => {
+      req.log?.error?.({ err }, "Upload stream error");
+      if (!res.headersSent) res.status(500).json({ error: "Upload stream failed" });
     });
   } catch (error) {
     req.log?.error?.({ err: error }, "Error in local upload");
@@ -182,16 +203,39 @@ router.get("/storage/objects/*path", requireAuth, requireRole("super_admin", "pr
 
     const isReplit = !!process.env.REPL_ID;
     if (!isReplit) {
-        const { fileURLToPath } = await import("url");
-        // We use process.cwd() as the base, which is consistent with the upload logic
-        const localPath = path.join(process.cwd(), "uploads", objectPath.replace("/objects/uploads/", ""));
-        res.sendFile(localPath, (err) => {
-          if (err && !res.headersSent) {
-            req.log.warn({ localPath, err }, "File not found on disk");
-            res.status(404).json({ error: "File not found on disk" });
-          }
-        });
-      return;
+      // 1. Check disk paths (/tmp or uploads/)
+      const candidatePaths = [
+        path.join(process.cwd(), "uploads", objectPath.replace("/objects/uploads/", "")),
+        path.join(os.tmpdir(), "uploads", objectPath.replace("/objects/uploads/", "")),
+        path.join(process.cwd(), "uploads", objectPath.replace("/objects/", "")),
+        path.join(os.tmpdir(), "uploads", objectPath.replace("/objects/", "")),
+      ];
+      for (const cp of candidatePaths) {
+        if (fs.existsSync(cp)) {
+          return res.sendFile(cp);
+        }
+      }
+
+      // 2. Fetch from Neon Postgres uploaded_files table
+      try {
+        const result = await db.execute(sql`
+          SELECT file_name, content_type, file_data, file_size 
+          FROM uploaded_files 
+          WHERE file_path = ${objectPath} OR file_path = ${'/objects/uploads/' + objectPath.replace(/^\/objects\/(uploads\/)?/, '')}
+          LIMIT 1
+        `);
+        if (result.rows.length > 0) {
+          const row = result.rows[0] as any;
+          res.setHeader("Content-Type", row.content_type || "application/octet-stream");
+          res.setHeader("Content-Length", row.file_size);
+          res.setHeader("Content-Disposition", `inline; filename="${row.file_name}"`);
+          return res.end(row.file_data);
+        }
+      } catch (dbErr) {
+        req.log?.warn?.({ err: dbErr }, "Database file lookup failed");
+      }
+
+      return res.status(404).json({ error: "File not found" });
     }
 
     const objectFile = await objectStorageService.getObjectEntityFile(objectPath);

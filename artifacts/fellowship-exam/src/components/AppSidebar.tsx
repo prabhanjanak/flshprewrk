@@ -42,22 +42,22 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: "Dashboard",            href: "/",                  icon: LayoutDashboard, roles: ["super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "unit_coordinator", "doctor", "student"] },
-  { label: "Application Forms",    href: "/application-forms", icon: FormInput,       roles: ["super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"] },
-  { label: "Candidates Directory", href: "/candidates",        icon: ClipboardList,   roles: ["super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "unit_coordinator"] },
-  { label: "Interview Evaluation", href: "/interviews",        icon: Stethoscope,     roles: ["super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "unit_coordinator", "doctor"] },
-  { label: "Call & Offer Letters", href: "/letters",           icon: Award,           roles: ["super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"] },
-  { label: "User Management",      href: "/users",             icon: Users,           roles: ["super_admin"] },
-  { label: "My Results",           href: "/results",           icon: FileText,        roles: ["student"] },
+  { label: "Dashboard",                 href: "/",                  icon: LayoutDashboard, roles: ["super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "unit_coordinator", "doctor", "student"] },
+  { label: "Applications & Admissions", href: "/application-forms", icon: FormInput,       roles: ["super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "unit_coordinator"] },
+  { label: "Letters",                   href: "/letters",           icon: Award,           roles: ["super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "unit_coordinator"] },
+  { label: "Interview Evaluation",      href: "/interviews",        icon: Stethoscope,     roles: ["super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "unit_coordinator", "doctor"] },
+  { label: "User Management",           href: "/users",             icon: Users,           roles: ["super_admin"] },
+  { label: "My Results",                href: "/results",           icon: FileText,        roles: ["student"] },
 ];
 
 const roleLabel: Record<string, string> = {
   super_admin:              "Super Admin",
-  program_admin:            "Program Admin",
-  central_exam_coordinator: "Central Exam Coordinator",
   exam_coordinator:         "Exam Coordinator",
-  unit_coordinator:         "Unit Coordinator",
-  doctor:                   "Doctor / Interviewer",
+  doctor:                   "Doctor",
+  // Legacy aliases mapped directly to 3 canonical roles
+  program_admin:            "Exam Coordinator",
+  central_exam_coordinator: "Exam Coordinator",
+  unit_coordinator:         "Exam Coordinator",
   student:                  "Candidate",
   display_operator:         "Display Operator",
 };
@@ -89,7 +89,7 @@ function SidebarContent({ onNavigate, collapsed }: { onNavigate?: () => void; co
       </div>
 
       {/* Active Program Suite Switcher */}
-      {!collapsed && (user.role === "super_admin" || user.role === "program_admin" || user.role === "central_exam_coordinator") && (
+      {!collapsed && (user.role === "super_admin" || user.role === "exam_coordinator" || user.role === "program_admin" || user.role === "central_exam_coordinator") && (
         <div className="px-4 py-3 border-b border-white/10 bg-white/5">
           <div className="flex items-center justify-between gap-1 mb-1.5">
             <span className="text-[10px] font-black uppercase tracking-widest text-orange-400 flex items-center gap-1">

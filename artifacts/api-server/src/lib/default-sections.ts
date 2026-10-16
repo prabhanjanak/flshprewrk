@@ -9,7 +9,7 @@ export const DEFAULT_SECTIONS = [
         id: "intro_text", 
         type: "info", 
         label: "Key Instructions", 
-        defaultValue: "<b>1. Multiple Sub-specialties:</b> Candidates can now apply for multiple Sub-specialties in a single application form. Separate fees apply for each specialization.<br/><br/><b>2. Required Documents:</b> Kindly carry your basic and post-graduate educational certificates, current valid medical registration license, and passport-size photograph.<br/><br/><b>3. Selection Process:</b> Selection involves a written test (MCQ pattern) and an interview.<br/><br/><b>4. Application Fee:</b> Rs.2750/- per specialization, payable only through online transfer to the HDFC Bank account.<br/><br/><b>5. Age Limit:</b> The age limit is 35 years; those beyond 35 years and those awaiting PG results are not eligible.<br/><br/><b>6. Government Bond:</b> Applicants under Government bond or Compulsory Rural Service must submit a 'No Objection Certificate' during the examination.<br/><br/><b>7. NOC Requirement:</b> Selected fellows must submit NOC from their State Medical Council during Fellowship induction.<br/><br/><b>8. Recommendation Letters:</b> Two Letters of Recommendation are required to be uploaded in the last page of this form.<br/><br/><b>9. Payment Proof:</b> The receipt of online payment (screenshot) must be enclosed to the application form." 
+        defaultValue: "<b>1. Multiple Sub-specialties:</b> Candidates can now apply for multiple Sub-specialties in a single application form. Separate fees apply for each specialization.<br/><br/><b>2. Required Documents:</b> Kindly carry your basic and post-graduate educational certificates, current valid medical registration license, and passport-size photograph.<br/><br/><b>3. Selection Process:</b> Selection involves a written test (MCQ pattern) and an interview.<br/><br/><b>4. Application Fee:</b> Rs.2750/- per specialization, payable online during application submission.<br/><br/><b>5. Age Limit:</b> The age limit is 35 years; those beyond 35 years and those awaiting PG results are not eligible.<br/><br/><b>6. Government Bond:</b> Applicants under Government bond or Compulsory Rural Service must submit a 'No Objection Certificate' during the examination.<br/><br/><b>7. NOC Requirement:</b> Selected fellows must submit NOC from their State Medical Council during Fellowship induction.<br/><br/><b>8. Recommendation Letters:</b> Two Letters of Recommendation are required to be uploaded in the last page of this form."
       }
     ]
   },
@@ -30,11 +30,11 @@ export const DEFAULT_SECTIONS = [
     fields: [
       { id: "unit_cornea", type: "checkbox_group", label: "Cornea Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Jaipur", "Shimoga", "Not Applicable"], visibleIf: { field: "specialization", contains: "Cornea" } },
       { id: "unit_glaucoma", type: "checkbox_group", label: "Glaucoma Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga", "Not Applicable"], visibleIf: { field: "specialization", contains: "Glaucoma" } },
-      { id: "unit_iol", type: "checkbox_group", label: "IOL Preferred Center", options: ["Anand", "Bangalore", "Guntur", "Hyderabad", "Indore", "Jaipur", "Kanpur", "Krishnankoil", "Ludhiana", "Panvel", "Shimoga", "Varanasi", "Not Applicable"], visibleIf: { field: "specialization", contains: "IOL" } },
+      { id: "unit_iol", type: "checkbox_group", label: "IOL Preferred Center", options: ["Anand", "Bangalore", "Coimbatore", "Guntur", "Hyderabad", "Indore", "Jaipur", "Kanpur", "Krishnankoil", "Ludhiana", "Panvel", "Shimoga", "Varanasi", "Not Applicable"], visibleIf: { field: "specialization", contains: "IOL" } },
       { id: "unit_medical_retina", type: "checkbox_group", label: "Medical Retina Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Jaipur", "Shimoga", "Not Applicable"], visibleIf: { field: "specialization", contains: "Medical Retina" } },
-      { id: "unit_oculoplasty", type: "checkbox_group", label: "Oculoplasty Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Not Applicable"], visibleIf: { field: "specialization", contains: "Oculoplasty" } },
+      { id: "unit_oculoplasty", type: "checkbox_group", label: "Oculoplasty Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Varanasi", "Not Applicable"], visibleIf: { field: "specialization", contains: "Oculoplasty" } },
       { id: "unit_pediatric", type: "checkbox_group", label: "Pediatric Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga", "Not Applicable"], visibleIf: { field: "specialization", contains: "Pediatric Ophthalmology" } },
-      { id: "unit_phaco", type: "checkbox_group", label: "Phaco Refractive Preferred Center", options: ["Bangalore", "Not Applicable"], visibleIf: { field: "specialization", contains: "Phaco Refractive" } },
+      { id: "unit_phaco", type: "checkbox_group", label: "Phaco Refractive Preferred Center", options: ["Bangalore", "Coimbatore", "Not Applicable"], visibleIf: { field: "specialization", contains: "Phaco Refractive" } },
       { id: "unit_vitreo_retina", type: "checkbox_group", label: "Vitreo Retina Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga", "Not Applicable"], visibleIf: { field: "specialization", contains: "Vitreo Retina" } },
       { id: "referralSource", type: "select", label: "Where did you hear about this Fellowship?", required: true, options: ["Sankara Website", "Word of Mouth", "Referred by any Faculty or exiting trainee at Sankara", "IJO Advertisement", "Social Media Platforms (Instagram/Facebook/Whatsapp/LinkedIn)"], isStandard: true, mapping: "referralSource" }
     ]
@@ -44,8 +44,9 @@ export const DEFAULT_SECTIONS = [
     title: "Referral Information",
     description: "Details of the person who referred you.",
     enabled: true,
+    visibleIf: { field: "referralSource", contains: "Referred" },
     fields: [
-      { id: "referredByName", type: "text", label: "Name of referred Faculty/Existing Trainee", isStandard: true, mapping: "referredByName" }
+      { id: "referredByName", type: "text", label: "Name of referred Faculty/Existing Trainee", isStandard: true, mapping: "referredByName", visibleIf: { field: "referralSource", contains: "Referred" } }
     ]
   },
   {
@@ -53,8 +54,9 @@ export const DEFAULT_SECTIONS = [
     title: "Social Media",
     description: "Specify the media source if applicable.",
     enabled: true,
+    visibleIf: { field: "referralSource", contains: "Social Media" },
     fields: [
-      { id: "mediaSource", type: "text", label: "Media Source", isStandard: true, mapping: "mediaSource" }
+      { id: "mediaSource", type: "text", label: "Media Source", isStandard: true, mapping: "mediaSource", visibleIf: { field: "referralSource", contains: "Social Media" } }
     ]
   },
   {
@@ -89,7 +91,7 @@ export const DEFAULT_SECTIONS = [
     description: "Declare any ailments.",
     enabled: true,
     fields: [
-      { id: "medicalConditions", type: "checkbox_group", label: "Ailments / Medications", options: ["Asthma", "Hypertension", "Diabetes", "Skin Allergy", "Hearing Impairment", "Tuberculosis", "Post Covid", "None of the Above"], isStandard: true, mapping: "medicalConditions" }
+      { id: "medicalConditions", type: "checkbox_group", label: "Ailments / Medications", options: ["Asthma", "Hypertension", "Diabetes", "Skin Allergy", "Hearing Impairment", "Tuberculosis", "Any Heart Related Issues", "Any Liver Related Issues", "None of the Above"], isStandard: true, mapping: "medicalConditions" }
     ]
   },
   {

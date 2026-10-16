@@ -1,19 +1,31 @@
 import { Router } from "express";
 import { DEFAULT_SECTIONS } from "../lib/default-sections";
-import { eq, desc, inArray, and, sql } from "drizzle-orm";
+import { eq, desc, inArray, and, or, sql } from "drizzle-orm";
 import { 
   db, applicationFormsTable, applicationSubmissionsTable, programsTable, 
   candidatesTable, candidatePreferencesTable, specialitiesTable, paymentSettingsTable, 
   documentsTable, applicationsTable, interviewScoresTable, doctorAssignmentsTable, 
-  examAttemptsTable, candidateExamAssignmentsTable, batchCandidatesTable 
+  examAttemptsTable, candidateExamAssignmentsTable, batchCandidatesTable, unitsTable
 } from "@workspace/db";
 import { requireAuth, requireRole } from "../middleware/auth";
 import * as XLSX from "xlsx";
-import { sendApplicationApprovalEmail, sendApplicationSubmissionConfirmationEmail } from "../lib/email";
+import { 
+  sendApplicationApprovalEmail, 
+  sendApplicationSubmissionConfirmationEmail,
+  sendCallLetterWithAttachment,
+  sendOfferLetterWithAttachment
+} from "../lib/email";
+import { 
+  generateStudentDirectoryPdf, 
+  generateCallLetterPdf, 
+  generateOfferLetterPdf, 
+  isRetinaSpecialty 
+} from "../lib/letters";
 import { google } from "googleapis";
 import fs from "fs/promises";
 import { createWriteStream } from "fs";
 import path from "path";
+import os from "os";
 import PDFDocument from "pdfkit";
 import { parseSpecializationString, formatDOBToStandard, formatToDDMMYYYY, formatToLocalDateTime } from "../lib/utils";
 
@@ -479,16 +491,353 @@ router.get(
     const subs = await db
       .select({
         submission: applicationSubmissionsTable,
-        candidateCode: candidatesTable.candidateCode
+        candidateId: candidatesTable.id,
+        candidateCode: candidatesTable.candidateCode,
+        candidateStatus: candidatesTable.status,
+        candidateUnitId: candidatesTable.unitId,
       })
       .from(applicationSubmissionsTable)
-      .leftJoin(candidatesTable, eq(candidatesTable.id, applicationSubmissionsTable.candidateId))
+      .leftJoin(
+        candidatesTable,
+        or(
+          eq(candidatesTable.id, applicationSubmissionsTable.candidateId),
+          eq(candidatesTable.email, applicationSubmissionsTable.email)
+        )
+      )
       .where(and(eq(applicationSubmissionsTable.formId, formId), eq(applicationSubmissionsTable.isMock, req.isMockMode)))
       .orderBy(desc(applicationSubmissionsTable.submittedAt));
+
     res.json(subs.map(s => ({
       ...s.submission,
-      candidateCode: s.candidateCode || null
+      candidateId: s.candidateId || s.submission.candidateId || null,
+      candidateCode: s.candidateCode || (s.submission as any).candidateCode || null,
+      candidateStatus: s.candidateStatus || null,
+      candidateUnitId: s.candidateUnitId || null,
     })));
+  }
+);
+
+// GET /application-forms/:id/student-list-pdf (Downloadable Official Student Directory PDF)
+router.get(
+  "/application-forms/:id/student-list-pdf",
+  requireAuth,
+  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "unit_coordinator"),
+  async (req, res) => {
+    try {
+      const formId = Number(req.params.id);
+      const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, formId));
+      if (!form) return res.status(404).json({ error: "Application form not found" });
+
+      const [program] = await db.select().from(programsTable).where(eq(programsTable.id, form.programId));
+      const units = await db.select().from(unitsTable);
+
+      const subs = await db
+        .select({
+          sub: applicationSubmissionsTable,
+          cand: candidatesTable,
+        })
+        .from(applicationSubmissionsTable)
+        .leftJoin(
+          candidatesTable,
+          or(
+            eq(candidatesTable.id, applicationSubmissionsTable.candidateId),
+            eq(candidatesTable.email, applicationSubmissionsTable.email)
+          )
+        )
+        .where(eq(applicationSubmissionsTable.formId, formId))
+        .orderBy(desc(applicationSubmissionsTable.submittedAt));
+
+      const candidatesList = subs.map((row, idx) => {
+        const s = row.sub;
+        const c = row.cand;
+        const specs = parseSpecializationString(s.specialization);
+        const specStr = specs.length > 0 ? specs.join(", ") : (s.specialization || "Ophthalmology Fellowship");
+
+        let unitName = "";
+        if (c?.unitId) {
+          const u = units.find(unit => unit.id === c.unitId);
+          if (u) unitName = u.name;
+        } else if (s.centerPreference) {
+          unitName = String(s.centerPreference).replace(/[{}"[\]]/g, "").trim();
+        }
+
+        const candidateCode = c?.candidateCode || (s as any).candidateCode || `APP-${String(s.id).padStart(4, "0")}`;
+        const qualParts = [s.degree, s.pgQualifications, s.medicalCouncilNumber ? `Reg: ${s.medicalCouncilNumber}` : null].filter(Boolean);
+        const qualification = qualParts.join(" · ");
+
+        let effectiveStatus = s.status || "pending";
+        if (c?.status === "allocated") {
+          effectiveStatus = "allocated";
+        }
+
+        return {
+          slNo: idx + 1,
+          candidateCode,
+          candidateName: s.fullName,
+          email: s.email,
+          phone: s.phone,
+          qualification: qualification || "MBBS / MS / DNB",
+          college: s.medicalCollege,
+          specialization: specStr,
+          status: effectiveStatus,
+          unitName: unitName || "—",
+          submittedAt: s.submittedAt ? new Date(s.submittedAt).toISOString() : null,
+        };
+      });
+
+      const pdfBuffer = await generateStudentDirectoryPdf({
+        programName: program?.name || form.title || "Fellowship Program December 2026",
+        academicSession: program?.academicYear || "December 2026",
+        candidates: candidatesList,
+      });
+
+      const filename = `Student_List_December_2026_${form.token || formId}.pdf`;
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+      res.send(pdfBuffer);
+    } catch (err: any) {
+      console.error("[student-list-pdf] Error:", err);
+      res.status(500).json({ error: err.message || "Failed to generate student list PDF" });
+    }
+  }
+);
+
+// GET /application-forms/submissions/:id/call-letter-pdf
+router.get(
+  "/application-forms/submissions/:id/call-letter-pdf",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const subId = Number(req.params.id);
+      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, subId));
+      if (!sub) return res.status(404).json({ error: "Submission not found" });
+
+      const [cand] = await db.select().from(candidatesTable).where(
+        or(
+          eq(candidatesTable.id, sub.candidateId || -1),
+          eq(candidatesTable.email, sub.email)
+        )
+      );
+
+      const candidateCode = cand?.candidateCode || (sub as any).candidateCode || `APP-${String(sub.id).padStart(4, "0")}`;
+      const specs = parseSpecializationString(sub.specialization);
+      const spec = specs.length > 0 ? specs.join(", ") : (sub.specialization || "Ophthalmology Fellowship");
+
+      const isRetina = isRetinaSpecialty(spec);
+      const defaultInterviewDate = isRetina ? "7th December 2026, Monday" : "8th December 2026, Tuesday";
+
+      const pdfBuffer = await generateCallLetterPdf({
+        candidateName: sub.fullName,
+        candidateCode,
+        specialization: spec,
+        email: sub.email,
+        phone: sub.phone,
+        address: sub.permanentAddress || sub.mailingAddress || cand?.address,
+        applicationId: sub.id,
+        interviewDate: (req.query.interviewDate as string) || defaultInterviewDate,
+        reportingTime: (req.query.reportingTime as string) || "8:00 AM Sharp",
+        venue: (req.query.venue as string) || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore – 560037",
+      });
+
+      const filename = `Interview_Call_Letter_${candidateCode}.pdf`;
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+      res.send(pdfBuffer);
+    } catch (err: any) {
+      console.error("[submission call-letter-pdf] Error:", err);
+      res.status(500).json({ error: err.message || "Failed to generate call letter" });
+    }
+  }
+);
+
+// POST /application-forms/submissions/:id/send-call-letter
+router.post(
+  "/application-forms/submissions/:id/send-call-letter",
+  requireAuth,
+  requireRole("super_admin", "program_admin", "central_exam_coordinator"),
+  async (req, res) => {
+    try {
+      const subId = Number(req.params.id);
+      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, subId));
+      if (!sub) return res.status(404).json({ error: "Submission not found" });
+
+      const [cand] = await db.select().from(candidatesTable).where(
+        or(
+          eq(candidatesTable.id, sub.candidateId || -1),
+          eq(candidatesTable.email, sub.email)
+        )
+      );
+
+      const candidateCode = cand?.candidateCode || (sub as any).candidateCode || `APP-${String(sub.id).padStart(4, "0")}`;
+      const specs = parseSpecializationString(sub.specialization);
+      const spec = (req.body.specialization as string) || (specs.length > 0 ? specs.join(", ") : (sub.specialization || "Ophthalmology Fellowship"));
+
+      const isRetina = isRetinaSpecialty(spec);
+      const interviewDate = (req.body.interviewDate as string) || (isRetina ? "7th December 2026, Monday" : "8th December 2026, Tuesday");
+      const reportingTime = (req.body.reportingTime as string) || "8:00 AM Sharp";
+      const venue = (req.body.venue as string) || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore – 560037";
+
+      const pdfBuffer = await generateCallLetterPdf({
+        candidateName: sub.fullName,
+        candidateCode,
+        specialization: spec,
+        email: sub.email,
+        phone: sub.phone,
+        address: sub.permanentAddress || sub.mailingAddress || cand?.address,
+        applicationId: sub.id,
+        interviewDate,
+        reportingTime,
+        venue,
+      });
+
+      const fileName = `Interview_Call_Letter_${candidateCode}.pdf`;
+
+      await sendCallLetterWithAttachment({
+        toEmail: sub.email,
+        toName: sub.fullName,
+        pdfBuffer,
+        fileName,
+        interviewDate,
+        reportingTime,
+        venue,
+        specialization: spec,
+      });
+
+      res.json({ success: true, fileName });
+    } catch (err: any) {
+      console.error("[submission send-call-letter] Error:", err);
+      res.status(500).json({ error: err.message || "Failed to send call letter" });
+    }
+  }
+);
+
+// GET /application-forms/submissions/:id/offer-letter-pdf
+router.get(
+  "/application-forms/submissions/:id/offer-letter-pdf",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const subId = Number(req.params.id);
+      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, subId));
+      if (!sub) return res.status(404).json({ error: "Submission not found" });
+
+      const [cand] = await db.select().from(candidatesTable).where(
+        or(
+          eq(candidatesTable.id, sub.candidateId || -1),
+          eq(candidatesTable.email, sub.email)
+        )
+      );
+
+      const candidateCode = cand?.candidateCode || (sub as any).candidateCode || `APP-${String(sub.id).padStart(4, "0")}`;
+      const units = await db.select().from(unitsTable);
+
+      let unitName = (req.query.unitName as string) || "";
+      if (!unitName && cand?.unitId) {
+        const u = units.find(x => x.id === cand.unitId);
+        if (u) unitName = u.name;
+      }
+      if (!unitName && sub.centerPreference) {
+        unitName = String(sub.centerPreference).replace(/[{}"[\]]/g, "").trim().split(",")[0] || "Bangalore";
+      }
+      if (!unitName) unitName = "Bangalore";
+
+      const specs = parseSpecializationString(sub.specialization);
+      const specialization = (req.query.specialization as string) || (specs[0] || "Cataract & IOL");
+      const duration = req.query.duration ? Number(req.query.duration) : (isRetinaSpecialty(specialization) ? 24 : 18);
+      const effectiveDate = (req.query.effectiveDate as string) || "6th January 2027";
+      const interviewDate = (req.query.interviewDate as string) || (isRetinaSpecialty(specialization) ? "7th December 2026" : "8th December 2026");
+
+      const pdfBuffer = await generateOfferLetterPdf({
+        candidateName: sub.fullName,
+        candidateCode,
+        specialization,
+        unitName,
+        cmoName: req.query.cmoName as string,
+        address: sub.permanentAddress || sub.mailingAddress || cand?.address,
+        durationMonths: duration,
+        effectiveDate,
+        interviewDate,
+        stipendAmount: (req.query.stipend as string) || "Rs 40,000",
+      });
+
+      const filename = `Fellowship_Offer_Letter_${candidateCode}.pdf`;
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+      res.send(pdfBuffer);
+    } catch (err: any) {
+      console.error("[submission offer-letter-pdf] Error:", err);
+      res.status(500).json({ error: err.message || "Failed to generate offer letter" });
+    }
+  }
+);
+
+// POST /application-forms/submissions/:id/send-offer-letter
+router.post(
+  "/application-forms/submissions/:id/send-offer-letter",
+  requireAuth,
+  requireRole("super_admin", "program_admin", "central_exam_coordinator"),
+  async (req, res) => {
+    try {
+      const subId = Number(req.params.id);
+      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, subId));
+      if (!sub) return res.status(404).json({ error: "Submission not found" });
+
+      const [cand] = await db.select().from(candidatesTable).where(
+        or(
+          eq(candidatesTable.id, sub.candidateId || -1),
+          eq(candidatesTable.email, sub.email)
+        )
+      );
+
+      const candidateCode = cand?.candidateCode || (sub as any).candidateCode || `APP-${String(sub.id).padStart(4, "0")}`;
+      const units = await db.select().from(unitsTable);
+
+      let unitName = (req.body.unitName as string) || "";
+      if (!unitName && cand?.unitId) {
+        const u = units.find(x => x.id === cand.unitId);
+        if (u) unitName = u.name;
+      }
+      if (!unitName && sub.centerPreference) {
+        unitName = String(sub.centerPreference).replace(/[{}"[\]]/g, "").trim().split(",")[0] || "Bangalore";
+      }
+      if (!unitName) unitName = "Bangalore";
+
+      const specs = parseSpecializationString(sub.specialization);
+      const specialization = (req.body.specialization as string) || (specs[0] || "Cataract & IOL");
+      const duration = req.body.duration ? Number(req.body.duration) : (isRetinaSpecialty(specialization) ? 24 : 18);
+      const effectiveDate = (req.body.effectiveDate as string) || "6th January 2027";
+      const interviewDate = (req.body.interviewDate as string) || (isRetinaSpecialty(specialization) ? "7th December 2026" : "8th December 2026");
+
+      const pdfBuffer = await generateOfferLetterPdf({
+        candidateName: sub.fullName,
+        candidateCode,
+        specialization,
+        unitName,
+        cmoName: req.body.cmoName as string,
+        address: sub.permanentAddress || sub.mailingAddress || cand?.address,
+        durationMonths: duration,
+        effectiveDate,
+        interviewDate,
+        stipendAmount: (req.body.stipend as string) || "Rs 40,000",
+      });
+
+      const fileName = `Fellowship_Offer_Letter_${candidateCode}.pdf`;
+
+      await sendOfferLetterWithAttachment({
+        toEmail: sub.email,
+        toName: sub.fullName,
+        pdfBuffer,
+        fileName,
+        unitName,
+        specialization,
+        effectiveDate,
+      });
+
+      res.json({ success: true, fileName });
+    } catch (err: any) {
+      console.error("[submission send-offer-letter] Error:", err);
+      res.status(500).json({ error: err.message || "Failed to send offer letter" });
+    }
   }
 );
 
@@ -2137,49 +2486,32 @@ router.post(
   }
 );
 
+function normalizeToken(t: string): string {
+  if (t === "DEC2026" || t === "dec2026" || t === "december2026") return "DECEMBER2026";
+  return t;
+}
+
 // Public: request a signed upload URL scoped to an active form token
 router.post("/apply/:token/request-upload-url", async (req, res) => {
-  const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, req.params.token));
+  const token = normalizeToken(req.params.token);
+  const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, token));
   if (!form) return res.status(404).json({ error: "Form not found" });
   if (!form.isActive) return res.status(410).json({ error: "This form is no longer accepting submissions" });
   if (form.deadline && new Date() > form.deadline) {
     return res.status(410).json({ error: "The deadline for this form has passed" });
   }
   const { name, contentType, size, candidateName, fieldName } = (req.body ?? {}) as { name?: string; contentType?: string; size?: number; candidateName?: string; fieldName?: string };
-  if (!name || typeof name !== "string" || !name.trim() || !contentType || typeof contentType !== "string") {
-    return res.status(400).json({ error: "Missing required fields: name, contentType" });
+  if (!name || typeof name !== "string" || !name.trim()) {
+    return res.status(400).json({ error: "Missing required field: name" });
   }
-  const fName = (fieldName || "").toLowerCase();
-  if (fName.includes("lor")) {
-    if (contentType !== "application/pdf") {
-      return res.status(400).json({ error: "LOR files must be in PDF format only" });
-    }
-    const maxLorSize = 5 * 1024 * 1024;
-    if (size && size > maxLorSize) {
-      return res.status(400).json({ error: "LOR file size exceeds 5MB limit" });
-    }
-  } else if (fName.includes("photo")) {
-    if (contentType !== "image/jpeg" && contentType !== "image/jpg") {
-      return res.status(400).json({ error: "Passport photograph must be in JPG/JPEG format only" });
-    }
-    const maxPhotoSize = 2 * 1024 * 1024;
-    if (size && size > maxPhotoSize) {
-      return res.status(400).json({ error: "Passport photograph size exceeds 2MB limit" });
-    }
-  } else {
-    const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "image/jpg"];
-    if (!allowedTypes.includes(contentType)) {
-      return res.status(400).json({ error: "Only PDF, JPG, and PNG files are allowed" });
-    }
-    const maxSize = 10 * 1024 * 1024;
-    if (size && size > maxSize) {
-      return res.status(400).json({ error: "File size exceeds 10MB limit" });
-    }
-  }
+
+  // Accept ANY file format and ANY size — no restriction
+  const cleanContentType = contentType && typeof contentType === "string" ? contentType : "application/octet-stream";
+
   try {
     const isReplit = !!process.env.REPL_ID;
     if (!isReplit) {
-      // Local fallback
+      // Local fallback / Vercel
       const objectId = Math.random().toString(36).substring(2, 10);
       const ext = name.split('.').pop() ?? "bin";
       const sanitizedName = name.split('.')[0].replace(/[^a-zA-Z0-9]/g, "_");
@@ -2187,54 +2519,72 @@ router.post("/apply/:token/request-upload-url", async (req, res) => {
       let folderName = candidateName ? candidateName.trim().replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_") : "Unknown_Candidate";
       const filename = `${sanitizedName}_${objectId}.${ext}`;
 
-      const uploadURL = `/api/apply/${req.params.token}/local-upload/${folderName}/${filename}`;
+      const uploadURL = `/api/apply/${token}/local-upload/${folderName}/${filename}`;
       const objectPath = `/objects/uploads/${folderName}/${filename}`;
-      return res.json({ uploadURL, objectPath, metadata: { name: name.trim(), size, contentType } });
+      return res.json({ uploadURL, objectPath, metadata: { name: name.trim(), size, contentType: cleanContentType } });
     }
 
     const { ObjectStorageService } = await import("../lib/objectStorage");
     const objectStorageService = new ObjectStorageService();
     const uploadURL = await objectStorageService.getObjectEntityUploadURL();
     const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
-    return res.json({ uploadURL, objectPath, metadata: { name: name.trim(), size, contentType } });
+    return res.json({ uploadURL, objectPath, metadata: { name: name.trim(), size, contentType: cleanContentType } });
   } catch (error) {
     console.error("UPLOAD ENDPOINT ERROR:", error);
     return res.status(500).json({ error: "Failed to generate upload URL", details: error instanceof Error ? error.message : String(error) });
   }
 });
 
-// Public: handle local uploads when running outside Replit
+// Public: handle uploads with Neon Postgres DB persistence + local/tmp disk cache
 router.put("/apply/:token/local-upload/:folderName/:filename", async (req, res) => {
   try {
-    const uploadDir = path.join(process.cwd(), "uploads", req.params.folderName);
-    if (!uploadDir.includes(path.join("artifacts", "api-server"))) {
-      // Ensure we are in the api-server directory or relative to it
-      // This is a safety check and fix for mixed CWD scenarios
-    }
-    await fs.mkdir(uploadDir, { recursive: true });
-
-    const filePath = path.join(uploadDir, req.params.filename);
-    const writeStream = createWriteStream(filePath);
-
-    req.pipe(writeStream);
-
-    writeStream.on("finish", async () => {
-      try {
-        const { normalizeUploadedFile } = await import("../lib/image-normalizer");
-        await normalizeUploadedFile(filePath, req.params.filename);
-      } catch (normErr) {
-        console.warn("[upload-normalizer] Post-upload normalization skipped:", normErr);
-      }
-      res.json({ success: true, path: `/objects/uploads/${req.params.folderName}/${req.params.filename}` });
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk) => {
+      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
     });
 
-    writeStream.on("error", (err) => {
-      console.error("Write stream error:", err);
-      if (!res.headersSent) res.status(500).json({ error: "File write failed" });
+    req.on("end", async () => {
+      try {
+        const buffer = Buffer.concat(chunks);
+        const folderName = req.params.folderName;
+        const filename = req.params.filename;
+        const objectPath = `/objects/uploads/${folderName}/${filename}`;
+        const contentType = (req.headers["content-type"] as string) || "application/octet-stream";
+
+        // 1. Write to /tmp disk cache (safe and writable on Vercel)
+        try {
+          const tmpUploadDir = path.join(os.tmpdir(), "uploads", folderName);
+          await fs.mkdir(tmpUploadDir, { recursive: true });
+          await fs.writeFile(path.join(tmpUploadDir, filename), buffer);
+        } catch (_) {}
+
+        // 2. Try writing to process.cwd() (works locally on dev)
+        try {
+          const localUploadDir = path.join(process.cwd(), "uploads", folderName);
+          await fs.mkdir(localUploadDir, { recursive: true });
+          await fs.writeFile(path.join(localUploadDir, filename), buffer);
+        } catch (_) {}
+
+        // 3. Persist permanently to Neon Postgres DB
+        await db.execute(sql`
+          INSERT INTO uploaded_files (file_path, file_name, content_type, file_data, file_size)
+          VALUES (${objectPath}, ${filename}, ${contentType}, ${buffer}, ${buffer.length})
+          ON CONFLICT (file_path) DO UPDATE SET
+            file_data = EXCLUDED.file_data,
+            file_size = EXCLUDED.file_size,
+            content_type = EXCLUDED.content_type,
+            created_at = NOW()
+        `);
+
+        res.json({ success: true, path: objectPath });
+      } catch (saveErr: any) {
+        console.error("Failed to save uploaded file:", saveErr);
+        res.status(500).json({ error: saveErr.message || "Failed to save file" });
+      }
     });
 
     req.on("error", (err) => {
-      console.error("Request stream error:", err);
+      console.error("Upload stream error:", err);
       if (!res.headersSent) res.status(500).json({ error: "Upload stream failed" });
     });
   } catch (error) {
@@ -2245,7 +2595,8 @@ router.put("/apply/:token/local-upload/:folderName/:filename", async (req, res) 
 
 // Public: get form info (includes specialities for dropdown + custom fields)
 router.get("/apply/:token", async (req, res) => {
-  const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, req.params.token));
+  const token = normalizeToken(req.params.token);
+  const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, token));
   if (!form) return res.status(404).json({ error: "Form not found" });
   if (!form.isActive) return res.status(410).json({ error: "This form is no longer accepting submissions" });
   if (form.deadline && new Date() > form.deadline) {
@@ -2291,7 +2642,8 @@ router.get("/apply/:token", async (req, res) => {
 
 // Public: payment config
 router.get("/apply/:token/payment-config", async (req, res) => {
-  const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, req.params.token));
+  const token = normalizeToken(req.params.token);
+  const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, token));
   const programId = form?.programId ?? null;
 
   const all = await db.select().from(paymentSettingsTable).where(eq(paymentSettingsTable.isActive, true));
@@ -2299,25 +2651,29 @@ router.get("/apply/:token/payment-config", async (req, res) => {
   const global = all.find((s) => s.programId === null);
   const setting = specific ?? global ?? null;
 
-  if (!setting) {
+  const keyId = setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID;
+  const keySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
+  const hasCreds = !!(keyId && keySecret);
+
+  if (!setting && !hasCreds) {
     return res.json({ mock: true, amount: 275000, currency: "INR", description: "Fellowship Application Fee" });
   }
 
-  const hasCreds = !!(setting.razorpayKeyId && setting.razorpayKeySecret);
   res.json({
     mock: !hasCreds,
-    keyId: hasCreds ? setting.razorpayKeyId : undefined,
-    amount: setting.amount,
-    currency: setting.currency,
-    description: setting.description,
-    mode: setting.mode,
-    upiId: setting.upiId ?? undefined,
+    keyId: hasCreds ? keyId : undefined,
+    amount: setting?.amount || 275000,
+    currency: setting?.currency || "INR",
+    description: setting?.description || "Fellowship Application Fee",
+    mode: setting?.mode || "test",
+    upiId: setting?.upiId ?? undefined,
   });
 });
 
 // Public: submit application
 router.post("/apply/:token", async (req, res) => {
-  const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, req.params.token));
+  const token = normalizeToken(req.params.token);
+  const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, token));
   if (!form) return res.status(404).json({ error: "Form not found" });
   if (!form.isActive) return res.status(410).json({ error: "This form is no longer accepting submissions" });
   if (form.deadline && new Date() > form.deadline) {

@@ -17,4 +17,5 @@ export * from "./global-settings";
 export * from "./applications";
 export * from "./sessions";
 export * from "./audit-logs";
+export * from "./uploaded-files";
 

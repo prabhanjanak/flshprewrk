@@ -111,7 +111,7 @@ function parseMatrixFromFile() {
 router.get(
   "/seat-matrix",
   requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "unit_coordinator"),
+  requireRole("super_admin", "program_admin", "central_exam_coordinator", "unit_coordinator", "exam_coordinator", "doctor"),
   async (req, res) => {
     const programId = req.query["programId"] ? Number(req.query["programId"]) : null;
 

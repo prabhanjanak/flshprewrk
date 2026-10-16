@@ -297,17 +297,17 @@ export default function DashboardPage() {
   const programs = summary?.programs ?? [];
 
   const totalApplicants = stages.candidates?.total ?? 0;
-  const paidCount = stages.candidates?.paidCount ?? stages.applications?.paidCount ?? totalApplicants;
+  const paidCount = stages.candidates?.paidCount ?? stages.applications?.paidCount ?? 0;
   const approvedCount = stages.candidates?.approved ?? stages.approvals?.approvedCount ?? 0;
-  const pendingReviewCount = stages.candidates?.pendingReview ?? stages.approvals?.pendingCount ?? Math.max(0, totalApplicants - approvedCount);
-  const callLetterCount = stages.candidates?.callLettersIssued ?? stages.callLetters?.issuedCount ?? approvedCount;
+  const pendingReviewCount = stages.candidates?.pendingReview ?? stages.approvals?.pendingCount ?? 0;
+  const callLetterCount = stages.candidates?.callLettersIssued ?? stages.callLetters?.issuedCount ?? 0;
   const interviewCount = stages.candidates?.interviewCompleted ?? stages.interviews?.completedCount ?? 0;
   const allocatedCount = stages.candidates?.allocated ?? stages.selections?.allocatedSeats ?? stages.merit?.allocatedSeats ?? 0;
   const totalSeats = stages.selections?.totalSeats ?? stages.merit?.totalSeats ?? 0;
 
   const paymentPct = totalApplicants > 0 ? Math.min(100, Math.round((paidCount / totalApplicants) * 100)) : 0;
   const approvalPct = totalApplicants > 0 ? Math.min(100, Math.round((approvedCount / totalApplicants) * 100)) : 0;
-  const callLetterPct = approvedCount > 0 ? Math.min(100, Math.round((callLetterCount / approvedCount) * 100)) : (totalApplicants > 0 ? 100 : 0);
+  const callLetterPct = approvedCount > 0 ? Math.min(100, Math.round((callLetterCount / approvedCount) * 100)) : 0;
   const interviewPct = approvedCount > 0 ? Math.min(100, Math.round((interviewCount / approvedCount) * 100)) : 0;
   const seatsAllocPct = totalSeats > 0 ? Math.min(100, Math.round((allocatedCount / totalSeats) * 100)) : 0;
 

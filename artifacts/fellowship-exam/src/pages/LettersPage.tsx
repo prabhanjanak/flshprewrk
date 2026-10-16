@@ -66,6 +66,20 @@ const UNIT_CMO_MAP: Record<string, string> = {
   Hyderabad: "Dr. M. S. Reddy - Chief Medical Officer",
   Indore: "Dr. V. Sharma - Chief Medical Officer",
   Panvel: "Dr. N. Kulkarni - Chief Medical Officer",
+  Krishnankoil: "Dr. S. Meenakshi - Chief Medical Officer",
+};
+
+const DEFAULT_CANDIDATE: Candidate = {
+  id: 0,
+  candidateCode: "SAV-2027-001",
+  fullName: "Tejaswini",
+  email: "tejaswini@sankaraeye.com",
+  phone: "+91 98765 43210",
+  status: "approved",
+  unitId: 1,
+  address: "Sankara Eye Hospital Campus, Kundalahalli Gate, Bangalore – 560037",
+  dateOfBirth: null,
+  specialization: "Vitreo Retina",
 };
 
 function cleanDoctorName(rawName: string | null | undefined): string {
@@ -83,22 +97,26 @@ export default function LettersPage() {
   const [streamFilter, setStreamFilter] = useState<"all" | "retina" | "anterior">("all");
 
   // Customizer state
-  const [selectedCandidateId, setSelectedCandidateId] = useState<number | null>(null);
-  const [customName, setCustomName] = useState<string>("");
-  const [customAddress, setCustomAddress] = useState<string>("");
-  const [customPhone, setCustomPhone] = useState<string>("");
-  const [customEmail, setCustomEmail] = useState<string>("");
-  const [customSpecialty, setCustomSpecialty] = useState<string>("Cataract & IOL");
-  const [customUnitId, setCustomUnitId] = useState<number>(3); // Default Jaipur
-  const [customUnitName, setCustomUnitName] = useState<string>("Jaipur");
-  const [customCmo, setCustomCmo] = useState<string>("Dr. Neeraj Shah - Chief Medical Officer");
+  const [selectedCandidateId, setSelectedCandidateId] = useState<number | null>(0);
+  const [customName, setCustomName] = useState<string>("Tejaswini");
+  const [customCandidateCode, setCustomCandidateCode] = useState<string>("SAV-2027-001");
+  const [customAddress, setCustomAddress] = useState<string>("Sankara Eye Hospital Campus, Kundalahalli Gate, Bangalore – 560037");
+  const [customPhone, setCustomPhone] = useState<string>("+91 98765 43210");
+  const [customEmail, setCustomEmail] = useState<string>("tejaswini@sankaraeye.com");
+  const [customSpecialty, setCustomSpecialty] = useState<string>("Vitreo Retina");
+  const [customUnitId, setCustomUnitId] = useState<number>(1); // Default Bangalore
+  const [customUnitName, setCustomUnitName] = useState<string>("Bangalore");
+  const [customCmo, setCustomCmo] = useState<string>("Dr. Kaushik Murali - Chief Medical Officer");
   const [customStipend, setCustomStipend] = useState<string>("40000");
-  const [customEffectiveDate, setCustomEffectiveDate] = useState<string>("6th July 2026");
-  const [customDuration, setCustomDuration] = useState<number>(18);
-  const [customInterviewDate, setCustomInterviewDate] = useState<string>("8th June 2026, Monday");
+  const [customEffectiveDate, setCustomEffectiveDate] = useState<string>("1st January 2027");
+  const [customDuration, setCustomDuration] = useState<number>(24);
+  const [customInterviewDate, setCustomInterviewDate] = useState<string>("1st June 2026, Monday");
   const [customReportingTime, setCustomReportingTime] = useState<string>("8:00 AM Sharp");
   const [customVenue, setCustomVenue] = useState<string>(
     "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore – 560037"
+  );
+  const [customInductionDate, setCustomInductionDate] = useState<string>(
+    "2nd & 3rd July 2026 at Bangalore Main Hospital (For Testing Only)"
   );
 
   // Loading states
@@ -143,17 +161,19 @@ export default function LettersPage() {
     return "Cataract & IOL";
   };
 
-  // Sync first candidate on load
+  // Sync first candidate on load if candidates exist and no candidate was explicitly chosen
   useEffect(() => {
-    if (candidates.length > 0 && !selectedCandidateId) {
-      handleSelectCandidate(candidates[0]);
+    if (candidates.length > 0 && selectedCandidateId && selectedCandidateId > 0) {
+      const found = candidates.find((c) => c.id === selectedCandidateId);
+      if (found) handleSelectCandidate(found);
     }
   }, [candidates]);
 
   const handleSelectCandidate = (cand: Candidate) => {
     setSelectedCandidateId(cand.id);
+    setCustomCandidateCode(cand.candidateCode || "SAV-2027-001");
     setCustomName(cleanDoctorName(cand.fullName));
-    setCustomAddress(cand.address || "Hindi Vidhya Bhawan Ke Pass, Ward No 32, Sikar, Rajasthan");
+    setCustomAddress(cand.address || "Sankara Eye Hospital Campus, Kundalahalli Gate, Bangalore – 560037");
     setCustomPhone(cand.phone || "");
     setCustomEmail(cand.email || "");
 
@@ -164,16 +184,16 @@ export default function LettersPage() {
     setCustomDuration(isRet ? 24 : 18);
     setCustomInterviewDate(isRet ? "1st June 2026, Monday" : "8th June 2026, Monday");
 
-    const uId = cand.unitId || 3;
+    const uId = cand.unitId || 1;
     setCustomUnitId(uId);
-    const uName = units.find((u) => u.id === uId)?.name || "Jaipur";
+    const uName = units.find((u) => u.id === uId)?.name || "Bangalore";
     setCustomUnitName(uName);
-    setCustomCmo(UNIT_CMO_MAP[uName] || "Dr. Neeraj Shah - Chief Medical Officer");
+    setCustomCmo(UNIT_CMO_MAP[uName] || "Dr. Kaushik Murali - Chief Medical Officer");
   };
 
   const handleUnitChange = (uId: number) => {
     setCustomUnitId(uId);
-    const uName = units.find((u) => u.id === uId)?.name || "Jaipur";
+    const uName = units.find((u) => u.id === uId)?.name || "Bangalore";
     setCustomUnitName(uName);
     setCustomCmo(UNIT_CMO_MAP[uName] || "Chief Medical Officer");
   };
@@ -194,28 +214,37 @@ export default function LettersPage() {
   const retinaCount = candidates.filter((c) => isRetina(c)).length;
   const anteriorCount = candidates.filter((c) => !isRetina(c)).length;
 
-  const activeCandidate = candidates.find((c) => c.id === selectedCandidateId) || candidates[0];
+  const activeCandidate = (selectedCandidateId && selectedCandidateId !== 0)
+    ? (candidates.find((c) => c.id === selectedCandidateId) || DEFAULT_CANDIDATE)
+    : DEFAULT_CANDIDATE;
 
   // Download Call Letter PDF Handler
   const handleDownloadCallLetter = async (candidate?: Candidate) => {
-    const target = candidate || activeCandidate;
-    if (!target) return;
+    const target = candidate || activeCandidate || DEFAULT_CANDIDATE;
+    const targetId = target?.id ?? 0;
 
-    const key = `call_${target.id}`;
+    const key = `call_${targetId}`;
     setDownloadingId(key);
     try {
       const token = localStorage.getItem("fellowship_token") || "";
-      const isRet = isRetina(target);
+      const isRet = target.specialization ? isRetina(target) : customSpecialty.toLowerCase().includes("retina");
+      const docName = targetId === 0 ? customName : target.fullName;
+      const code = targetId === 0 ? customCandidateCode : target.candidateCode;
 
       const queryParams = new URLSearchParams({
         token,
+        candidateName: docName ? `Dr. ${cleanDoctorName(docName)}` : "Dr. Candidate",
+        candidateCode: code || "SAV-2027-001",
         interviewDate: customInterviewDate,
         reportingTime: customReportingTime,
         venue: customVenue,
         specialization: customSpecialty || getCandidateSpecialty(target),
+        email: target.email || customEmail,
+        phone: target.phone || customPhone,
+        address: target.address || customAddress,
       });
 
-      const res = await fetch(`/api/candidates/${target.id}/call-letter-pdf?${queryParams.toString()}`, {
+      const res = await fetch(`/api/candidates/${targetId}/call-letter-pdf?${queryParams.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -228,7 +257,7 @@ export default function LettersPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Interview_Call_Letter_${isRet ? "Retina" : "Anterior"}_${target.candidateCode}.pdf`;
+      a.download = `Interview_Call_Letter_${isRet ? "Retina" : "Anterior"}_${code || "SAV-2027-001"}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -236,7 +265,7 @@ export default function LettersPage() {
 
       toast({
         title: "Official Call Letter Downloaded",
-        description: `Generated with official Sankara branding for Dr. ${target.fullName}.`,
+        description: `Generated with official Sankara branding for Dr. ${cleanDoctorName(docName)}.`,
       });
     } catch (e: any) {
       toast({ title: "Download Failed", description: e.message, variant: "destructive" });
@@ -248,7 +277,14 @@ export default function LettersPage() {
   // Send Call Letter Email Handler
   const handleSendCallLetter = async (candidate?: Candidate) => {
     const target = candidate || activeCandidate;
-    if (!target) return;
+    if (!target || target.id === 0) {
+      toast({
+        title: "Registration Required",
+        description: "Email dispatch requires a registered candidate with an email address.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     const key = `send_call_${target.id}`;
     setSendingEmailId(key);
@@ -274,18 +310,21 @@ export default function LettersPage() {
 
   // Download Offer Letter PDF Handler
   const handleDownloadOfferLetter = async (candidate?: Candidate) => {
-    const target = candidate || activeCandidate;
-    if (!target) return;
+    const target = candidate || activeCandidate || DEFAULT_CANDIDATE;
+    const targetId = target?.id ?? 0;
 
-    const key = `offer_${target.id}`;
+    const key = `offer_${targetId}`;
     setDownloadingId(key);
     try {
       const token = localStorage.getItem("fellowship_token") || "";
       const stipendNum = Number(customStipend.replace(/[^0-9]/g, "") || 40000);
+      const docName = targetId === 0 ? customName : (customName || target.fullName);
+      const code = targetId === 0 ? customCandidateCode : target.candidateCode;
 
       const queryParams = new URLSearchParams({
         token,
-        candidateName: customName || target.fullName,
+        candidateName: docName ? `Dr. ${cleanDoctorName(docName)}` : "Dr. Candidate",
+        candidateCode: code || "SAV-2027-001",
         address: customAddress || target.address || "",
         specialization: customSpecialty,
         unitName: customUnitName,
@@ -294,9 +333,10 @@ export default function LettersPage() {
         duration: String(customDuration),
         effectiveDate: customEffectiveDate,
         interviewDate: customInterviewDate,
+        inductionDate: customInductionDate,
       });
 
-      const res = await fetch(`/api/candidates/${target.id}/offer-letter-pdf?${queryParams.toString()}`, {
+      const res = await fetch(`/api/candidates/${targetId}/offer-letter-pdf?${queryParams.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -309,7 +349,7 @@ export default function LettersPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Fellowship_Offer_Letter_${target.candidateCode}_${customSpecialty.replace(/\s+/g, "_")}.pdf`;
+      a.download = `Fellowship_Offer_Letter_${code || "SAV-2027-001"}_${customSpecialty.replace(/\s+/g, "_")}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -317,7 +357,7 @@ export default function LettersPage() {
 
       toast({
         title: "Official Offer Letter Downloaded",
-        description: `Generated with official SEF & SAV logos for Dr. ${customName || target.fullName} (Stipend: ₹${stipendNum.toLocaleString("en-IN")}).`,
+        description: `Generated with official SEF & SAV logos for Dr. ${cleanDoctorName(docName)} (Stipend: ₹${stipendNum.toLocaleString("en-IN")}).`,
       });
     } catch (e: any) {
       toast({ title: "Download Failed", description: e.message, variant: "destructive" });
@@ -346,6 +386,7 @@ export default function LettersPage() {
         duration: customDuration,
         interviewDate: customInterviewDate,
         effectiveDate: customEffectiveDate,
+        inductionDate: customInductionDate,
       });
 
       toast({
@@ -483,6 +524,194 @@ export default function LettersPage() {
             </div>
           </div>
 
+          {/* ══════════════ ON-DEMAND CALL LETTER GENERATOR CARD ══════════════ */}
+          <Card className="rounded-2xl border-2 border-purple-200/80 bg-white shadow-md overflow-hidden">
+            <CardHeader className="pb-4 bg-gradient-to-r from-purple-50/70 via-slate-50 to-white border-b border-purple-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-purple-700" />
+                    Interactive Interview Call Letter Generator & Customizer
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-500 font-medium mt-0.5">
+                    Generate official institutional <strong>Interview Call Letters</strong> with Sankara Academy of Vision branding, interview schedule, reporting instructions, and venue details.
+                  </CardDescription>
+                </div>
+
+                <Badge className="bg-purple-700 text-white font-black text-[10px] uppercase tracking-wider px-3 py-1.5 self-start sm:self-auto shadow-sm">
+                  Official Hall Ticket / Call Letter
+                </Badge>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-6 space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 1. Candidate Selection (or On-Demand Test Doctor) */}
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    Candidate / Target Mode *
+                  </Label>
+                  <select
+                    value={selectedCandidateId || 0}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      if (val === 0) {
+                        setSelectedCandidateId(0);
+                        setCustomName("Tejaswini");
+                        setCustomCandidateCode("SAV-2027-001");
+                        setCustomSpecialty("Vitreo Retina");
+                        setCustomDuration(24);
+                        setCustomInterviewDate("1st June 2026, Monday");
+                      } else {
+                        const c = candidates.find((x) => x.id === val);
+                        if (c) handleSelectCandidate(c);
+                      }
+                    }}
+                    className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-900 shadow-sm"
+                  >
+                    <option value={0}>✨ On-Demand / Custom Doctor (Dr. {cleanDoctorName(customName) || "Tejaswini"})</option>
+                    {candidates.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.fullName} ({c.candidateCode})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. Doctor Name */}
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    Doctor Full Name *
+                  </Label>
+                  <Input
+                    value={customName}
+                    onChange={(e) => {
+                      const clean = e.target.value.replace(/^(?:\s*(?:dr\.?|doctor)\s*)+/gi, "");
+                      setCustomName(clean);
+                    }}
+                    placeholder="e.g. Tejaswini"
+                    className="rounded-xl border-slate-200 text-xs font-bold h-10"
+                  />
+                  <span className="text-[10px] text-slate-400 font-medium block">
+                    In Call Letter: <strong>Dr. {cleanDoctorName(customName || activeCandidate?.fullName)}</strong>
+                  </span>
+                </div>
+
+                {/* 3. Candidate Code */}
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    Registration Code *
+                  </Label>
+                  <Input
+                    value={customCandidateCode}
+                    onChange={(e) => setCustomCandidateCode(e.target.value)}
+                    placeholder="e.g. SAV-2027-001"
+                    className="rounded-xl border-slate-200 text-xs font-bold font-mono h-10 uppercase"
+                  />
+                </div>
+
+                {/* 4. Subspecialty */}
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    Interview Subspecialty *
+                  </Label>
+                  <select
+                    value={customSpecialty}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCustomSpecialty(val);
+                      const isRet = val.toLowerCase().includes("retina");
+                      setCustomDuration(isRet ? 24 : 18);
+                      setCustomInterviewDate(isRet ? "1st June 2026, Monday" : "8th June 2026, Monday");
+                    }}
+                    className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-900 shadow-sm"
+                  >
+                    <option value="Vitreo Retina">Vitreo Retina (Retina Stream)</option>
+                    <option value="Medical Retina">Medical Retina (Retina Stream)</option>
+                    <option value="Cataract & IOL">Cataract & IOL (Anterior Stream)</option>
+                    <option value="Cornea & External Eye Diseases">Cornea & External Eye (Anterior Stream)</option>
+                    <option value="Glaucoma">Glaucoma (Anterior Stream)</option>
+                    <option value="Pediatric Ophthalmology & Strabismus">Pediatric Ophthalmology (Anterior Stream)</option>
+                    <option value="Orbit & Oculoplasty">Orbit & Oculoplasty (Anterior Stream)</option>
+                    <option value="Phaco Refractive">Phaco Refractive (Anterior Stream)</option>
+                    <option value="Comprehensive Ophthalmology">Comprehensive (Anterior Stream)</option>
+                  </select>
+                </div>
+
+                {/* 5. Interview Date */}
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    Interview Date *
+                  </Label>
+                  <Input
+                    value={customInterviewDate}
+                    onChange={(e) => setCustomInterviewDate(e.target.value)}
+                    placeholder="e.g. 1st June 2026, Monday"
+                    className="rounded-xl border-slate-200 text-xs font-medium h-10"
+                  />
+                </div>
+
+                {/* 6. Reporting Time */}
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    Reporting Time *
+                  </Label>
+                  <Input
+                    value={customReportingTime}
+                    onChange={(e) => setCustomReportingTime(e.target.value)}
+                    placeholder="e.g. 8:00 AM Sharp"
+                    className="rounded-xl border-slate-200 text-xs font-medium h-10"
+                  />
+                </div>
+
+                {/* 7. Interview Venue */}
+                <div className="sm:col-span-2 space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    Interview Venue *
+                  </Label>
+                  <Input
+                    value={customVenue}
+                    onChange={(e) => setCustomVenue(e.target.value)}
+                    placeholder="Venue Address"
+                    className="rounded-xl border-slate-200 text-xs font-medium h-10"
+                  />
+                </div>
+              </div>
+
+              {/* Call Letter Action Strip */}
+              <div className="p-4 rounded-xl bg-purple-50/70 border border-purple-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-purple-600 text-white shrink-0 shadow-xs">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div className="text-xs">
+                    <p className="font-black text-purple-950">
+                      Ready to generate Call Letter for Dr. {cleanDoctorName(customName || "Tejaswini")}
+                    </p>
+                    <p className="text-purple-800 font-medium">
+                      Stream: <strong>{customSpecialty.toLowerCase().includes("retina") ? "Retina Stream (1st June 2026)" : "Anterior Stream (8th June 2026)"}</strong> &bull; Code: <strong>{customCandidateCode}</strong>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <Button
+                    onClick={() => handleDownloadCallLetter()}
+                    disabled={downloadingId === `call_${activeCandidate?.id || 0}`}
+                    className="bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs h-10 px-5 rounded-xl shadow-sm cursor-pointer w-full sm:w-auto gap-2"
+                  >
+                    {downloadingId === `call_${activeCandidate?.id || 0}` ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
+                    Download Official Call Letter PDF
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Search & Filter Toolbar */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm">
             <div className="relative w-full sm:w-80">
@@ -551,8 +780,26 @@ export default function LettersPage() {
                     </tr>
                   ) : filteredCandidates.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-12 text-center text-slate-400">
-                        No candidates match your search filters.
+                      <td colSpan={5} className="py-10 text-center">
+                        <div className="max-w-md mx-auto space-y-3">
+                          <div className="w-12 h-12 rounded-full bg-purple-50 border border-purple-200 flex items-center justify-center mx-auto text-purple-700">
+                            <Calendar className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-800 text-sm">No registered candidate rows found.</p>
+                            <p className="text-xs text-slate-500 mt-1">
+                              Use the <strong>Interactive Generator above</strong> to customize dates, venues, or streams and download official Call Letters on-demand.
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => handleDownloadCallLetter()}
+                            className="bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-xl text-xs gap-1.5"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Download Dr. {cleanDoctorName(customName) || "Tejaswini"} Call Letter PDF
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ) : (
@@ -672,16 +919,27 @@ export default function LettersPage() {
                 {/* 1. Candidate Select */}
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                    Select Approved Doctor *
+                    Select Candidate / Target Mode *
                   </Label>
                   <select
-                    value={activeCandidate?.id || ""}
+                    value={selectedCandidateId || 0}
                     onChange={(e) => {
-                      const c = candidates.find((x) => x.id === Number(e.target.value));
-                      if (c) handleSelectCandidate(c);
+                      const val = Number(e.target.value);
+                      if (val === 0) {
+                        setSelectedCandidateId(0);
+                        setCustomName("Tejaswini");
+                        setCustomCandidateCode("SAV-2027-001");
+                        setCustomSpecialty("Vitreo Retina");
+                        setCustomDuration(24);
+                        setCustomInterviewDate("1st June 2026, Monday");
+                      } else {
+                        const c = candidates.find((x) => x.id === val);
+                        if (c) handleSelectCandidate(c);
+                      }
                     }}
                     className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-900 shadow-sm"
                   >
+                    <option value={0}>✨ On-Demand / Custom Doctor (Dr. {cleanDoctorName(customName) || "Tejaswini"})</option>
                     {candidates.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.fullName} ({c.candidateCode})
@@ -796,6 +1054,24 @@ export default function LettersPage() {
                     className="rounded-xl border-slate-200 text-xs font-medium h-10"
                   />
                 </div>
+
+                {/* 8. Mandatory Induction (Editable & Marked for Testing) */}
+                <div className="sm:col-span-2 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                      Mandatory Induction Program *
+                    </Label>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300">
+                      For Testing Only
+                    </span>
+                  </div>
+                  <Input
+                    value={customInductionDate}
+                    onChange={(e) => setCustomInductionDate(e.target.value)}
+                    placeholder="e.g. 2nd & 3rd July 2026 at Bangalore Main Hospital (For Testing Only)"
+                    className="rounded-xl border-amber-300 bg-amber-50/20 text-xs font-semibold h-10"
+                  />
+                </div>
               </div>
 
               {/* Live Visual Letter Mockup Box (With Real Header Logos) */}
@@ -886,7 +1162,12 @@ export default function LettersPage() {
                         </tr>
                         <tr className="bg-white">
                           <td className="py-2 px-3 font-bold text-slate-500">Mandatory Induction</td>
-                          <td className="py-2 px-3 font-bold text-slate-900">2nd & 3rd July 2026 at Bangalore Main Hospital</td>
+                          <td className="py-2 px-3 font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
+                            <span>{customInductionDate}</span>
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300">
+                              For Testing Only
+                            </span>
+                          </td>
                         </tr>
                       </tbody>
                     </table>
@@ -898,7 +1179,7 @@ export default function LettersPage() {
                       Section A: Stipend, Deposit & Core Leave Rules
                     </h4>
                     <ol className="list-decimal pl-5 space-y-1 text-[11px] leading-relaxed text-slate-700 font-sans">
-                      <li><strong>Induction Program:</strong> Mandatory 2-day induction program scheduled at Sankara Eye Hospital, Bangalore on 2nd & 3rd July 2026.</li>
+                      <li><strong>Induction Program:</strong> Mandatory 2-day induction program scheduled at Sankara Eye Hospital, Bangalore on <strong>{customInductionDate}</strong>.</li>
                       <li><strong>Monthly Stipend:</strong> Stipend of ₹ {Number(customStipend || 40000).toLocaleString("en-IN")}/- per month subject to statutory deductions.</li>
                       <li><strong>Security Deposit:</strong> Entire 1st month stipend + 15 days of 2nd & 3rd months held interest-free until completion.</li>
                       <li><strong>Earned Leave:</strong> 1-day leave earned per month of tenure apart from declared holidays.</li>
@@ -1000,15 +1281,80 @@ export default function LettersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
-                  {candidates.map((cand) => {
-                    const specialty = getCandidateSpecialty(cand);
-                    const isRet = isRetina(cand);
-                    const unitName = units.find((u) => u.id === cand.unitId)?.name || "Jaipur";
-                    const isSelected = selectedCandidateId === cand.id;
-                    const isDownloading = downloadingId === `offer_${cand.id}`;
-                    const isSending = sendingEmailId === `send_offer_${cand.id}`;
+                  {candidates.length === 0 ? (
+                    <tr className="bg-blue-50/30">
+                      <td className="py-3.5 px-4">
+                        <div className="font-bold text-slate-900 flex items-center gap-2">
+                          Dr. {cleanDoctorName(customName || "Tejaswini")}
+                          <Badge className="bg-purple-100 text-purple-700 text-[9px] font-black uppercase">
+                            On-Demand Doctor
+                          </Badge>
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5 mt-0.5">
+                          <span className="font-bold text-[#0b4a8f]">{customCandidateCode || "SAV-2027-001"}</span>
+                          <span>•</span>
+                          <span>{customEmail}</span>
+                        </div>
+                      </td>
 
-                    return (
+                      <td className="py-3.5 px-4">
+                        <div className="font-bold text-slate-800">{customSpecialty}</div>
+                        <span className="text-[10px] text-slate-500">{customDuration} Months</span>
+                      </td>
+
+                      <td className="py-3.5 px-4">
+                        <div className="font-bold text-slate-900 flex items-center gap-1">
+                          <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                          Sankara Eye Hospital – {customUnitName}
+                        </div>
+                      </td>
+
+                      <td className="py-3.5 px-4">
+                        <div className="font-black text-[#0b4a8f] flex items-center gap-1">
+                          <IndianRupee className="w-3 h-3" />
+                          {Number(customStipend || 40000).toLocaleString("en-IN")} / month
+                        </div>
+                        <span className="text-[10px] text-slate-400">Customizable in editor</span>
+                      </td>
+
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="rounded-xl text-xs font-bold h-8 px-3 bg-[#0b4a8f] text-white"
+                          >
+                            <Edit3 className="w-3.5 h-3.5 mr-1" />
+                            Active in Preview
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={downloadingId === `offer_0`}
+                            onClick={() => handleDownloadOfferLetter()}
+                            className="rounded-xl border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold h-8 px-3 cursor-pointer"
+                          >
+                            {downloadingId === `offer_0` ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                            ) : (
+                              <Download className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                            )}
+                            PDF
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    candidates.map((cand) => {
+                      const specialty = getCandidateSpecialty(cand);
+                      const isRet = isRetina(cand);
+                      const unitName = units.find((u) => u.id === cand.unitId)?.name || "Jaipur";
+                      const isSelected = selectedCandidateId === cand.id;
+                      const isDownloading = downloadingId === `offer_${cand.id}`;
+                      const isSending = sendingEmailId === `send_offer_${cand.id}`;
+
+                      return (
                       <tr key={cand.id} className={`hover:bg-slate-50/60 transition-colors ${isSelected ? "bg-blue-50/40" : ""}`}>
                         <td className="py-3 px-4">
                           <div className="font-bold text-slate-900">{cand.fullName}</div>
@@ -1091,7 +1437,8 @@ export default function LettersPage() {
                         </td>
                       </tr>
                     );
-                  })}
+                  })
+                )}
                 </tbody>
               </table>
             </div>

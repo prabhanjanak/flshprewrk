@@ -14,7 +14,11 @@
       "destination": "/api/index"
     },
     {
-      "source": "/apply/(.*)",
+      "source": "/objects/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/storage/(.*)",
       "destination": "/api/index"
     },
     {

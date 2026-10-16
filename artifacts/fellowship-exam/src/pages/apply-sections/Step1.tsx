@@ -119,7 +119,7 @@ export default function Step1({ form, set, err, formInfo }: any) {
             {err("referralSource")}
           </div>
 
-          {form.referralSource === "Referred by faculty/trainee" && (
+          {form.referralSource && /referred/i.test(form.referralSource) && (
             <div className="space-y-1.5">
               <Label>Referral Name <span className="text-destructive">*</span></Label>
               <Input placeholder="Enter Referral Name" value={form.referredByName || ""} onChange={(e) => set("referredByName", e.target.value)} />
@@ -127,7 +127,7 @@ export default function Step1({ form, set, err, formInfo }: any) {
             </div>
           )}
 
-          {form.referralSource === "Social Media" && (
+          {form.referralSource && /social\s*media/i.test(form.referralSource) && (
             <div className="space-y-1.5">
               <Label>Platform Name <span className="text-destructive">*</span></Label>
               <Input placeholder="e.g. LinkedIn, Instagram, Facebook" value={form.mediaSource || ""} onChange={(e) => set("mediaSource", e.target.value)} />

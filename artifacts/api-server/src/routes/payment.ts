@@ -6,11 +6,17 @@ import Razorpay from "razorpay";
 
 const router: Router = Router();
 
+function normalizeToken(t: string): string {
+  if (t === "DEC2026" || t === "dec2026" || t === "december2026") return "DECEMBER2026";
+  return t;
+}
+
 // POST /api/payment/create-order
 router.post("/payment/create-order", async (req, res) => {
   try {
-    const { token } = req.body as { token: string };
-    if (!token) return res.status(400).json({ error: "Token is required" });
+    const rawToken = (req.body as { token: string })?.token;
+    if (!rawToken) return res.status(400).json({ error: "Token is required" });
+    const token = normalizeToken(rawToken);
 
     // 1. Find the form to get the programId
     const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, token));
@@ -24,7 +30,10 @@ router.post("/payment/create-order", async (req, res) => {
     const global = all.find((s) => s.programId === null);
     const setting = specific ?? global;
 
-    if (!setting || !setting.razorpayKeyId || !setting.razorpayKeySecret) {
+    const razorpayKeyId = setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID;
+    const razorpayKeySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
+
+    if (!razorpayKeyId || !razorpayKeySecret) {
       return res.status(400).json({ error: "Razorpay is not configured for this program" });
     }
 
@@ -37,7 +46,7 @@ router.post("/payment/create-order", async (req, res) => {
     let unitFeeInPaise = 268000; // default ₹2680 (268000 paise)
     if (program?.feeAmount && program.feeAmount > 0) {
       unitFeeInPaise = program.feeAmount * 100;
-    } else if (setting.amount) {
+    } else if (setting?.amount) {
       unitFeeInPaise = Number(setting.amount);
     }
 
@@ -54,13 +63,13 @@ router.post("/payment/create-order", async (req, res) => {
 
     // 4. Initialize Razorpay instance as per official guide
     const instance = new Razorpay({
-      key_id: setting.razorpayKeyId,
-      key_secret: setting.razorpayKeySecret,
+      key_id: razorpayKeyId,
+      key_secret: razorpayKeySecret,
     });
 
     const options = {
       amount: finalAmountPaise,
-      currency: setting.currency || "INR",
+      currency: setting?.currency || "INR",
       receipt: `receipt_form_${form.id}_${Date.now()}`,
     };
 
@@ -69,11 +78,11 @@ router.post("/payment/create-order", async (req, res) => {
     // Return order and public key to frontend
     res.json({
       order,
-      key: setting.razorpayKeyId,
+      key: razorpayKeyId,
       pricingModel,
       unitFee: unitFeeInPaise / 100,
       totalAmount: finalAmountPaise / 100,
-      mode: setting.mode,
+      mode: setting?.mode || "test",
     });
   } catch (error: any) {
     console.error("Order creation failed:", error);
@@ -84,9 +93,11 @@ router.post("/payment/create-order", async (req, res) => {
 // POST /api/payment/verify
 router.post("/payment/verify", async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, token } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    const rawToken = req.body?.token;
 
-    if (!token) return res.status(400).json({ error: "Token is required" });
+    if (!rawToken) return res.status(400).json({ error: "Token is required" });
+    const token = normalizeToken(rawToken);
 
     // 1. Find the form to get the programId
     const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, token));
@@ -100,14 +111,16 @@ router.post("/payment/verify", async (req, res) => {
     const global = all.find((s) => s.programId === null);
     const setting = specific ?? global;
 
-    if (!setting || !setting.razorpayKeySecret) {
+    const razorpayKeySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
+
+    if (!razorpayKeySecret) {
       return res.status(400).json({ error: "Razorpay secret not found" });
     }
 
     // 3. Verify signature using standard HMAC logic (as shown in Razorpay docs)
     const body = razorpay_order_id + "|" + razorpay_payment_id;
     const expectedSignature = crypto
-      .createHmac("sha256", setting.razorpayKeySecret)
+      .createHmac("sha256", razorpayKeySecret)
       .update(body.toString())
       .digest("hex");
 

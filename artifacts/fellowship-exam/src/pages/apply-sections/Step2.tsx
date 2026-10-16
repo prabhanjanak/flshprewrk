@@ -53,7 +53,7 @@ export default function Step2({ form, set, err }: any) {
           <div className="space-y-3">
             <Label>Medical Conditions <span className="text-destructive">*</span></Label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {["Asthma", "Hypertension", "Diabetes", "Skin Allergy", "Hearing Impairment", "Tuberculosis", "Post Covid", "None of the Above"].map((cond) => (
+              {["Asthma", "Hypertension", "Diabetes", "Skin Allergy", "Hearing Impairment", "Tuberculosis", "Any Heart Related Issues", "Any Liver Related Issues", "None of the Above"].map((cond) => (
                 <label key={cond} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted dark:hover:bg-muted/50 p-2 rounded border border-border">
                   <Checkbox checked={(form.medicalConditions || []).includes(cond)} onCheckedChange={() => toggleMedical(cond)} />
                   {cond}

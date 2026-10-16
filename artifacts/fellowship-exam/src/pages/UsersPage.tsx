@@ -26,44 +26,44 @@ interface Unit { id: number; name: string; city: string; }
 const SALUTATIONS = ["Dr.", "Mr.", "Ms.", "Mrs.", "Prof."];
 
 const roleColors: Record<string, string> = {
-  super_admin: "bg-red-100 text-red-800",
-  program_admin: "bg-orange-100 text-orange-800",
-  central_exam_coordinator: "bg-blue-100 text-blue-800",
-  unit_coordinator: "bg-cyan-100 text-cyan-800",
-  doctor: "bg-purple-100 text-purple-800",
+  super_admin: "bg-red-100 text-red-800 border-red-200",
+  exam_coordinator: "bg-blue-100 text-blue-800 border-blue-200",
+  doctor: "bg-purple-100 text-purple-800 border-purple-200",
+  // Legacy aliases
+  program_admin: "bg-blue-100 text-blue-800 border-blue-200",
+  central_exam_coordinator: "bg-blue-100 text-blue-800 border-blue-200",
+  unit_coordinator: "bg-blue-100 text-blue-800 border-blue-200",
   student: "bg-gray-100 text-gray-800",
 };
 
 const roleLabel: Record<string, string> = {
   super_admin: "Super Admin",
-  program_admin: "Program Admin",
-  central_exam_coordinator: "Central Exam Coordinator",
-  unit_coordinator: "Unit Coordinator",
-  doctor: "Doctor / Interviewer",
-  student: "Student / Candidate",
+  exam_coordinator: "Exam Coordinator",
+  doctor: "Doctor",
+  // Legacy aliases map to Exam Coordinator
+  program_admin: "Exam Coordinator",
+  central_exam_coordinator: "Exam Coordinator",
+  unit_coordinator: "Exam Coordinator",
 };
 
 const ALL_ROLES = [
-  { value: "program_admin", label: "Program Admin" },
-  { value: "central_exam_coordinator", label: "Central Exam Coordinator" },
-  { value: "unit_coordinator", label: "Unit Coordinator" },
-  { value: "doctor", label: "Doctor / Interviewer" },
-  { value: "student", label: "Student / Candidate" },
+  { value: "super_admin", label: "Super Admin" },
+  { value: "exam_coordinator", label: "Exam Coordinator" },
+  { value: "doctor", label: "Doctor" },
 ];
 
 const COORDINATOR_ROLES = [
-  { value: "central_exam_coordinator", label: "Central Exam Coordinator" },
-  { value: "unit_coordinator", label: "Unit Coordinator" },
-  { value: "doctor", label: "Doctor / Interviewer" },
+  { value: "exam_coordinator", label: "Exam Coordinator" },
+  { value: "doctor", label: "Doctor" },
 ];
 
 const EMPTY_FORM = {
   salutation: "", fullName: "", email: "", employeeId: "",
   designation: "", gender: "", avatarSeed: "",
-  role: "unit_coordinator", unitId: "",
+  role: "exam_coordinator", unitId: "",
 };
 
-const allRoles = Object.keys(roleLabel);
+const allRoles = ["super_admin", "exam_coordinator", "doctor"];
 
 export default function UsersPage() {
   const { user: me } = useAuth();
@@ -148,7 +148,13 @@ export default function UsersPage() {
       (u.unitName ?? "").toLowerCase().includes(search.toLowerCase()) ||
       (u.employeeId ?? "").toLowerCase().includes(search.toLowerCase()) ||
       (u.designation ?? "").toLowerCase().includes(search.toLowerCase());
-    return matchSearch && (roleFilter === "all" || u.role === roleFilter);
+    
+    const matchRole =
+      roleFilter === "all" ||
+      u.role === roleFilter ||
+      (roleFilter === "exam_coordinator" && ["exam_coordinator", "central_exam_coordinator", "program_admin", "unit_coordinator"].includes(u.role));
+
+    return matchSearch && matchRole;
   });
 
   const displayName = (u: User) => [u.salutation, u.fullName].filter(Boolean).join(" ");
@@ -183,10 +189,10 @@ export default function UsersPage() {
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "System Admins", value: users.filter(u => u.role.includes('admin')).length, icon: ShieldCheck, colorClasses: "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400" },
-          { label: "Unit Coordinators", value: users.filter(u => u.role === 'unit_coordinator').length, icon: Building2, colorClasses: "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400" },
-          { label: "Medical Faculty", value: users.filter(u => u.role === 'doctor').length, icon: BadgeCheck, colorClasses: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400" },
-          { label: "Active Fellows", value: users.filter(u => u.role === 'student').length, icon: UserPlus, colorClasses: "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400" },
+          { label: "Super Admins", value: users.filter(u => u.role === 'super_admin').length, icon: ShieldCheck, colorClasses: "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400" },
+          { label: "Exam Coordinators", value: users.filter(u => ['exam_coordinator', 'central_exam_coordinator', 'program_admin', 'unit_coordinator'].includes(u.role)).length, icon: Building2, colorClasses: "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" },
+          { label: "Interview Doctors", value: users.filter(u => u.role === 'doctor').length, icon: BadgeCheck, colorClasses: "bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400" },
+          { label: "Active Personnel", value: users.filter(u => u.active).length, icon: UserPlus, colorClasses: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400" },
         ].map((s, i) => (
           <Card key={i} className="border-none shadow-sm bg-white dark:bg-zinc-900">
             <CardContent className="p-4 flex items-center gap-4">

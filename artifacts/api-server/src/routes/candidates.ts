@@ -281,6 +281,9 @@ async function fullCandidate(c: typeof candidatesTable.$inferSelect) {
       photoUrl: sub.photoUrl,
       paymentUrl: sub.paymentUrl,
       otherInformation: sub.otherInformation,
+      customAnswers: sub.customAnswers ?? null,
+      formData: sub.formData ?? null,
+      declarationAccepted: sub.declarationAccepted ?? null,
       submittedAt: sub.submittedAt ? sub.submittedAt.toISOString() : null,
     } : null,
   };
@@ -1887,17 +1890,25 @@ router.post("/candidates/:id/generate-document", requireAuth, requireRole("super
   }
 });
 
-// GET /candidates/:id/call-letter-pdf (Auto-detects Retina vs Anterior)
+// GET /candidates/:id/call-letter-pdf (Auto-detects Retina vs Anterior, supports id=0 on-demand)
 router.get("/candidates/:id/call-letter-pdf", requireAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
-    if (!c) { res.status(404).json({ error: "Candidate not found" }); return; }
+    let c: any = null;
+    let sub: any = null;
+    if (id > 0) {
+      const [found] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
+      c = found;
+      if (c) {
+        const [foundSub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
+        sub = foundSub;
+      }
+    }
 
-    const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
-    
-    let spec = "Ophthalmology Fellowship";
-    if (sub?.specialization) {
+    const candidateName = (req.query.candidateName as string) || c?.fullName || "Dr. Candidate";
+    const candidateCode = (req.query.candidateCode as string) || c?.candidateCode || "SAV-2027-001";
+    let spec = (req.query.specialization as string) || "";
+    if (!spec && sub?.specialization) {
       try {
         const parsed = typeof sub.specialization === "string" && sub.specialization.startsWith("[")
           ? JSON.parse(sub.specialization)
@@ -1907,19 +1918,23 @@ router.get("/candidates/:id/call-letter-pdf", requireAuth, async (req, res) => {
         spec = String(sub.specialization);
       }
     }
+    if (!spec) spec = "Vitreo Retina";
 
     const pdfBuffer = await generateCallLetterPdf({
-      candidateName: c.fullName,
-      candidateCode: c.candidateCode,
+      candidateName,
+      candidateCode,
       specialization: spec,
-      email: c.email,
-      phone: c.phone,
-      address: c.address,
-      applicationId: sub?.id || c.id,
+      email: (req.query.email as string) || c?.email || "candidate@sankaraeye.com",
+      phone: (req.query.phone as string) || c?.phone || "",
+      address: (req.query.address as string) || c?.address || "",
+      applicationId: sub?.id || (c?.id || 1),
+      interviewDate: (req.query.interviewDate as string) || (isRetinaSpecialty(spec) ? "1st June 2026, Monday" : "8th June 2026, Monday"),
+      reportingTime: (req.query.reportingTime as string) || "8:00 AM Sharp",
+      venue: (req.query.venue as string) || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore – 560037",
     });
 
     const isRetina = isRetinaSpecialty(spec);
-    const filename = `Interview_Call_Letter_${isRetina ? "Retina" : "Anterior"}_${c.candidateCode}.pdf`;
+    const filename = `Interview_Call_Letter_${isRetina ? "Retina" : "Anterior"}_${candidateCode}.pdf`;
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
@@ -1930,14 +1945,21 @@ router.get("/candidates/:id/call-letter-pdf", requireAuth, async (req, res) => {
   }
 });
 
-// GET /candidates/:id/offer-letter-pdf (Official Standard Format)
+// GET /candidates/:id/offer-letter-pdf (Official Standard Format, supports id=0 on-demand)
 router.get("/candidates/:id/offer-letter-pdf", requireAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
-    if (!c) { res.status(404).json({ error: "Candidate not found" }); return; }
+    let c: any = null;
+    let sub: any = null;
+    if (id > 0) {
+      const [found] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
+      c = found;
+      if (c) {
+        const [foundSub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
+        sub = foundSub;
+      }
+    }
 
-    const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
     const units = await db.select().from(unitsTable);
     
     // Dynamic unit resolution with query override
@@ -1947,8 +1969,8 @@ router.get("/candidates/:id/offer-letter-pdf", requireAuth, async (req, res) => 
       if (u) unitName = u.name;
     }
     if (!unitName) {
-      const unit = c.unitId ? units.find((u) => u.id === c.unitId) : null;
-      unitName = unit?.name || "Jaipur";
+      const unit = c?.unitId ? units.find((u) => u.id === c.unitId) : null;
+      unitName = unit?.name || "Bangalore";
     }
 
     const cReviewNotes = sub?.reviewNotes ?? "";
@@ -1956,7 +1978,7 @@ router.get("/candidates/:id/offer-letter-pdf", requireAuth, async (req, res) => 
     if (!specialization) {
       specialization = cReviewNotes.includes("Allocated to ") 
         ? cReviewNotes.replace("Allocated to ", "").split(" [")[0] 
-        : (sub?.specialization ? parseSpecializationString(sub.specialization)[0] : "Cataract & IOL");
+        : (sub?.specialization ? parseSpecializationString(sub.specialization)[0] : "Vitreo Retina");
     }
 
     // Dynamic stipend with query override
@@ -1972,22 +1994,25 @@ router.get("/candidates/:id/offer-letter-pdf", requireAuth, async (req, res) => 
     }
 
     const duration = req.query.duration ? Number(req.query.duration) : (isRetinaSpecialty(specialization) ? 24 : 18);
-    const effectiveDate = (req.query.effectiveDate as string) || "6th July 2026";
+    const effectiveDate = (req.query.effectiveDate as string) || "1st January 2027";
+    const candidateName = (req.query.candidateName as string) || c?.fullName || "Dr. Tejaswini";
+    const candidateCode = (req.query.candidateCode as string) || c?.candidateCode || "SAV-2027-001";
 
     const pdfBuffer = await generateOfferLetterPdf({
-      candidateName: (req.query.candidateName as string) || c.fullName,
-      candidateCode: c.candidateCode,
-      specialization: specialization || "Cataract & IOL",
+      candidateName,
+      candidateCode,
+      specialization: specialization || "Vitreo Retina",
       unitName,
-      cmoName: req.query.cmoName as string,
-      address: (req.query.address as string) || c.address,
+      cmoName: (req.query.cmoName as string) || "Dr. Kaushik Murali - Chief Medical Officer",
+      address: (req.query.address as string) || c?.address || "Sankara Eye Hospital Campus",
       durationMonths: duration,
       effectiveDate,
       stipendAmount: stipendFormatted,
       interviewDate: req.query.interviewDate as string,
+      inductionDate: (req.query.inductionDate as string) || "2nd & 3rd July 2026 at Bangalore Main Hospital (For Testing Only)",
     });
 
-    const filename = `Fellowship_Offer_Letter_${c.candidateCode}.pdf`;
+    const filename = `Fellowship_Offer_Letter_${candidateCode}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
     res.send(pdfBuffer);
@@ -2093,8 +2118,8 @@ router.post("/candidates/:id/send-offer-letter", requireAuth, requireRole("super
     }
 
     const duration = req.body.duration ? Number(String(req.body.duration).replace(/[^0-9]/g, "")) : (isRetinaSpecialty(specialization) ? 24 : 18);
-    const effectiveDate = (req.body.effectiveDate || req.body.start_date as string) || "6th July 2026";
-    const interviewDate = (req.body.interviewDate || req.body.interview_date as string) || (isRetinaSpecialty(specialization) ? "1st June 2026" : "8th June 2026");
+    const effectiveDate = (req.body.effectiveDate || req.body.start_date as string) || "6th January 2027";
+    const interviewDate = (req.body.interviewDate || req.body.interview_date as string) || (isRetinaSpecialty(specialization) ? "7th December 2026" : "8th December 2026");
 
     const pdfBuffer = await generateOfferLetterPdf({
       candidateName: req.body.candidateName || c.fullName,
@@ -2107,6 +2132,7 @@ router.post("/candidates/:id/send-offer-letter", requireAuth, requireRole("super
       effectiveDate,
       stipendAmount: stipendFormatted,
       interviewDate,
+      inductionDate: req.body.inductionDate || "2nd & 3rd July 2026 at Bangalore Main Hospital (For Testing Only)",
     });
 
     const fileName = `Fellowship_Offer_Letter_${c.candidateCode}.pdf`;
@@ -2219,7 +2245,7 @@ router.get(["/candidates/:id/summary-pdf", "/candidates/:id/application-pdf", "/
     renderField("Contact Identity", full.email, rightCol, currY);
     currY += 40;
     renderField("Mobile Registry", full.phone, leftCol, currY);
-    renderField("Academic Year", batch?.name || "JULY 2026 CYCLE", rightCol, currY);
+    renderField("Academic Year", batch?.name || "DECEMBER 2026 CYCLE", rightCol, currY);
     currY += 40;
     renderField("Clinical Segment", (sub?.reviewNotes ?? "").replace("Allocated to ", "") || "Fellowship Track", leftCol, currY);
     renderField("Reporting Unit", full.unitName || "Pending Allocation", rightCol, currY);

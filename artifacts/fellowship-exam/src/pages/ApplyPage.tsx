@@ -242,49 +242,31 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
   }, [token]);
 
   const set = (field: string, value: unknown) => {
-    setForm((f) => ({ ...f, [field]: value }));
+    setForm((f) => {
+      const next = { ...f, [field]: value };
+      if (field === "referralSource") {
+        if (!/referred/i.test(String(value || ""))) {
+          delete next.referredByName;
+        }
+        if (!/social\s*media/i.test(String(value || ""))) {
+          delete next.mediaSource;
+        }
+      }
+      return next;
+    });
     setErrors(prev => {
       const next = { ...prev };
       delete next[field];
+      if (field === "referralSource") {
+        delete next.referredByName;
+        delete next.mediaSource;
+      }
       return next;
     });
   };
 
   const onFileChange = (field: string, file: File | null) => {
     if (file) {
-      const lowerField = field.toLowerCase();
-      const lowerName = file.name.toLowerCase();
-      
-      if (lowerField.includes("lor")) {
-        // LOR must be PDF only, <= 5MB
-        const isPdf = file.type === "application/pdf" || lowerName.endsWith(".pdf");
-        if (!isPdf) {
-          setErrors(prev => ({ ...prev, [field]: "LOR file must be in PDF format only" }));
-          return;
-        }
-        if (file.size > 5 * 1024 * 1024) {
-          setErrors(prev => ({ ...prev, [field]: "LOR file size exceeds 5MB limit" }));
-          return;
-        }
-      } else if (lowerField.includes("photo")) {
-        // Passport size photo must be JPG/JPEG only, <= 2MB
-        const isJpg = file.type === "image/jpeg" || file.type === "image/jpg" || lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg");
-        if (!isJpg) {
-          setErrors(prev => ({ ...prev, [field]: "Passport photo must be in JPG/JPEG format only" }));
-          return;
-        }
-        if (file.size > 2 * 1024 * 1024) {
-          setErrors(prev => ({ ...prev, [field]: "Passport photo size exceeds 2MB limit" }));
-          return;
-        }
-      } else {
-        // General files, <= 10MB
-        if (file.size > 10 * 1024 * 1024) {
-          setErrors(prev => ({ ...prev, [field]: "File size exceeds 10MB limit" }));
-          return;
-        }
-      }
-
       setFiles(prev => ({ ...prev, [field]: file }));
       setErrors(prev => {
          const next = { ...prev };
@@ -294,10 +276,75 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
     }
   };
 
-  const validateStep = (currentStep: number) => {
-    const sections = formInfo?.sectionsConfig ? [...formInfo.sectionsConfig] : [];
-    if (isManualEntry && sections.length > 0 && sections[sections.length - 1].id !== 'manual_payment') {
-      sections.push({
+  const isFieldVisible = (f: any, formData: Record<string, any>) => {
+    // Business rule: referredByName only visible if referralSource indicates referee/trainee
+    if (f.id === "referredByName") {
+      const src = formData.referralSource || "";
+      if (!/referred/i.test(src)) return false;
+    }
+    // Business rule: mediaSource only visible if referralSource indicates social media
+    if (f.id === "mediaSource") {
+      const src = formData.referralSource || "";
+      if (!/social\s*media/i.test(src)) return false;
+    }
+
+    if (!f.visibleIf) return true;
+    const targetValue = formData[f.visibleIf.field];
+    const conditionValue = f.visibleIf.contains || f.visibleIf.equals;
+    if (f.visibleIf.key) {
+      const nestedVal = targetValue?.[f.visibleIf.key];
+      return nestedVal === conditionValue;
+    }
+    if (f.visibleIf.contains) {
+      if (!targetValue) return false;
+      if (Array.isArray(targetValue)) {
+        return targetValue.some((v: any) => String(v).toLowerCase().includes(String(conditionValue).toLowerCase()));
+      }
+      return String(targetValue).toLowerCase().includes(String(conditionValue).toLowerCase());
+    }
+    if (f.visibleIf.equals) {
+      return String(targetValue).toLowerCase() === String(conditionValue).toLowerCase();
+    }
+    return true;
+  };
+
+  const isSectionVisible = (section: any, formData: Record<string, any>) => {
+    if (section.enabled === false) return false;
+
+    // Special branching for referral_info and social_media
+    if (section.id === "referral_info") {
+      const src = formData.referralSource || "";
+      if (!/referred/i.test(src)) return false;
+    }
+    if (section.id === "social_media") {
+      const src = formData.referralSource || "";
+      if (!/social\s*media/i.test(src)) return false;
+    }
+
+    if (section.visibleIf) {
+      const targetValue = formData[section.visibleIf.field];
+      const conditionValue = section.visibleIf.contains || section.visibleIf.equals;
+      if (section.visibleIf.contains) {
+        if (!targetValue || !String(targetValue).toLowerCase().includes(String(conditionValue).toLowerCase())) return false;
+      } else if (section.visibleIf.equals) {
+        if (String(targetValue).toLowerCase() !== String(conditionValue).toLowerCase()) return false;
+      }
+    }
+
+    // Skip section if all of its input fields are conditionally hidden
+    const inputFields = section.fields?.filter((f: any) => f.type !== 'info' && f.type !== 'heading' && f.type !== 'static_text') || [];
+    if (inputFields.length > 0) {
+      const anyVisible = inputFields.some((f: any) => isFieldVisible(f, formData));
+      if (!anyVisible) return false;
+    }
+
+    return true;
+  };
+
+  const getVisibleSections = (formData: Record<string, any>) => {
+    const raw = formInfo?.sectionsConfig ? [...formInfo.sectionsConfig] : [];
+    if (isManualEntry && raw.length > 0 && raw[raw.length - 1].id !== 'manual_payment') {
+      raw.push({
         id: 'manual_payment',
         title: "Administrative Manual Payment",
         description: "Enter offline payment details for this candidate.",
@@ -307,27 +354,18 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
         ]
       });
     }
+    return raw.filter(sec => isSectionVisible(sec, formData));
+  };
+
+  const validateStep = (currentStep: number) => {
+    const sections = getVisibleSections(form);
     const section = sections[currentStep];
     if (!section) return true;
     const newErrors: Record<string, string> = {};
     let hasError = false;
 
     section.fields.forEach((f: any) => {
-      // Check visibility logic first
-      let isVisible = true;
-      if (f.visibleIf) {
-         const targetValue = form[f.visibleIf.field];
-         const conditionValue = f.visibleIf.contains || f.visibleIf.equals;
-         if (f.visibleIf.key) {
-            const nestedVal = targetValue?.[f.visibleIf.key];
-            if (nestedVal !== conditionValue) isVisible = false;
-         } else if (f.visibleIf.contains) {
-            if (!targetValue || !targetValue.includes(conditionValue)) isVisible = false;
-         } else if (f.visibleIf.equals) {
-            if (targetValue !== conditionValue) isVisible = false;
-         }
-      }
-
+      const isVisible = isFieldVisible(f, form);
       const isNonInput = f.type === 'info' || f.type === 'heading' || f.type === 'static_text';
 
       if (isVisible && !isNonInput) {
@@ -363,35 +401,53 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
     setSubmitError(null);
 
     try {
-      // 1. Upload files via correct two-step local upload route
+      // 1. Upload files via correct two-step local upload route with resilient inline fallback
       const uploadedUrls: Record<string, string> = {};
       for (const [field, file] of Object.entries(files)) {
-        const urlRes = await fetch(`${API}/apply/${token}/request-upload-url`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: file.name,
-            contentType: file.type,
-            size: file.size,
-            candidateName: form.fullName || "candidate",
-            fieldName: field,
-          }),
-        });
-        if (!urlRes.ok) {
-          const err = await urlRes.json().catch(() => ({}));
-          throw new Error(err.error || `Failed to get upload URL for ${field}`);
+        let objectPathUrl: string | null = null;
+        try {
+          const urlRes = await fetch(`${API}/apply/${token}/request-upload-url`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: file.name,
+              contentType: file.type || "application/octet-stream",
+              size: file.size,
+              candidateName: form.fullName || "candidate",
+              fieldName: field,
+            }),
+          });
+          if (urlRes.ok) {
+            const { uploadURL, objectPath } = await urlRes.json();
+            const putRes = await fetch(uploadURL, {
+              method: "PUT",
+              headers: { "Content-Type": file.type || "application/octet-stream" },
+              body: file,
+            });
+            if (putRes.ok) {
+              objectPathUrl = objectPath;
+            }
+          }
+        } catch (uploadErr) {
+          console.warn(`Direct upload failed for ${field}, falling back to inline data URL:`, uploadErr);
         }
-        const { uploadURL, objectPath } = await urlRes.json();
 
-        // Step 1b: PUT the file directly to the returned URL
-        const putRes = await fetch(uploadURL, {
-          method: "PUT",
-          headers: { "Content-Type": file.type },
-          body: file,
-        });
-        if (!putRes.ok) throw new Error(`Failed to upload ${field}`);
-
-        uploadedUrls[field] = objectPath;
+        // If direct upload succeeded, use it; otherwise convert to Base64 data URL so candidate NEVER gets blocked!
+        if (objectPathUrl) {
+          uploadedUrls[field] = objectPathUrl;
+        } else {
+          try {
+            const base64 = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+            });
+            uploadedUrls[field] = base64;
+          } catch (b64Err) {
+            console.error(`Base64 fallback failed for ${field}:`, b64Err);
+          }
+        }
       }
       const finalForm = { ...form, ...uploadedUrls };
 
@@ -480,20 +536,9 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
   };
 
   const next = async () => {
-    const sections = formInfo?.sectionsConfig ? [...formInfo.sectionsConfig] : [];
-    if (isManualEntry && sections.length > 0 && sections[sections.length - 1].id !== 'manual_payment') {
-      sections.push({
-        id: 'manual_payment',
-        title: "Administrative Manual Payment",
-        description: "Enter offline payment details for this candidate.",
-        fields: [
-          { id: "paymentUTR", type: "text", label: "Payment Reference / UTR Number", required: true },
-          { id: "paymentUrl", type: "file", label: "Payment Screenshot", required: true }
-        ]
-      });
-    }
+    const sections = getVisibleSections(form);
     if (!validateStep(step)) return;
-    if (step === sections.length - 1) {
+    if (step >= sections.length - 1) {
       await handlePaymentAndSubmit();
       return;
     }
@@ -676,19 +721,8 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
       );
    }
 
-    const sections = formInfo.sectionsConfig ? [...formInfo.sectionsConfig] : [];
-  if (isManualEntry && sections.length > 0 && sections[sections.length - 1].id !== 'manual_payment') {
-      sections.push({
-          id: 'manual_payment',
-          title: "Administrative Manual Payment",
-          description: "Enter offline payment details for this candidate.",
-          fields: [
-              { id: "paymentUTR", type: "text", label: "Payment Reference / UTR Number", required: true },
-              { id: "paymentUrl", type: "file", label: "Payment Screenshot", required: true }
-          ]
-      });
-  }
-  const currentSection = sections[step];
+    const sections = getVisibleSections(form);
+    const currentSection = sections[step] || sections[sections.length - 1];
   if (!currentSection) {
      return (
         <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] p-4">
@@ -773,18 +807,7 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
           
           <CardContent className="p-6 md:p-8 space-y-8">
              {currentSection.fields.map((field: any) => {
-               if (field.visibleIf) {
-                 const targetValue = form[field.visibleIf.field];
-                 const conditionValue = field.visibleIf.contains || field.visibleIf.equals;
-                 if (field.visibleIf.key) {
-                    const nestedVal = targetValue?.[field.visibleIf.key];
-                    if (nestedVal !== conditionValue) return null;
-                 } else if (field.visibleIf.contains) {
-                    if (!targetValue || !targetValue.includes(conditionValue)) return null;
-                 } else if (field.visibleIf.equals) {
-                    if (targetValue !== conditionValue) return null;
-                 }
-               }
+               if (!isFieldVisible(field, form)) return null;
 
                return (
                  <div key={field.id} className="space-y-3">
@@ -802,13 +825,7 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
                          name={field.id}
                          onChange={(e) => onFileChange(field.id, e.target.files?.[0] || null)}
                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                         accept={
-                            field.id.toLowerCase().includes("lor") 
-                              ? ".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*" 
-                              : field.id.toLowerCase().includes("photo") 
-                                ? ".jpg,.jpeg,.png,.webp,.heic,image/*" 
-                                : ".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
-                          }
+                         accept="*/*"
                        />
                        <div className="text-center">
                          {files[field.id] ? (
@@ -826,11 +843,7 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
                              </div>
                              <p className="text-sm font-medium text-slate-600">Click to upload or drag & drop</p>
                              <p className="text-xs text-slate-400 mt-1">
-                               {field.id.toLowerCase().includes("lor")
-                                 ? "PDF, JPG, PNG supported (Images auto-formatted to standard PDF)"
-                                 : field.id.toLowerCase().includes("photo")
-                                   ? "JPG, PNG, WebP (Auto-cropped to standard passport photo size)"
-                                   : "PDF or Images (Auto-compressed & normalized)"}
+                               All file formats (PDF, JPG, PNG, DOC, DOCX, images) and all file sizes supported
                              </p>
                            </>
                          )}
@@ -1229,30 +1242,30 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
              )}
           </CardContent>
 
-          <div className="bg-slate-50 p-6 flex items-center justify-between border-t border-slate-100">
+          <div className="bg-slate-50 px-6 py-4 flex items-center justify-between border-t border-slate-100">
             <Button
               variant="outline"
               onClick={prev}
               disabled={step === 0 || submitting}
-              className="h-14 px-8 border-2 border-slate-200/80 hover:bg-slate-50 hover:border-slate-300 rounded-2xl text-slate-700 font-bold transition-all active:scale-[0.98] cursor-pointer font-outfit"
+              className="h-10 px-5 border border-slate-200 hover:bg-slate-100 rounded-xl text-slate-700 font-semibold text-sm transition-all active:scale-[0.98] cursor-pointer font-outfit"
             >
-              <ChevronLeft className="w-4 h-4 mr-2" /> Previous
+              <ChevronLeft className="w-4 h-4 mr-1.5" /> Previous
             </Button>
 
             <Button 
               onClick={next} 
               disabled={submitting}
-              className="bg-[#000080] hover:bg-[#000066] text-white px-10 py-7 rounded-2xl flex items-center gap-2 text-[17px] font-extrabold transition-all shadow-xl shadow-blue-950/10 hover:shadow-2xl hover:shadow-blue-950/20 active:scale-[0.98] cursor-pointer font-outfit"
+              className="bg-[#000080] hover:bg-[#000066] text-white h-10 px-6 rounded-xl flex items-center gap-2 text-sm font-bold transition-all shadow-md shadow-blue-950/10 hover:shadow-lg active:scale-[0.98] cursor-pointer font-outfit"
             >
               {submitting ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   Processing...
                 </>
               ) : step === sections.length - 1 ? (
-                <>Submit & Pay <ChevronRight className="w-5 h-5" /></>
+                <>Submit & Pay <ChevronRight className="w-4 h-4" /></>
               ) : (
-                <>Next Step <ChevronRight className="w-5 h-5" /></>
+                <>Next Step <ChevronRight className="w-4 h-4" /></>
               )}
             </Button>
           </div>

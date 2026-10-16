@@ -15250,11 +15250,11 @@ var require_mime_types = __commonJS({
       }
       return exts[0];
     }
-    function lookup(path16) {
-      if (!path16 || typeof path16 !== "string") {
+    function lookup(path15) {
+      if (!path15 || typeof path15 !== "string") {
         return false;
       }
-      var extension2 = extname("x." + path16).toLowerCase().slice(1);
+      var extension2 = extname("x." + path15).toLowerCase().slice(1);
       if (!extension2) {
         return false;
       }
@@ -18726,13 +18726,13 @@ var require_view = __commonJS({
   "../../node_modules/.pnpm/express@5.2.1/node_modules/express/lib/view.js"(exports, module) {
     "use strict";
     var debug = require_src()("express:view");
-    var path16 = __require("node:path");
+    var path15 = __require("node:path");
     var fs16 = __require("node:fs");
-    var dirname2 = path16.dirname;
-    var basename3 = path16.basename;
-    var extname = path16.extname;
-    var join2 = path16.join;
-    var resolve4 = path16.resolve;
+    var dirname2 = path15.dirname;
+    var basename3 = path15.basename;
+    var extname = path15.extname;
+    var join2 = path15.join;
+    var resolve4 = path15.resolve;
     module.exports = View2;
     function View2(name2, options) {
       var opts = options || {};
@@ -18761,17 +18761,17 @@ var require_view = __commonJS({
       this.path = this.lookup(fileName);
     }
     View2.prototype.lookup = function lookup(name2) {
-      var path17;
+      var path16;
       var roots = [].concat(this.root);
       debug('lookup "%s"', name2);
-      for (var i2 = 0; i2 < roots.length && !path17; i2++) {
+      for (var i2 = 0; i2 < roots.length && !path16; i2++) {
         var root = roots[i2];
         var loc = resolve4(root, name2);
         var dir = dirname2(loc);
         var file2 = basename3(loc);
-        path17 = this.resolve(dir, file2);
+        path16 = this.resolve(dir, file2);
       }
-      return path17;
+      return path16;
     };
     View2.prototype.render = function render(options, callback) {
       var sync = true;
@@ -18793,21 +18793,21 @@ var require_view = __commonJS({
     };
     View2.prototype.resolve = function resolve5(dir, file2) {
       var ext2 = this.ext;
-      var path17 = join2(dir, file2);
-      var stat3 = tryStat(path17);
+      var path16 = join2(dir, file2);
+      var stat3 = tryStat(path16);
       if (stat3 && stat3.isFile()) {
-        return path17;
+        return path16;
       }
-      path17 = join2(dir, basename3(file2, ext2), "index" + ext2);
-      stat3 = tryStat(path17);
+      path16 = join2(dir, basename3(file2, ext2), "index" + ext2);
+      stat3 = tryStat(path16);
       if (stat3 && stat3.isFile()) {
-        return path17;
+        return path16;
       }
     };
-    function tryStat(path17) {
-      debug('stat "%s"', path17);
+    function tryStat(path16) {
+      debug('stat "%s"', path16);
       try {
-        return fs16.statSync(path17);
+        return fs16.statSync(path16);
       } catch (e2) {
         return void 0;
       }
@@ -20005,15 +20005,15 @@ var require_dist = __commonJS({
           if (token.type === endType)
             break;
           if (token.type === "char" || token.type === "escape") {
-            let path16 = token.value;
+            let path15 = token.value;
             let cur = tokens[pos];
             while (cur.type === "char" || cur.type === "escape") {
-              path16 += cur.value;
+              path15 += cur.value;
               cur = tokens[++pos];
             }
             output.push({
               type: "text",
-              value: encodePath(path16)
+              value: encodePath(path15)
             });
             continue;
           }
@@ -20037,16 +20037,16 @@ var require_dist = __commonJS({
       }
       return new TokenData(consumeUntil("end"), str);
     }
-    function compile(path16, options = {}) {
+    function compile(path15, options = {}) {
       const { encode = encodeURIComponent, delimiter = DEFAULT_DELIMITER } = options;
-      const data = typeof path16 === "object" ? path16 : parse4(path16, options);
+      const data = typeof path15 === "object" ? path15 : parse4(path15, options);
       const fn = tokensToFunction(data.tokens, delimiter, encode);
-      return function path17(params = {}) {
-        const [path18, ...missing] = fn(params);
+      return function path16(params = {}) {
+        const [path17, ...missing] = fn(params);
         if (missing.length) {
           throw new TypeError(`Missing parameters: ${missing.join(", ")}`);
         }
-        return path18;
+        return path17;
       };
     }
     function tokensToFunction(tokens, delimiter, encode) {
@@ -20102,9 +20102,9 @@ var require_dist = __commonJS({
         return [encodeValue(value)];
       };
     }
-    function match2(path16, options = {}) {
+    function match2(path15, options = {}) {
       const { decode: decode2 = decodeURIComponent, delimiter = DEFAULT_DELIMITER } = options;
-      const { regexp, keys } = pathToRegexp(path16, options);
+      const { regexp, keys } = pathToRegexp(path15, options);
       const decoders = keys.map((key) => {
         if (decode2 === false)
           return NOOP_VALUE;
@@ -20116,7 +20116,7 @@ var require_dist = __commonJS({
         const m2 = regexp.exec(input);
         if (!m2)
           return false;
-        const path17 = m2[0];
+        const path16 = m2[0];
         const params = /* @__PURE__ */ Object.create(null);
         for (let i2 = 1; i2 < m2.length; i2++) {
           if (m2[i2] === void 0)
@@ -20125,15 +20125,15 @@ var require_dist = __commonJS({
           const decoder = decoders[i2 - 1];
           params[key.name] = decoder(m2[i2]);
         }
-        return { path: path17, params };
+        return { path: path16, params };
       };
     }
-    function pathToRegexp(path16, options = {}) {
+    function pathToRegexp(path15, options = {}) {
       const { delimiter = DEFAULT_DELIMITER, end = true, sensitive = false, trailing = true } = options;
       const keys = [];
       const flags = sensitive ? "" : "i";
       const sources = [];
-      for (const input of pathsToArray(path16, [])) {
+      for (const input of pathsToArray(path15, [])) {
         const data = typeof input === "object" ? input : parse4(input, options);
         for (const tokens of flatten(data.tokens, 0, [])) {
           sources.push(toRegExpSource(tokens, delimiter, keys, data.originalPath));
@@ -20263,18 +20263,18 @@ var require_layer = __commonJS({
     var TRAILING_SLASH_REGEXP = /\/+$/;
     var MATCHING_GROUP_REGEXP = /\((?:\?<(.*?)>)?(?!\?)/g;
     module.exports = Layer;
-    function Layer(path16, options, fn) {
+    function Layer(path15, options, fn) {
       if (!(this instanceof Layer)) {
-        return new Layer(path16, options, fn);
+        return new Layer(path15, options, fn);
       }
-      debug("new %o", path16);
+      debug("new %o", path15);
       const opts = options || {};
       this.handle = fn;
       this.keys = [];
       this.name = fn.name || "<anonymous>";
       this.params = void 0;
       this.path = void 0;
-      this.slash = path16 === "/" && opts.end === false;
+      this.slash = path15 === "/" && opts.end === false;
       function matcher(_path) {
         if (_path instanceof RegExp) {
           const keys = [];
@@ -20313,7 +20313,7 @@ var require_layer = __commonJS({
           decode: decodeParam
         });
       }
-      this.matchers = Array.isArray(path16) ? path16.map(matcher) : [matcher(path16)];
+      this.matchers = Array.isArray(path15) ? path15.map(matcher) : [matcher(path15)];
     }
     Layer.prototype.handleError = function handleError(error40, req, res, next) {
       const fn = this.handle;
@@ -20353,9 +20353,9 @@ var require_layer = __commonJS({
         next(err);
       }
     };
-    Layer.prototype.match = function match2(path16) {
+    Layer.prototype.match = function match2(path15) {
       let match3;
-      if (path16 != null) {
+      if (path15 != null) {
         if (this.slash) {
           this.params = {};
           this.path = "";
@@ -20363,7 +20363,7 @@ var require_layer = __commonJS({
         }
         let i2 = 0;
         while (!match3 && i2 < this.matchers.length) {
-          match3 = this.matchers[i2](path16);
+          match3 = this.matchers[i2](path15);
           i2++;
         }
       }
@@ -20391,13 +20391,13 @@ var require_layer = __commonJS({
         throw err;
       }
     }
-    function loosen(path16) {
-      if (path16 instanceof RegExp || path16 === "/") {
-        return path16;
+    function loosen(path15) {
+      if (path15 instanceof RegExp || path15 === "/") {
+        return path15;
       }
-      return Array.isArray(path16) ? path16.map(function(p) {
+      return Array.isArray(path15) ? path15.map(function(p) {
         return loosen(p);
-      }) : String(path16).replace(TRAILING_SLASH_REGEXP, "");
+      }) : String(path15).replace(TRAILING_SLASH_REGEXP, "");
     }
   }
 });
@@ -20413,9 +20413,9 @@ var require_route = __commonJS({
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
     module.exports = Route;
-    function Route(path16) {
-      debug("new %o", path16);
-      this.path = path16;
+    function Route(path15) {
+      debug("new %o", path15);
+      this.path = path15;
       this.stack = [];
       this.methods = /* @__PURE__ */ Object.create(null);
     }
@@ -20623,8 +20623,8 @@ var require_router = __commonJS({
         if (++sync > 100) {
           return setImmediate(next, err);
         }
-        const path16 = getPathname(req);
-        if (path16 == null) {
+        const path15 = getPathname(req);
+        if (path15 == null) {
           return done(layerError);
         }
         let layer;
@@ -20632,7 +20632,7 @@ var require_router = __commonJS({
         let route;
         while (match2 !== true && idx < stack.length) {
           layer = stack[idx++];
-          match2 = matchLayer(layer, path16);
+          match2 = matchLayer(layer, path15);
           route = layer.route;
           if (typeof match2 !== "boolean") {
             layerError = layerError || match2;
@@ -20670,18 +20670,18 @@ var require_router = __commonJS({
           } else if (route) {
             layer.handleRequest(req, res, next);
           } else {
-            trimPrefix(layer, layerError, layerPath, path16);
+            trimPrefix(layer, layerError, layerPath, path15);
           }
           sync = 0;
         });
       }
-      function trimPrefix(layer, layerError, layerPath, path16) {
+      function trimPrefix(layer, layerError, layerPath, path15) {
         if (layerPath.length !== 0) {
-          if (layerPath !== path16.substring(0, layerPath.length)) {
+          if (layerPath !== path15.substring(0, layerPath.length)) {
             next(layerError);
             return;
           }
-          const c = path16[layerPath.length];
+          const c = path15[layerPath.length];
           if (c && c !== "/") {
             next(layerError);
             return;
@@ -20705,7 +20705,7 @@ var require_router = __commonJS({
     };
     Router34.prototype.use = function use(handler) {
       let offset = 0;
-      let path16 = "/";
+      let path15 = "/";
       if (typeof handler !== "function") {
         let arg = handler;
         while (Array.isArray(arg) && arg.length !== 0) {
@@ -20713,7 +20713,7 @@ var require_router = __commonJS({
         }
         if (typeof arg !== "function") {
           offset = 1;
-          path16 = handler;
+          path15 = handler;
         }
       }
       const callbacks = flatten.call(slice.call(arguments, offset), Infinity);
@@ -20725,8 +20725,8 @@ var require_router = __commonJS({
         if (typeof fn !== "function") {
           throw new TypeError("argument handler must be a function");
         }
-        debug("use %o %s", path16, fn.name || "<anonymous>");
-        const layer = new Layer(path16, {
+        debug("use %o %s", path15, fn.name || "<anonymous>");
+        const layer = new Layer(path15, {
           sensitive: this.caseSensitive,
           strict: false,
           end: false
@@ -20736,9 +20736,9 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router34.prototype.route = function route(path16) {
-      const route2 = new Route(path16);
-      const layer = new Layer(path16, {
+    Router34.prototype.route = function route(path15) {
+      const route2 = new Route(path15);
+      const layer = new Layer(path15, {
         sensitive: this.caseSensitive,
         strict: this.strict,
         end: true
@@ -20751,8 +20751,8 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router34.prototype[method] = function(path16) {
-        const route = this.route(path16);
+      Router34.prototype[method] = function(path15) {
+        const route = this.route(path15);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
       };
@@ -20781,9 +20781,9 @@ var require_router = __commonJS({
       const fqdnIndex = url3.substring(0, pathLength).indexOf("://");
       return fqdnIndex !== -1 ? url3.substring(0, url3.indexOf("/", 3 + fqdnIndex)) : void 0;
     }
-    function matchLayer(layer, path16) {
+    function matchLayer(layer, path15) {
       try {
-        return layer.match(path16);
+        return layer.match(path15);
       } catch (err) {
         return err;
       }
@@ -21011,7 +21011,7 @@ var require_application = __commonJS({
     };
     app2.use = function use(fn) {
       var offset = 0;
-      var path16 = "/";
+      var path15 = "/";
       if (typeof fn !== "function") {
         var arg = fn;
         while (Array.isArray(arg) && arg.length !== 0) {
@@ -21019,7 +21019,7 @@ var require_application = __commonJS({
         }
         if (typeof arg !== "function") {
           offset = 1;
-          path16 = fn;
+          path15 = fn;
         }
       }
       var fns = flatten.call(slice.call(arguments, offset), Infinity);
@@ -21029,12 +21029,12 @@ var require_application = __commonJS({
       var router34 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router34.use(path16, fn2);
+          return router34.use(path15, fn2);
         }
-        debug(".use app under %s", path16);
-        fn2.mountpath = path16;
+        debug(".use app under %s", path15);
+        fn2.mountpath = path15;
         fn2.parent = this;
-        router34.use(path16, function mounted_app(req, res, next) {
+        router34.use(path15, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -21046,8 +21046,8 @@ var require_application = __commonJS({
       }, this);
       return this;
     };
-    app2.route = function route(path16) {
-      return this.router.route(path16);
+    app2.route = function route(path15) {
+      return this.router.route(path15);
     };
     app2.engine = function engine2(ext2, fn) {
       if (typeof fn !== "function") {
@@ -21090,7 +21090,7 @@ var require_application = __commonJS({
       }
       return this;
     };
-    app2.path = function path16() {
+    app2.path = function path15() {
       return this.parent ? this.parent.path() + this.mountpath : "";
     };
     app2.enabled = function enabled(setting) {
@@ -21106,17 +21106,17 @@ var require_application = __commonJS({
       return this.set(setting, false);
     };
     methods.forEach(function(method) {
-      app2[method] = function(path16) {
+      app2[method] = function(path15) {
         if (method === "get" && arguments.length === 1) {
-          return this.set(path16);
+          return this.set(path15);
         }
-        var route = this.route(path16);
+        var route = this.route(path15);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
       };
     });
-    app2.all = function all(path16) {
-      var route = this.route(path16);
+    app2.all = function all(path15) {
+      var route = this.route(path15);
       var args = slice.call(arguments, 1);
       for (var i2 = 0; i2 < methods.length; i2++) {
         route[methods[i2]].apply(route, args);
@@ -22026,7 +22026,7 @@ var require_request = __commonJS({
       var subdomains2 = !isIP2(hostname2) ? hostname2.split(".").reverse() : [hostname2];
       return subdomains2.slice(offset);
     });
-    defineGetter(req, "path", function path16() {
+    defineGetter(req, "path", function path15() {
       return parse4(this).pathname;
     });
     defineGetter(req, "host", function host() {
@@ -22438,27 +22438,27 @@ var require_send = __commonJS({
     var ms = require_ms();
     var onFinished = require_on_finished();
     var parseRange = require_range_parser();
-    var path16 = __require("path");
+    var path15 = __require("path");
     var statuses = require_statuses();
     var Stream3 = __require("stream");
     var util4 = __require("util");
-    var extname = path16.extname;
-    var join2 = path16.join;
-    var normalize2 = path16.normalize;
-    var resolve4 = path16.resolve;
-    var sep2 = path16.sep;
+    var extname = path15.extname;
+    var join2 = path15.join;
+    var normalize2 = path15.normalize;
+    var resolve4 = path15.resolve;
+    var sep2 = path15.sep;
     var BYTES_RANGE_REGEXP = /^ *bytes=/;
     var MAX_MAXAGE = 60 * 60 * 24 * 365 * 1e3;
     var UP_PATH_REGEXP = /(?:^|[\\/])\.\.(?:[\\/]|$)/;
     module.exports = send;
-    function send(req, path17, options) {
-      return new SendStream(req, path17, options);
+    function send(req, path16, options) {
+      return new SendStream(req, path16, options);
     }
-    function SendStream(req, path17, options) {
+    function SendStream(req, path16, options) {
       Stream3.call(this);
       var opts = options || {};
       this.options = opts;
-      this.path = path17;
+      this.path = path16;
       this.req = req;
       this._acceptRanges = opts.acceptRanges !== void 0 ? Boolean(opts.acceptRanges) : true;
       this._cacheControl = opts.cacheControl !== void 0 ? Boolean(opts.cacheControl) : true;
@@ -22572,10 +22572,10 @@ var require_send = __commonJS({
       var lastModified = this.res.getHeader("Last-Modified");
       return parseHttpDate(lastModified) <= parseHttpDate(ifRange);
     };
-    SendStream.prototype.redirect = function redirect(path17) {
+    SendStream.prototype.redirect = function redirect(path16) {
       var res = this.res;
       if (hasListeners(this, "directory")) {
-        this.emit("directory", res, path17);
+        this.emit("directory", res, path16);
         return;
       }
       if (this.hasTrailingSlash()) {
@@ -22595,38 +22595,38 @@ var require_send = __commonJS({
     SendStream.prototype.pipe = function pipe2(res) {
       var root = this._root;
       this.res = res;
-      var path17 = decode2(this.path);
-      if (path17 === -1) {
+      var path16 = decode2(this.path);
+      if (path16 === -1) {
         this.error(400);
         return res;
       }
-      if (~path17.indexOf("\0")) {
+      if (~path16.indexOf("\0")) {
         this.error(400);
         return res;
       }
       var parts;
       if (root !== null) {
-        if (path17) {
-          path17 = normalize2("." + sep2 + path17);
+        if (path16) {
+          path16 = normalize2("." + sep2 + path16);
         }
-        if (UP_PATH_REGEXP.test(path17)) {
-          debug('malicious path "%s"', path17);
+        if (UP_PATH_REGEXP.test(path16)) {
+          debug('malicious path "%s"', path16);
           this.error(403);
           return res;
         }
-        parts = path17.split(sep2);
-        path17 = normalize2(join2(root, path17));
+        parts = path16.split(sep2);
+        path16 = normalize2(join2(root, path16));
       } else {
-        if (UP_PATH_REGEXP.test(path17)) {
-          debug('malicious path "%s"', path17);
+        if (UP_PATH_REGEXP.test(path16)) {
+          debug('malicious path "%s"', path16);
           this.error(403);
           return res;
         }
-        parts = normalize2(path17).split(sep2);
-        path17 = resolve4(path17);
+        parts = normalize2(path16).split(sep2);
+        path16 = resolve4(path16);
       }
       if (containsDotFile(parts)) {
-        debug('%s dotfile "%s"', this._dotfiles, path17);
+        debug('%s dotfile "%s"', this._dotfiles, path16);
         switch (this._dotfiles) {
           case "allow":
             break;
@@ -22640,13 +22640,13 @@ var require_send = __commonJS({
         }
       }
       if (this._index.length && this.hasTrailingSlash()) {
-        this.sendIndex(path17);
+        this.sendIndex(path16);
         return res;
       }
-      this.sendFile(path17);
+      this.sendFile(path16);
       return res;
     };
-    SendStream.prototype.send = function send2(path17, stat3) {
+    SendStream.prototype.send = function send2(path16, stat3) {
       var len = stat3.size;
       var options = this.options;
       var opts = {};
@@ -22658,9 +22658,9 @@ var require_send = __commonJS({
         this.headersAlreadySent();
         return;
       }
-      debug('pipe "%s"', path17);
-      this.setHeader(path17, stat3);
-      this.type(path17);
+      debug('pipe "%s"', path16);
+      this.setHeader(path16, stat3);
+      this.type(path16);
       if (this.isConditionalGET()) {
         if (this.isPreconditionFailure()) {
           this.error(412);
@@ -22709,28 +22709,28 @@ var require_send = __commonJS({
         res.end();
         return;
       }
-      this.stream(path17, opts);
+      this.stream(path16, opts);
     };
-    SendStream.prototype.sendFile = function sendFile(path17) {
+    SendStream.prototype.sendFile = function sendFile(path16) {
       var i2 = 0;
       var self2 = this;
-      debug('stat "%s"', path17);
-      fs16.stat(path17, function onstat(err, stat3) {
-        var pathEndsWithSep = path17[path17.length - 1] === sep2;
-        if (err && err.code === "ENOENT" && !extname(path17) && !pathEndsWithSep) {
+      debug('stat "%s"', path16);
+      fs16.stat(path16, function onstat(err, stat3) {
+        var pathEndsWithSep = path16[path16.length - 1] === sep2;
+        if (err && err.code === "ENOENT" && !extname(path16) && !pathEndsWithSep) {
           return next(err);
         }
         if (err) return self2.onStatError(err);
-        if (stat3.isDirectory()) return self2.redirect(path17);
+        if (stat3.isDirectory()) return self2.redirect(path16);
         if (pathEndsWithSep) return self2.error(404);
-        self2.emit("file", path17, stat3);
-        self2.send(path17, stat3);
+        self2.emit("file", path16, stat3);
+        self2.send(path16, stat3);
       });
       function next(err) {
         if (self2._extensions.length <= i2) {
           return err ? self2.onStatError(err) : self2.error(404);
         }
-        var p = path17 + "." + self2._extensions[i2++];
+        var p = path16 + "." + self2._extensions[i2++];
         debug('stat "%s"', p);
         fs16.stat(p, function(err2, stat3) {
           if (err2) return next(err2);
@@ -22740,7 +22740,7 @@ var require_send = __commonJS({
         });
       }
     };
-    SendStream.prototype.sendIndex = function sendIndex(path17) {
+    SendStream.prototype.sendIndex = function sendIndex(path16) {
       var i2 = -1;
       var self2 = this;
       function next(err) {
@@ -22748,7 +22748,7 @@ var require_send = __commonJS({
           if (err) return self2.onStatError(err);
           return self2.error(404);
         }
-        var p = join2(path17, self2._index[i2]);
+        var p = join2(path16, self2._index[i2]);
         debug('stat "%s"', p);
         fs16.stat(p, function(err2, stat3) {
           if (err2) return next(err2);
@@ -22759,10 +22759,10 @@ var require_send = __commonJS({
       }
       next();
     };
-    SendStream.prototype.stream = function stream2(path17, options) {
+    SendStream.prototype.stream = function stream2(path16, options) {
       var self2 = this;
       var res = this.res;
-      var stream3 = fs16.createReadStream(path17, options);
+      var stream3 = fs16.createReadStream(path16, options);
       this.emit("stream", stream3);
       stream3.pipe(res);
       function cleanup() {
@@ -22777,17 +22777,17 @@ var require_send = __commonJS({
         self2.emit("end");
       });
     };
-    SendStream.prototype.type = function type(path17) {
+    SendStream.prototype.type = function type(path16) {
       var res = this.res;
       if (res.getHeader("Content-Type")) return;
-      var ext2 = extname(path17);
+      var ext2 = extname(path16);
       var type2 = mime3.contentType(ext2) || "application/octet-stream";
       debug("content-type %s", type2);
       res.setHeader("Content-Type", type2);
     };
-    SendStream.prototype.setHeader = function setHeader(path17, stat3) {
+    SendStream.prototype.setHeader = function setHeader(path16, stat3) {
       var res = this.res;
-      this.emit("headers", res, path17, stat3);
+      this.emit("headers", res, path16, stat3);
       if (this._acceptRanges && !res.getHeader("Accept-Ranges")) {
         debug("accept ranges");
         res.setHeader("Accept-Ranges", "bytes");
@@ -22845,9 +22845,9 @@ var require_send = __commonJS({
       }
       return err instanceof Error ? createError(status, err, { expose: false }) : createError(status, err);
     }
-    function decode2(path17) {
+    function decode2(path16) {
       try {
-        return decodeURIComponent(path17);
+        return decodeURIComponent(path16);
       } catch (err) {
         return -1;
       }
@@ -22991,7 +22991,7 @@ var require_response = __commonJS({
     var http3 = __require("node:http");
     var onFinished = require_on_finished();
     var mime3 = require_mime_types();
-    var path16 = __require("node:path");
+    var path15 = __require("node:path");
     var pathIsAbsolute = __require("node:path").isAbsolute;
     var statuses = require_statuses();
     var sign = require_cookie_signature().sign;
@@ -23000,8 +23000,8 @@ var require_response = __commonJS({
     var setCharset = require_utils3().setCharset;
     var cookie = require_cookie();
     var send = require_send();
-    var extname = path16.extname;
-    var resolve4 = path16.resolve;
+    var extname = path15.extname;
+    var resolve4 = path15.resolve;
     var vary = require_vary();
     var { Buffer: Buffer4 } = __require("node:buffer");
     var res = Object.create(http3.ServerResponse.prototype);
@@ -23147,26 +23147,26 @@ var require_response = __commonJS({
       this.type("txt");
       return this.send(body);
     };
-    res.sendFile = function sendFile(path17, options, callback) {
+    res.sendFile = function sendFile(path16, options, callback) {
       var done = callback;
       var req = this.req;
       var res2 = this;
       var next = req.next;
       var opts = options || {};
-      if (!path17) {
+      if (!path16) {
         throw new TypeError("path argument is required to res.sendFile");
       }
-      if (typeof path17 !== "string") {
+      if (typeof path16 !== "string") {
         throw new TypeError("path must be a string to res.sendFile");
       }
       if (typeof options === "function") {
         done = options;
         opts = {};
       }
-      if (!opts.root && !pathIsAbsolute(path17)) {
+      if (!opts.root && !pathIsAbsolute(path16)) {
         throw new TypeError("path must be absolute or specify root to res.sendFile");
       }
-      var pathname = encodeURI(path17);
+      var pathname = encodeURI(path16);
       opts.etag = this.app.enabled("etag");
       var file2 = send(req, pathname, opts);
       sendfile(res2, file2, opts, function(err) {
@@ -23177,7 +23177,7 @@ var require_response = __commonJS({
         }
       });
     };
-    res.download = function download(path17, filename, options, callback) {
+    res.download = function download(path16, filename, options, callback) {
       var done = callback;
       var name2 = filename;
       var opts = options || null;
@@ -23194,7 +23194,7 @@ var require_response = __commonJS({
         opts = filename;
       }
       var headers = {
-        "Content-Disposition": contentDisposition(name2 || path17)
+        "Content-Disposition": contentDisposition(name2 || path16)
       };
       if (opts && opts.headers) {
         var keys = Object.keys(opts.headers);
@@ -23207,7 +23207,7 @@ var require_response = __commonJS({
       }
       opts = Object.create(opts);
       opts.headers = headers;
-      var fullPath = !opts.root ? resolve4(path17) : path17;
+      var fullPath = !opts.root ? resolve4(path16) : path16;
       return this.sendFile(fullPath, opts, done);
     };
     res.contentType = res.type = function contentType(type) {
@@ -23490,11 +23490,11 @@ var require_serve_static = __commonJS({
         }
         var forwardError = !fallthrough;
         var originalUrl = parseUrl.original(req);
-        var path16 = parseUrl(req).pathname;
-        if (path16 === "/" && originalUrl.pathname.substr(-1) !== "/") {
-          path16 = "";
+        var path15 = parseUrl(req).pathname;
+        if (path15 === "/" && originalUrl.pathname.substr(-1) !== "/") {
+          path15 = "";
         }
-        var stream2 = send(req, path16, opts);
+        var stream2 = send(req, path15, opts);
         stream2.on("directory", onDirectory);
         if (setHeaders) {
           stream2.on("headers", setHeaders);
@@ -24142,8 +24142,8 @@ var require_req = __commonJS({
       if (req.originalUrl) {
         _req.url = req.originalUrl;
       } else {
-        const path16 = req.path;
-        _req.url = typeof path16 === "string" ? path16 : req.url ? req.url.path || req.url : void 0;
+        const path15 = req.path;
+        _req.url = typeof path15 === "string" ? path15 : req.url ? req.url.path || req.url : void 0;
       }
       if (req.query) {
         _req.query = req.query;
@@ -24308,14 +24308,14 @@ var require_redact = __commonJS({
       }
       return obj;
     }
-    function parsePath(path16) {
+    function parsePath(path15) {
       const parts = [];
       let current = "";
       let inBrackets = false;
       let inQuotes = false;
       let quoteChar = "";
-      for (let i2 = 0; i2 < path16.length; i2++) {
-        const char2 = path16[i2];
+      for (let i2 = 0; i2 < path15.length; i2++) {
+        const char2 = path15[i2];
         if (!inBrackets && char2 === ".") {
           if (current) {
             parts.push(current);
@@ -24446,10 +24446,10 @@ var require_redact = __commonJS({
       return current;
     }
     function redactPaths(obj, paths, censor, remove = false) {
-      for (const path16 of paths) {
-        const parts = parsePath(path16);
+      for (const path15 of paths) {
+        const parts = parsePath(path15);
         if (parts.includes("*")) {
-          redactWildcardPath(obj, parts, censor, path16, remove);
+          redactWildcardPath(obj, parts, censor, path15, remove);
         } else {
           if (remove) {
             removeKey(obj, parts);
@@ -24534,8 +24534,8 @@ var require_redact = __commonJS({
           }
         } else {
           if (afterWildcard.includes("*")) {
-            const wrappedCensor = typeof censor === "function" ? (value, path16) => {
-              const fullPath = [...pathArray.slice(0, pathLength), ...path16];
+            const wrappedCensor = typeof censor === "function" ? (value, path15) => {
+              const fullPath = [...pathArray.slice(0, pathLength), ...path15];
               return censor(value, fullPath);
             } : censor;
             redactWildcardPath(current, afterWildcard, wrappedCensor, originalPath, remove);
@@ -24570,8 +24570,8 @@ var require_redact = __commonJS({
         return null;
       }
       const pathStructure = /* @__PURE__ */ new Map();
-      for (const path16 of pathsToClone) {
-        const parts = parsePath(path16);
+      for (const path15 of pathsToClone) {
+        const parts = parsePath(path15);
         let current = pathStructure;
         for (let i2 = 0; i2 < parts.length; i2++) {
           const part = parts[i2];
@@ -24623,24 +24623,24 @@ var require_redact = __commonJS({
       }
       return cloneSelectively(obj, pathStructure);
     }
-    function validatePath(path16) {
-      if (typeof path16 !== "string") {
+    function validatePath(path15) {
+      if (typeof path15 !== "string") {
         throw new Error("Paths must be (non-empty) strings");
       }
-      if (path16 === "") {
+      if (path15 === "") {
         throw new Error("Invalid redaction path ()");
       }
-      if (path16.includes("..")) {
-        throw new Error(`Invalid redaction path (${path16})`);
+      if (path15.includes("..")) {
+        throw new Error(`Invalid redaction path (${path15})`);
       }
-      if (path16.includes(",")) {
-        throw new Error(`Invalid redaction path (${path16})`);
+      if (path15.includes(",")) {
+        throw new Error(`Invalid redaction path (${path15})`);
       }
       let bracketCount = 0;
       let inQuotes = false;
       let quoteChar = "";
-      for (let i2 = 0; i2 < path16.length; i2++) {
-        const char2 = path16[i2];
+      for (let i2 = 0; i2 < path15.length; i2++) {
+        const char2 = path15[i2];
         if ((char2 === '"' || char2 === "'") && bracketCount > 0) {
           if (!inQuotes) {
             inQuotes = true;
@@ -24654,20 +24654,20 @@ var require_redact = __commonJS({
         } else if (char2 === "]" && !inQuotes) {
           bracketCount--;
           if (bracketCount < 0) {
-            throw new Error(`Invalid redaction path (${path16})`);
+            throw new Error(`Invalid redaction path (${path15})`);
           }
         }
       }
       if (bracketCount !== 0) {
-        throw new Error(`Invalid redaction path (${path16})`);
+        throw new Error(`Invalid redaction path (${path15})`);
       }
     }
     function validatePaths(paths) {
       if (!Array.isArray(paths)) {
         throw new TypeError("paths must be an array");
       }
-      for (const path16 of paths) {
-        validatePath(path16);
+      for (const path15 of paths) {
+        validatePath(path15);
       }
     }
     function slowRedact(options = {}) {
@@ -24835,8 +24835,8 @@ var require_redaction = __commonJS({
         if (shape[k] === null) {
           o[k] = (value) => topCensor(value, [k]);
         } else {
-          const wrappedCensor = typeof censor === "function" ? (value, path16) => {
-            return censor(value, [k, ...path16]);
+          const wrappedCensor = typeof censor === "function" ? (value, path15) => {
+            return censor(value, [k, ...path15]);
           } : censor;
           o[k] = Redact({
             paths: shape[k],
@@ -25057,7 +25057,7 @@ var require_sonic_boom = __commonJS({
     var fs16 = __require("fs");
     var EventEmitter3 = __require("events");
     var inherits = __require("util").inherits;
-    var path16 = __require("path");
+    var path15 = __require("path");
     var sleep = require_atomic_sleep();
     var assert2 = __require("assert");
     var BUSY_WRITE_TIMEOUT = 100;
@@ -25111,7 +25111,7 @@ var require_sonic_boom = __commonJS({
       const mode = sonic.mode;
       if (sonic.sync) {
         try {
-          if (sonic.mkdir) fs16.mkdirSync(path16.dirname(file2), { recursive: true });
+          if (sonic.mkdir) fs16.mkdirSync(path15.dirname(file2), { recursive: true });
           const fd = fs16.openSync(file2, flags, mode);
           fileOpened(null, fd);
         } catch (err) {
@@ -25119,7 +25119,7 @@ var require_sonic_boom = __commonJS({
           throw err;
         }
       } else if (sonic.mkdir) {
-        fs16.mkdir(path16.dirname(file2), { recursive: true }, (err) => {
+        fs16.mkdir(path15.dirname(file2), { recursive: true }, (err) => {
           if (err) return fileOpened(err);
           fs16.open(file2, flags, mode, fileOpened);
         });
@@ -27978,7 +27978,7 @@ var require_multistream = __commonJS({
 var require_pino = __commonJS({
   "../../node_modules/.pnpm/pino@9.14.0/node_modules/pino/pino.js"(exports, module) {
     "use strict";
-    var os2 = __require("node:os");
+    var os5 = __require("node:os");
     var stdSerializers = require_pino_std_serializers();
     var caller = require_caller();
     var redaction = require_redaction();
@@ -28025,7 +28025,7 @@ var require_pino = __commonJS({
     } = symbols;
     var { epochTime, nullTime } = time4;
     var { pid } = process;
-    var hostname2 = os2.hostname();
+    var hostname2 = os5.hostname();
     var defaultErrorSerializer = stdSerializers.err;
     var defaultOptions = {
       level: "info",
@@ -31836,7 +31836,7 @@ var require_split2 = __commonJS({
 var require_helper = __commonJS({
   "../../node_modules/.pnpm/pgpass@1.0.5/node_modules/pgpass/lib/helper.js"(exports, module) {
     "use strict";
-    var path16 = __require("path");
+    var path15 = __require("path");
     var Stream3 = __require("stream").Stream;
     var split = require_split2();
     var util4 = __require("util");
@@ -31875,7 +31875,7 @@ var require_helper = __commonJS({
     };
     module.exports.getFileName = function(rawEnv) {
       var env = rawEnv || process.env;
-      var file2 = env.PGPASSFILE || (isWin ? path16.join(env.APPDATA || "./", "postgresql", "pgpass.conf") : path16.join(env.HOME || "./", ".pgpass"));
+      var file2 = env.PGPASSFILE || (isWin ? path15.join(env.APPDATA || "./", "postgresql", "pgpass.conf") : path15.join(env.HOME || "./", ".pgpass"));
       return file2;
     };
     module.exports.usePgPass = function(stats, fname) {
@@ -32007,7 +32007,7 @@ var require_helper = __commonJS({
 var require_lib4 = __commonJS({
   "../../node_modules/.pnpm/pgpass@1.0.5/node_modules/pgpass/lib/index.js"(exports, module) {
     "use strict";
-    var path16 = __require("path");
+    var path15 = __require("path");
     var fs16 = __require("fs");
     var helper = require_helper();
     module.exports = function(connInfo, cb) {
@@ -35098,7 +35098,7 @@ var init_selection_proxy = __esm({
 function mapResultRow(columns, row, joinsNotNullableMap) {
   const nullifyMap = {};
   const result = columns.reduce(
-    (result2, { path: path16, field }, columnIndex) => {
+    (result2, { path: path15, field }, columnIndex) => {
       let decoder;
       if (is(field, Column)) {
         decoder = field;
@@ -35110,8 +35110,8 @@ function mapResultRow(columns, row, joinsNotNullableMap) {
         decoder = field.sql.decoder;
       }
       let node = result2;
-      for (const [pathChunkIndex, pathChunk] of path16.entries()) {
-        if (pathChunkIndex < path16.length - 1) {
+      for (const [pathChunkIndex, pathChunk] of path15.entries()) {
+        if (pathChunkIndex < path15.length - 1) {
           if (!(pathChunk in node)) {
             node[pathChunk] = {};
           }
@@ -35119,8 +35119,8 @@ function mapResultRow(columns, row, joinsNotNullableMap) {
         } else {
           const rawValue = row[columnIndex];
           const value = node[pathChunk] = rawValue === null ? null : decoder.mapFromDriverValue(rawValue);
-          if (joinsNotNullableMap && is(field, Column) && path16.length === 2) {
-            const objectName = path16[0];
+          if (joinsNotNullableMap && is(field, Column) && path15.length === 2) {
+            const objectName = path15[0];
             if (!(objectName in nullifyMap)) {
               nullifyMap[objectName] = value === null ? getTableName(field.table) : false;
             } else if (typeof nullifyMap[objectName] === "string" && nullifyMap[objectName] !== getTableName(field.table)) {
@@ -42257,10 +42257,10 @@ function assignProp(target, prop, value) {
     configurable: true
   });
 }
-function getElementAtPath(obj, path16) {
-  if (!path16)
+function getElementAtPath(obj, path15) {
+  if (!path15)
     return obj;
-  return path16.reduce((acc, key) => acc?.[key], obj);
+  return path15.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -42509,11 +42509,11 @@ function aborted(x2, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path16, issues) {
+function prefixIssues(path15, issues) {
   return issues.map((iss) => {
     var _a2;
     (_a2 = iss).path ?? (_a2.path = []);
-    iss.path.unshift(path16);
+    iss.path.unshift(path15);
     return iss;
   });
 }
@@ -42702,7 +42702,7 @@ function treeifyError(error40, _mapper) {
     return issue2.message;
   };
   const result = { errors: [] };
-  const processError = (error41, path16 = []) => {
+  const processError = (error41, path15 = []) => {
     var _a2, _b;
     for (const issue2 of error41.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
@@ -42712,7 +42712,7 @@ function treeifyError(error40, _mapper) {
       } else if (issue2.code === "invalid_element") {
         processError({ issues: issue2.issues }, issue2.path);
       } else {
-        const fullpath = [...path16, ...issue2.path];
+        const fullpath = [...path15, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -42742,9 +42742,9 @@ function treeifyError(error40, _mapper) {
   processError(error40);
   return result;
 }
-function toDotPath(path16) {
+function toDotPath(path15) {
   const segs = [];
-  for (const seg of path16) {
+  for (const seg of path15) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -54722,6 +54722,29 @@ var init_audit_logs = __esm({
   }
 });
 
+// ../../lib/db/src/schema/uploaded-files.ts
+var bytea, uploadedFilesTable;
+var init_uploaded_files = __esm({
+  "../../lib/db/src/schema/uploaded-files.ts"() {
+    "use strict";
+    init_pg_core();
+    bytea = customType({
+      dataType() {
+        return "bytea";
+      }
+    });
+    uploadedFilesTable = pgTable("uploaded_files", {
+      id: serial("id").primaryKey(),
+      filePath: text("file_path").notNull().unique(),
+      fileName: text("file_name").notNull(),
+      contentType: text("content_type").notNull(),
+      fileData: bytea("file_data").notNull(),
+      fileSize: integer("file_size").notNull(),
+      createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+    });
+  }
+});
+
 // ../../lib/db/src/schema/index.ts
 var schema_exports = {};
 __export(schema_exports, {
@@ -54765,6 +54788,7 @@ __export(schema_exports, {
   seatMatrixEntriesTable: () => seatMatrixEntriesTable,
   specialitiesTable: () => specialitiesTable,
   unitsTable: () => unitsTable,
+  uploadedFilesTable: () => uploadedFilesTable,
   userRoleEnum: () => userRoleEnum,
   userSessionsTable: () => userSessionsTable,
   usersTable: () => usersTable,
@@ -54792,6 +54816,7 @@ var init_schema2 = __esm({
     init_applications();
     init_sessions();
     init_audit_logs();
+    init_uploaded_files();
   }
 });
 
@@ -54843,6 +54868,7 @@ __export(src_exports, {
   seatMatrixEntriesTable: () => seatMatrixEntriesTable,
   specialitiesTable: () => specialitiesTable,
   unitsTable: () => unitsTable,
+  uploadedFilesTable: () => uploadedFilesTable,
   userRoleEnum: () => userRoleEnum,
   userSessionsTable: () => userSessionsTable,
   usersTable: () => usersTable,
@@ -60467,27 +60493,25 @@ async function requireAuth(req, res, next) {
   }
   try {
     const verified = verifyToken(token);
-    const [session] = await db.select().from(userSessionsTable).where(eq(userSessionsTable.token, token));
-    if (!session || !session.isActive) {
-      res.status(401).json({ error: "Session has been terminated or is invalid" });
-      return;
-    }
-    const [setting] = await db.select().from(globalSettingsTable).where(eq(globalSettingsTable.key, "session_inactivity_timeout"));
-    const timeoutMinutes = setting ? parseInt(setting.value, 10) : 30;
-    const now = /* @__PURE__ */ new Date();
-    const lastActive = new Date(session.lastActivityAt);
-    const inactiveDiffMs = now.getTime() - lastActive.getTime();
-    if (inactiveDiffMs > timeoutMinutes * 60 * 1e3) {
-      await db.update(userSessionsTable).set({ isActive: false }).where(eq(userSessionsTable.id, session.id));
-      res.status(401).json({ error: "Session expired due to inactivity" });
-      return;
-    }
     const [userRecord] = await db.select({ id: usersTable.id, active: usersTable.active }).from(usersTable).where(eq(usersTable.id, verified.userId));
     if (!userRecord || userRecord.active === false) {
       res.status(403).json({ error: "User account is disabled or revoked" });
       return;
     }
-    db.update(userSessionsTable).set({ lastActivityAt: now }).where(eq(userSessionsTable.id, session.id)).catch((err) => console.error("Failed to update session activity:", err));
+    const now = /* @__PURE__ */ new Date();
+    const [session] = await db.select().from(userSessionsTable).where(eq(userSessionsTable.token, token));
+    if (session) {
+      db.update(userSessionsTable).set({ lastActivityAt: now, isActive: true }).where(eq(userSessionsTable.id, session.id)).catch((err) => console.error("Failed to update session activity:", err));
+    } else {
+      db.insert(userSessionsTable).values({
+        userId: verified.userId,
+        token,
+        isActive: true,
+        ipAddress: String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "127.0.0.1").split(",")[0].trim(),
+        deviceInfo: String(req.headers["user-agent"] || "Unknown Device"),
+        lastActivityAt: now
+      }).catch((err) => console.error("Failed to auto-register session:", err));
+    }
     req.user = verified;
     req.sessionToken = token;
     next();
@@ -60501,11 +60525,20 @@ function requireRole(...roles) {
       res.status(401).json({ error: "Unauthenticated" });
       return;
     }
-    if (!roles.includes(req.user.role)) {
-      res.status(403).json({ error: "Forbidden" });
+    const userRole = req.user.role;
+    if (userRole === "super_admin") {
+      next();
       return;
     }
-    next();
+    const coordinatorRoles = ["exam_coordinator", "central_exam_coordinator", "program_admin", "unit_coordinator"];
+    const isUserCoord = coordinatorRoles.includes(userRole);
+    const acceptsCoord = roles.some((r2) => coordinatorRoles.includes(r2));
+    if (roles.includes(userRole) || isUserCoord && acceptsCoord) {
+      next();
+      return;
+    }
+    res.status(403).json({ error: "Forbidden" });
+    return;
   };
 }
 var init_auth2 = __esm({
@@ -60650,8 +60683,8 @@ var require_cookies = __commonJS({
         if (urlparts.hostname !== cookie.domain && (cookie.domain.charAt(0) !== "." || ("." + urlparts.hostname).substr(-cookie.domain.length) !== cookie.domain)) {
           return false;
         }
-        const path16 = this.getPath(urlparts.pathname);
-        if (path16.substr(0, cookie.path.length) !== cookie.path) {
+        const path15 = this.getPath(urlparts.pathname);
+        if (path15.substr(0, cookie.path.length) !== cookie.path) {
           return false;
         }
         if (cookie.secure && urlparts.protocol !== "https:") {
@@ -60709,16 +60742,16 @@ var require_cookies = __commonJS({
        * @returns {String} Normalized path
        */
       getPath(pathname) {
-        let path16 = (pathname || "/").split("/");
-        path16.pop();
-        path16 = path16.join("/").trim();
-        if (path16.charAt(0) !== "/") {
-          path16 = "/" + path16;
+        let path15 = (pathname || "/").split("/");
+        path15.pop();
+        path15 = path15.join("/").trim();
+        if (path15.charAt(0) !== "/") {
+          path15 = "/" + path15;
         }
-        if (path16.substr(-1) !== "/") {
-          path16 += "/";
+        if (path15.substr(-1) !== "/") {
+          path15 += "/";
         }
-        return path16;
+        return path15;
       }
     };
     module.exports = Cookies;
@@ -61066,7 +61099,7 @@ var require_shared = __commonJS({
     var nmfetch = require_fetch();
     var dns = __require("dns");
     var net = __require("net");
-    var os2 = __require("os");
+    var os5 = __require("os");
     var DNS_TTL = 5 * 60 * 1e3;
     var CACHE_CLEANUP_INTERVAL = 30 * 1e3;
     var MAX_CACHE_SIZE = 1e3;
@@ -61077,7 +61110,7 @@ var require_shared = __commonJS({
     };
     var networkInterfaces;
     try {
-      networkInterfaces = os2.networkInterfaces();
+      networkInterfaces = os5.networkInterfaces();
     } catch (_err) {
     }
     module.exports.networkInterfaces = networkInterfaces;
@@ -61577,7 +61610,7 @@ var require_shared = __commonJS({
 var require_mime_types2 = __commonJS({
   "../../node_modules/.pnpm/nodemailer@8.0.7/node_modules/nodemailer/lib/mime-funcs/mime-types.js"(exports, module) {
     "use strict";
-    var path16 = __require("path");
+    var path15 = __require("path");
     var defaultMimeType = "application/octet-stream";
     var defaultExtension = "bin";
     var mimeTypes = /* @__PURE__ */ new Map([
@@ -63644,7 +63677,7 @@ var require_mime_types2 = __commonJS({
         if (!filename) {
           return defaultMimeType;
         }
-        const parsed = path16.parse(filename);
+        const parsed = path15.parse(filename);
         const extension = (parsed.ext.substr(1) || parsed.name || "").split("?").shift().trim().toLowerCase();
         const value = extensions.has(extension) ? extensions.get(extension) : defaultMimeType;
         if (Array.isArray(value)) {
@@ -66831,7 +66864,7 @@ var require_dkim = __commonJS({
     var sign = require_sign3();
     var { PassThrough: PassThrough6 } = __require("stream");
     var fs16 = __require("fs");
-    var path16 = __require("path");
+    var path15 = __require("path");
     var crypto10 = __require("crypto");
     var DKIM_ALGO = "sha256";
     var MAX_MESSAGE_SIZE = 2 * 1024 * 1024;
@@ -66845,7 +66878,7 @@ var require_dkim = __commonJS({
         this.chunks = [];
         this.chunklen = 0;
         this.readPos = 0;
-        this.cachePath = this.cacheDir ? path16.join(this.cacheDir, "message." + Date.now() + "-" + crypto10.randomBytes(14).toString("hex")) : false;
+        this.cachePath = this.cacheDir ? path15.join(this.cacheDir, "message." + Date.now() + "-" + crypto10.randomBytes(14).toString("hex")) : false;
         this.cache = false;
         this.headers = false;
         this.bodyHash = false;
@@ -67853,7 +67886,7 @@ var require_smtp_connection = __commonJS({
     var { EventEmitter: EventEmitter3 } = __require("events");
     var net = __require("net");
     var tls = __require("tls");
-    var os2 = __require("os");
+    var os5 = __require("os");
     var crypto10 = __require("crypto");
     var DataStream = require_data_stream2();
     var { PassThrough: PassThrough6 } = __require("stream");
@@ -69288,7 +69321,7 @@ var require_smtp_connection = __commonJS({
       _getHostname() {
         let defaultHostname;
         try {
-          defaultHostname = os2.hostname() || "";
+          defaultHostname = os5.hostname() || "";
         } catch (_err) {
           defaultHostname = "localhost";
         }
@@ -72265,8 +72298,8 @@ async function sendCallLetterWithAttachment(opts) {
       "SMTP server is not configured. Please configure your hospital SMTP server in Settings \u2192 Email Settings, or download the Call Letter PDF directly."
     );
   }
-  const isRetina = opts.specialization?.toLowerCase().includes("retina");
-  const defaultDate = isRetina ? "1st June 2026, Monday" : "8th June 2026, Monday";
+  const isRetina = opts.specialization ? opts.specialization.toLowerCase().includes("retina") || opts.specialization.toLowerCase().includes("vitreo") || /\b(vr|mr)\b/i.test(opts.specialization) : false;
+  const defaultDate = isRetina ? "7th December 2026, Monday" : "8th December 2026, Tuesday";
   const dateStr = opts.interviewDate || defaultDate;
   const timeStr = opts.reportingTime || "8:00 AM Sharp";
   const venueStr = opts.venue || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore \u2013 560037";
@@ -72285,7 +72318,7 @@ async function sendCallLetterWithAttachment(opts) {
       <div style="font-family: Arial, sans-serif; max-width: 620px; margin: auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
         <div style="text-align: center; margin-bottom: 20px;">
           <h2 style="color: #0b4a8f; margin: 0 0 6px; font-size: 20px;">SANKARA ACADEMY OF VISION</h2>
-          <p style="color: #64748b; font-size: 13px; margin: 0;">Central Fellowship Admissions & Selection Board 2026</p>
+          <p style="color: #64748b; font-size: 13px; margin: 0;">Fellowship Admissions & Academic Board</p>
         </div>
         <div style="background-color: #f8fafc; border-left: 4px solid #0b4a8f; padding: 14px; border-radius: 6px; margin-bottom: 20px;">
           <p style="margin: 0; color: #1e293b; font-size: 14px;">Dear <strong>Dr. ${opts.toName}</strong>,</p>
@@ -72301,6 +72334,11 @@ async function sendCallLetterWithAttachment(opts) {
         <p style="font-size: 13px; color: #475569; line-height: 1.5;">
           Kindly print the attached Call Letter and carry all required original credentials and certificates for physical verification.
         </p>
+        <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; margin: 16px 0; text-align: center;">
+          <p style="margin: 0; font-size: 13px; color: #92400e; font-weight: bold;">
+            For clarifications contact Radhika (Course Coordinator) on 9666677505.
+          </p>
+        </div>
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
         <p style="color: #94a3b8; font-size: 11px; margin: 0; text-align: center;">
           Sankara Academy of Vision &bull; Sri Kanchi Kamakoti Medical Trust &bull; Official Call Letter
@@ -72334,7 +72372,7 @@ async function sendOfferLetterWithAttachment(opts) {
       <div style="font-family: Arial, sans-serif; max-width: 620px; margin: auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
         <div style="text-align: center; margin-bottom: 20px;">
           <h2 style="color: #0b4a8f; margin: 0 0 6px; font-size: 20px;">SANKARA ACADEMY OF VISION</h2>
-          <p style="color: #64748b; font-size: 13px; margin: 0;">Central Fellowship Admissions & Selection Board 2026</p>
+          <p style="color: #64748b; font-size: 13px; margin: 0;">Fellowship Admissions & Academic Board</p>
         </div>
         <div style="background-color: #f0fdf4; border-left: 4px solid #16a34a; padding: 14px; border-radius: 6px; margin-bottom: 20px;">
           <p style="margin: 0; color: #166534; font-size: 14px;">Dear <strong>Dr. ${opts.toName}</strong>,</p>
@@ -72346,7 +72384,7 @@ async function sendOfferLetterWithAttachment(opts) {
           Please find attached your formal Fellowship Offer Letter containing full appointment details, tenure, monthly stipend, and joining regulations.
         </p>
         <p style="font-size: 13px; color: #475569; line-height: 1.5;">
-          Kindly review the document carefully and submit your acceptance within 3 working days.
+          Kindly review the document carefully and submit your acceptance within 3 working days by emailing <a href="mailto:radhika@sankaraeye.com">radhika@sankaraeye.com</a> or contacting <strong>Radhika (Course Coordinator) on 9666677505</strong>.
         </p>
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
         <p style="color: #94a3b8; font-size: 11px; margin: 0; text-align: center;">
@@ -78216,22 +78254,22 @@ var init_from = __esm({
     init_file();
     init_fetch_blob();
     ({ stat } = fs3);
-    blobFromSync = (path16, type) => fromBlob(statSync(path16), path16, type);
-    blobFrom = (path16, type) => stat(path16).then((stat3) => fromBlob(stat3, path16, type));
-    fileFrom = (path16, type) => stat(path16).then((stat3) => fromFile(stat3, path16, type));
-    fileFromSync = (path16, type) => fromFile(statSync(path16), path16, type);
-    fromBlob = (stat3, path16, type = "") => new fetch_blob_default([new BlobDataItem({
-      path: path16,
+    blobFromSync = (path15, type) => fromBlob(statSync(path15), path15, type);
+    blobFrom = (path15, type) => stat(path15).then((stat3) => fromBlob(stat3, path15, type));
+    fileFrom = (path15, type) => stat(path15).then((stat3) => fromFile(stat3, path15, type));
+    fileFromSync = (path15, type) => fromFile(statSync(path15), path15, type);
+    fromBlob = (stat3, path15, type = "") => new fetch_blob_default([new BlobDataItem({
+      path: path15,
       size: stat3.size,
       lastModified: stat3.mtimeMs,
       start: 0
     })], { type });
-    fromFile = (stat3, path16, type = "") => new file_default([new BlobDataItem({
-      path: path16,
+    fromFile = (stat3, path15, type = "") => new file_default([new BlobDataItem({
+      path: path15,
       size: stat3.size,
       lastModified: stat3.mtimeMs,
       start: 0
-    })], basename(path16), { type, lastModified: stat3.mtimeMs });
+    })], basename(path15), { type, lastModified: stat3.mtimeMs });
     BlobDataItem = class _BlobDataItem {
       #path;
       #start;
@@ -83189,8 +83227,8 @@ var require_util2 = __commonJS({
     exports.isValidFile = isValidFile;
     exports.getWellKnownCertificateConfigFileLocation = getWellKnownCertificateConfigFileLocation;
     var fs16 = __require("fs");
-    var os2 = __require("os");
-    var path16 = __require("path");
+    var os5 = __require("os");
+    var path15 = __require("path");
     var WELL_KNOWN_CERTIFICATE_CONFIG_FILE = "certificate_config.json";
     var CLOUDSDK_CONFIG_DIRECTORY = "gcloud";
     function snakeToCamel(str) {
@@ -83283,11 +83321,11 @@ var require_util2 = __commonJS({
       }
     }
     function getWellKnownCertificateConfigFileLocation() {
-      const configDir = process.env.CLOUDSDK_CONFIG || (_isWindows() ? path16.join(process.env.APPDATA || "", CLOUDSDK_CONFIG_DIRECTORY) : path16.join(process.env.HOME || "", ".config", CLOUDSDK_CONFIG_DIRECTORY));
-      return path16.join(configDir, WELL_KNOWN_CERTIFICATE_CONFIG_FILE);
+      const configDir = process.env.CLOUDSDK_CONFIG || (_isWindows() ? path15.join(process.env.APPDATA || "", CLOUDSDK_CONFIG_DIRECTORY) : path15.join(process.env.HOME || "", ".config", CLOUDSDK_CONFIG_DIRECTORY));
+      return path15.join(configDir, WELL_KNOWN_CERTIFICATE_CONFIG_FILE);
     }
     function _isWindows() {
-      return os2.platform().startsWith("win");
+      return os5.platform().startsWith("win");
     }
   }
 });
@@ -84689,7 +84727,7 @@ var require_getCredentials = __commonJS({
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getCredentials = getCredentials;
-    var path16 = __require("path");
+    var path15 = __require("path");
     var fs16 = __require("fs");
     var util_1 = __require("util");
     var errorWithCode_1 = require_errorWithCode();
@@ -84761,7 +84799,7 @@ var require_getCredentials = __commonJS({
        * @returns An instance of a class that implements ICredentialsProvider.
        */
       static create(keyFilePath) {
-        const keyFileExtension = path16.extname(keyFilePath);
+        const keyFileExtension = path15.extname(keyFilePath);
         switch (keyFileExtension) {
           case ExtensionFiles.JSON:
             return new JsonCredentialsProvider(keyFilePath);
@@ -87846,8 +87884,8 @@ var require_googleauth = __commonJS({
     var fs16 = __require("fs");
     var gaxios_1 = require_src2();
     var gcpMetadata = require_src4();
-    var os2 = __require("os");
-    var path16 = __require("path");
+    var os5 = __require("os");
+    var path15 = __require("path");
     var crypto_1 = require_crypto3();
     var computeclient_1 = require_computeclient();
     var idtokenclient_1 = require_idtokenclient();
@@ -88133,11 +88171,11 @@ var require_googleauth = __commonJS({
         } else {
           const home = process.env["HOME"];
           if (home) {
-            location = path16.join(home, ".config");
+            location = path15.join(home, ".config");
           }
         }
         if (location) {
-          location = path16.join(location, "gcloud", "application_default_credentials.json");
+          location = path15.join(location, "gcloud", "application_default_credentials.json");
           if (!fs16.existsSync(location)) {
             location = null;
           }
@@ -88349,7 +88387,7 @@ var require_googleauth = __commonJS({
        * @api private
        */
       _isWindows() {
-        const sys = os2.platform();
+        const sys = os5.platform();
         if (sys && sys.length >= 3) {
           if (sys.substring(0, 3).toLowerCase() === "win") {
             return true;
@@ -88481,7 +88519,7 @@ var require_googleauth = __commonJS({
         if (this.jsonContent) {
           return this._cacheClientFromJSON(this.jsonContent, this.clientOptions);
         } else if (this.keyFilename) {
-          const filePath = path16.resolve(this.keyFilename);
+          const filePath = path15.resolve(this.keyFilename);
           const stream2 = fs16.createReadStream(filePath);
           return await this.fromStreamAsync(stream2, this.clientOptions);
         } else if (this.apiKey) {
@@ -89605,8 +89643,8 @@ var require_apirequest = __commonJS({
       }
       if (parameters.context._options.rootUrl !== void 0 && options.url !== void 0) {
         const originalUrl = new URL(options.url);
-        const path16 = originalUrl.href.substr(originalUrl.origin.length);
-        options.url = new URL(path16, parameters.context._options.rootUrl).href;
+        const path15 = originalUrl.href.substr(originalUrl.origin.length);
+        options.url = new URL(path15, parameters.context._options.rootUrl).href;
       }
       options.paramsSerializer = (params2) => {
         return qs.stringify(params2, { arrayFormat: "repeat" });
@@ -878579,13 +878617,13 @@ function __disposeResources(env) {
   }
   return next();
 }
-function __rewriteRelativeImportExtension(path16, preserveJsx) {
-  if (typeof path16 === "string" && /^\.\.?\//.test(path16)) {
-    return path16.replace(/\.(tsx)$|((?:\.d)?)((?:\.[^./]+?)?)\.([cm]?)ts$/i, function(m2, tsx, d, ext2, cm) {
+function __rewriteRelativeImportExtension(path15, preserveJsx) {
+  if (typeof path15 === "string" && /^\.\.?\//.test(path15)) {
+    return path15.replace(/\.(tsx)$|((?:\.d)?)((?:\.[^./]+?)?)\.([cm]?)ts$/i, function(m2, tsx, d, ext2, cm) {
       return tsx ? preserveJsx ? ".jsx" : ".js" : d && (!ext2 || !cm) ? m2 : d + ext2 + "." + cm.toLowerCase() + "js";
     });
   }
-  return path16;
+  return path15;
 }
 var extendStatics, __assign, __createBinding, __setModuleDefault, ownKeys, _SuppressedError, tslib_es6_default;
 var init_tslib_es6 = __esm({
@@ -1015078,16 +1015116,16 @@ var require_main3 = __commonJS({
       * @return {Path}
       */
       mapPoints(fn) {
-        let path16 = new _$67ee4828d81adb28$export$2e2bcd8739ae039();
+        let path15 = new _$67ee4828d81adb28$export$2e2bcd8739ae039();
         for (let c of this.commands) {
           let args = [];
           for (let i2 = 0; i2 < c.args.length; i2 += 2) {
             let [x2, y] = fn(c.args[i2], c.args[i2 + 1]);
             args.push(x2, y);
           }
-          path16[c.command](...args);
+          path15[c.command](...args);
         }
-        return path16;
+        return path15;
       }
       /**
       * Transforms the path by the given matrix.
@@ -1015426,11 +1015464,11 @@ var require_main3 = __commonJS({
         let { advance: advanceWidth, bearing: leftBearing } = this._getTableMetrics(this._font.hmtx);
         if (this._font.vmtx) var { advance: advanceHeight, bearing: topBearing } = this._getTableMetrics(this._font.vmtx);
         else {
-          let os2;
+          let os22;
           if (typeof cbox === "undefined" || cbox === null) ({ cbox } = this);
-          if ((os2 = this._font["OS/2"]) && os2.version > 0) {
-            var advanceHeight = Math.abs(os2.typoAscender - os2.typoDescender);
-            var topBearing = os2.typoAscender - cbox.maxY;
+          if ((os22 = this._font["OS/2"]) && os22.version > 0) {
+            var advanceHeight = Math.abs(os22.typoAscender - os22.typoDescender);
+            var topBearing = os22.typoAscender - cbox.maxY;
           } else {
             let { hhea } = this._font;
             var advanceHeight = Math.abs(hhea.ascent - hhea.descent);
@@ -1015780,7 +1015818,7 @@ var require_main3 = __commonJS({
       // Converts contours to a Path object that can be rendered
       _getPath() {
         let contours = this._getContours();
-        let path16 = new (0, $67ee4828d81adb28$export$2e2bcd8739ae039)();
+        let path15 = new (0, $67ee4828d81adb28$export$2e2bcd8739ae039)();
         for (let i2 = 0; i2 < contours.length; i2++) {
           let contour = contours[i2];
           let firstPt = contour[0];
@@ -1015796,26 +1015834,26 @@ var require_main3 = __commonJS({
               firstPt = new $f680320fa07ef53d$export$baf26146a414f24a(false, false, (firstPt.x + lastPt.x) / 2, (firstPt.y + lastPt.y) / 2);
             var curvePt = firstPt;
           }
-          path16.moveTo(firstPt.x, firstPt.y);
+          path15.moveTo(firstPt.x, firstPt.y);
           for (let j = start; j < contour.length; j++) {
             let pt = contour[j];
             let prevPt = j === 0 ? firstPt : contour[j - 1];
-            if (prevPt.onCurve && pt.onCurve) path16.lineTo(pt.x, pt.y);
+            if (prevPt.onCurve && pt.onCurve) path15.lineTo(pt.x, pt.y);
             else if (prevPt.onCurve && !pt.onCurve) var curvePt = pt;
             else if (!prevPt.onCurve && !pt.onCurve) {
               let midX = (prevPt.x + pt.x) / 2;
               let midY = (prevPt.y + pt.y) / 2;
-              path16.quadraticCurveTo(prevPt.x, prevPt.y, midX, midY);
+              path15.quadraticCurveTo(prevPt.x, prevPt.y, midX, midY);
               var curvePt = pt;
             } else if (!prevPt.onCurve && pt.onCurve) {
-              path16.quadraticCurveTo(curvePt.x, curvePt.y, pt.x, pt.y);
+              path15.quadraticCurveTo(curvePt.x, curvePt.y, pt.x, pt.y);
               var curvePt = null;
             } else throw new Error("Unknown TTF path state");
           }
-          if (curvePt) path16.quadraticCurveTo(curvePt.x, curvePt.y, firstPt.x, firstPt.y);
-          path16.closePath();
+          if (curvePt) path15.quadraticCurveTo(curvePt.x, curvePt.y, firstPt.x, firstPt.y);
+          path15.closePath();
         }
-        return path16;
+        return path15;
       }
       constructor(...args) {
         super(...args);
@@ -1015838,7 +1015876,7 @@ var require_main3 = __commonJS({
         let str = cff.topDict.CharStrings[this.id];
         let end = str.offset + str.length;
         stream2.pos = str.offset;
-        let path16 = new (0, $67ee4828d81adb28$export$2e2bcd8739ae039)();
+        let path15 = new (0, $67ee4828d81adb28$export$2e2bcd8739ae039)();
         let stack = [];
         let trans = [];
         let width = null;
@@ -1015866,8 +1015904,8 @@ var require_main3 = __commonJS({
           return stack.length = 0;
         }
         function moveTo(x3, y2) {
-          if (open) path16.closePath();
-          path16.moveTo(x3, y2);
+          if (open) path15.closePath();
+          path15.moveTo(x3, y2);
           open = true;
         }
         let parse4 = function() {
@@ -1015894,7 +1015932,7 @@ var require_main3 = __commonJS({
                   while (stack.length >= 2) {
                     x2 += stack.shift();
                     y += stack.shift();
-                    path16.lineTo(x2, y);
+                    path15.lineTo(x2, y);
                   }
                   break;
                 case 6:
@@ -1015903,7 +1015941,7 @@ var require_main3 = __commonJS({
                   while (stack.length >= 1) {
                     if (phase) x2 += stack.shift();
                     else y += stack.shift();
-                    path16.lineTo(x2, y);
+                    path15.lineTo(x2, y);
                     phase = !phase;
                   }
                   break;
@@ -1015915,7 +1015953,7 @@ var require_main3 = __commonJS({
                     c2y = c1y + stack.shift();
                     x2 = c2x + stack.shift();
                     y = c2y + stack.shift();
-                    path16.bezierCurveTo(c1x, c1y, c2x, c2y, x2, y);
+                    path15.bezierCurveTo(c1x, c1y, c2x, c2y, x2, y);
                   }
                   break;
                 case 10:
@@ -1015939,7 +1015977,7 @@ var require_main3 = __commonJS({
                   if (cff.version >= 2) break;
                   if (stack.length > 0) checkWidth();
                   if (open) {
-                    path16.closePath();
+                    path15.closePath();
                     open = false;
                   }
                   break;
@@ -1015987,17 +1016025,17 @@ var require_main3 = __commonJS({
                     c2y = c1y + stack.shift();
                     x2 = c2x + stack.shift();
                     y = c2y + stack.shift();
-                    path16.bezierCurveTo(c1x, c1y, c2x, c2y, x2, y);
+                    path15.bezierCurveTo(c1x, c1y, c2x, c2y, x2, y);
                   }
                   x2 += stack.shift();
                   y += stack.shift();
-                  path16.lineTo(x2, y);
+                  path15.lineTo(x2, y);
                   break;
                 case 25:
                   while (stack.length >= 8) {
                     x2 += stack.shift();
                     y += stack.shift();
-                    path16.lineTo(x2, y);
+                    path15.lineTo(x2, y);
                   }
                   c1x = x2 + stack.shift();
                   c1y = y + stack.shift();
@@ -1016005,7 +1016043,7 @@ var require_main3 = __commonJS({
                   c2y = c1y + stack.shift();
                   x2 = c2x + stack.shift();
                   y = c2y + stack.shift();
-                  path16.bezierCurveTo(c1x, c1y, c2x, c2y, x2, y);
+                  path15.bezierCurveTo(c1x, c1y, c2x, c2y, x2, y);
                   break;
                 case 26:
                   if (stack.length % 2) x2 += stack.shift();
@@ -1016016,7 +1016054,7 @@ var require_main3 = __commonJS({
                     c2y = c1y + stack.shift();
                     x2 = c2x;
                     y = c2y + stack.shift();
-                    path16.bezierCurveTo(c1x, c1y, c2x, c2y, x2, y);
+                    path15.bezierCurveTo(c1x, c1y, c2x, c2y, x2, y);
                   }
                   break;
                 case 27:
@@ -1016028,7 +1016066,7 @@ var require_main3 = __commonJS({
                     c2y = c1y + stack.shift();
                     x2 = c2x + stack.shift();
                     y = c2y;
-                    path16.bezierCurveTo(c1x, c1y, c2x, c2y, x2, y);
+                    path15.bezierCurveTo(c1x, c1y, c2x, c2y, x2, y);
                   }
                   break;
                 case 28:
@@ -1016067,7 +1016105,7 @@ var require_main3 = __commonJS({
                       x2 = c2x + stack.shift();
                       y = c2y + (stack.length === 1 ? stack.shift() : 0);
                     }
-                    path16.bezierCurveTo(c1x, c1y, c2x, c2y, x2, y);
+                    path15.bezierCurveTo(c1x, c1y, c2x, c2y, x2, y);
                     phase = !phase;
                   }
                   break;
@@ -1016193,8 +1016231,8 @@ var require_main3 = __commonJS({
                       c6y = c5y;
                       x2 = c6x;
                       y = c6y;
-                      path16.bezierCurveTo(c1x, c1y, c2x, c2y, c3x, c3y);
-                      path16.bezierCurveTo(c4x, c4y, c5x, c5y, c6x, c6y);
+                      path15.bezierCurveTo(c1x, c1y, c2x, c2y, c3x, c3y);
+                      path15.bezierCurveTo(c4x, c4y, c5x, c5y, c6x, c6y);
                       break;
                     case 35:
                       pts = [];
@@ -1016203,8 +1016241,8 @@ var require_main3 = __commonJS({
                         y += stack.shift();
                         pts.push(x2, y);
                       }
-                      path16.bezierCurveTo(...pts.slice(0, 6));
-                      path16.bezierCurveTo(...pts.slice(6));
+                      path15.bezierCurveTo(...pts.slice(0, 6));
+                      path15.bezierCurveTo(...pts.slice(6));
                       stack.shift();
                       break;
                     case 36:
@@ -1016222,8 +1016260,8 @@ var require_main3 = __commonJS({
                       c6y = c5y;
                       x2 = c6x;
                       y = c6y;
-                      path16.bezierCurveTo(c1x, c1y, c2x, c2y, c3x, c3y);
-                      path16.bezierCurveTo(c4x, c4y, c5x, c5y, c6x, c6y);
+                      path15.bezierCurveTo(c1x, c1y, c2x, c2y, c3x, c3y);
+                      path15.bezierCurveTo(c4x, c4y, c5x, c5y, c6x, c6y);
                       break;
                     case 37:
                       let startx = x2;
@@ -1016242,8 +1016280,8 @@ var require_main3 = __commonJS({
                         y += stack.shift();
                       }
                       pts.push(x2, y);
-                      path16.bezierCurveTo(...pts.slice(0, 6));
-                      path16.bezierCurveTo(...pts.slice(6));
+                      path15.bezierCurveTo(...pts.slice(0, 6));
+                      path15.bezierCurveTo(...pts.slice(6));
                       break;
                     default:
                       throw new Error(`Unknown op: 12 ${op}`);
@@ -1016263,8 +1016301,8 @@ var require_main3 = __commonJS({
           }
         };
         parse4();
-        if (open) path16.closePath();
-        return path16;
+        if (open) path15.closePath();
+        return path15;
       }
       constructor(...args) {
         super(...args);
@@ -1016724,7 +1016762,7 @@ var require_main3 = __commonJS({
       yPoints: new $elh9A$restructure.Array($2784eedf0b35a048$var$Point, 0)
     });
     var $2784eedf0b35a048$export$2e2bcd8739ae039 = class {
-      encodeSimple(path16, instructions = []) {
+      encodeSimple(path15, instructions = []) {
         let endPtsOfContours = [];
         let xPoints = [];
         let yPoints = [];
@@ -1016732,14 +1016770,14 @@ var require_main3 = __commonJS({
         let same = 0;
         let lastX = 0, lastY = 0, lastFlag = 0;
         let pointCount = 0;
-        for (let i2 = 0; i2 < path16.commands.length; i2++) {
-          let c = path16.commands[i2];
+        for (let i2 = 0; i2 < path15.commands.length; i2++) {
+          let c = path15.commands[i2];
           for (let j = 0; j < c.args.length; j += 2) {
             let x2 = c.args[j];
             let y = c.args[j + 1];
             let flag = 0;
             if (c.command === "quadraticCurveTo" && j === 2) {
-              let next = path16.commands[i2 + 1];
+              let next = path15.commands[i2 + 1];
               if (next && next.command === "quadraticCurveTo") {
                 let midX = (lastX + next.args[0]) / 2;
                 let midY = (lastY + next.args[1]) / 2;
@@ -1016766,8 +1016804,8 @@ var require_main3 = __commonJS({
           }
           if (c.command === "closePath") endPtsOfContours.push(pointCount - 1);
         }
-        if (path16.commands.length > 1 && path16.commands[path16.commands.length - 1].command !== "closePath") endPtsOfContours.push(pointCount - 1);
-        let bbox = path16.bbox;
+        if (path15.commands.length > 1 && path15.commands[path15.commands.length - 1].command !== "closePath") endPtsOfContours.push(pointCount - 1);
+        let bbox = path15.bbox;
         let glyf = {
           numberOfContours: endPtsOfContours.length,
           xMin: bbox.minX,
@@ -1016874,7 +1016912,7 @@ var require_main3 = __commonJS({
         for (let gid of this.glyphs) {
           this.charstrings.push(this.cff.getCharString(gid));
           let glyph = this.font.getGlyph(gid);
-          let path16 = glyph.path;
+          let path15 = glyph.path;
           for (let subr in glyph._usedGsubrs) gsubrs[subr] = true;
         }
         this.gsubrs = this.subsetSubrs(this.cff.globalSubrIndex, gsubrs);
@@ -1016912,7 +1016950,7 @@ var require_main3 = __commonJS({
           used_fds[fd] = true;
           topDict.FDSelect.fds.push(fd_select[fd]);
           let glyph = this.font.getGlyph(gid);
-          let path16 = glyph.path;
+          let path15 = glyph.path;
           for (let subr in glyph._usedSubrs) used_subrs[fd_select[fd]][subr] = true;
         }
         for (let i2 = 0; i2 < topDict.FDArray.length; i2++) {
@@ -1016929,7 +1016967,7 @@ var require_main3 = __commonJS({
         let used_subrs = {};
         for (let gid of this.glyphs) {
           let glyph = this.font.getGlyph(gid);
-          let path16 = glyph.path;
+          let path15 = glyph.path;
           for (let subr in glyph._usedSubrs) used_subrs[subr] = true;
         }
         let privateDict = Object.assign({}, this.cff.topDict.Private);
@@ -1017154,8 +1017192,8 @@ var require_main3 = __commonJS({
       * @type {number}
       */
       get capHeight() {
-        let os2 = this["OS/2"];
-        return os2 ? os2.capHeight : this.ascent;
+        let os22 = this["OS/2"];
+        return os22 ? os22.capHeight : this.ascent;
       }
       /**
       * The height of lower case letters in the font.
@@ -1017163,8 +1017201,8 @@ var require_main3 = __commonJS({
       * @type {number}
       */
       get xHeight() {
-        let os2 = this["OS/2"];
-        return os2 ? os2.xHeight : 0;
+        let os22 = this["OS/2"];
+        return os22 ? os22.xHeight : 0;
       }
       /**
       * The number of glyphs in the font.
@@ -1019348,17 +1019386,17 @@ var require_png_js = __commonJS({
     var fs__default = /* @__PURE__ */ _interopDefaultCompat(fs16);
     var zlib__default = /* @__PURE__ */ _interopDefaultCompat(zlib4);
     var PNG = class _PNG {
-      static decode(path16, fn) {
+      static decode(path15, fn) {
         {
-          return fs__default.default.readFile(path16, function(err, file2) {
+          return fs__default.default.readFile(path15, function(err, file2) {
             const png = new _PNG(file2);
             return png.decode((pixels) => fn(pixels));
           });
         }
       }
-      static load(path16) {
+      static load(path15) {
         {
-          const file2 = fs__default.default.readFileSync(path16);
+          const file2 = fs__default.default.readFileSync(path15);
           return new _PNG(file2);
         }
       }
@@ -1021231,15 +1021269,15 @@ var require_pdfkit = __commonJS({
       }
       return [i2 - 1, number5];
     };
-    var parse4 = function(path16) {
+    var parse4 = function(path15) {
       const pathData = [];
       let command = null;
       let args = [];
       let argsCount = 0;
       let canHaveComma = false;
       let hadComma = false;
-      for (let i2 = 0; i2 < path16.length; i2 += 1) {
-        const c = path16.charAt(i2);
+      for (let i2 = 0; i2 < path15.length; i2 += 1) {
+        const c = path15.charAt(i2);
         if (isWsp(c)) {
           continue;
         }
@@ -1021284,11 +1021322,11 @@ var require_pdfkit = __commonJS({
           const position = args.length;
           if (position === 0 || position === 1) {
             if (c !== "+" && c !== "-") {
-              [newCursor, number5] = readNumber(path16, i2);
+              [newCursor, number5] = readNumber(path15, i2);
             }
           }
           if (position === 2 || position === 5 || position === 6) {
-            [newCursor, number5] = readNumber(path16, i2);
+            [newCursor, number5] = readNumber(path15, i2);
           }
           if (position === 3 || position === 4) {
             if (c === "0") {
@@ -1021299,7 +1021337,7 @@ var require_pdfkit = __commonJS({
             }
           }
         } else {
-          [newCursor, number5] = readNumber(path16, i2);
+          [newCursor, number5] = readNumber(path15, i2);
         }
         if (number5 == null) {
           return pathData;
@@ -1021555,8 +1021593,8 @@ var require_pdfkit = __commonJS({
       return [a00 * x1 + a01 * y1, a10 * x1 + a11 * y1, a00 * x2 + a01 * y2, a10 * x2 + a11 * y2, a00 * x3 + a01 * y3, a10 * x3 + a11 * y3];
     };
     var SVGPath = class {
-      static apply(doc, path16) {
-        const commands = parse4(path16);
+      static apply(doc, path15) {
+        const commands = parse4(path15);
         apply(commands, doc);
       }
     };
@@ -1021720,8 +1021758,8 @@ var require_pdfkit = __commonJS({
         }
         return this.closePath();
       },
-      path(path16) {
-        SVGPath.apply(this, path16);
+      path(path15) {
+        SVGPath.apply(this, path15);
         return this;
       },
       _windingRule(rule) {
@@ -1025261,7 +1025299,7 @@ end`);
         this._tableStruct.dictionary.data.ID = this._id;
         if (structParent instanceof PDFStructureElement) {
           structParent.add(this._tableStruct);
-        } else if (structParent instanceof PDFDocument9) {
+        } else if (structParent instanceof PDFDocument8) {
           structParent.addStructure(this._tableStruct);
         }
         this._headerRowLookup = {};
@@ -1025580,7 +1025618,7 @@ end`);
         }
       }
     };
-    var PDFDocument9 = class extends stream2.Readable {
+    var PDFDocument8 = class extends stream2.Readable {
       constructor(options = {}) {
         super(options);
         this.options = options;
@@ -1025836,7 +1025874,7 @@ end`);
       }
     };
     var mixin = (methods) => {
-      Object.assign(PDFDocument9.prototype, methods);
+      Object.assign(PDFDocument8.prototype, methods);
     };
     mixin(MetadataMixin);
     mixin(ColorMixin);
@@ -1025851,8 +1025889,8 @@ end`);
     mixin(AttachmentsMixin);
     mixin(SubsetMixin);
     mixin(TableMixin);
-    PDFDocument9.LineWrapper = LineWrapper;
-    module.exports = PDFDocument9;
+    PDFDocument8.LineWrapper = LineWrapper;
+    module.exports = PDFDocument8;
   }
 });
 
@@ -1026004,8 +1026042,47 @@ function numberToWordsIndian(num) {
 }
 function isRetinaSpecialty(specialization) {
   if (!specialization) return false;
-  const lower2 = specialization.toLowerCase();
-  return lower2.includes("retina") || lower2.includes("vrs") || lower2.includes("vitreo");
+  const lower2 = specialization.toLowerCase().trim();
+  if (lower2.includes("retina") || lower2.includes("vitreo") || lower2.includes("vrs")) return true;
+  if (/\b(vr|mr|v\.r|m\.r)\b/i.test(specialization)) return true;
+  return false;
+}
+function formatPhaseDurations(specialization, rawDuration) {
+  const spec = (specialization || "").toLowerCase().trim();
+  if (spec.includes("cataract") || spec.includes("iol")) {
+    return {
+      phase1: "18 Months (Cataract & IOL)",
+      phase2: "Not Applicable",
+      phaseSummary: "Phase 1: 18 Months",
+      tenureText: "18 Months",
+      totalMonths: 18
+    };
+  }
+  if (spec.includes("medical retina") || spec.includes("retina") && (spec.includes("mr") || spec.includes("medical"))) {
+    return {
+      phase1: "18 Months (Medical Retina)",
+      phase2: "Not Applicable",
+      phaseSummary: "Phase 1: 18 Months",
+      tenureText: "18 Months",
+      totalMonths: 18
+    };
+  }
+  if (spec.includes("vitreo") || spec.includes("vrs") || spec.includes("retina") && !spec.includes("medical")) {
+    return {
+      phase1: "Not Applicable",
+      phase2: "24 Months (Vitreo Retina)",
+      phaseSummary: "Phase 2: 24 Months",
+      tenureText: "24 Months",
+      totalMonths: 24
+    };
+  }
+  return {
+    phase1: "6 Months (IOL)",
+    phase2: "18 Months (Speciality)",
+    phaseSummary: "Phase 1: 6 Months (IOL) + Phase 2: 18 Months (Speciality)",
+    tenureText: "24 Months",
+    totalMonths: 24
+  };
 }
 function cleanDoctorName(rawName) {
   if (!rawName) return "";
@@ -1026037,113 +1026114,179 @@ async function generateCallLetterPdf(data) {
   return new Promise((resolve4, reject) => {
     try {
       const isRetina = isRetinaSpecialty(data.specialization);
-      const doc = new import_pdfkit.default({ margin: 40, size: "A4", bufferPages: true });
+      const doc = new import_pdfkit.default({
+        size: "A4",
+        margins: { top: 28, bottom: 20, left: 42, right: 42 },
+        bufferPages: true,
+        autoFirstPage: false
+      });
       const buffers = [];
       doc.on("data", (chunk) => buffers.push(chunk));
       doc.on("end", () => resolve4(Buffer.concat(buffers)));
       const colors = {
         navy: "#0b4a8f",
+        darkNavy: "#062b54",
         dark: "#1e293b",
-        slate: "#475569",
+        slate: "#334155",
         lightSlate: "#64748b",
         border: "#cbd5e1",
-        accent: "#d97706"
+        accent: "#d97706",
+        tableHeader: "#e2e8f0"
       };
       const left = 40;
       const contentWidth = 515;
       const { sefLogo, savLogo } = getLogoPaths();
-      if (sefLogo && fs4.existsSync(sefLogo)) {
-        doc.image(sefLogo, left, 34, { width: 90 });
-      }
-      if (savLogo && fs4.existsSync(savLogo)) {
-        doc.image(savLogo, left + contentWidth - 36, 30, { width: 36 });
-      }
-      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(13).text("SANKARA ACADEMY OF VISION", left, 32, { width: contentWidth, align: "center" });
-      doc.fillColor(colors.dark).font("Helvetica").fontSize(7.5).text("Educational unit of Sankara Eye Foundation, India \xB7 Sri Kanchi Kamakoti Medical Trust", left, 47, { width: contentWidth, align: "center" });
-      doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(8).text("CENTRAL FELLOWSHIP ADMISSIONS & SELECTION BOARD 2026", left, 58, { width: contentWidth, align: "center" });
-      doc.fillColor(colors.lightSlate).font("Helvetica").fontSize(7).text("www.sankaraeye.com \xB7 admissions@sankaraeye.com", left, 69, { width: contentWidth, align: "center" });
-      doc.strokeColor(colors.navy).lineWidth(1).moveTo(left, 82).lineTo(left + contentWidth, 82).stroke();
-      const defaultInterviewDate = isRetina ? "1st June 2026, Monday" : "8th June 2026, Monday";
+      const defaultInterviewDate = isRetina ? "7th December 2026, Monday" : "8th December 2026, Tuesday";
       const interviewDate = data.interviewDate || defaultInterviewDate;
       const reportingTime = data.reportingTime || "8:00 AM Sharp";
       const venue = data.venue || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore \u2013 560037";
-      const letterTitle = isRetina ? "FELLOWSHIP INTERVIEW CALL LETTER \u2014 RETINA & VITREO RETINAL SURGERY" : "FELLOWSHIP INTERVIEW CALL LETTER \u2014 ANTERIOR SEGMENT & SUBSPECIALTIES";
-      doc.rect(left, 90, contentWidth, 20).fill(colors.navy);
-      doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(9).text(letterTitle, left, 95, { width: contentWidth, align: "center" });
-      doc.rect(left, 116, contentWidth, 42).fill("#f8fafc");
-      doc.strokeColor(colors.border).lineWidth(0.5).rect(left, 116, contentWidth, 42).stroke();
-      const cleanName = (data.candidateName || "").replace(/^Dr\.?\s*/i, "");
-      doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(10).text(`Dear Dr. ${cleanName}`, left + 14, 124);
-      doc.fillColor(colors.lightSlate).font("Helvetica").fontSize(8).text(
-        `Registration Code: ${data.candidateCode}  |  Stream: ${data.specialization || "Fellowship"}  |  Email: ${data.email}`,
+      const offerDayText = isRetina ? "7th December 2026" : "8th December 2026";
+      const letterTitle = isRetina ? "FELLOWSHIP INTERVIEW CALL LETTER \u2014 VITREO RETINA (VR) & MEDICAL RETINA (MR)" : "FELLOWSHIP INTERVIEW CALL LETTER \u2014 ANTERIOR SEGMENT & SUBSPECIALTIES";
+      const cleanName = cleanDoctorName(data.candidateName);
+      doc.addPage();
+      if (sefLogo && fs4.existsSync(sefLogo)) {
+        doc.image(sefLogo, left, 28, { width: 95 });
+      }
+      if (savLogo && fs4.existsSync(savLogo)) {
+        doc.image(savLogo, left + contentWidth - 38, 25, { width: 38 });
+      }
+      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(13).text("SANKARA ACADEMY OF VISION", left, 28, { width: contentWidth, align: "center" });
+      doc.fillColor(colors.dark).font("Helvetica").fontSize(8).text("Educational unit of Sankara Eye Foundation, India \xB7 Sri Kanchi Kamakoti Medical Trust", left, 44, { width: contentWidth, align: "center" });
+      doc.fillColor(colors.lightSlate).font("Helvetica").fontSize(7.5).text("www.sankaraeye.com \xB7 radhika@sankaraeye.com", left, 56, { width: contentWidth, align: "center" });
+      doc.strokeColor(colors.navy).lineWidth(1.2).moveTo(left, 70).lineTo(left + contentWidth, 70).stroke();
+      doc.rect(left, 78, contentWidth, 22).fill(colors.navy);
+      doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(9.5).text(letterTitle, left, 84, { width: contentWidth, align: "center" });
+      doc.rect(left, 108, contentWidth, 38).fill("#f8fafc");
+      doc.strokeColor(colors.border).lineWidth(0.6).rect(left, 108, contentWidth, 38).stroke();
+      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(10.5).text(`Dear Dr. ${cleanName},`, left + 14, 115);
+      doc.fillColor(colors.slate).font("Helvetica").fontSize(8.2).text(
+        `Registration Code: ${data.candidateCode}   |   Subspecialty Stream: ${data.specialization || "Fellowship"}   |   Email: ${data.email}`,
         left + 14,
-        140
+        131
       );
-      let y = 166;
-      doc.fillColor(colors.dark).font("Helvetica").fontSize(8).text(
-        "Thank you for your interest in the Fellowship programme at Sankara Eye Foundation, India (www.sankaraeye.com). Sankara Eye Foundation is a group of 13 hospitals across India with over 3,000 medical professionals performing 200,000+ vision-restoring surgeries annually. Training is coordinated by the Sankara Academy of Vision with state-of-the-art diagnostic and surgical facilities, recognized faculty of national eminence, and extensive surgical exposure.",
+      let curY = 154;
+      doc.fillColor(colors.dark).font("Helvetica").fontSize(8.4).text(
+        "Thank you for your interest in the Fellowship programme at Sankara Eye Foundation, India (www.sankaraeye.com).\n\nSankara Eye Foundation is a group of 13 hospitals across the country with a medical and support team of 3000, we perform over 200,000 vision restoring surgeries every year. Training at Sankara is coordinated by the Sankara Academy of Vision.\n\nWith a combination of state of the art diagnostic and surgical facilities, faculty of national eminence and a large inflow of patients, fellows would benefit from a comprehensive training in their specialty; this would enable them a confidence to practice independently. There is an emphasis during the training towards clinical research apart from the surgical training.\n\nTraining is offered across various units of Sankara and the same would be communicated to you at the interview. Candidates could also be deputed to other sister units during training to maximize surgical exposure.\n\nPostgraduates in Ophthalmology recognized by the Medical Council of India would be eligible for applying for the same.\n\nThe organization offers an 18-month Cataract and IOL Fellowship (DO candidates for whom it would be 24 months). During this candidate can expect to perform a high volume of surgery based on their competency including techniques of small incision cataract surgery and phacoemulsification.\n\nSubspecialty training is offered in Glaucoma, Cornea, Pediatric Ophthalmology, Phaco Refractive, Orbit and Oculoplasty. We would also offer training in Medical Retina. This comprises of 2 parts an initial exposure to cataract and thereafter a subspecialty training as detailed below.",
         left,
-        y,
-        { width: contentWidth, lineGap: 2 }
+        curY,
+        { width: contentWidth, lineGap: 2.2 }
       );
-      y = 216;
-      doc.rect(left, y, contentWidth, 16).fill("#e2e8f0");
-      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(7.5).text("SUBSPECIALTY TRAINING DURATION & STRUCTURE", left + 8, y + 4.5);
+      curY = doc.y + 12;
+      doc.rect(left, curY, contentWidth, 18).fill(colors.tableHeader);
+      doc.strokeColor(colors.border).lineWidth(0.8).rect(left, curY, contentWidth, 18).stroke();
+      doc.fillColor(colors.darkNavy).font("Helvetica-Bold").fontSize(8).text("Subspecialty", left + 8, curY + 5);
+      doc.fillColor(colors.darkNavy).font("Helvetica-Bold").fontSize(8).text("Phase#1 (IOL) Duration", left + 205, curY + 5);
+      doc.fillColor(colors.darkNavy).font("Helvetica-Bold").fontSize(8).text("Phase#2 Speciality", left + 365, curY + 5);
       const tableRows = [
-        ["Cataract & IOL", "18 Months", "Not Applicable"],
-        ["Medical Retina*", "18 Months", "Not Applicable"],
-        ["Vitreo Retina", "Not Applicable", "24 Months"],
-        ["Glaucoma", "6 Months (IOL Phase)", "18 Months (Subspecialty)"],
-        ["Pediatric Ophthalmology & Strabismus", "6 Months (IOL Phase)", "18 Months (Subspecialty)"],
-        ["Cornea & External Eye Diseases", "6 Months (IOL Phase)", "18 Months (Subspecialty)"],
-        ["Phaco Refractive / Oculoplasty", "6 Months (IOL Phase)", "18 Months (Subspecialty)"]
+        ["Cataract & IOL", "18 Months", "Not applicable"],
+        ["Medical Retina*", "18 months", "Not applicable"],
+        ["Vitreo Retina", "Not applicable", "24 months"],
+        ["Glaucoma", "6 months", "18 months"],
+        ["Pediatric Ophthalmology & Strabismus", "6 months", "18 months"],
+        ["Cornea", "6 months", "18 months"],
+        ["Phaco Refractive", "6 months", "18 months"],
+        ["Oculoplasty", "6 months", "18 months"]
       ];
-      y += 16;
+      curY += 18;
       tableRows.forEach(([spec, p1, p2], idx) => {
         const rowBg = idx % 2 === 0 ? "#ffffff" : "#f8fafc";
-        doc.rect(left, y, contentWidth, 14).fill(rowBg);
-        doc.strokeColor(colors.border).lineWidth(0.3).rect(left, y, contentWidth, 14).stroke();
-        doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(7.2).text(spec, left + 8, y + 3.5);
-        doc.fillColor(colors.lightSlate).font("Helvetica").fontSize(7.2).text(p1, left + 210, y + 3.5);
-        doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(7.2).text(p2, left + 360, y + 3.5);
-        y += 14;
+        const rowH = 14;
+        doc.rect(left, curY, contentWidth, rowH).fill(rowBg);
+        doc.strokeColor(colors.border).lineWidth(0.3).rect(left, curY, contentWidth, rowH).stroke();
+        doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(7.5).text(spec, left + 8, curY + 3.5);
+        doc.fillColor(colors.slate).font("Helvetica").fontSize(7.5).text(p1, left + 205, curY + 3.5);
+        doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(7.5).text(p2, left + 365, curY + 3.5);
+        curY += rowH;
       });
-      y += 8;
-      doc.rect(left, y, contentWidth, 68).fill("#f8fafc");
-      doc.strokeColor(colors.navy).lineWidth(1.2).rect(left, y, contentWidth, 68).stroke();
-      doc.rect(left, y, contentWidth, 16).fill(colors.navy);
-      doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(8).text("SELECTION ASSESSMENT & INTERVIEW SCHEDULE", left + 8, y + 4.5);
-      doc.fillColor(colors.slate).font("Helvetica-Bold").fontSize(7.5).text("DATE & DAY:", left + 14, y + 24);
-      doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(9).text(interviewDate, left + 105, y + 24);
-      doc.fillColor(colors.slate).font("Helvetica-Bold").fontSize(7.5).text("REPORTING TIME:", left + 300, y + 24);
-      doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(9).text(reportingTime, left + 395, y + 24);
-      doc.fillColor(colors.slate).font("Helvetica-Bold").fontSize(7.5).text("VENUE ADDRESS:", left + 14, y + 42);
-      doc.fillColor(colors.dark).font("Helvetica").fontSize(8).text(venue, left + 105, y + 42, { width: 395 });
-      y += 76;
-      doc.rect(left, y, contentWidth, 136).fill("#ffffff");
-      doc.strokeColor(colors.border).lineWidth(0.5).rect(left, y, contentWidth, 136).stroke();
-      doc.rect(left, y, contentWidth, 15).fill("#e2e8f0");
-      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(7.5).text("MANDATORY REGULATIONS & KEY UPDATES", left + 8, y + 4);
-      const updates = [
-        "1. Degree Eligibility: Candidates appearing must have cleared PG (MS/MD) and DNB (Theory & Practicals). Result-awaited candidates are not eligible for final selection.",
-        "2. Government Bond / Rural Service: Applicants under government bond must submit a 'No Objection Certificate (NOC)' at the time of examination.",
-        "3. State Medical Council NOC: Selected fellows must submit NOC from their State Medical Council within 3 days of accepting the Fellowship Offer.",
-        "4. Induction Program: Selected Fellows must undergo a mandatory 2-day induction program in Bangalore on 2nd & 3rd July 2026. A non-refundable security deposit of Rs. 8,850 (incl. GST) will be collected towards this program.",
-        "5. Unit Reporting: Reporting at selected units will be on 6th July 2026. A monthly stipend is paid for the entire duration.",
-        "6. Required Documents: Carry educational credentials, complete CV, 1 passport color photo, and all original certificates for physical verification."
-      ];
-      let uy = y + 20;
-      updates.forEach((u) => {
-        doc.fillColor(colors.dark).font("Helvetica").fontSize(7.2).text(u, left + 8, uy, { width: contentWidth - 16, lineGap: 1.5 });
-        uy += 18;
-      });
-      y += 144;
-      doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(7.5).text("For clarifications, please contact: Radhika (Admissions Coordinator) on 9666677505", left, y, { width: contentWidth, align: "center" });
-      doc.fillColor(colors.lightSlate).font("Helvetica-Oblique").fontSize(6.5).text(
-        "Sankara Academy of Vision \xB7 Sankara Eye Care Institutions, India \xB7 Official Call Letter",
+      curY += 5;
+      doc.fillColor(colors.lightSlate).font("Helvetica-Oblique").fontSize(7.2).text(
+        "*During the speciality phase too, cataract exposure would continue.\n(For DO Candidates phase 1 of the training would be 6 months longer than indicated)",
+        left + 8,
+        curY,
+        { width: contentWidth - 16, lineGap: 1.5 }
+      );
+      doc.fillColor(colors.lightSlate).font("Helvetica").fontSize(7).text(
+        "Page 1 of 2 \xB7 Sankara Academy of Vision Fellowship Admissions",
         left,
-        780,
+        792,
         { width: contentWidth, align: "center" }
+      );
+      doc.addPage();
+      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(10).text("SANKARA ACADEMY OF VISION", left, 28);
+      doc.fillColor(colors.lightSlate).font("Helvetica").fontSize(8).text(
+        `Interview Call Letter \u2014 Dr. ${cleanName} [ ${data.candidateCode} ]`,
+        left,
+        28,
+        { width: contentWidth, align: "right" }
+      );
+      doc.strokeColor(colors.border).lineWidth(0.8).moveTo(left, 42).lineTo(left + contentWidth, 42).stroke();
+      curY = 56;
+      doc.fillColor(colors.dark).font("Helvetica").fontSize(8.6).text(
+        "The selection process would comprise of an objective assessment of your theoretical knowledge and an OSCE and skills evaluation with an interview by a panel of faculty.",
+        left,
+        curY,
+        { width: contentWidth, lineGap: 2.2 }
+      );
+      curY = doc.y + 14;
+      doc.rect(left, curY, contentWidth, 96).fill("#f8fafc");
+      doc.strokeColor(colors.navy).lineWidth(1.2).rect(left, curY, contentWidth, 96).stroke();
+      doc.rect(left, curY, contentWidth, 20).fill(colors.navy);
+      doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(8.5).text("SELECTION ASSESSMENT & INTERVIEW SCHEDULE", left + 10, curY + 6);
+      let sy = curY + 28;
+      doc.fillColor(colors.slate).font("Helvetica-Bold").fontSize(8).text("DATE & DAY:", left + 14, sy);
+      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(9.5).text(interviewDate, left + 120, sy);
+      sy += 20;
+      doc.fillColor(colors.slate).font("Helvetica-Bold").fontSize(8).text("REPORTING TIME:", left + 14, sy);
+      doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(9.5).text(reportingTime, left + 120, sy);
+      sy += 20;
+      doc.fillColor(colors.slate).font("Helvetica-Bold").fontSize(8).text("VENUE ADDRESS:", left + 14, sy);
+      doc.fillColor(colors.dark).font("Helvetica").fontSize(8.2).text(
+        "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore \u2013 560037",
+        left + 120,
+        sy,
+        { width: 375 }
+      );
+      curY += 108;
+      doc.fillColor(colors.dark).font("Helvetica").fontSize(8.4).text(
+        `You are requested to carry your educational credentials and a complete CV, one passport size color photograph and relevant original certificates for verification at the interview. Selected candidates will be given an offer by close of day on the ${offerDayText}, other candidates in the merit list would be in the waiting list.`,
+        left,
+        curY,
+        { width: contentWidth, lineGap: 2.2 }
+      );
+      curY = doc.y + 16;
+      doc.rect(left, curY, contentWidth, 18).fill(colors.tableHeader);
+      doc.strokeColor(colors.border).lineWidth(0.8).rect(left, curY, contentWidth, 18).stroke();
+      doc.fillColor(colors.darkNavy).font("Helvetica-Bold").fontSize(8.5).text("KEY UPDATES & MANDATORY REGULATIONS", left + 10, curY + 5);
+      const keyUpdates = [
+        "The Applicants appearing for the interviews will have to clear the results of PG(MS/MD) and DNB (Theory & Practical\u2019s), those appearing for the PG exams and awaiting for the results shall not be eligible for the interview final selection process.",
+        "Applicants who are under Government bond or Compulsory Rural Service will have to submit \u2018No Objection Certificate\u2019 during the time of examination.",
+        "All the selected fellows will need to submit NOC from their State Medical Council within 3 days of accepting the Fellowship Offer, without which the joining will not be agreeable.",
+        "Selected Fellows will have to undergo a 2 day induction program mandatory at Bangalore on 2nd & 3rd January 2027, a security non-refundable deposit of Rs.8850 including GST shall be collected towards this induction program.",
+        "The reporting at the selected units shall be on 6th January 2027. You would be paid a stipend for the duration of the training."
+      ];
+      curY += 26;
+      keyUpdates.forEach((item, idx) => {
+        doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(8.2).text(`${idx + 1}.`, left + 6, curY);
+        doc.fillColor(colors.dark).font("Helvetica").fontSize(8.2).text(item, left + 20, curY, {
+          width: contentWidth - 26,
+          lineGap: 2
+        });
+        curY = doc.y + 7;
+      });
+      curY += 14;
+      doc.rect(left, curY, contentWidth, 32).fill("#fffbeb");
+      doc.strokeColor("#f59e0b").lineWidth(0.8).rect(left, curY, contentWidth, 32).stroke();
+      doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(9.5).text(
+        "For clarifications contact Radhika (Course Coordinator) on 9666677505.",
+        left,
+        curY + 10,
+        { width: contentWidth, align: "center" }
+      );
+      doc.fillColor(colors.lightSlate).font("Helvetica-Oblique").fontSize(7).text(
+        "Page 2 of 2 \xB7 Sankara Academy of Vision \xB7 Educational unit of Sankara Eye Foundation, India \xB7 Sri Kanchi Kamakoti Medical Trust",
+        left,
+        792,
+        { width: contentWidth, align: "center", lineBreak: false }
       );
       doc.end();
     } catch (e2) {
@@ -1026155,8 +1026298,185 @@ async function generateOfferLetterPdf(data) {
   return new Promise((resolve4, reject) => {
     try {
       const doc = new import_pdfkit.default({
-        margin: 40,
         size: "A4",
+        margins: { top: 28, bottom: 20, left: 45, right: 45 },
+        bufferPages: true,
+        autoFirstPage: false
+      });
+      const buffers = [];
+      doc.on("data", (chunk) => buffers.push(chunk));
+      doc.on("end", () => resolve4(Buffer.concat(buffers)));
+      const colors = {
+        navy: "#0b4a8f",
+        darkNavy: "#062b54",
+        dark: "#1e293b",
+        slate: "#334155",
+        lightSlate: "#64748b",
+        border: "#cbd5e1",
+        bullet: "#0b4a8f"
+      };
+      const left = 45;
+      const contentWidth = 505;
+      const { sefLogo, savLogo } = getLogoPaths();
+      const defaultInterviewDate = isRetinaSpecialty(data.specialization) ? "7th December 2026" : "8th December 2026";
+      const interviewDate = data.interviewDate || defaultInterviewDate;
+      const phaseDetails = formatPhaseDurations(data.specialization, data.durationMonths);
+      const effectiveDate = data.effectiveDate || "6th January 2027";
+      const unit = data.unitName || "Bangalore Main Hospital";
+      let reportingDoctor = data.cmoName || "Dr. Kaushik Murali";
+      reportingDoctor = reportingDoctor.replace(/ - Chief Medical Officer$/i, "").trim();
+      let stipendNum = 4e4;
+      if (data.stipendAmount) {
+        const parsed = Number(String(data.stipendAmount).replace(/[^0-9]/g, ""));
+        if (parsed > 0) stipendNum = parsed;
+      }
+      const stipendWords = data.stipendWords || numberToWordsIndian(stipendNum).replace(/^Rupees\s+/i, "").replace(/\s+Only$/i, "");
+      const issueDate = data.issuanceDate || (/* @__PURE__ */ new Date()).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+      const cleanName = cleanDoctorName(data.candidateName);
+      const durationText = `${phaseDetails.totalMonths} Months`;
+      const inductionDates = data.inductionDate || "2nd & 3rd July 2026 at Bangalore Main Hospital (For Testing Only)";
+      doc.addPage();
+      if (sefLogo && fs4.existsSync(sefLogo)) {
+        doc.image(sefLogo, left, 26, { width: 95 });
+      }
+      if (savLogo && fs4.existsSync(savLogo)) {
+        doc.image(savLogo, left + contentWidth - 38, 24, { width: 38 });
+      }
+      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(13).text("SANKARA ACADEMY OF VISION", left, 26, { width: contentWidth, align: "center" });
+      doc.fillColor(colors.dark).font("Helvetica").fontSize(8).text("Educational unit of Sankara Eye Foundation, India \xB7 Sri Kanchi Kamakoti Medical Trust", left, 42, { width: contentWidth, align: "center" });
+      doc.fillColor(colors.lightSlate).font("Helvetica").fontSize(7.5).text("www.sankaraeye.com \xB7 radhika@sankaraeye.com", left, 54, { width: contentWidth, align: "center" });
+      doc.strokeColor(colors.navy).lineWidth(1.2).moveTo(left, 68).lineTo(left + contentWidth, 68).stroke();
+      doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(9.5).text(`Date: ${issueDate}`, left, 78, { width: contentWidth, align: "right" });
+      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(10.5).text(`Dear Dr. ${cleanName}`, left, 78);
+      if (data.address) {
+        doc.fillColor(colors.slate).font("Helvetica").fontSize(8.5).text(data.address.toUpperCase(), left, 93, { width: 340, lineGap: 1.5 });
+      }
+      const subY = data.address ? Math.max(122, doc.y + 6) : 108;
+      doc.fillColor(colors.darkNavy).font("Helvetica-Bold").fontSize(10.5).text("Sub: Fellowship Offer Letter", left, subY);
+      let curY = subY + 20;
+      doc.fillColor(colors.dark).font("Helvetica").fontSize(9).text(
+        `This refers to your interview dated ${interviewDate} for our Fellowship program.
+
+Sankara Academy of Vision, Educational unit of Sankara Eye Foundation, India is pleased to offer you fellowship in ${data.specialization} at Sankara Eye Hospital \u2013 ${unit} for a period of ${durationText} effective ${effectiveDate}. You shall report to duty on ${effectiveDate}.`,
+        left,
+        curY,
+        { width: contentWidth, lineGap: 2.5 }
+      );
+      const page1Bullets = [
+        `You shall be attending mandatory two-day induction program scheduled at Sankara Eye Hospital, Bangalore on ${inductionDates}`,
+        `You shall be paid a stipend of Rs ${stipendNum.toLocaleString("en-IN")} (${stipendWords} Only) per month subject to income tax and other statutory deductions as applicable.`,
+        `Your entire first month stipend and 15 days of second & third months' stipend would be held as a deposit which would be paid back interest free only after the successful completion of the fellowship.`,
+        `You would be eligible for 1-day leave of earned for each month of your tenure apart from the declared holidays.`,
+        `Your Fellowship Appointment letter together with the terms and conditions shall be handed to you on your date of joining duty.`,
+        `You will adhere to the policies of Sankara Eye Foundation, India.`,
+        `You shall be reporting to Dr. ${reportingDoctor} - Chief Medical Officer`,
+        `You may be deputed to other units of Sankara hospitals during your fellowship tenure.`,
+        `Extension of Fellowship Course is not possible except under rare approvals.`
+      ];
+      curY = doc.y + 12;
+      page1Bullets.forEach((bullet) => {
+        doc.fillColor(colors.bullet).font("Helvetica-Bold").fontSize(10).text("\u2022", left + 4, curY, { continued: false });
+        doc.fillColor(colors.dark).font("Helvetica").fontSize(8.8).text(bullet, left + 18, curY, {
+          width: contentWidth - 18,
+          lineGap: 2
+        });
+        curY = doc.y + 6;
+      });
+      doc.strokeColor(colors.border).lineWidth(0.8).moveTo(left, 785).lineTo(left + contentWidth, 785).stroke();
+      doc.fillColor(colors.lightSlate).font("Helvetica-Oblique").fontSize(7.5).text(
+        "Page 1 of 2 \xB7 Sankara Academy of Vision \xB7 Educational unit of Sankara Eye Foundation, India",
+        left,
+        792,
+        { width: contentWidth, align: "center", lineBreak: false }
+      );
+      doc.addPage();
+      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(10).text("SANKARA ACADEMY OF VISION", left, 26);
+      doc.fillColor(colors.lightSlate).font("Helvetica").fontSize(8).text(
+        `Fellowship Offer Letter \u2014 Dr. ${cleanName} [ ${data.candidateCode} ]`,
+        left,
+        26,
+        { width: contentWidth, align: "right" }
+      );
+      doc.strokeColor(colors.border).lineWidth(0.8).moveTo(left, 39).lineTo(left + contentWidth, 39).stroke();
+      curY = 48;
+      doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(9).text("On the date of joining you are requested to bring:", left, curY);
+      curY = doc.y + 3;
+      doc.fillColor(colors.bullet).font("Helvetica-Bold").fontSize(10).text("\u2022", left + 4, curY, { continued: false });
+      doc.fillColor(colors.dark).font("Helvetica").fontSize(8.8).text("3 passport-size color photographs.", left + 16, curY);
+      curY = doc.y + 8;
+      doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(9).text("Also carry the Originals and photocopies of the following documents:", left, curY);
+      const requiredDocuments = [
+        "1. MBBS Degree Certificate.",
+        "2. DOMS/MS and Dip. NB Certificate",
+        "3. Medical Council Registration Certificate",
+        "4. Medical Fitness Certificate",
+        "5. PAN card, Residential Proof & Age Proof"
+      ];
+      curY = doc.y + 4;
+      requiredDocuments.forEach((docItem) => {
+        doc.fillColor(colors.dark).font("Helvetica").fontSize(8.8).text(docItem, left + 14, curY);
+        curY = doc.y + 2.5;
+      });
+      curY = doc.y + 5;
+      doc.fillColor(colors.darkNavy).font("Helvetica-Bold").fontSize(8.8).text(
+        "Submission of the photocopied documents mentioned above is mandatory on the date of Joining.",
+        left,
+        curY,
+        { width: contentWidth }
+      );
+      const page2Clauses = [
+        "Your joining shall be subject to the clearance of your PG result where applicable or submission of relieving order from your previous employment.",
+        "Please be informed that due diligence shall be initiated in the first six months of your reporting. In this process of verification, if there are confirmed unfavorable reports of your academic credentials, past experience, banking transactions or social standing, your services shall be discontinued with immediate effect.",
+        "Sankara Eye Foundation, India follows an equal opportunity policy and a policy of zero tolerance to any form of harassment. Please update yourself on the grievance redressal policy as part of your induction.",
+        "Your Fellowship with Sankara Academy of Vision can be discontinued if found non-conforming to the rules of the organization or on disciplinary grounds or your action is shown to have maligned the reputation of the organization.",
+        "Please validate your acceptance within 3 days on receipt of this letter by sending an email to radhika@sankaraeye.com. Receiving no response from your end will invalidate this offer granted to you. The fellowship would then be offered to the next candidate on the merit list."
+      ];
+      curY = doc.y + 7;
+      page2Clauses.forEach((clause) => {
+        doc.fillColor(colors.dark).font("Helvetica").fontSize(8.8).text(clause, left, curY, {
+          width: contentWidth,
+          lineGap: 2
+        });
+        curY = doc.y + 5.5;
+      });
+      curY = doc.y + 4;
+      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(9).text(
+        "Our journey together will certainly be inspiring, challenging, rewarding and satisfying.",
+        left,
+        curY,
+        { width: contentWidth }
+      );
+      curY = doc.y + 6;
+      doc.fillColor(colors.dark).font("Helvetica").fontSize(9).text("Wishing you the very best", left, curY);
+      curY = doc.y + 14;
+      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(10.5).text("Dr. Kaushik Murali", left, curY);
+      curY = doc.y + 2;
+      doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(8.5).text(
+        "President\nMedical Administration, Quality & Education\nSankara Eye Foundation, India",
+        left,
+        curY,
+        { lineGap: 1.5 }
+      );
+      doc.strokeColor(colors.border).lineWidth(0.8).moveTo(left, 785).lineTo(left + contentWidth, 785).stroke();
+      doc.fillColor(colors.lightSlate).font("Helvetica-Oblique").fontSize(7.5).text(
+        "Page 2 of 2 \xB7 Sankara Academy of Vision \xB7 Educational unit of Sankara Eye Foundation, India",
+        left,
+        792,
+        { width: contentWidth, align: "center", lineBreak: false }
+      );
+      doc.end();
+    } catch (e2) {
+      reject(e2);
+    }
+  });
+}
+async function generateStudentDirectoryPdf(data) {
+  return new Promise((resolve4, reject) => {
+    try {
+      const doc = new import_pdfkit.default({
+        margin: 25,
+        size: "A4",
+        layout: "landscape",
         bufferPages: true,
         autoFirstPage: false
       });
@@ -1026171,175 +1026491,151 @@ async function generateOfferLetterPdf(data) {
         lightSlate: "#64748b",
         border: "#cbd5e1",
         cardBg: "#f8fafc",
-        tableHeader: "#e2e8f0",
-        accent: "#d97706"
+        accent: "#d97706",
+        green: "#166534",
+        greenBg: "#dcfce7",
+        amber: "#92400e",
+        amberBg: "#fef3c7",
+        blueBg: "#e0f2fe"
       };
-      const left = 40;
-      const contentWidth = 515;
+      const left = 25;
+      const contentWidth = 792;
       const { sefLogo, savLogo } = getLogoPaths();
-      const defaultInterviewDate = isRetinaSpecialty(data.specialization) ? "1st June 2026" : "8th June 2026";
-      const interviewDate = data.interviewDate || defaultInterviewDate;
-      const duration3 = data.durationMonths || (isRetinaSpecialty(data.specialization) ? 24 : 18);
-      const effectiveDate = data.effectiveDate || "6th July 2026";
-      const unit = data.unitName || "Jaipur";
-      const cmo = data.cmoName || "Dr. Neeraj Shah - Chief Medical Officer";
-      let stipendNum = 4e4;
-      if (data.stipendAmount) {
-        const parsed = Number(String(data.stipendAmount).replace(/[^0-9]/g, ""));
-        if (parsed > 0) stipendNum = parsed;
-      }
-      const stipendWords = data.stipendWords || numberToWordsIndian(stipendNum);
-      const issueDate = data.issuanceDate || (/* @__PURE__ */ new Date()).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
-      const cleanName = cleanDoctorName(data.candidateName);
-      doc.addPage();
-      if (sefLogo && fs4.existsSync(sefLogo)) {
-        doc.image(sefLogo, left, 28, { width: 95 });
-      }
-      if (savLogo && fs4.existsSync(savLogo)) {
-        doc.image(savLogo, left + contentWidth - 38, 25, { width: 38 });
-      }
-      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(13).text("SANKARA ACADEMY OF VISION", left, 28, { width: contentWidth, align: "center" });
-      doc.fillColor(colors.dark).font("Helvetica").fontSize(8).text("Educational unit of Sankara Eye Foundation, India \xB7 Sri Kanchi Kamakoti Medical Trust", left, 44, { width: contentWidth, align: "center" });
-      doc.fillColor(colors.lightSlate).font("Helvetica").fontSize(7.5).text("www.sankaraeye.com \xB7 radhika@sankaraeye.com", left, 56, { width: contentWidth, align: "center" });
-      doc.strokeColor(colors.navy).lineWidth(1.2).moveTo(left, 70).lineTo(left + contentWidth, 70).stroke();
-      doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(9.5).text(`Date: ${issueDate}`, left, 78, { width: contentWidth, align: "right" });
-      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(11).text(`Dear Dr. ${cleanName},`, left, 78);
-      if (data.address) {
-        doc.fillColor(colors.slate).font("Helvetica").fontSize(8.5).text(data.address.toUpperCase(), left, 92, { width: 340, lineGap: 1.5 });
-      }
-      const subY = data.address ? Math.max(122, doc.y + 6) : 110;
-      doc.rect(left, subY, contentWidth, 20).fill(colors.navy);
-      doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(10).text("OFFICIAL FELLOWSHIP OFFER & APPOINTMENT LETTER", left, subY + 5.5, { width: contentWidth, align: "center" });
-      let curY = subY + 28;
-      doc.fillColor(colors.dark).font("Helvetica").fontSize(9.2).text(
-        `This refers to your interview dated for our Central Fellowship Program on ${interviewDate}.
-
-Sankara Academy of Vision, Educational unit of Sankara Eye Foundation, India is pleased to offer you fellowship in ${data.specialization} at Sankara Eye Hospital \u2013 ${unit} for a period of ${duration3} Months effective ${effectiveDate}. You shall report to duty on ${effectiveDate}.`,
-        left,
-        curY,
-        { width: contentWidth, lineGap: 2.5 }
-      );
-      curY = doc.y + 10;
-      doc.rect(left, curY, contentWidth, 18).fill(colors.tableHeader);
-      doc.strokeColor(colors.border).lineWidth(0.8).rect(left, curY, contentWidth, 18).stroke();
-      doc.fillColor(colors.darkNavy).font("Helvetica-Bold").fontSize(8.5).text("FELLOWSHIP APPOINTMENT & REPORTING DETAILS", left + 10, curY + 5);
-      const tableItems = [
-        ["Selected Doctor", `Dr. ${cleanName} (Reg Code: ${data.candidateCode})`],
-        ["Subspecialty Stream", data.specialization],
-        ["Assigned Hospital Unit", `Sankara Eye Hospital \u2013 ${unit}`],
-        ["Reporting Authority", cmo],
-        ["Fellowship Tenure", `${duration3} Months (Effective from ${effectiveDate})`],
-        ["Monthly Stipend", `Rs ${stipendNum.toLocaleString("en-IN")}/- (${stipendWords})`],
-        ["Mandatory Induction", `2nd & 3rd July 2026 at Sankara Eye Hospital, Bangalore`],
-        ["Duty Commencement Date", `${effectiveDate} (Bangalore / Allocated Unit)`]
-      ];
-      curY += 18;
-      tableItems.forEach(([label, val], idx) => {
-        const rowBg = idx % 2 === 0 ? "#ffffff" : "#f8fafc";
-        const rowH = 16.5;
-        doc.rect(left, curY, contentWidth, rowH).fill(rowBg);
-        doc.strokeColor(colors.border).lineWidth(0.4).rect(left, curY, contentWidth, rowH).stroke();
-        doc.fillColor(colors.slate).font("Helvetica-Bold").fontSize(8.2).text(label, left + 8, curY + 4.5, { width: 155 });
-        doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(8.5).text(val, left + 170, curY + 4.5, { width: 335 });
-        curY += rowH;
+      const session = data.academicSession || "December 2026";
+      const programName = data.programName || "Central Fellowship Program";
+      const genDate = data.generationDate || (/* @__PURE__ */ new Date()).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+      const colWidths = {
+        sl: 30,
+        code: 80,
+        name: 145,
+        contact: 135,
+        qualification: 120,
+        stream: 130,
+        status: 75,
+        unit: 77
+      };
+      const renderHeader = (isFirstPage) => {
+        doc.addPage();
+        let curY2 = 20;
+        if (isFirstPage) {
+          if (sefLogo && fs4.existsSync(sefLogo)) {
+            doc.image(sefLogo, left, curY2, { width: 95 });
+          }
+          if (savLogo && fs4.existsSync(savLogo)) {
+            doc.image(savLogo, left + contentWidth - 45, curY2 - 2, { width: 45 });
+          }
+          doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(13).text("SANKARA ACADEMY OF VISION", left, curY2, { width: contentWidth, align: "center" });
+          doc.fillColor(colors.dark).font("Helvetica").fontSize(7.5).text("Educational unit of Sankara Eye Foundation, India \xB7 Sri Kanchi Kamakoti Medical Trust", left, curY2 + 16, { width: contentWidth, align: "center" });
+          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(8.5).text(`FELLOWSHIP CANDIDATE DIRECTORY & ADMISSIONS ROSTER \u2014 ${session.toUpperCase()}`, left, curY2 + 27, { width: contentWidth, align: "center" });
+          doc.strokeColor(colors.navy).lineWidth(1).moveTo(left, curY2 + 39).lineTo(left + contentWidth, curY2 + 39).stroke();
+          doc.rect(left, curY2 + 43, contentWidth, 20).fill("#f1f5f9");
+          doc.strokeColor(colors.border).lineWidth(0.5).rect(left, curY2 + 43, contentWidth, 20).stroke();
+          doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(8).text(
+            `Program: ${programName}   |   Session: ${session}   |   Total Candidates: ${data.candidates.length}`,
+            left + 12,
+            curY2 + 49
+          );
+          doc.fillColor(colors.lightSlate).font("Helvetica").fontSize(7.5).text(
+            `Generated On: ${genDate} \xB7 Sankara Academy of Vision`,
+            left + 450,
+            curY2 + 49,
+            { width: 330, align: "right" }
+          );
+          curY2 += 67;
+        } else {
+          doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(8.5).text(`SANKARA ACADEMY OF VISION \u2014 CANDIDATE DIRECTORY (${session})`, left, curY2);
+          doc.fillColor(colors.lightSlate).font("Helvetica").fontSize(7.5).text(`Total Candidates: ${data.candidates.length}`, left + contentWidth - 150, curY2, { width: 150, align: "right" });
+          doc.strokeColor(colors.border).lineWidth(0.5).moveTo(left, curY2 + 13).lineTo(left + contentWidth, curY2 + 13).stroke();
+          curY2 += 18;
+        }
+        doc.rect(left, curY2, contentWidth, 19).fill(colors.navy);
+        doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(7.5);
+        let colX = left;
+        doc.text("#", colX + 2, curY2 + 5.5, { width: colWidths.sl, align: "center" });
+        colX += colWidths.sl;
+        doc.text("REG CODE", colX + 6, curY2 + 5.5, { width: colWidths.code });
+        colX += colWidths.code;
+        doc.text("CANDIDATE NAME", colX + 6, curY2 + 5.5, { width: colWidths.name });
+        colX += colWidths.name;
+        doc.text("CONTACT DETAILS", colX + 6, curY2 + 5.5, { width: colWidths.contact });
+        colX += colWidths.contact;
+        doc.text("QUALIFICATION", colX + 6, curY2 + 5.5, { width: colWidths.qualification });
+        colX += colWidths.qualification;
+        doc.text("SPECIALIZATION", colX + 6, curY2 + 5.5, { width: colWidths.stream });
+        colX += colWidths.stream;
+        doc.text("STATUS", colX + 6, curY2 + 5.5, { width: colWidths.status, align: "center" });
+        colX += colWidths.status;
+        doc.text("ALLOCATED UNIT", colX + 6, curY2 + 5.5, { width: colWidths.unit });
+        return curY2 + 19;
+      };
+      let curY = renderHeader(true);
+      const bottomLimit = 548;
+      data.candidates.forEach((c, idx) => {
+        const rowHeight = 25;
+        if (curY + rowHeight > bottomLimit) {
+          curY = renderHeader(false);
+        }
+        const isEven = idx % 2 === 0;
+        doc.rect(left, curY, contentWidth, rowHeight).fill(isEven ? "#ffffff" : "#f8fafc");
+        doc.strokeColor(colors.border).lineWidth(0.3).rect(left, curY, contentWidth, rowHeight).stroke();
+        let colX = left;
+        doc.fillColor(colors.lightSlate).font("Helvetica-Bold").fontSize(7.5).text(String(c.slNo || idx + 1), colX, curY + 7.5, { width: colWidths.sl, align: "center" });
+        colX += colWidths.sl;
+        doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(8).text(c.candidateCode || "\u2014", colX + 6, curY + 7.5, { width: colWidths.code - 8 });
+        colX += colWidths.code;
+        const docName = cleanDoctorName(c.candidateName);
+        doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(8).text(`Dr. ${docName}`, colX + 6, curY + 4, { width: colWidths.name - 8, lineBreak: false });
+        if (c.submittedAt) {
+          const dtStr = new Date(c.submittedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+          doc.fillColor(colors.lightSlate).font("Helvetica").fontSize(6.5).text(`Applied: ${dtStr}`, colX + 6, curY + 14.5, { width: colWidths.name - 8 });
+        }
+        colX += colWidths.name;
+        doc.fillColor(colors.slate).font("Helvetica").fontSize(7).text(c.email || "\u2014", colX + 6, curY + 4, { width: colWidths.contact - 8, lineBreak: false });
+        if (c.phone) {
+          doc.fillColor(colors.lightSlate).font("Helvetica").fontSize(6.8).text(`Ph: ${c.phone}`, colX + 6, curY + 14, { width: colWidths.contact - 8 });
+        }
+        colX += colWidths.contact;
+        const qualText = [c.qualification, c.college].filter(Boolean).join(" \xB7 ") || "MBBS / MS / DNB";
+        doc.fillColor(colors.dark).font("Helvetica").fontSize(7.2).text(qualText, colX + 6, curY + 5, { width: colWidths.qualification - 8, height: 17, ellipsis: true });
+        colX += colWidths.qualification;
+        const specText = c.specialization || "Ophthalmology Fellowship";
+        doc.fillColor(colors.slate).font("Helvetica-Bold").fontSize(7.2).text(specText, colX + 6, curY + 5, { width: colWidths.stream - 8, height: 17, ellipsis: true });
+        colX += colWidths.stream;
+        const stLower = (c.status || "pending").toLowerCase();
+        let stLabel = "Pending";
+        let stBg = colors.amberBg;
+        let stColor = colors.amber;
+        if (stLower === "approved" || stLower === "verified" || stLower === "scheduled") {
+          stLabel = "Approved";
+          stBg = colors.greenBg;
+          stColor = colors.green;
+        } else if (stLower === "allocated" || stLower === "completed") {
+          stLabel = "Allocated";
+          stBg = colors.blueBg;
+          stColor = colors.navy;
+        } else if (stLower === "rejected") {
+          stLabel = "Rejected";
+          stBg = "#fee2e2";
+          stColor = "#991b1b";
+        }
+        doc.rect(colX + 5, curY + 5.5, colWidths.status - 10, 14).fill(stBg);
+        doc.fillColor(stColor).font("Helvetica-Bold").fontSize(6.5).text(stLabel, colX + 5, curY + 9, { width: colWidths.status - 10, align: "center" });
+        colX += colWidths.status;
+        doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(7.5).text(c.unitName || "\u2014", colX + 6, curY + 7.5, { width: colWidths.unit - 8 });
+        curY += rowHeight;
       });
-      curY += 10;
-      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(9.5).text("SECTION A: STIPEND, DEPOSIT & CORE LEAVE RULES", left, curY);
-      doc.strokeColor(colors.navy).lineWidth(0.8).moveTo(left, curY + 13).lineTo(left + 260, curY + 13).stroke();
-      const page1Points = [
-        `1. Induction Program: You shall be attending mandate two-day induction program scheduled at Sankara Eye Hospital, Bangalore on 2nd & 3rd July 2026.`,
-        `2. Monthly Stipend: You shall be paid a stipend of Rs ${stipendNum.toLocaleString("en-IN")} (${stipendWords}) per month subject to income tax and other statutory deductions as applicable.`,
-        `3. Security Deposit: Your entire first month stipend and 15 days of second & third months' stipend would be held as a deposit which would be paid back interest free only after the successful completion of the fellowship. This would be forfeited if you discontinue the fellowship or if the fellowship is terminated due to disciplinary issues.`,
-        `4. Earned Leave: You would be eligible for 1-day leave earned for each month of your tenure apart from declared holidays.`,
-        `5. Appointment & Compliance: Your Fellowship Appointment letter together with terms and conditions shall be handed to you on your date of joining. You will adhere to the policies of Sankara Eye Foundation, India.`
-      ];
-      curY += 20;
-      page1Points.forEach((pt) => {
-        doc.fillColor(colors.dark).font("Helvetica").fontSize(8.3).text(pt, left, curY, {
-          width: contentWidth,
-          lineGap: 2
-        });
-        curY = doc.y + 4.5;
-      });
-      doc.addPage();
-      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(10).text("SANKARA ACADEMY OF VISION", left, 28);
-      doc.fillColor(colors.lightSlate).font("Helvetica").fontSize(8).text(
-        `Fellowship Offer Letter \u2014 Dr. ${cleanName} [ ${data.candidateCode} ]`,
-        left,
-        28,
-        { width: contentWidth, align: "right" }
-      );
-      doc.strokeColor(colors.border).lineWidth(0.8).moveTo(left, 42).lineTo(left + contentWidth, 42).stroke();
-      curY = 52;
-      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(9.5).text("SECTION B: HOSPITAL REGULATIONS, DEPUTATION & CONDUCT", left, curY);
-      doc.strokeColor(colors.navy).lineWidth(0.8).moveTo(left, curY + 13).lineTo(left + 300, curY + 13).stroke();
-      const page2PointsSectionB = [
-        `6. Reporting CMO: You shall report to ${cmo} at Sankara Eye Hospital \u2013 ${unit}.`,
-        `7. Inter-Unit Deputation: You may be deputed to other units of Sankara hospitals (for a period of not more than 3 months at a time) during your fellowship tenure to maximize clinical and surgical exposure.`,
-        `8. Course Extension Policy: Extension of Fellowship Course is not possible. In rare cases Dean-SAV may approve an extension duration not beyond 3 months, which shall be a non-stipendable period.`,
-        `9. Training Cost Reimbursement: If the fellowship is discontinued prematurely by you or due to disciplinary actions, you will be required to reimburse training and accommodation expenses incurred by Sankara Academy of Vision.`,
-        `10. External Examinations (ICO/FICO): Written permission must be obtained in advance from the Unit CMO and Dean SAV before appearing for external examinations.`,
-        `11. Uniform & Scrubs Policy: As per SAV Uniform Policy, you must wear the institute-issued apron or scrubs on all working days while on duty.`,
-        `12. Property Indemnity: In case of damage to hospital instruments or books due to negligence, the replacement cost shall be recovered from your deposit.`
-      ];
-      curY += 20;
-      page2PointsSectionB.forEach((pt) => {
-        doc.fillColor(colors.dark).font("Helvetica").fontSize(8.2).text(pt, left, curY, {
-          width: contentWidth,
-          lineGap: 1.8
-        });
-        curY = doc.y + 4;
-      });
-      curY += 4;
-      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(9.5).text("SECTION C: MANDATORY DOCUMENTS & VERIFICATION", left, curY);
-      doc.strokeColor(colors.navy).lineWidth(0.8).moveTo(left, curY + 13).lineTo(left + 280, curY + 13).stroke();
-      const page2PointsSectionC = [
-        `13. Mandatory Joining Documents: Bring 3 passport photos, Originals and photocopies of: MBBS Degree, DOMS/MS/DNB Degree Certificate, Medical Council Registration, Medical Fitness Certificate, PAN Card, and Residential/Age Proof.`,
-        `14. PG Clearance / Relieving Order: Joining is strictly subject to clearance of your PG results or submission of a relieving order from your previous employer.`,
-        `15. Background Due Diligence: Background verification shall be conducted in the first 6 months. Any adverse academic, banking, or credential reports will lead to immediate termination.`,
-        `16. Equal Opportunity & Anti-Harassment: Sankara Eye Foundation follows a strict zero-tolerance policy towards harassment and adheres to equal opportunity norms.`,
-        `17. Acceptance Deadline: Validate your acceptance within 3 days by emailing radhika@sankaraeye.com. Failure to respond within 3 days will invalidate this offer and pass it to the next candidate on the merit list.`
-      ];
-      curY += 20;
-      page2PointsSectionC.forEach((pt) => {
-        doc.fillColor(colors.dark).font("Helvetica").fontSize(8.2).text(pt, left, curY, {
-          width: contentWidth,
-          lineGap: 1.8
-        });
-        curY = doc.y + 4;
-      });
-      curY += 8;
-      doc.fillColor(colors.darkNavy).font("Helvetica-Bold").fontSize(8.8).text(
-        "Our journey together will certainly be inspiring, challenging, rewarding and satisfying.",
-        left,
-        curY,
-        { width: contentWidth }
-      );
-      curY = doc.y + 8;
-      doc.fillColor(colors.slate).font("Helvetica").fontSize(8.5).text("Wishing you the very best,", left, curY);
-      curY = doc.y + 18;
-      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(10).text("Dr. Kaushik Murali", left, curY);
-      doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(8).text(
-        "President\nMedical Administration, Quality & Education\nSankara Eye Foundation, India",
-        left,
-        doc.y + 2,
-        { lineGap: 1.5 }
-      );
       const pages = doc.bufferedPageRange();
       const pageCount = pages.count;
       for (let i2 = 0; i2 < pageCount; i2++) {
         doc.switchToPage(i2);
-        const oldBottom = doc.page.margins.bottom;
-        doc.page.margins.bottom = 0;
-        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(left, 785).lineTo(left + contentWidth, 785).stroke();
+        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(left, 568).lineTo(left + contentWidth, 568).stroke();
         doc.fillColor(colors.lightSlate).font("Helvetica").fontSize(7).text(
-          `Sankara Academy of Vision \xB7 Fellowship Offer Letter \xB7 ${data.candidateCode}`,
+          `Sankara Academy of Vision \xB7 Official Admissions Roster \xB7 December 2026 Session \xB7 Generated on ${genDate}`,
           left,
-          792,
-          { width: 320, lineBreak: false }
+          574,
+          { width: 550 }
         );
-        doc.text(`Page ${i2 + 1} of ${pageCount}`, left + contentWidth - 100, 792, { width: 100, align: "right", lineBreak: false });
-        doc.page.margins.bottom = oldBottom;
+        doc.text(`Page ${i2 + 1} of ${pageCount}`, left + contentWidth - 100, 574, { width: 100, align: "right" });
       }
       doc.end();
     } catch (e2) {
@@ -1032041,7 +1032337,7 @@ var require_xlsx = __commonJS({
           }
           return o;
         }
-        function find(cfb, path16) {
+        function find(cfb, path15) {
           var UCFullPaths = cfb.FullPaths.map(function(x2) {
             return x2.toUpperCase();
           });
@@ -1032050,11 +1032346,11 @@ var require_xlsx = __commonJS({
             return y[y.length - (x2.slice(-1) == "/" ? 2 : 1)];
           });
           var k = false;
-          if (path16.charCodeAt(0) === 47) {
+          if (path15.charCodeAt(0) === 47) {
             k = true;
-            path16 = UCFullPaths[0].slice(0, -1) + path16;
-          } else k = path16.indexOf("/") !== -1;
-          var UCPath = path16.toUpperCase();
+            path15 = UCFullPaths[0].slice(0, -1) + path15;
+          } else k = path15.indexOf("/") !== -1;
+          var UCPath = path15.toUpperCase();
           var w = k === true ? UCFullPaths.indexOf(UCPath) : UCPaths.indexOf(UCPath);
           if (w !== -1) return cfb.FileIndex[w];
           var m2 = !UCPath.match(chr1);
@@ -1033035,11 +1033331,11 @@ var require_xlsx = __commonJS({
         }
         throw new Error("cannot save file " + fname);
       }
-      function read_binary(path16) {
-        if (typeof _fs !== "undefined") return _fs.readFileSync(path16);
-        if (typeof Deno !== "undefined") return Deno.readFileSync(path16);
+      function read_binary(path15) {
+        if (typeof _fs !== "undefined") return _fs.readFileSync(path15);
+        if (typeof Deno !== "undefined") return Deno.readFileSync(path15);
         if (typeof $ !== "undefined" && typeof File !== "undefined" && typeof Folder !== "undefined") try {
-          var infile = File(path16);
+          var infile = File(path15);
           infile.open("r");
           infile.encoding = "binary";
           var data = infile.read();
@@ -1033048,7 +1033344,7 @@ var require_xlsx = __commonJS({
         } catch (e2) {
           if (!e2.message || !e2.message.match(/onstruct/)) throw e2;
         }
-        throw new Error("Cannot access file " + path16);
+        throw new Error("Cannot access file " + path15);
       }
       function keys(o) {
         var ks = Object.keys(o), o2 = [];
@@ -1033325,16 +1033621,16 @@ var require_xlsx = __commonJS({
         for (var i2 = 0; i2 < k.length; ++i2) if (k[i2].slice(-1) != "/") o.push(k[i2].replace(/^Root Entry[\/]/, ""));
         return o.sort();
       }
-      function zip_add_file(zip, path16, content) {
+      function zip_add_file(zip, path15, content) {
         if (zip.FullPaths) {
           if (typeof content == "string") {
             var res;
             if (has_buf) res = Buffer_from(content);
             else res = utf8decode(content);
-            return CFB.utils.cfb_add(zip, path16, res);
+            return CFB.utils.cfb_add(zip, path15, res);
           }
-          CFB.utils.cfb_add(zip, path16, content);
-        } else zip.file(path16, content);
+          CFB.utils.cfb_add(zip, path15, content);
+        } else zip.file(path15, content);
       }
       function zip_new() {
         return CFB.utils.cfb_new();
@@ -1033351,11 +1033647,11 @@ var require_xlsx = __commonJS({
         }
         throw new Error("Unrecognized type " + o.type);
       }
-      function resolve_path(path16, base) {
-        if (path16.charAt(0) == "/") return path16.slice(1);
+      function resolve_path(path15, base) {
+        if (path15.charAt(0) == "/") return path15.slice(1);
         var result = base.split("/");
         if (base.slice(-1) != "/") result.pop();
-        var target = path16.split("/");
+        var target = path15.split("/");
         while (target.length !== 0) {
           var step = target.shift();
           if (step === "..") result.pop();
@@ -1037024,9 +1037320,9 @@ var require_xlsx = __commonJS({
         cell2.isst = blob.read_shift(4);
         return cell2;
       }
-      function write_LabelSst(R, C, v, os2) {
+      function write_LabelSst(R, C, v, os5) {
         var o = new_buf(10);
-        write_XLSCell(R, C, os2, o);
+        write_XLSCell(R, C, os5, o);
         o.write_shift(4, v);
         return o;
       }
@@ -1037039,10 +1037335,10 @@ var require_xlsx = __commonJS({
         cell2.val = str;
         return cell2;
       }
-      function write_Label(R, C, v, os2, opts) {
+      function write_Label(R, C, v, os5, opts) {
         var b8 = !opts || opts.biff == 8;
         var o = new_buf(6 + 2 + +b8 + (1 + b8) * v.length);
-        write_XLSCell(R, C, os2, o);
+        write_XLSCell(R, C, os5, o);
         o.write_shift(2, v.length);
         if (b8) o.write_shift(1, 1);
         o.write_shift((1 + b8) * v.length, v, b8 ? "utf16le" : "sbcs");
@@ -1037196,9 +1037492,9 @@ var require_xlsx = __commonJS({
         cell2.t = val === true || val === false ? "b" : "e";
         return cell2;
       }
-      function write_BoolErr(R, C, v, os2, opts, t2) {
+      function write_BoolErr(R, C, v, os5, opts, t2) {
         var o = new_buf(8);
-        write_XLSCell(R, C, os2, o);
+        write_XLSCell(R, C, os5, o);
         write_Bes(v, t2, o);
         return o;
       }
@@ -1037209,9 +1037505,9 @@ var require_xlsx = __commonJS({
         cell2.val = xnum;
         return cell2;
       }
-      function write_Number(R, C, v, os2) {
+      function write_Number(R, C, v, os5) {
         var o = new_buf(14);
-        write_XLSCell(R, C, os2, o);
+        write_XLSCell(R, C, os5, o);
         write_Xnum(v, o);
         return o;
       }
@@ -1044034,8 +1044330,8 @@ var require_xlsx = __commonJS({
         var cbf = parse_XLSCellParsedFormula(blob, end - blob.l, opts);
         return { cell: cell2, val: val[0], formula: cbf, shared: flags >> 3 & 1, tt: val[1] };
       }
-      function write_Formula(cell2, R, C, opts, os2) {
-        var o1 = write_XLSCell(R, C, os2);
+      function write_Formula(cell2, R, C, opts, os5) {
+        var o1 = write_XLSCell(R, C, os5);
         var o2 = write_FormulaValue(cell2.v);
         var o3 = new_buf(6);
         var flags = 1 | 32;
@@ -1045614,8 +1045910,8 @@ var require_xlsx = __commonJS({
             break;
         }
         var v = writetag("v", escapexml(vv)), o = { r: ref };
-        var os2 = get_cell_style(opts.cellXfs, cell2, opts);
-        if (os2 !== 0) o.s = os2;
+        var os5 = get_cell_style(opts.cellXfs, cell2, opts);
+        if (os5 !== 0) o.s = os5;
         switch (cell2.t) {
           case "n":
             break;
@@ -1049430,8 +1049726,8 @@ var require_xlsx = __commonJS({
             p = escapexlml(cell2.v || "");
             break;
         }
-        var os2 = get_cell_style(opts.cellXfs, cell2, opts);
-        attr["ss:StyleID"] = "s" + (21 + os2);
+        var os5 = get_cell_style(opts.cellXfs, cell2, opts);
+        attr["ss:StyleID"] = "s" + (21 + os5);
         attr["ss:Index"] = addr.c + 1;
         var _v = cell2.v != null ? p : "";
         var m2 = cell2.t == "z" ? "" : '<Data ss:Type="' + t2 + '">' + _v + "</Data>";
@@ -1055266,32 +1055562,32 @@ var require_xlsx = __commonJS({
         });
       }
       function write_ws_biff8_cell(ba, cell2, R, C, opts) {
-        var os2 = 16 + get_cell_style(opts.cellXfs, cell2, opts);
+        var os5 = 16 + get_cell_style(opts.cellXfs, cell2, opts);
         if (cell2.v == null && !cell2.bf) {
-          write_biff_rec(ba, 513, write_XLSCell(R, C, os2));
+          write_biff_rec(ba, 513, write_XLSCell(R, C, os5));
           return;
         }
-        if (cell2.bf) write_biff_rec(ba, 6, write_Formula(cell2, R, C, opts, os2));
+        if (cell2.bf) write_biff_rec(ba, 6, write_Formula(cell2, R, C, opts, os5));
         else switch (cell2.t) {
           case "d":
           case "n":
             var v = cell2.t == "d" ? datenum(parseDate(cell2.v)) : cell2.v;
-            write_biff_rec(ba, 515, write_Number(R, C, v, os2, opts));
+            write_biff_rec(ba, 515, write_Number(R, C, v, os5, opts));
             break;
           case "b":
           case "e":
-            write_biff_rec(ba, 517, write_BoolErr(R, C, cell2.v, os2, opts, cell2.t));
+            write_biff_rec(ba, 517, write_BoolErr(R, C, cell2.v, os5, opts, cell2.t));
             break;
           /* TODO: codepage, sst */
           case "s":
           case "str":
             if (opts.bookSST) {
               var isst = get_sst_id(opts.Strings, cell2.v, opts.revStrings);
-              write_biff_rec(ba, 253, write_LabelSst(R, C, isst, os2, opts));
-            } else write_biff_rec(ba, 516, write_Label(R, C, (cell2.v || "").slice(0, 255), os2, opts));
+              write_biff_rec(ba, 253, write_LabelSst(R, C, isst, os5, opts));
+            } else write_biff_rec(ba, 516, write_Label(R, C, (cell2.v || "").slice(0, 255), os5, opts));
             break;
           default:
-            write_biff_rec(ba, 513, write_XLSCell(R, C, os2));
+            write_biff_rec(ba, 513, write_XLSCell(R, C, os5));
         }
       }
       function write_ws_biff8(idx, opts, wb) {
@@ -1058009,19 +1058305,19 @@ var require_xlsx = __commonJS({
         }
         return !wbrels || wbrels.length === 0 ? null : wbrels;
       }
-      function safe_parse_sheet(zip, path16, relsPath, sheet, idx, sheetRels, sheets, stype, opts, wb, themes, styles) {
+      function safe_parse_sheet(zip, path15, relsPath, sheet, idx, sheetRels, sheets, stype, opts, wb, themes, styles) {
         try {
-          sheetRels[sheet] = parse_rels(getzipstr(zip, relsPath, true), path16);
-          var data = getzipdata(zip, path16);
+          sheetRels[sheet] = parse_rels(getzipstr(zip, relsPath, true), path15);
+          var data = getzipdata(zip, path15);
           var _ws;
           switch (stype) {
             case "sheet":
-              _ws = parse_ws(data, path16, idx, opts, sheetRels[sheet], wb, themes, styles);
+              _ws = parse_ws(data, path15, idx, opts, sheetRels[sheet], wb, themes, styles);
               break;
             case "chart":
-              _ws = parse_cs(data, path16, idx, opts, sheetRels[sheet], wb, themes, styles);
+              _ws = parse_cs(data, path15, idx, opts, sheetRels[sheet], wb, themes, styles);
               if (!_ws || !_ws["!drawel"]) break;
-              var dfile = resolve_path(_ws["!drawel"].Target, path16);
+              var dfile = resolve_path(_ws["!drawel"].Target, path15);
               var drelsp = get_rels_path(dfile);
               var draw = parse_drawing(getzipstr(zip, dfile, true), parse_rels(getzipstr(zip, drelsp, true), dfile));
               var chartp = resolve_path(draw, dfile);
@@ -1058029,10 +1058325,10 @@ var require_xlsx = __commonJS({
               _ws = parse_chart(getzipstr(zip, chartp, true), chartp, opts, parse_rels(getzipstr(zip, crelsp, true), chartp), wb, _ws);
               break;
             case "macro":
-              _ws = parse_ms(data, path16, idx, opts, sheetRels[sheet], wb, themes, styles);
+              _ws = parse_ms(data, path15, idx, opts, sheetRels[sheet], wb, themes, styles);
               break;
             case "dialog":
-              _ws = parse_ds(data, path16, idx, opts, sheetRels[sheet], wb, themes, styles);
+              _ws = parse_ds(data, path15, idx, opts, sheetRels[sheet], wb, themes, styles);
               break;
             default:
               throw new Error("Unrecognized sheet type " + stype);
@@ -1058042,13 +1058338,13 @@ var require_xlsx = __commonJS({
           if (sheetRels && sheetRels[sheet]) keys(sheetRels[sheet]).forEach(function(n) {
             var dfile2 = "";
             if (sheetRels[sheet][n].Type == RELS.CMNT) {
-              dfile2 = resolve_path(sheetRels[sheet][n].Target, path16);
+              dfile2 = resolve_path(sheetRels[sheet][n].Target, path15);
               var comments = parse_cmnt(getzipdata(zip, dfile2, true), dfile2, opts);
               if (!comments || !comments.length) return;
               sheet_insert_comments(_ws, comments, false);
             }
             if (sheetRels[sheet][n].Type == RELS.TCMNT) {
-              dfile2 = resolve_path(sheetRels[sheet][n].Target, path16);
+              dfile2 = resolve_path(sheetRels[sheet][n].Target, path15);
               tcomments = tcomments.concat(parse_tcmnt_xml(getzipdata(zip, dfile2, true), opts));
             }
           });
@@ -1058152,7 +1058448,7 @@ var require_xlsx = __commonJS({
         if (opts.bookDeps && dir.calcchain) deps = parse_cc(getzipdata(zip, strip_front_slash(dir.calcchain)), dir.calcchain, opts);
         var i2 = 0;
         var sheetRels = {};
-        var path16, relsPath;
+        var path15, relsPath;
         {
           var wbsheets = wb.Sheets;
           props.Worksheets = wbsheets.length;
@@ -1058177,15 +1058473,15 @@ var require_xlsx = __commonJS({
         wsloop: for (i2 = 0; i2 != props.Worksheets; ++i2) {
           var stype = "sheet";
           if (wbrels && wbrels[i2]) {
-            path16 = "xl/" + wbrels[i2][1].replace(/[\/]?xl\//, "");
-            if (!safegetzipfile(zip, path16)) path16 = wbrels[i2][1];
-            if (!safegetzipfile(zip, path16)) path16 = wbrelsfile.replace(/_rels\/.*$/, "") + wbrels[i2][1];
+            path15 = "xl/" + wbrels[i2][1].replace(/[\/]?xl\//, "");
+            if (!safegetzipfile(zip, path15)) path15 = wbrels[i2][1];
+            if (!safegetzipfile(zip, path15)) path15 = wbrelsfile.replace(/_rels\/.*$/, "") + wbrels[i2][1];
             stype = wbrels[i2][2];
           } else {
-            path16 = "xl/worksheets/sheet" + (i2 + 1 - nmode) + "." + wbext;
-            path16 = path16.replace(/sheet0\./, "sheet.");
+            path15 = "xl/worksheets/sheet" + (i2 + 1 - nmode) + "." + wbext;
+            path15 = path15.replace(/sheet0\./, "sheet.");
           }
-          relsPath = path16.replace(/^(.*)(\/)([^\/]*)$/, "$1/_rels/$3.rels");
+          relsPath = path15.replace(/^(.*)(\/)([^\/]*)$/, "$1/_rels/$3.rels");
           if (opts && opts.sheets != null) switch (typeof opts.sheets) {
             case "number":
               if (i2 != opts.sheets) continue wsloop;
@@ -1058203,7 +1058499,7 @@ var require_xlsx = __commonJS({
                 if (!snjseen) continue wsloop;
               }
           }
-          safe_parse_sheet(zip, path16, relsPath, props.SheetNames[i2], i2, sheetRels, sheets, stype, opts, wb, themes, styles);
+          safe_parse_sheet(zip, path15, relsPath, props.SheetNames[i2], i2, sheetRels, sheets, stype, opts, wb, themes, styles);
         }
         out = {
           Directory: dir,
@@ -1061536,13 +1061832,13 @@ function getStat(file2, followSymlinks) {
     });
   });
 }
-async function* exploreWalkAsync(dir, path16, followSymlinks, useStat, shouldSkip, strict2) {
-  let files = await readdir2(path16 + dir, strict2);
+async function* exploreWalkAsync(dir, path15, followSymlinks, useStat, shouldSkip, strict2) {
+  let files = await readdir2(path15 + dir, strict2);
   for (const file2 of files) {
     let name2 = file2.name;
     const filename = dir + "/" + name2;
     const relative = filename.slice(1);
-    const absolute = path16 + "/" + relative;
+    const absolute = path15 + "/" + relative;
     let stat3 = file2;
     if (useStat || followSymlinks) stat3 = await getStat(absolute, followSymlinks) ?? stat3;
     if (stat3.isDirectory()) {
@@ -1061552,7 +1061848,7 @@ async function* exploreWalkAsync(dir, path16, followSymlinks, useStat, shouldSki
           absolute,
           stat: stat3
         };
-        yield* exploreWalkAsync(filename, path16, followSymlinks, useStat, shouldSkip, false);
+        yield* exploreWalkAsync(filename, path15, followSymlinks, useStat, shouldSkip, false);
       }
     } else yield {
       relative,
@@ -1061561,8 +1061857,8 @@ async function* exploreWalkAsync(dir, path16, followSymlinks, useStat, shouldSki
     };
   }
 }
-async function* explore(path16, followSymlinks, useStat, shouldSkip) {
-  yield* exploreWalkAsync("", path16, followSymlinks, useStat, shouldSkip, true);
+async function* explore(path15, followSymlinks, useStat, shouldSkip) {
+  yield* exploreWalkAsync("", path15, followSymlinks, useStat, shouldSkip, true);
 }
 function readOptions(options) {
   return {
@@ -1071943,22 +1072239,22 @@ var require_ours = __commonJS({
 // ../../node_modules/.pnpm/normalize-path@3.0.0/node_modules/normalize-path/index.js
 var require_normalize_path = __commonJS({
   "../../node_modules/.pnpm/normalize-path@3.0.0/node_modules/normalize-path/index.js"(exports, module) {
-    module.exports = function(path16, stripTrailing) {
-      if (typeof path16 !== "string") {
+    module.exports = function(path15, stripTrailing) {
+      if (typeof path15 !== "string") {
         throw new TypeError("expected path to be a string");
       }
-      if (path16 === "\\" || path16 === "/") return "/";
-      var len = path16.length;
-      if (len <= 1) return path16;
+      if (path15 === "\\" || path15 === "/") return "/";
+      var len = path15.length;
+      if (len <= 1) return path15;
       var prefix = "";
-      if (len > 4 && path16[3] === "\\") {
-        var ch = path16[2];
-        if ((ch === "?" || ch === ".") && path16.slice(0, 2) === "\\\\") {
-          path16 = path16.slice(2);
+      if (len > 4 && path15[3] === "\\") {
+        var ch = path15[2];
+        if ((ch === "?" || ch === ".") && path15.slice(0, 2) === "\\\\") {
+          path15 = path15.slice(2);
           prefix = "//";
         }
       }
-      var segs = path16.split(/[/\\]+/);
+      var segs = path15.split(/[/\\]+/);
       if (stripTrailing !== false && segs[segs.length - 1] === "") {
         segs.pop();
       }
@@ -1077362,6 +1077658,9 @@ async function fullCandidate(c) {
       photoUrl: sub.photoUrl,
       paymentUrl: sub.paymentUrl,
       otherInformation: sub.otherInformation,
+      customAnswers: sub.customAnswers ?? null,
+      formData: sub.formData ?? null,
+      declarationAccepted: sub.declarationAccepted ?? null,
       submittedAt: sub.submittedAt ? sub.submittedAt.toISOString() : null
     } : null
   };
@@ -1078731,14 +1079030,20 @@ var init_candidates2 = __esm({
     router7.get("/candidates/:id/call-letter-pdf", requireAuth, async (req, res) => {
       try {
         const id = Number(req.params.id);
-        const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
-        if (!c) {
-          res.status(404).json({ error: "Candidate not found" });
-          return;
+        let c = null;
+        let sub = null;
+        if (id > 0) {
+          const [found] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
+          c = found;
+          if (c) {
+            const [foundSub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
+            sub = foundSub;
+          }
         }
-        const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
-        let spec = "Ophthalmology Fellowship";
-        if (sub?.specialization) {
+        const candidateName = req.query.candidateName || c?.fullName || "Dr. Candidate";
+        const candidateCode = req.query.candidateCode || c?.candidateCode || "SAV-2027-001";
+        let spec = req.query.specialization || "";
+        if (!spec && sub?.specialization) {
           try {
             const parsed = typeof sub.specialization === "string" && sub.specialization.startsWith("[") ? JSON.parse(sub.specialization) : [sub.specialization];
             spec = Array.isArray(parsed) ? parsed.join(", ") : String(sub.specialization);
@@ -1078746,17 +1079051,21 @@ var init_candidates2 = __esm({
             spec = String(sub.specialization);
           }
         }
+        if (!spec) spec = "Vitreo Retina";
         const pdfBuffer = await generateCallLetterPdf({
-          candidateName: c.fullName,
-          candidateCode: c.candidateCode,
+          candidateName,
+          candidateCode,
           specialization: spec,
-          email: c.email,
-          phone: c.phone,
-          address: c.address,
-          applicationId: sub?.id || c.id
+          email: req.query.email || c?.email || "candidate@sankaraeye.com",
+          phone: req.query.phone || c?.phone || "",
+          address: req.query.address || c?.address || "",
+          applicationId: sub?.id || (c?.id || 1),
+          interviewDate: req.query.interviewDate || (isRetinaSpecialty(spec) ? "1st June 2026, Monday" : "8th June 2026, Monday"),
+          reportingTime: req.query.reportingTime || "8:00 AM Sharp",
+          venue: req.query.venue || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore \u2013 560037"
         });
         const isRetina = isRetinaSpecialty(spec);
-        const filename = `Interview_Call_Letter_${isRetina ? "Retina" : "Anterior"}_${c.candidateCode}.pdf`;
+        const filename = `Interview_Call_Letter_${isRetina ? "Retina" : "Anterior"}_${candidateCode}.pdf`;
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
         res.send(pdfBuffer);
@@ -1078768,12 +1079077,16 @@ var init_candidates2 = __esm({
     router7.get("/candidates/:id/offer-letter-pdf", requireAuth, async (req, res) => {
       try {
         const id = Number(req.params.id);
-        const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
-        if (!c) {
-          res.status(404).json({ error: "Candidate not found" });
-          return;
+        let c = null;
+        let sub = null;
+        if (id > 0) {
+          const [found] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
+          c = found;
+          if (c) {
+            const [foundSub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
+            sub = foundSub;
+          }
         }
-        const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
         const units = await db.select().from(unitsTable);
         let unitName = req.query.unitName || "";
         if (!unitName && req.query.unitId) {
@@ -1078781,13 +1079094,13 @@ var init_candidates2 = __esm({
           if (u) unitName = u.name;
         }
         if (!unitName) {
-          const unit = c.unitId ? units.find((u) => u.id === c.unitId) : null;
-          unitName = unit?.name || "Jaipur";
+          const unit = c?.unitId ? units.find((u) => u.id === c.unitId) : null;
+          unitName = unit?.name || "Bangalore";
         }
         const cReviewNotes = sub?.reviewNotes ?? "";
         let specialization = req.query.specialization || "";
         if (!specialization) {
-          specialization = cReviewNotes.includes("Allocated to ") ? cReviewNotes.replace("Allocated to ", "").split(" [")[0] : sub?.specialization ? parseSpecializationString(sub.specialization)[0] : "Cataract & IOL";
+          specialization = cReviewNotes.includes("Allocated to ") ? cReviewNotes.replace("Allocated to ", "").split(" [")[0] : sub?.specialization ? parseSpecializationString(sub.specialization)[0] : "Vitreo Retina";
         }
         const stipendQuery = req.query.stipend;
         let stipendFormatted = "Rs 40,000 (Rupees Forty Thousand Only)";
@@ -1078800,20 +1079113,23 @@ var init_candidates2 = __esm({
           }
         }
         const duration3 = req.query.duration ? Number(req.query.duration) : isRetinaSpecialty(specialization) ? 24 : 18;
-        const effectiveDate = req.query.effectiveDate || "6th July 2026";
+        const effectiveDate = req.query.effectiveDate || "1st January 2027";
+        const candidateName = req.query.candidateName || c?.fullName || "Dr. Tejaswini";
+        const candidateCode = req.query.candidateCode || c?.candidateCode || "SAV-2027-001";
         const pdfBuffer = await generateOfferLetterPdf({
-          candidateName: req.query.candidateName || c.fullName,
-          candidateCode: c.candidateCode,
-          specialization: specialization || "Cataract & IOL",
+          candidateName,
+          candidateCode,
+          specialization: specialization || "Vitreo Retina",
           unitName,
-          cmoName: req.query.cmoName,
-          address: req.query.address || c.address,
+          cmoName: req.query.cmoName || "Dr. Kaushik Murali - Chief Medical Officer",
+          address: req.query.address || c?.address || "Sankara Eye Hospital Campus",
           durationMonths: duration3,
           effectiveDate,
           stipendAmount: stipendFormatted,
-          interviewDate: req.query.interviewDate
+          interviewDate: req.query.interviewDate,
+          inductionDate: req.query.inductionDate || "2nd & 3rd July 2026 at Bangalore Main Hospital (For Testing Only)"
         });
-        const filename = `Fellowship_Offer_Letter_${c.candidateCode}.pdf`;
+        const filename = `Fellowship_Offer_Letter_${candidateCode}.pdf`;
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
         res.send(pdfBuffer);
@@ -1078907,8 +1079223,8 @@ var init_candidates2 = __esm({
           }
         }
         const duration3 = req.body.duration ? Number(String(req.body.duration).replace(/[^0-9]/g, "")) : isRetinaSpecialty(specialization) ? 24 : 18;
-        const effectiveDate = req.body.effectiveDate || req.body.start_date || "6th July 2026";
-        const interviewDate = req.body.interviewDate || req.body.interview_date || (isRetinaSpecialty(specialization) ? "1st June 2026" : "8th June 2026");
+        const effectiveDate = req.body.effectiveDate || req.body.start_date || "6th January 2027";
+        const interviewDate = req.body.interviewDate || req.body.interview_date || (isRetinaSpecialty(specialization) ? "7th December 2026" : "8th December 2026");
         const pdfBuffer = await generateOfferLetterPdf({
           candidateName: req.body.candidateName || c.fullName,
           candidateCode: c.candidateCode,
@@ -1078919,7 +1079235,8 @@ var init_candidates2 = __esm({
           durationMonths: duration3,
           effectiveDate,
           stipendAmount: stipendFormatted,
-          interviewDate
+          interviewDate,
+          inductionDate: req.body.inductionDate || "2nd & 3rd July 2026 at Bangalore Main Hospital (For Testing Only)"
         });
         const fileName = `Fellowship_Offer_Letter_${c.candidateCode}.pdf`;
         await sendOfferLetterWithAttachment({
@@ -1079008,7 +1079325,7 @@ var init_candidates2 = __esm({
         renderField("Contact Identity", full.email, rightCol, currY);
         currY += 40;
         renderField("Mobile Registry", full.phone, leftCol, currY);
-        renderField("Academic Year", batch?.name || "JULY 2026 CYCLE", rightCol, currY);
+        renderField("Academic Year", batch?.name || "DECEMBER 2026 CYCLE", rightCol, currY);
         currY += 40;
         renderField("Clinical Segment", (sub?.reviewNotes ?? "").replace("Allocated to ", "") || "Fellowship Track", leftCol, currY);
         renderField("Reporting Unit", full.unitName || "Pending Allocation", rightCol, currY);
@@ -1082359,14 +1082676,14 @@ var require_url_state_machine = __commonJS({
       return url3.replace(/\u0009|\u000A|\u000D/g, "");
     }
     function shortenPath(url3) {
-      const path16 = url3.path;
-      if (path16.length === 0) {
+      const path15 = url3.path;
+      if (path15.length === 0) {
         return;
       }
-      if (url3.scheme === "file" && path16.length === 1 && isNormalizedWindowsDriveLetter(path16[0])) {
+      if (url3.scheme === "file" && path15.length === 1 && isNormalizedWindowsDriveLetter(path15[0])) {
         return;
       }
-      path16.pop();
+      path15.pop();
     }
     function includesCredentials(url3) {
       return url3.username !== "" || url3.password !== "";
@@ -1087993,7 +1088310,7 @@ var require_src11 = __commonJS({
     var fs16 = __require("fs");
     var gaxios_1 = require_src8();
     var jws = require_jws();
-    var path16 = __require("path");
+    var path15 = __require("path");
     var util_1 = __require("util");
     var readFile3 = fs16.readFile ? (0, util_1.promisify)(fs16.readFile) : async () => {
       throw new ErrorWithCode("use key rather than keyFile.", "MISSING_CREDENTIALS");
@@ -1088081,7 +1088398,7 @@ var require_src11 = __commonJS({
        * @returns an object with privateKey and clientEmail properties
        */
       async getCredentials(keyFile) {
-        const ext2 = path16.extname(keyFile);
+        const ext2 = path15.extname(keyFile);
         switch (ext2) {
           case ".json": {
             const key = await readFile3(keyFile, "utf8");
@@ -1090775,8 +1091092,8 @@ var require_googleauth2 = __commonJS({
     var child_process_1 = __require("child_process");
     var fs16 = __require("fs");
     var gcpMetadata = require_src10();
-    var os2 = __require("os");
-    var path16 = __require("path");
+    var os5 = __require("os");
+    var path15 = __require("path");
     var crypto_1 = require_crypto6();
     var transporters_1 = require_transporters();
     var computeclient_1 = require_computeclient2();
@@ -1091037,11 +1091354,11 @@ var require_googleauth2 = __commonJS({
         } else {
           const home = process.env["HOME"];
           if (home) {
-            location = path16.join(home, ".config");
+            location = path15.join(home, ".config");
           }
         }
         if (location) {
-          location = path16.join(location, "gcloud", "application_default_credentials.json");
+          location = path15.join(location, "gcloud", "application_default_credentials.json");
           if (!fs16.existsSync(location)) {
             location = null;
           }
@@ -1091216,7 +1091533,7 @@ var require_googleauth2 = __commonJS({
        * @api private
        */
       _isWindows() {
-        const sys = os2.platform();
+        const sys = os5.platform();
         if (sys && sys.length >= 3) {
           if (sys.substring(0, 3).toLowerCase() === "win") {
             return true;
@@ -1091459,7 +1091776,7 @@ var require_googleauth2 = __commonJS({
       if (this.jsonContent) {
         return this._cacheClientFromJSON(this.jsonContent, this.clientOptions);
       } else if (this.keyFilename) {
-        const filePath = path16.resolve(this.keyFilename);
+        const filePath = path15.resolve(this.keyFilename);
         const stream2 = fs16.createReadStream(filePath);
         return await this.fromStreamAsync(stream2, this.clientOptions);
       } else if (this.apiKey) {
@@ -1097681,11 +1097998,11 @@ var require_Mime = __commonJS({
         }
       }
     };
-    Mime.prototype.getType = function(path16) {
-      path16 = String(path16);
-      let last = path16.replace(/^.*[/\\]/, "").toLowerCase();
+    Mime.prototype.getType = function(path15) {
+      path15 = String(path15);
+      let last = path15.replace(/^.*[/\\]/, "").toLowerCase();
       let ext2 = last.replace(/^.*\./, "").toLowerCase();
-      let hasPath = last.length < path16.length;
+      let hasPath = last.length < path15.length;
       let hasDot = ext2.length < last.length - 1;
       return (hasDot || !hasPath) && this._types[ext2] || null;
     };
@@ -1098449,10 +1098766,10 @@ var init_acl = __esm({
       get(optionsOrCallback, cb) {
         const options = typeof optionsOrCallback === "object" ? optionsOrCallback : null;
         const callback = typeof optionsOrCallback === "function" ? optionsOrCallback : cb;
-        let path16 = "";
+        let path15 = "";
         const query = {};
         if (options) {
-          path16 = "/" + encodeURIComponent(options.entity);
+          path15 = "/" + encodeURIComponent(options.entity);
           if (options.generation) {
             query.generation = options.generation;
           }
@@ -1098461,7 +1098778,7 @@ var init_acl = __esm({
           }
         }
         this.request({
-          uri: path16,
+          uri: path15,
           qs: query
         }, (err, resp) => {
           if (err) {
@@ -1100111,10 +1100428,10 @@ var init_signer = __esm({
 `;
         }).join("");
       }
-      getCanonicalRequest(method, path16, query, headers, signedHeaders, contentSha256) {
+      getCanonicalRequest(method, path15, query, headers, signedHeaders, contentSha256) {
         return [
           method,
-          path16,
+          path15,
           query,
           headers,
           signedHeaders,
@@ -1108519,11 +1108836,11 @@ __export(objectStorage_exports, {
 });
 import { Readable as Readable5 } from "stream";
 import { randomUUID } from "crypto";
-function parseObjectPath(path16) {
-  if (!path16.startsWith("/")) {
-    path16 = `/${path16}`;
+function parseObjectPath(path15) {
+  if (!path15.startsWith("/")) {
+    path15 = `/${path15}`;
   }
-  const pathParts = path16.split("/");
+  const pathParts = path15.split("/");
   if (pathParts.length < 3) {
     throw new Error("Invalid path: must contain at least a bucket name");
   }
@@ -1108604,7 +1108921,7 @@ var init_objectStorage = __esm({
         const pathsStr = process.env.PUBLIC_OBJECT_SEARCH_PATHS || "";
         const paths = Array.from(
           new Set(
-            pathsStr.split(",").map((path16) => path16.trim()).filter((path16) => path16.length > 0)
+            pathsStr.split(",").map((path15) => path15.trim()).filter((path15) => path15.length > 0)
           )
         );
         if (paths.length === 0) {
@@ -1108728,99 +1109045,6 @@ var init_objectStorage = __esm({
         });
       }
     };
-  }
-});
-
-// src/lib/image-normalizer.ts
-var image_normalizer_exports = {};
-__export(image_normalizer_exports, {
-  normalizeUploadedFile: () => normalizeUploadedFile
-});
-import path7 from "path";
-import fs9 from "fs/promises";
-import { createWriteStream as createWriteStream2 } from "fs";
-async function normalizeUploadedFile(filePath, fileTypeHint) {
-  try {
-    const ext2 = path7.extname(filePath).toLowerCase();
-    const imageExtensions = [".jpg", ".jpeg", ".png", ".webp", ".tiff", ".bmp", ".gif", ".heic", ".avif"];
-    const isImage = imageExtensions.includes(ext2) || ext2 === "";
-    if (!isImage) {
-      return { normalizedPath: filePath, wasConverted: false };
-    }
-    let sharpModule;
-    try {
-      sharpModule = (await import("sharp")).default;
-    } catch {
-      return { normalizedPath: filePath, wasConverted: false };
-    }
-    const hint = (fileTypeHint || "").toLowerCase();
-    const isPhoto = hint.includes("photo") || path7.basename(filePath).toLowerCase().includes("photo");
-    const isLor = hint.includes("lor") || hint.includes("recommendation") || path7.basename(filePath).toLowerCase().includes("lor");
-    const isDoc = hint.includes("doc") || hint.includes("cert") || hint.includes("marksheet") || isLor;
-    const dir = path7.dirname(filePath);
-    const baseName = path7.basename(filePath, ext2);
-    if (isPhoto) {
-      const outputPath2 = path7.join(dir, `${baseName}_std.jpg`);
-      await sharpModule(filePath, { failOnError: false }).rotate().resize(600, 720, {
-        fit: "cover",
-        position: "center"
-      }).jpeg({ quality: 85, mozjpeg: true }).toFile(outputPath2);
-      await fs9.unlink(filePath).catch(() => {
-      });
-      await fs9.rename(outputPath2, filePath).catch(() => {
-      });
-      return { normalizedPath: filePath, wasConverted: true };
-    }
-    if (isDoc) {
-      const tempOptimizedImg = path7.join(dir, `${baseName}_temp.jpg`);
-      const pdfOutputPath = path7.join(dir, `${baseName}.pdf`);
-      await sharpModule(filePath, { failOnError: false }).rotate().resize(1600, 2200, {
-        fit: "inside",
-        withoutEnlargement: true
-      }).jpeg({ quality: 85, mozjpeg: true }).toFile(tempOptimizedImg);
-      await new Promise((resolve4, reject) => {
-        const doc = new import_pdfkit3.default({ size: "A4", margin: 20 });
-        const writeStream = createWriteStream2(pdfOutputPath);
-        doc.pipe(writeStream);
-        const pageWidth = 595.28 - 40;
-        const pageHeight = 841.89 - 40;
-        doc.image(tempOptimizedImg, 20, 20, {
-          fit: [pageWidth, pageHeight],
-          align: "center",
-          valign: "center"
-        });
-        doc.end();
-        writeStream.on("finish", () => resolve4());
-        writeStream.on("error", reject);
-      });
-      await fs9.unlink(tempOptimizedImg).catch(() => {
-      });
-      if (filePath !== pdfOutputPath) {
-        await fs9.unlink(filePath).catch(() => {
-        });
-      }
-      return { normalizedPath: pdfOutputPath, wasConverted: true };
-    }
-    const outputPath = path7.join(dir, `${baseName}_std.jpg`);
-    await sharpModule(filePath, { failOnError: false }).rotate().resize(1600, 2200, {
-      fit: "inside",
-      withoutEnlargement: true
-    }).jpeg({ quality: 85, mozjpeg: true }).toFile(outputPath);
-    await fs9.unlink(filePath).catch(() => {
-    });
-    await fs9.rename(outputPath, filePath).catch(() => {
-    });
-    return { normalizedPath: filePath, wasConverted: true };
-  } catch (err) {
-    console.warn(`[image-normalizer] Could not normalize ${filePath}:`, err.message);
-    return { normalizedPath: filePath, wasConverted: false };
-  }
-}
-var import_pdfkit3;
-var init_image_normalizer = __esm({
-  "src/lib/image-normalizer.ts"() {
-    "use strict";
-    import_pdfkit3 = __toESM(require_pdfkit(), 1);
   }
 });
 
@@ -1117671,11 +1117895,11 @@ var require_mime_types3 = __commonJS({
       }
       return exts[0];
     }
-    function lookup(path16) {
-      if (!path16 || typeof path16 !== "string") {
+    function lookup(path15) {
+      if (!path15 || typeof path15 !== "string") {
         return false;
       }
-      var extension2 = extname("x." + path16).toLowerCase().substr(1);
+      var extension2 = extname("x." + path15).toLowerCase().substr(1);
       if (!extension2) {
         return false;
       }
@@ -1117977,7 +1118201,7 @@ var require_form_data = __commonJS({
     "use strict";
     var CombinedStream = require_combined_stream();
     var util4 = __require("util");
-    var path16 = __require("path");
+    var path15 = __require("path");
     var http3 = __require("http");
     var https2 = __require("https");
     var parseUrl = __require("url").parse;
@@ -1118105,11 +1118329,11 @@ var require_form_data = __commonJS({
     FormData4.prototype._getContentDisposition = function(value, options) {
       var filename;
       if (typeof options.filepath === "string") {
-        filename = path16.normalize(options.filepath).replace(/\\/g, "/");
+        filename = path15.normalize(options.filepath).replace(/\\/g, "/");
       } else if (options.filename || value && (value.name || value.path)) {
-        filename = path16.basename(options.filename || value && (value.name || value.path));
+        filename = path15.basename(options.filename || value && (value.name || value.path));
       } else if (value && value.readable && hasOwn(value, "httpVersion")) {
-        filename = path16.basename(value.client._httpMessage.path || "");
+        filename = path15.basename(value.client._httpMessage.path || "");
       }
       if (filename) {
         return 'filename="' + filename + '"';
@@ -1118832,7 +1119056,7 @@ var require_axios = __commonJS({
     var https2 = __require("https");
     var http22 = __require("http2");
     var util4 = __require("util");
-    var path16 = __require("path");
+    var path15 = __require("path");
     var followRedirects = require_follow_redirects();
     var zlib4 = __require("zlib");
     var stream2 = __require("stream");
@@ -1119706,9 +1119930,9 @@ var require_axios = __commonJS({
     function removeBrackets(key) {
       return utils$1.endsWith(key, "[]") ? key.slice(0, -2) : key;
     }
-    function renderKey(path17, key, dots) {
-      if (!path17) return key;
-      return path17.concat(key).map(function each(token, i2) {
+    function renderKey(path16, key, dots) {
+      if (!path16) return key;
+      return path16.concat(key).map(function each(token, i2) {
         token = removeBrackets(token);
         return !dots && i2 ? "[" + token + "]" : token;
       }).join(dots ? "." : "");
@@ -1119757,13 +1119981,13 @@ var require_axios = __commonJS({
         }
         return value;
       }
-      function defaultVisitor(value, key, path17) {
+      function defaultVisitor(value, key, path16) {
         let arr = value;
         if (utils$1.isReactNative(formData) && utils$1.isReactNativeBlob(value)) {
-          formData.append(renderKey(path17, key, dots), convertValue(value));
+          formData.append(renderKey(path16, key, dots), convertValue(value));
           return false;
         }
-        if (value && !path17 && typeof value === "object") {
+        if (value && !path16 && typeof value === "object") {
           if (utils$1.endsWith(key, "{}")) {
             key = metaTokens ? key : key.slice(0, -2);
             value = JSON.stringify(value);
@@ -1119782,7 +1120006,7 @@ var require_axios = __commonJS({
         if (isVisitable(value)) {
           return true;
         }
-        formData.append(renderKey(path17, key, dots), convertValue(value));
+        formData.append(renderKey(path16, key, dots), convertValue(value));
         return false;
       }
       const stack = [];
@@ -1119791,19 +1120015,19 @@ var require_axios = __commonJS({
         convertValue,
         isVisitable
       });
-      function build(value, path17, depth = 0) {
+      function build(value, path16, depth = 0) {
         if (utils$1.isUndefined(value)) return;
         if (depth > maxDepth) {
           throw new AxiosError("Object is too deeply nested (" + depth + " levels). Max depth: " + maxDepth, AxiosError.ERR_FORM_DATA_DEPTH_EXCEEDED);
         }
         if (stack.indexOf(value) !== -1) {
-          throw Error("Circular reference detected in " + path17.join("."));
+          throw Error("Circular reference detected in " + path16.join("."));
         }
         stack.push(value);
         utils$1.forEach(value, function each(el, key) {
-          const result = !(utils$1.isUndefined(el) || el === null) && visitor.call(formData, el, utils$1.isString(key) ? key.trim() : key, path17, exposedHelpers);
+          const result = !(utils$1.isUndefined(el) || el === null) && visitor.call(formData, el, utils$1.isString(key) ? key.trim() : key, path16, exposedHelpers);
           if (result === true) {
-            build(el, path17 ? path17.concat(key) : [key], depth + 1);
+            build(el, path16 ? path16.concat(key) : [key], depth + 1);
           }
         });
         stack.pop();
@@ -1119991,7 +1120215,7 @@ var require_axios = __commonJS({
     };
     function toURLEncodedForm(data, options) {
       return toFormData2(data, new platform.classes.URLSearchParams(), {
-        visitor: function(value, key, path17, helpers) {
+        visitor: function(value, key, path16, helpers) {
           if (platform.isNode && utils$1.isBuffer(value)) {
             this.append(key, value.toString("base64"));
             return false;
@@ -1120019,11 +1120243,11 @@ var require_axios = __commonJS({
       return obj;
     }
     function formDataToJSON(formData) {
-      function buildPath(path17, value, target, index3) {
-        let name2 = path17[index3++];
+      function buildPath(path16, value, target, index3) {
+        let name2 = path16[index3++];
         if (name2 === "__proto__") return true;
         const isNumericKey = Number.isFinite(+name2);
-        const isLast = index3 >= path17.length;
+        const isLast = index3 >= path16.length;
         name2 = !name2 && utils$1.isArray(target) ? target.length : name2;
         if (isLast) {
           if (utils$1.hasOwnProp(target, name2)) {
@@ -1120036,7 +1120260,7 @@ var require_axios = __commonJS({
         if (!target[name2] || !utils$1.isObject(target[name2])) {
           target[name2] = [];
         }
-        const result = buildPath(path17, value, target[name2], index3);
+        const result = buildPath(path16, value, target[name2], index3);
         if (result && utils$1.isArray(target[name2])) {
           target[name2] = arrayToObject(target[name2]);
         }
@@ -1121348,8 +1121572,8 @@ var require_axios = __commonJS({
           }
           if (config2.allowedSocketPaths != null) {
             const allowed = Array.isArray(config2.allowedSocketPaths) ? config2.allowedSocketPaths : [config2.allowedSocketPaths];
-            const resolvedSocket = path16.resolve(config2.socketPath);
-            const isAllowed = allowed.some((entry) => typeof entry === "string" && path16.resolve(entry) === resolvedSocket);
+            const resolvedSocket = path15.resolve(config2.socketPath);
+            const isAllowed = allowed.some((entry) => typeof entry === "string" && path15.resolve(entry) === resolvedSocket);
             if (!isAllowed) {
               return reject(new AxiosError(`socketPath "${config2.socketPath}" is not permitted by allowedSocketPaths`, AxiosError.ERR_BAD_OPTION_VALUE, config2));
             }
@@ -1121601,14 +1121825,14 @@ var require_axios = __commonJS({
     var cookies = platform.hasStandardBrowserEnv ? (
       // Standard browser envs support document.cookie
       {
-        write(name2, value, expires, path17, domain2, secure, sameSite) {
+        write(name2, value, expires, path16, domain2, secure, sameSite) {
           if (typeof document === "undefined") return;
           const cookie = [`${name2}=${encodeURIComponent(value)}`];
           if (utils$1.isNumber(expires)) {
             cookie.push(`expires=${new Date(expires).toUTCString()}`);
           }
-          if (utils$1.isString(path17)) {
-            cookie.push(`path=${path17}`);
+          if (utils$1.isString(path16)) {
+            cookie.push(`path=${path16}`);
           }
           if (utils$1.isString(domain2)) {
             cookie.push(`domain=${domain2}`);
@@ -1126835,10 +1127059,10 @@ var require_segments = __commonJS({
       const segs = getSegmentsFromString(data, Utils.isKanjiModeEnabled());
       const nodes = buildNodes(segs);
       const graph = buildGraph(nodes, version4);
-      const path16 = dijkstra.find_path(graph.map, "start", "end");
+      const path15 = dijkstra.find_path(graph.map, "start", "end");
       const optimizedSegs = [];
-      for (let i2 = 1; i2 < path16.length - 1; i2++) {
-        optimizedSegs.push(graph.table[path16[i2]].node);
+      for (let i2 = 1; i2 < path15.length - 1; i2++) {
+        optimizedSegs.push(graph.table[path15[i2]].node);
       }
       return exports.fromArray(mergeSegments(optimizedSegs));
     };
@@ -1129315,7 +1129539,7 @@ var require_png2 = __commonJS({
       });
       png.pack();
     };
-    exports.renderToFile = function renderToFile(path16, qrData, options, cb) {
+    exports.renderToFile = function renderToFile(path15, qrData, options, cb) {
       if (typeof cb === "undefined") {
         cb = options;
         options = void 0;
@@ -1129326,7 +1129550,7 @@ var require_png2 = __commonJS({
         called = true;
         cb.apply(null, args);
       };
-      const stream2 = fs16.createWriteStream(path16);
+      const stream2 = fs16.createWriteStream(path15);
       stream2.on("error", done);
       stream2.on("close", done);
       exports.renderToFileStream(stream2, qrData, options);
@@ -1129388,14 +1129612,14 @@ var require_utf8 = __commonJS({
       }
       return output;
     };
-    exports.renderToFile = function renderToFile(path16, qrData, options, cb) {
+    exports.renderToFile = function renderToFile(path15, qrData, options, cb) {
       if (typeof cb === "undefined") {
         cb = options;
         options = void 0;
       }
       const fs16 = __require("fs");
       const utf8 = exports.render(qrData, options);
-      fs16.writeFile(path16, utf8, cb);
+      fs16.writeFile(path15, utf8, cb);
     };
   }
 });
@@ -1129516,7 +1129740,7 @@ var require_svg_tag = __commonJS({
       return str;
     }
     function qrToPath(data, size, margin) {
-      let path16 = "";
+      let path15 = "";
       let moveBy = 0;
       let newRow = false;
       let lineLength = 0;
@@ -1129527,19 +1129751,19 @@ var require_svg_tag = __commonJS({
         if (data[i2]) {
           lineLength++;
           if (!(i2 > 0 && col > 0 && data[i2 - 1])) {
-            path16 += newRow ? svgCmd("M", col + margin, 0.5 + row + margin) : svgCmd("m", moveBy, 0);
+            path15 += newRow ? svgCmd("M", col + margin, 0.5 + row + margin) : svgCmd("m", moveBy, 0);
             moveBy = 0;
             newRow = false;
           }
           if (!(col + 1 < size && data[i2 + 1])) {
-            path16 += svgCmd("h", lineLength);
+            path15 += svgCmd("h", lineLength);
             lineLength = 0;
           }
         } else {
           moveBy++;
         }
       }
-      return path16;
+      return path15;
     }
     exports.render = function render(qrData, options, cb) {
       const opts = Utils.getOptions(options);
@@ -1129547,10 +1129771,10 @@ var require_svg_tag = __commonJS({
       const data = qrData.modules.data;
       const qrcodesize = size + opts.margin * 2;
       const bg = !opts.color.light.a ? "" : "<path " + getColorAttrib(opts.color.light, "fill") + ' d="M0 0h' + qrcodesize + "v" + qrcodesize + 'H0z"/>';
-      const path16 = "<path " + getColorAttrib(opts.color.dark, "stroke") + ' d="' + qrToPath(data, size, opts.margin) + '"/>';
+      const path15 = "<path " + getColorAttrib(opts.color.dark, "stroke") + ' d="' + qrToPath(data, size, opts.margin) + '"/>';
       const viewBox = 'viewBox="0 0 ' + qrcodesize + " " + qrcodesize + '"';
       const width = !opts.width ? "" : 'width="' + opts.width + '" height="' + opts.width + '" ';
-      const svgTag = '<svg xmlns="http://www.w3.org/2000/svg" ' + width + viewBox + ' shape-rendering="crispEdges">' + bg + path16 + "</svg>\n";
+      const svgTag = '<svg xmlns="http://www.w3.org/2000/svg" ' + width + viewBox + ' shape-rendering="crispEdges">' + bg + path15 + "</svg>\n";
       if (typeof cb === "function") {
         cb(null, svgTag);
       }
@@ -1129564,7 +1129788,7 @@ var require_svg = __commonJS({
   "../../node_modules/.pnpm/qrcode@1.5.4/node_modules/qrcode/lib/renderer/svg.js"(exports) {
     var svgTagRenderer = require_svg_tag();
     exports.render = svgTagRenderer.render;
-    exports.renderToFile = function renderToFile(path16, qrData, options, cb) {
+    exports.renderToFile = function renderToFile(path15, qrData, options, cb) {
       if (typeof cb === "undefined") {
         cb = options;
         options = void 0;
@@ -1129572,7 +1129796,7 @@ var require_svg = __commonJS({
       const fs16 = __require("fs");
       const svgTag = exports.render(qrData, options);
       const xmlStr = '<?xml version="1.0" encoding="utf-8"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">' + svgTag;
-      fs16.writeFile(path16, xmlStr, cb);
+      fs16.writeFile(path15, xmlStr, cb);
     };
   }
 });
@@ -1129730,8 +1129954,8 @@ var require_server = __commonJS({
         cb
       };
     }
-    function getTypeFromFilename(path16) {
-      return path16.slice((path16.lastIndexOf(".") - 1 >>> 0) + 2).toLowerCase();
+    function getTypeFromFilename(path15) {
+      return path15.slice((path15.lastIndexOf(".") - 1 >>> 0) + 2).toLowerCase();
     }
     function getRendererFromType(type) {
       switch (type) {
@@ -1129795,17 +1130019,17 @@ var require_server = __commonJS({
       const renderer = getRendererFromType(params.opts.type);
       return render(renderer.renderToBuffer, text2, params);
     };
-    exports.toFile = function toFile(path16, text2, opts, cb) {
-      if (typeof path16 !== "string" || !(typeof text2 === "string" || typeof text2 === "object")) {
+    exports.toFile = function toFile(path15, text2, opts, cb) {
+      if (typeof path15 !== "string" || !(typeof text2 === "string" || typeof text2 === "object")) {
         throw new Error("Invalid argument");
       }
       if (arguments.length < 3 && !canPromise()) {
         throw new Error("Too few arguments provided");
       }
       const params = checkParams(text2, opts, cb);
-      const type = params.opts.type || getTypeFromFilename(path16);
+      const type = params.opts.type || getTypeFromFilename(path15);
       const renderer = getRendererFromType(type);
-      const renderToFile = renderer.renderToFile.bind(null, path16);
+      const renderToFile = renderer.renderToFile.bind(null, path15);
       return render(renderToFile, text2, params);
     };
     exports.toFileStream = function toFileStream(stream2, text2, opts) {
@@ -1129834,7 +1130058,8 @@ init_afm_fonts();
 var import_express34 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 var import_pino_http = __toESM(require_logger(), 1);
-import path15 from "path";
+import path14 from "path";
+import os4 from "os";
 import { fileURLToPath } from "url";
 import fs15 from "fs";
 
@@ -1133701,11 +1133926,11 @@ router18.get("/dashboard/summary", requireAuth, async (req, res) => {
         code: s2.code || "GEN",
         seats: s2.seats || 0,
         applicantCount,
-        totalApplications: specApps.length || applicantCount,
+        totalApplications: specApps.length,
         interviewCompletedCount: completedApps || allCandidates.filter((c) => (c.status === "interview_completed" || c.status === "allocated") && unionCandIds.has(c.id)).length,
         allocatedCount: specAllocated,
-        avgMcqScore: 0,
-        avgInterviewScore: 0
+        avgMcqScore: specMcqAvg,
+        avgInterviewScore: specInterviewAvg
       };
     });
     const exams = await readDb.select().from(examsTable).where(eq(examsTable.isMock, isMock));
@@ -1133766,7 +1133991,9 @@ router18.get("/dashboard/summary", requireAuth, async (req, res) => {
     const interviewCompletedCandidatesCount = allCandidates.filter(
       (c) => c.status === "interview_completed" || c.status === "allocated"
     ).length;
-    const paidSubmissionsCount = programSubmissions.filter((s2) => s2.paidAmount && s2.paidAmount > 0).length || allCandidates.length;
+    const paidSubmissionsCount = programSubmissions.filter((s2) => s2.paidAmount && s2.paidAmount > 0 || s2.paymentId).length;
+    const scheduledAppCandIds = new Set(allApps.filter((a) => a.batchId !== null || a.interviewSlot !== null).map((a) => a.candidateId));
+    const callLettersIssuedCount = allCandidates.filter((c) => scheduledAppCandIds.has(c.id)).length;
     res.json({
       programs: allPrograms.map((p) => ({
         id: p.id,
@@ -1133790,7 +1134017,7 @@ router18.get("/dashboard/summary", requireAuth, async (req, res) => {
           approved: approvedCandidatesCount,
           interviewCompleted: interviewCompletedCandidatesCount,
           allocated: allocatedCandidates,
-          callLettersIssued: approvedCandidatesCount
+          callLettersIssued: callLettersIssuedCount
         },
         applications: {
           total: allCandidates.length,
@@ -1133802,8 +1134029,8 @@ router18.get("/dashboard/summary", requireAuth, async (req, res) => {
           pendingCount: pendingCandidatesCount
         },
         callLetters: {
-          issuedCount: approvedCandidatesCount,
-          scheduledCount: allApps.filter((a) => a.batchId !== null || a.interviewSlot !== null).length || approvedCandidatesCount
+          issuedCount: callLettersIssuedCount,
+          scheduledCount: allApps.filter((a) => a.batchId !== null || a.interviewSlot !== null).length
         },
         interviews: {
           completedCount: interviewCompletedCandidatesCount,
@@ -1134500,7 +1134727,7 @@ var DEFAULT_SECTIONS = [
         id: "intro_text",
         type: "info",
         label: "Key Instructions",
-        defaultValue: "<b>1. Multiple Sub-specialties:</b> Candidates can now apply for multiple Sub-specialties in a single application form. Separate fees apply for each specialization.<br/><br/><b>2. Required Documents:</b> Kindly carry your basic and post-graduate educational certificates, current valid medical registration license, and passport-size photograph.<br/><br/><b>3. Selection Process:</b> Selection involves a written test (MCQ pattern) and an interview.<br/><br/><b>4. Application Fee:</b> Rs.2750/- per specialization, payable only through online transfer to the HDFC Bank account.<br/><br/><b>5. Age Limit:</b> The age limit is 35 years; those beyond 35 years and those awaiting PG results are not eligible.<br/><br/><b>6. Government Bond:</b> Applicants under Government bond or Compulsory Rural Service must submit a 'No Objection Certificate' during the examination.<br/><br/><b>7. NOC Requirement:</b> Selected fellows must submit NOC from their State Medical Council during Fellowship induction.<br/><br/><b>8. Recommendation Letters:</b> Two Letters of Recommendation are required to be uploaded in the last page of this form.<br/><br/><b>9. Payment Proof:</b> The receipt of online payment (screenshot) must be enclosed to the application form."
+        defaultValue: "<b>1. Multiple Sub-specialties:</b> Candidates can now apply for multiple Sub-specialties in a single application form. Separate fees apply for each specialization.<br/><br/><b>2. Required Documents:</b> Kindly carry your basic and post-graduate educational certificates, current valid medical registration license, and passport-size photograph.<br/><br/><b>3. Selection Process:</b> Selection involves a written test (MCQ pattern) and an interview.<br/><br/><b>4. Application Fee:</b> Rs.2750/- per specialization, payable online during application submission.<br/><br/><b>5. Age Limit:</b> The age limit is 35 years; those beyond 35 years and those awaiting PG results are not eligible.<br/><br/><b>6. Government Bond:</b> Applicants under Government bond or Compulsory Rural Service must submit a 'No Objection Certificate' during the examination.<br/><br/><b>7. NOC Requirement:</b> Selected fellows must submit NOC from their State Medical Council during Fellowship induction.<br/><br/><b>8. Recommendation Letters:</b> Two Letters of Recommendation are required to be uploaded in the last page of this form."
       }
     ]
   },
@@ -1134521,11 +1134748,11 @@ var DEFAULT_SECTIONS = [
     fields: [
       { id: "unit_cornea", type: "checkbox_group", label: "Cornea Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Jaipur", "Shimoga", "Not Applicable"], visibleIf: { field: "specialization", contains: "Cornea" } },
       { id: "unit_glaucoma", type: "checkbox_group", label: "Glaucoma Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga", "Not Applicable"], visibleIf: { field: "specialization", contains: "Glaucoma" } },
-      { id: "unit_iol", type: "checkbox_group", label: "IOL Preferred Center", options: ["Anand", "Bangalore", "Guntur", "Hyderabad", "Indore", "Jaipur", "Kanpur", "Krishnankoil", "Ludhiana", "Panvel", "Shimoga", "Varanasi", "Not Applicable"], visibleIf: { field: "specialization", contains: "IOL" } },
+      { id: "unit_iol", type: "checkbox_group", label: "IOL Preferred Center", options: ["Anand", "Bangalore", "Coimbatore", "Guntur", "Hyderabad", "Indore", "Jaipur", "Kanpur", "Krishnankoil", "Ludhiana", "Panvel", "Shimoga", "Varanasi", "Not Applicable"], visibleIf: { field: "specialization", contains: "IOL" } },
       { id: "unit_medical_retina", type: "checkbox_group", label: "Medical Retina Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Jaipur", "Shimoga", "Not Applicable"], visibleIf: { field: "specialization", contains: "Medical Retina" } },
-      { id: "unit_oculoplasty", type: "checkbox_group", label: "Oculoplasty Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Not Applicable"], visibleIf: { field: "specialization", contains: "Oculoplasty" } },
+      { id: "unit_oculoplasty", type: "checkbox_group", label: "Oculoplasty Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Varanasi", "Not Applicable"], visibleIf: { field: "specialization", contains: "Oculoplasty" } },
       { id: "unit_pediatric", type: "checkbox_group", label: "Pediatric Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga", "Not Applicable"], visibleIf: { field: "specialization", contains: "Pediatric Ophthalmology" } },
-      { id: "unit_phaco", type: "checkbox_group", label: "Phaco Refractive Preferred Center", options: ["Bangalore", "Not Applicable"], visibleIf: { field: "specialization", contains: "Phaco Refractive" } },
+      { id: "unit_phaco", type: "checkbox_group", label: "Phaco Refractive Preferred Center", options: ["Bangalore", "Coimbatore", "Not Applicable"], visibleIf: { field: "specialization", contains: "Phaco Refractive" } },
       { id: "unit_vitreo_retina", type: "checkbox_group", label: "Vitreo Retina Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga", "Not Applicable"], visibleIf: { field: "specialization", contains: "Vitreo Retina" } },
       { id: "referralSource", type: "select", label: "Where did you hear about this Fellowship?", required: true, options: ["Sankara Website", "Word of Mouth", "Referred by any Faculty or exiting trainee at Sankara", "IJO Advertisement", "Social Media Platforms (Instagram/Facebook/Whatsapp/LinkedIn)"], isStandard: true, mapping: "referralSource" }
     ]
@@ -1134535,8 +1134762,9 @@ var DEFAULT_SECTIONS = [
     title: "Referral Information",
     description: "Details of the person who referred you.",
     enabled: true,
+    visibleIf: { field: "referralSource", contains: "Referred" },
     fields: [
-      { id: "referredByName", type: "text", label: "Name of referred Faculty/Existing Trainee", isStandard: true, mapping: "referredByName" }
+      { id: "referredByName", type: "text", label: "Name of referred Faculty/Existing Trainee", isStandard: true, mapping: "referredByName", visibleIf: { field: "referralSource", contains: "Referred" } }
     ]
   },
   {
@@ -1134544,8 +1134772,9 @@ var DEFAULT_SECTIONS = [
     title: "Social Media",
     description: "Specify the media source if applicable.",
     enabled: true,
+    visibleIf: { field: "referralSource", contains: "Social Media" },
     fields: [
-      { id: "mediaSource", type: "text", label: "Media Source", isStandard: true, mapping: "mediaSource" }
+      { id: "mediaSource", type: "text", label: "Media Source", isStandard: true, mapping: "mediaSource", visibleIf: { field: "referralSource", contains: "Social Media" } }
     ]
   },
   {
@@ -1134580,7 +1134809,7 @@ var DEFAULT_SECTIONS = [
     description: "Declare any ailments.",
     enabled: true,
     fields: [
-      { id: "medicalConditions", type: "checkbox_group", label: "Ailments / Medications", options: ["Asthma", "Hypertension", "Diabetes", "Skin Allergy", "Hearing Impairment", "Tuberculosis", "Post Covid", "None of the Above"], isStandard: true, mapping: "medicalConditions" }
+      { id: "medicalConditions", type: "checkbox_group", label: "Ailments / Medications", options: ["Asthma", "Hypertension", "Diabetes", "Skin Allergy", "Hearing Impairment", "Tuberculosis", "Any Heart Related Issues", "Any Liver Related Issues", "None of the Above"], isStandard: true, mapping: "medicalConditions" }
     ]
   },
   {
@@ -1134654,12 +1134883,13 @@ init_src();
 init_auth2();
 var XLSX5 = __toESM(require_xlsx(), 1);
 init_email();
+init_letters();
 var import_googleapis2 = __toESM(require_src7(), 1);
-var import_pdfkit4 = __toESM(require_pdfkit(), 1);
+var import_pdfkit3 = __toESM(require_pdfkit(), 1);
 init_utils5();
-import fs10 from "fs/promises";
-import { createWriteStream as createWriteStream3 } from "fs";
-import path8 from "path";
+import fs9 from "fs/promises";
+import path7 from "path";
+import os2 from "os";
 var router20 = (0, import_express20.Router)();
 function generateToken() {
   return Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -1134726,7 +1134956,7 @@ router20.get(
         const [candidate] = await db.select().from(candidatesTable).where(eq(candidatesTable.email, sub.email));
         if (candidate) candidateCode = candidate.candidateCode;
       }
-      const doc = new import_pdfkit4.default({
+      const doc = new import_pdfkit3.default({
         margin: 36,
         size: "LETTER",
         bufferPages: true,
@@ -1134811,7 +1135041,7 @@ router20.get(
       const photoW = 85;
       const photoH = 105;
       if (photoUrl && photoUrl.startsWith("/objects/")) {
-        const localPath = path8.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
+        const localPath = path7.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
         try {
           doc.image(localPath, photoX, photoY, { width: photoW, height: photoH });
           doc.rect(photoX, photoY, photoW, photoH).strokeColor(colors.border).lineWidth(1).stroke();
@@ -1135051,12 +1135281,298 @@ router20.get(
     const formId = Number(req.params.id);
     const subs = await db.select({
       submission: applicationSubmissionsTable,
-      candidateCode: candidatesTable.candidateCode
-    }).from(applicationSubmissionsTable).leftJoin(candidatesTable, eq(candidatesTable.id, applicationSubmissionsTable.candidateId)).where(and(eq(applicationSubmissionsTable.formId, formId), eq(applicationSubmissionsTable.isMock, req.isMockMode))).orderBy(desc(applicationSubmissionsTable.submittedAt));
+      candidateId: candidatesTable.id,
+      candidateCode: candidatesTable.candidateCode,
+      candidateStatus: candidatesTable.status,
+      candidateUnitId: candidatesTable.unitId
+    }).from(applicationSubmissionsTable).leftJoin(
+      candidatesTable,
+      or(
+        eq(candidatesTable.id, applicationSubmissionsTable.candidateId),
+        eq(candidatesTable.email, applicationSubmissionsTable.email)
+      )
+    ).where(and(eq(applicationSubmissionsTable.formId, formId), eq(applicationSubmissionsTable.isMock, req.isMockMode))).orderBy(desc(applicationSubmissionsTable.submittedAt));
     res.json(subs.map((s2) => ({
       ...s2.submission,
-      candidateCode: s2.candidateCode || null
+      candidateId: s2.candidateId || s2.submission.candidateId || null,
+      candidateCode: s2.candidateCode || s2.submission.candidateCode || null,
+      candidateStatus: s2.candidateStatus || null,
+      candidateUnitId: s2.candidateUnitId || null
     })));
+  }
+);
+router20.get(
+  "/application-forms/:id/student-list-pdf",
+  requireAuth,
+  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "unit_coordinator"),
+  async (req, res) => {
+    try {
+      const formId = Number(req.params.id);
+      const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, formId));
+      if (!form) return res.status(404).json({ error: "Application form not found" });
+      const [program] = await db.select().from(programsTable).where(eq(programsTable.id, form.programId));
+      const units = await db.select().from(unitsTable);
+      const subs = await db.select({
+        sub: applicationSubmissionsTable,
+        cand: candidatesTable
+      }).from(applicationSubmissionsTable).leftJoin(
+        candidatesTable,
+        or(
+          eq(candidatesTable.id, applicationSubmissionsTable.candidateId),
+          eq(candidatesTable.email, applicationSubmissionsTable.email)
+        )
+      ).where(eq(applicationSubmissionsTable.formId, formId)).orderBy(desc(applicationSubmissionsTable.submittedAt));
+      const candidatesList = subs.map((row, idx) => {
+        const s2 = row.sub;
+        const c = row.cand;
+        const specs = parseSpecializationString(s2.specialization);
+        const specStr = specs.length > 0 ? specs.join(", ") : s2.specialization || "Ophthalmology Fellowship";
+        let unitName = "";
+        if (c?.unitId) {
+          const u = units.find((unit) => unit.id === c.unitId);
+          if (u) unitName = u.name;
+        } else if (s2.centerPreference) {
+          unitName = String(s2.centerPreference).replace(/[{}"[\]]/g, "").trim();
+        }
+        const candidateCode = c?.candidateCode || s2.candidateCode || `APP-${String(s2.id).padStart(4, "0")}`;
+        const qualParts = [s2.degree, s2.pgQualifications, s2.medicalCouncilNumber ? `Reg: ${s2.medicalCouncilNumber}` : null].filter(Boolean);
+        const qualification = qualParts.join(" \xB7 ");
+        let effectiveStatus = s2.status || "pending";
+        if (c?.status === "allocated") {
+          effectiveStatus = "allocated";
+        }
+        return {
+          slNo: idx + 1,
+          candidateCode,
+          candidateName: s2.fullName,
+          email: s2.email,
+          phone: s2.phone,
+          qualification: qualification || "MBBS / MS / DNB",
+          college: s2.medicalCollege,
+          specialization: specStr,
+          status: effectiveStatus,
+          unitName: unitName || "\u2014",
+          submittedAt: s2.submittedAt ? new Date(s2.submittedAt).toISOString() : null
+        };
+      });
+      const pdfBuffer = await generateStudentDirectoryPdf({
+        programName: program?.name || form.title || "Fellowship Program December 2026",
+        academicSession: program?.academicYear || "December 2026",
+        candidates: candidatesList
+      });
+      const filename = `Student_List_December_2026_${form.token || formId}.pdf`;
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+      res.send(pdfBuffer);
+    } catch (err) {
+      console.error("[student-list-pdf] Error:", err);
+      res.status(500).json({ error: err.message || "Failed to generate student list PDF" });
+    }
+  }
+);
+router20.get(
+  "/application-forms/submissions/:id/call-letter-pdf",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const subId = Number(req.params.id);
+      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, subId));
+      if (!sub) return res.status(404).json({ error: "Submission not found" });
+      const [cand] = await db.select().from(candidatesTable).where(
+        or(
+          eq(candidatesTable.id, sub.candidateId || -1),
+          eq(candidatesTable.email, sub.email)
+        )
+      );
+      const candidateCode = cand?.candidateCode || sub.candidateCode || `APP-${String(sub.id).padStart(4, "0")}`;
+      const specs = parseSpecializationString(sub.specialization);
+      const spec = specs.length > 0 ? specs.join(", ") : sub.specialization || "Ophthalmology Fellowship";
+      const isRetina = isRetinaSpecialty(spec);
+      const defaultInterviewDate = isRetina ? "7th December 2026, Monday" : "8th December 2026, Tuesday";
+      const pdfBuffer = await generateCallLetterPdf({
+        candidateName: sub.fullName,
+        candidateCode,
+        specialization: spec,
+        email: sub.email,
+        phone: sub.phone,
+        address: sub.permanentAddress || sub.mailingAddress || cand?.address,
+        applicationId: sub.id,
+        interviewDate: req.query.interviewDate || defaultInterviewDate,
+        reportingTime: req.query.reportingTime || "8:00 AM Sharp",
+        venue: req.query.venue || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore \u2013 560037"
+      });
+      const filename = `Interview_Call_Letter_${candidateCode}.pdf`;
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+      res.send(pdfBuffer);
+    } catch (err) {
+      console.error("[submission call-letter-pdf] Error:", err);
+      res.status(500).json({ error: err.message || "Failed to generate call letter" });
+    }
+  }
+);
+router20.post(
+  "/application-forms/submissions/:id/send-call-letter",
+  requireAuth,
+  requireRole("super_admin", "program_admin", "central_exam_coordinator"),
+  async (req, res) => {
+    try {
+      const subId = Number(req.params.id);
+      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, subId));
+      if (!sub) return res.status(404).json({ error: "Submission not found" });
+      const [cand] = await db.select().from(candidatesTable).where(
+        or(
+          eq(candidatesTable.id, sub.candidateId || -1),
+          eq(candidatesTable.email, sub.email)
+        )
+      );
+      const candidateCode = cand?.candidateCode || sub.candidateCode || `APP-${String(sub.id).padStart(4, "0")}`;
+      const specs = parseSpecializationString(sub.specialization);
+      const spec = req.body.specialization || (specs.length > 0 ? specs.join(", ") : sub.specialization || "Ophthalmology Fellowship");
+      const isRetina = isRetinaSpecialty(spec);
+      const interviewDate = req.body.interviewDate || (isRetina ? "7th December 2026, Monday" : "8th December 2026, Tuesday");
+      const reportingTime = req.body.reportingTime || "8:00 AM Sharp";
+      const venue = req.body.venue || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore \u2013 560037";
+      const pdfBuffer = await generateCallLetterPdf({
+        candidateName: sub.fullName,
+        candidateCode,
+        specialization: spec,
+        email: sub.email,
+        phone: sub.phone,
+        address: sub.permanentAddress || sub.mailingAddress || cand?.address,
+        applicationId: sub.id,
+        interviewDate,
+        reportingTime,
+        venue
+      });
+      const fileName = `Interview_Call_Letter_${candidateCode}.pdf`;
+      await sendCallLetterWithAttachment({
+        toEmail: sub.email,
+        toName: sub.fullName,
+        pdfBuffer,
+        fileName,
+        interviewDate,
+        reportingTime,
+        venue,
+        specialization: spec
+      });
+      res.json({ success: true, fileName });
+    } catch (err) {
+      console.error("[submission send-call-letter] Error:", err);
+      res.status(500).json({ error: err.message || "Failed to send call letter" });
+    }
+  }
+);
+router20.get(
+  "/application-forms/submissions/:id/offer-letter-pdf",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const subId = Number(req.params.id);
+      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, subId));
+      if (!sub) return res.status(404).json({ error: "Submission not found" });
+      const [cand] = await db.select().from(candidatesTable).where(
+        or(
+          eq(candidatesTable.id, sub.candidateId || -1),
+          eq(candidatesTable.email, sub.email)
+        )
+      );
+      const candidateCode = cand?.candidateCode || sub.candidateCode || `APP-${String(sub.id).padStart(4, "0")}`;
+      const units = await db.select().from(unitsTable);
+      let unitName = req.query.unitName || "";
+      if (!unitName && cand?.unitId) {
+        const u = units.find((x2) => x2.id === cand.unitId);
+        if (u) unitName = u.name;
+      }
+      if (!unitName && sub.centerPreference) {
+        unitName = String(sub.centerPreference).replace(/[{}"[\]]/g, "").trim().split(",")[0] || "Bangalore";
+      }
+      if (!unitName) unitName = "Bangalore";
+      const specs = parseSpecializationString(sub.specialization);
+      const specialization = req.query.specialization || (specs[0] || "Cataract & IOL");
+      const duration3 = req.query.duration ? Number(req.query.duration) : isRetinaSpecialty(specialization) ? 24 : 18;
+      const effectiveDate = req.query.effectiveDate || "6th January 2027";
+      const interviewDate = req.query.interviewDate || (isRetinaSpecialty(specialization) ? "7th December 2026" : "8th December 2026");
+      const pdfBuffer = await generateOfferLetterPdf({
+        candidateName: sub.fullName,
+        candidateCode,
+        specialization,
+        unitName,
+        cmoName: req.query.cmoName,
+        address: sub.permanentAddress || sub.mailingAddress || cand?.address,
+        durationMonths: duration3,
+        effectiveDate,
+        interviewDate,
+        stipendAmount: req.query.stipend || "Rs 40,000"
+      });
+      const filename = `Fellowship_Offer_Letter_${candidateCode}.pdf`;
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+      res.send(pdfBuffer);
+    } catch (err) {
+      console.error("[submission offer-letter-pdf] Error:", err);
+      res.status(500).json({ error: err.message || "Failed to generate offer letter" });
+    }
+  }
+);
+router20.post(
+  "/application-forms/submissions/:id/send-offer-letter",
+  requireAuth,
+  requireRole("super_admin", "program_admin", "central_exam_coordinator"),
+  async (req, res) => {
+    try {
+      const subId = Number(req.params.id);
+      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, subId));
+      if (!sub) return res.status(404).json({ error: "Submission not found" });
+      const [cand] = await db.select().from(candidatesTable).where(
+        or(
+          eq(candidatesTable.id, sub.candidateId || -1),
+          eq(candidatesTable.email, sub.email)
+        )
+      );
+      const candidateCode = cand?.candidateCode || sub.candidateCode || `APP-${String(sub.id).padStart(4, "0")}`;
+      const units = await db.select().from(unitsTable);
+      let unitName = req.body.unitName || "";
+      if (!unitName && cand?.unitId) {
+        const u = units.find((x2) => x2.id === cand.unitId);
+        if (u) unitName = u.name;
+      }
+      if (!unitName && sub.centerPreference) {
+        unitName = String(sub.centerPreference).replace(/[{}"[\]]/g, "").trim().split(",")[0] || "Bangalore";
+      }
+      if (!unitName) unitName = "Bangalore";
+      const specs = parseSpecializationString(sub.specialization);
+      const specialization = req.body.specialization || (specs[0] || "Cataract & IOL");
+      const duration3 = req.body.duration ? Number(req.body.duration) : isRetinaSpecialty(specialization) ? 24 : 18;
+      const effectiveDate = req.body.effectiveDate || "6th January 2027";
+      const interviewDate = req.body.interviewDate || (isRetinaSpecialty(specialization) ? "7th December 2026" : "8th December 2026");
+      const pdfBuffer = await generateOfferLetterPdf({
+        candidateName: sub.fullName,
+        candidateCode,
+        specialization,
+        unitName,
+        cmoName: req.body.cmoName,
+        address: sub.permanentAddress || sub.mailingAddress || cand?.address,
+        durationMonths: duration3,
+        effectiveDate,
+        interviewDate,
+        stipendAmount: req.body.stipend || "Rs 40,000"
+      });
+      const fileName = `Fellowship_Offer_Letter_${candidateCode}.pdf`;
+      await sendOfferLetterWithAttachment({
+        toEmail: sub.email,
+        toName: sub.fullName,
+        pdfBuffer,
+        fileName,
+        unitName,
+        specialization,
+        effectiveDate
+      });
+      res.json({ success: true, fileName });
+    } catch (err) {
+      console.error("[submission send-offer-letter] Error:", err);
+      res.status(500).json({ error: err.message || "Failed to send offer letter" });
+    }
   }
 );
 router20.get(
@@ -1135384,7 +1135900,7 @@ router20.patch(
           if (!isReplit) {
             try {
               const fsPromises = await import("fs/promises");
-              const localPath = path8.join(process.cwd(), "uploads", oldValue.replace("/objects/uploads/", ""));
+              const localPath = path7.join(process.cwd(), "uploads", oldValue.replace("/objects/uploads/", ""));
               await fsPromises.unlink(localPath);
               req.log?.info?.({ localPath }, `Successfully deleted replaced file from disk`);
             } catch (err) {
@@ -1136486,44 +1137002,23 @@ router20.post(
     }
   }
 );
+function normalizeToken(t2) {
+  if (t2 === "DEC2026" || t2 === "dec2026" || t2 === "december2026") return "DECEMBER2026";
+  return t2;
+}
 router20.post("/apply/:token/request-upload-url", async (req, res) => {
-  const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, req.params.token));
+  const token = normalizeToken(req.params.token);
+  const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, token));
   if (!form) return res.status(404).json({ error: "Form not found" });
   if (!form.isActive) return res.status(410).json({ error: "This form is no longer accepting submissions" });
   if (form.deadline && /* @__PURE__ */ new Date() > form.deadline) {
     return res.status(410).json({ error: "The deadline for this form has passed" });
   }
   const { name: name2, contentType, size, candidateName, fieldName } = req.body ?? {};
-  if (!name2 || typeof name2 !== "string" || !name2.trim() || !contentType || typeof contentType !== "string") {
-    return res.status(400).json({ error: "Missing required fields: name, contentType" });
+  if (!name2 || typeof name2 !== "string" || !name2.trim()) {
+    return res.status(400).json({ error: "Missing required field: name" });
   }
-  const fName = (fieldName || "").toLowerCase();
-  if (fName.includes("lor")) {
-    if (contentType !== "application/pdf") {
-      return res.status(400).json({ error: "LOR files must be in PDF format only" });
-    }
-    const maxLorSize = 5 * 1024 * 1024;
-    if (size && size > maxLorSize) {
-      return res.status(400).json({ error: "LOR file size exceeds 5MB limit" });
-    }
-  } else if (fName.includes("photo")) {
-    if (contentType !== "image/jpeg" && contentType !== "image/jpg") {
-      return res.status(400).json({ error: "Passport photograph must be in JPG/JPEG format only" });
-    }
-    const maxPhotoSize = 2 * 1024 * 1024;
-    if (size && size > maxPhotoSize) {
-      return res.status(400).json({ error: "Passport photograph size exceeds 2MB limit" });
-    }
-  } else {
-    const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "image/jpg"];
-    if (!allowedTypes.includes(contentType)) {
-      return res.status(400).json({ error: "Only PDF, JPG, and PNG files are allowed" });
-    }
-    const maxSize = 10 * 1024 * 1024;
-    if (size && size > maxSize) {
-      return res.status(400).json({ error: "File size exceeds 10MB limit" });
-    }
-  }
+  const cleanContentType = contentType && typeof contentType === "string" ? contentType : "application/octet-stream";
   try {
     const isReplit = !!process.env.REPL_ID;
     if (!isReplit) {
@@ -1136532,15 +1137027,15 @@ router20.post("/apply/:token/request-upload-url", async (req, res) => {
       const sanitizedName = name2.split(".")[0].replace(/[^a-zA-Z0-9]/g, "_");
       let folderName = candidateName ? candidateName.trim().replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_") : "Unknown_Candidate";
       const filename = `${sanitizedName}_${objectId}.${ext2}`;
-      const uploadURL2 = `/api/apply/${req.params.token}/local-upload/${folderName}/${filename}`;
+      const uploadURL2 = `/api/apply/${token}/local-upload/${folderName}/${filename}`;
       const objectPath2 = `/objects/uploads/${folderName}/${filename}`;
-      return res.json({ uploadURL: uploadURL2, objectPath: objectPath2, metadata: { name: name2.trim(), size, contentType } });
+      return res.json({ uploadURL: uploadURL2, objectPath: objectPath2, metadata: { name: name2.trim(), size, contentType: cleanContentType } });
     }
     const { ObjectStorageService: ObjectStorageService2 } = await Promise.resolve().then(() => (init_objectStorage(), objectStorage_exports));
     const objectStorageService2 = new ObjectStorageService2();
     const uploadURL = await objectStorageService2.getObjectEntityUploadURL();
     const objectPath = objectStorageService2.normalizeObjectEntityPath(uploadURL);
-    return res.json({ uploadURL, objectPath, metadata: { name: name2.trim(), size, contentType } });
+    return res.json({ uploadURL, objectPath, metadata: { name: name2.trim(), size, contentType: cleanContentType } });
   } catch (error40) {
     console.error("UPLOAD ENDPOINT ERROR:", error40);
     return res.status(500).json({ error: "Failed to generate upload URL", details: error40 instanceof Error ? error40.message : String(error40) });
@@ -1136548,28 +1137043,46 @@ router20.post("/apply/:token/request-upload-url", async (req, res) => {
 });
 router20.put("/apply/:token/local-upload/:folderName/:filename", async (req, res) => {
   try {
-    const uploadDir = path8.join(process.cwd(), "uploads", req.params.folderName);
-    if (!uploadDir.includes(path8.join("artifacts", "api-server"))) {
-    }
-    await fs10.mkdir(uploadDir, { recursive: true });
-    const filePath = path8.join(uploadDir, req.params.filename);
-    const writeStream = createWriteStream3(filePath);
-    req.pipe(writeStream);
-    writeStream.on("finish", async () => {
-      try {
-        const { normalizeUploadedFile: normalizeUploadedFile2 } = await Promise.resolve().then(() => (init_image_normalizer(), image_normalizer_exports));
-        await normalizeUploadedFile2(filePath, req.params.filename);
-      } catch (normErr) {
-        console.warn("[upload-normalizer] Post-upload normalization skipped:", normErr);
-      }
-      res.json({ success: true, path: `/objects/uploads/${req.params.folderName}/${req.params.filename}` });
+    const chunks = [];
+    req.on("data", (chunk) => {
+      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
     });
-    writeStream.on("error", (err) => {
-      console.error("Write stream error:", err);
-      if (!res.headersSent) res.status(500).json({ error: "File write failed" });
+    req.on("end", async () => {
+      try {
+        const buffer = Buffer.concat(chunks);
+        const folderName = req.params.folderName;
+        const filename = req.params.filename;
+        const objectPath = `/objects/uploads/${folderName}/${filename}`;
+        const contentType = req.headers["content-type"] || "application/octet-stream";
+        try {
+          const tmpUploadDir = path7.join(os2.tmpdir(), "uploads", folderName);
+          await fs9.mkdir(tmpUploadDir, { recursive: true });
+          await fs9.writeFile(path7.join(tmpUploadDir, filename), buffer);
+        } catch (_) {
+        }
+        try {
+          const localUploadDir = path7.join(process.cwd(), "uploads", folderName);
+          await fs9.mkdir(localUploadDir, { recursive: true });
+          await fs9.writeFile(path7.join(localUploadDir, filename), buffer);
+        } catch (_) {
+        }
+        await db.execute(sql`
+          INSERT INTO uploaded_files (file_path, file_name, content_type, file_data, file_size)
+          VALUES (${objectPath}, ${filename}, ${contentType}, ${buffer}, ${buffer.length})
+          ON CONFLICT (file_path) DO UPDATE SET
+            file_data = EXCLUDED.file_data,
+            file_size = EXCLUDED.file_size,
+            content_type = EXCLUDED.content_type,
+            created_at = NOW()
+        `);
+        res.json({ success: true, path: objectPath });
+      } catch (saveErr) {
+        console.error("Failed to save uploaded file:", saveErr);
+        res.status(500).json({ error: saveErr.message || "Failed to save file" });
+      }
     });
     req.on("error", (err) => {
-      console.error("Request stream error:", err);
+      console.error("Upload stream error:", err);
       if (!res.headersSent) res.status(500).json({ error: "Upload stream failed" });
     });
   } catch (error40) {
@@ -1136578,7 +1137091,8 @@ router20.put("/apply/:token/local-upload/:folderName/:filename", async (req, res
   }
 });
 router20.get("/apply/:token", async (req, res) => {
-  const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, req.params.token));
+  const token = normalizeToken(req.params.token);
+  const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, token));
   if (!form) return res.status(404).json({ error: "Form not found" });
   if (!form.isActive) return res.status(410).json({ error: "This form is no longer accepting submissions" });
   if (form.deadline && /* @__PURE__ */ new Date() > form.deadline) {
@@ -1136634,28 +1137148,32 @@ router20.get("/apply/:token", async (req, res) => {
   });
 });
 router20.get("/apply/:token/payment-config", async (req, res) => {
-  const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, req.params.token));
+  const token = normalizeToken(req.params.token);
+  const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, token));
   const programId = form?.programId ?? null;
   const all = await db.select().from(paymentSettingsTable).where(eq(paymentSettingsTable.isActive, true));
   const specific = programId ? all.find((s2) => s2.programId === programId) : null;
   const global2 = all.find((s2) => s2.programId === null);
   const setting = specific ?? global2 ?? null;
-  if (!setting) {
+  const keyId = setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID;
+  const keySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
+  const hasCreds = !!(keyId && keySecret);
+  if (!setting && !hasCreds) {
     return res.json({ mock: true, amount: 275e3, currency: "INR", description: "Fellowship Application Fee" });
   }
-  const hasCreds = !!(setting.razorpayKeyId && setting.razorpayKeySecret);
   res.json({
     mock: !hasCreds,
-    keyId: hasCreds ? setting.razorpayKeyId : void 0,
-    amount: setting.amount,
-    currency: setting.currency,
-    description: setting.description,
-    mode: setting.mode,
-    upiId: setting.upiId ?? void 0
+    keyId: hasCreds ? keyId : void 0,
+    amount: setting?.amount || 275e3,
+    currency: setting?.currency || "INR",
+    description: setting?.description || "Fellowship Application Fee",
+    mode: setting?.mode || "test",
+    upiId: setting?.upiId ?? void 0
   });
 });
 router20.post("/apply/:token", async (req, res) => {
-  const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, req.params.token));
+  const token = normalizeToken(req.params.token);
+  const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, token));
   if (!form) return res.status(404).json({ error: "Form not found" });
   if (!form.isActive) return res.status(410).json({ error: "This form is no longer accepting submissions" });
   if (form.deadline && /* @__PURE__ */ new Date() > form.deadline) {
@@ -1136824,8 +1137342,8 @@ init_src();
 init_drizzle_orm();
 init_drizzle_orm();
 init_auth2();
-import * as fs11 from "fs";
-import * as path9 from "path";
+import * as fs10 from "fs";
+import * as path8 from "path";
 var router21 = (0, import_express21.Router)();
 function getCanonicalSpecialtyName2(name2) {
   const norm = name2.toLowerCase().trim();
@@ -1136860,10 +1137378,10 @@ var INDUCTION_DATES = [
   { displayDate: "06 July 2026", event: "New Fellows Report to Respective Units", venue: "Respective Units" }
 ];
 function findLatestFile() {
-  const assetsDir = path9.resolve(process.cwd(), "../../attached_assets");
-  if (!fs11.existsSync(assetsDir)) return null;
-  const files = fs11.readdirSync(assetsDir).filter((f3) => f3.startsWith("Seat_Matrix_") && f3.endsWith(".xlsx")).sort().reverse();
-  return files[0] ? path9.join(assetsDir, files[0]) : null;
+  const assetsDir = path8.resolve(process.cwd(), "../../attached_assets");
+  if (!fs10.existsSync(assetsDir)) return null;
+  const files = fs10.readdirSync(assetsDir).filter((f3) => f3.startsWith("Seat_Matrix_") && f3.endsWith(".xlsx")).sort().reverse();
+  return files[0] ? path8.join(assetsDir, files[0]) : null;
 }
 function parseMatrixFromFile() {
   const xlsxPath = findLatestFile();
@@ -1136904,7 +1137422,7 @@ function parseMatrixFromFile() {
 router21.get(
   "/seat-matrix",
   requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "unit_coordinator"),
+  requireRole("super_admin", "program_admin", "central_exam_coordinator", "unit_coordinator", "exam_coordinator", "doctor"),
   async (req, res) => {
     const programId = req.query["programId"] ? Number(req.query["programId"]) : null;
     const entries = programId ? await db.select().from(seatMatrixEntriesTable).where(eq(seatMatrixEntriesTable.programId, programId)) : await db.select().from(seatMatrixEntriesTable);
@@ -1137356,8 +1137874,9 @@ init_auth2();
 init_src();
 init_drizzle_orm();
 import { Readable as Readable6 } from "stream";
-import path10 from "path";
-import { createWriteStream as createWriteStream4 } from "fs";
+import path9 from "path";
+import os3 from "os";
+import fs11 from "fs";
 var router24 = (0, import_express24.Router)();
 var objectStorageService = new ObjectStorageService();
 router24.post("/storage/uploads/request-url", requireAuth, async (req, res) => {
@@ -1137387,28 +1137906,46 @@ router24.post("/storage/uploads/request-url", requireAuth, async (req, res) => {
 });
 router24.put("/storage/local-upload/:filename", requireAuth, async (req, res) => {
   try {
-    const uploadDir = path10.join(process.cwd(), "uploads");
-    const fsPromises = await import("fs/promises");
-    await fsPromises.mkdir(uploadDir, { recursive: true });
-    const filePath = path10.join(uploadDir, req.params.filename);
-    const writeStream = createWriteStream4(filePath);
-    req.pipe(writeStream);
-    writeStream.on("finish", async () => {
-      let finalFilename = req.params.filename;
-      try {
-        const { normalizeUploadedFile: normalizeUploadedFile2 } = await Promise.resolve().then(() => (init_image_normalizer(), image_normalizer_exports));
-        const normResult = await normalizeUploadedFile2(filePath, req.params.filename);
-        if (normResult?.normalizedPath) {
-          finalFilename = path10.basename(normResult.normalizedPath);
-        }
-      } catch (normErr) {
-        console.warn("[storage-normalizer] Post-upload normalization skipped:", normErr);
-      }
-      res.json({ success: true, path: `/objects/uploads/${finalFilename}` });
+    const chunks = [];
+    req.on("data", (chunk) => {
+      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
     });
-    writeStream.on("error", (err) => {
-      req.log?.error?.({ err }, "Error writing file");
-      res.status(500).json({ error: "Failed to upload file" });
+    req.on("end", async () => {
+      try {
+        const buffer = Buffer.concat(chunks);
+        const filename = req.params.filename;
+        const objectPath = `/objects/uploads/${filename}`;
+        const contentType = req.headers["content-type"] || "application/octet-stream";
+        try {
+          const tmpUploadDir = path9.join(os3.tmpdir(), "uploads");
+          await fs11.promises.mkdir(tmpUploadDir, { recursive: true });
+          await fs11.promises.writeFile(path9.join(tmpUploadDir, filename), buffer);
+        } catch (_) {
+        }
+        try {
+          const localUploadDir = path9.join(process.cwd(), "uploads");
+          await fs11.promises.mkdir(localUploadDir, { recursive: true });
+          await fs11.promises.writeFile(path9.join(localUploadDir, filename), buffer);
+        } catch (_) {
+        }
+        await db.execute(sql`
+          INSERT INTO uploaded_files (file_path, file_name, content_type, file_data, file_size)
+          VALUES (${objectPath}, ${filename}, ${contentType}, ${buffer}, ${buffer.length})
+          ON CONFLICT (file_path) DO UPDATE SET
+            file_data = EXCLUDED.file_data,
+            file_size = EXCLUDED.file_size,
+            content_type = EXCLUDED.content_type,
+            created_at = NOW()
+        `);
+        res.json({ success: true, path: objectPath });
+      } catch (saveErr) {
+        req.log?.error?.({ err: saveErr }, "Error saving uploaded file");
+        res.status(500).json({ error: saveErr.message || "Failed to save file" });
+      }
+    });
+    req.on("error", (err) => {
+      req.log?.error?.({ err }, "Upload stream error");
+      if (!res.headersSent) res.status(500).json({ error: "Upload stream failed" });
     });
   } catch (error40) {
     req.log?.error?.({ err: error40 }, "Error in local upload");
@@ -1137509,15 +1138046,35 @@ router24.get("/storage/objects/*path", requireAuth, requireRole("super_admin", "
     }
     const isReplit = !!process.env.REPL_ID;
     if (!isReplit) {
-      const { fileURLToPath: fileURLToPath2 } = await import("url");
-      const localPath = path10.join(process.cwd(), "uploads", objectPath.replace("/objects/uploads/", ""));
-      res.sendFile(localPath, (err) => {
-        if (err && !res.headersSent) {
-          req.log.warn({ localPath, err }, "File not found on disk");
-          res.status(404).json({ error: "File not found on disk" });
+      const candidatePaths = [
+        path9.join(process.cwd(), "uploads", objectPath.replace("/objects/uploads/", "")),
+        path9.join(os3.tmpdir(), "uploads", objectPath.replace("/objects/uploads/", "")),
+        path9.join(process.cwd(), "uploads", objectPath.replace("/objects/", "")),
+        path9.join(os3.tmpdir(), "uploads", objectPath.replace("/objects/", ""))
+      ];
+      for (const cp of candidatePaths) {
+        if (fs11.existsSync(cp)) {
+          return res.sendFile(cp);
         }
-      });
-      return;
+      }
+      try {
+        const result = await db.execute(sql`
+          SELECT file_name, content_type, file_data, file_size 
+          FROM uploaded_files 
+          WHERE file_path = ${objectPath} OR file_path = ${"/objects/uploads/" + objectPath.replace(/^\/objects\/(uploads\/)?/, "")}
+          LIMIT 1
+        `);
+        if (result.rows.length > 0) {
+          const row = result.rows[0];
+          res.setHeader("Content-Type", row.content_type || "application/octet-stream");
+          res.setHeader("Content-Length", row.file_size);
+          res.setHeader("Content-Disposition", `inline; filename="${row.file_name}"`);
+          return res.end(row.file_data);
+        }
+      } catch (dbErr) {
+        req.log?.warn?.({ err: dbErr }, "Database file lookup failed");
+      }
+      return res.status(404).json({ error: "File not found" });
     }
     const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
     const response = await objectStorageService.downloadObject(objectFile);
@@ -1137552,10 +1138109,15 @@ init_src();
 var import_razorpay = __toESM(require_razorpay(), 1);
 import crypto9 from "crypto";
 var router25 = (0, import_express25.Router)();
+function normalizeToken2(t2) {
+  if (t2 === "DEC2026" || t2 === "dec2026" || t2 === "december2026") return "DECEMBER2026";
+  return t2;
+}
 router25.post("/payment/create-order", async (req, res) => {
   try {
-    const { token } = req.body;
-    if (!token) return res.status(400).json({ error: "Token is required" });
+    const rawToken = req.body?.token;
+    if (!rawToken) return res.status(400).json({ error: "Token is required" });
+    const token = normalizeToken2(rawToken);
     const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, token));
     if (!form) return res.status(404).json({ error: "Form not found" });
     const programId = form.programId;
@@ -1137563,7 +1138125,9 @@ router25.post("/payment/create-order", async (req, res) => {
     const specific = programId ? all.find((s2) => s2.programId === programId) : null;
     const global2 = all.find((s2) => s2.programId === null);
     const setting = specific ?? global2;
-    if (!setting || !setting.razorpayKeyId || !setting.razorpayKeySecret) {
+    const razorpayKeyId = setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID;
+    const razorpayKeySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
+    if (!razorpayKeyId || !razorpayKeySecret) {
       return res.status(400).json({ error: "Razorpay is not configured for this program" });
     }
     const [program] = programId ? await db.select().from(programsTable).where(eq(programsTable.id, programId)) : [null];
@@ -1137571,7 +1138135,7 @@ router25.post("/payment/create-order", async (req, res) => {
     let unitFeeInPaise = 268e3;
     if (program?.feeAmount && program.feeAmount > 0) {
       unitFeeInPaise = program.feeAmount * 100;
-    } else if (setting.amount) {
+    } else if (setting?.amount) {
       unitFeeInPaise = Number(setting.amount);
     }
     const { specializationCount = 1 } = req.body;
@@ -1137584,22 +1138148,22 @@ router25.post("/payment/create-order", async (req, res) => {
       finalAmountPaise = 0;
     }
     const instance = new import_razorpay.default({
-      key_id: setting.razorpayKeyId,
-      key_secret: setting.razorpayKeySecret
+      key_id: razorpayKeyId,
+      key_secret: razorpayKeySecret
     });
     const options = {
       amount: finalAmountPaise,
-      currency: setting.currency || "INR",
+      currency: setting?.currency || "INR",
       receipt: `receipt_form_${form.id}_${Date.now()}`
     };
     const order = await instance.orders.create(options);
     res.json({
       order,
-      key: setting.razorpayKeyId,
+      key: razorpayKeyId,
       pricingModel,
       unitFee: unitFeeInPaise / 100,
       totalAmount: finalAmountPaise / 100,
-      mode: setting.mode
+      mode: setting?.mode || "test"
     });
   } catch (error40) {
     console.error("Order creation failed:", error40);
@@ -1137608,8 +1138172,10 @@ router25.post("/payment/create-order", async (req, res) => {
 });
 router25.post("/payment/verify", async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, token } = req.body;
-    if (!token) return res.status(400).json({ error: "Token is required" });
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    const rawToken = req.body?.token;
+    if (!rawToken) return res.status(400).json({ error: "Token is required" });
+    const token = normalizeToken2(rawToken);
     const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, token));
     if (!form) return res.status(404).json({ error: "Form not found" });
     const programId = form.programId;
@@ -1137617,11 +1138183,12 @@ router25.post("/payment/verify", async (req, res) => {
     const specific = programId ? all.find((s2) => s2.programId === programId) : null;
     const global2 = all.find((s2) => s2.programId === null);
     const setting = specific ?? global2;
-    if (!setting || !setting.razorpayKeySecret) {
+    const razorpayKeySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
+    if (!razorpayKeySecret) {
       return res.status(400).json({ error: "Razorpay secret not found" });
     }
     const body = razorpay_order_id + "|" + razorpay_payment_id;
-    const expectedSignature = crypto9.createHmac("sha256", setting.razorpayKeySecret).update(body.toString()).digest("hex");
+    const expectedSignature = crypto9.createHmac("sha256", razorpayKeySecret).update(body.toString()).digest("hex");
     if (expectedSignature === razorpay_signature) {
       return res.json({ success: true, status: "ok" });
     }
@@ -1138083,9 +1138650,9 @@ var debug_default = router27;
 var import_express28 = __toESM(require_express2(), 1);
 init_auth2();
 import fs12 from "fs/promises";
-import path11 from "path";
+import path10 from "path";
 var router28 = (0, import_express28.Router)();
-var DB_PATH = path11.join(process.cwd(), "tv-access.json");
+var DB_PATH = path10.join(process.cwd(), "tv-access.json");
 async function getAccessCode() {
   try {
     const data = await fs12.readFile(DB_PATH, "utf-8");
@@ -1138196,10 +1138763,10 @@ var import_express30 = __toESM(require_express2(), 1);
 init_src();
 init_drizzle_orm();
 init_auth2();
-var import_pdfkit5 = __toESM(require_pdfkit(), 1);
+var import_pdfkit4 = __toESM(require_pdfkit(), 1);
 var import_qrcode = __toESM(require_lib9(), 1);
 init_utils5();
-import path12 from "path";
+import path11 from "path";
 var router30 = (0, import_express30.Router)();
 router30.patch(
   "/programs/:id/hall-ticket-settings",
@@ -1138305,7 +1138872,7 @@ async function drawHallTicketPage(doc, data) {
   const photoH = 105;
   let hasPhoto = false;
   if (data.photoUrl && data.photoUrl.startsWith("/objects/")) {
-    const localPath = path12.join(process.cwd(), "uploads", data.photoUrl.replace("/objects/", ""));
+    const localPath = path11.join(process.cwd(), "uploads", data.photoUrl.replace("/objects/", ""));
     try {
       doc.image(localPath, photoX, photoY, { width: photoW, height: photoH });
       doc.rect(photoX, photoY, photoW, photoH).strokeColor(colors.border).lineWidth(1).stroke();
@@ -1138430,7 +1138997,7 @@ router30.get("/hall-tickets/download/:identifier", async (req, res) => {
     const candidateName = sub?.fullName || candidate?.fullName || "Candidate";
     const candidateCode = sub?.candidateCode || candidate?.candidateCode || `SAV-${sub?.id || "2026"}`;
     const hallTicketNumber = application?.hallTicketNumber || `${program?.hallTicketPrefix || "SAV-2026"}-${String(sub?.id || 1).padStart(3, "0")}`;
-    const doc = new import_pdfkit5.default({ margin: 36, size: "LETTER" });
+    const doc = new import_pdfkit4.default({ margin: 36, size: "LETTER" });
     const filename = `HallTicket_${candidateName.replace(/\s+/g, "_")}_${hallTicketNumber}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
@@ -1138494,7 +1139061,7 @@ router30.get(
       if (list.length === 0) {
         return res.status(400).json({ error: "No candidate records found for this program." });
       }
-      const doc = new import_pdfkit5.default({ margin: 36, size: "LETTER", autoFirstPage: false });
+      const doc = new import_pdfkit4.default({ margin: 36, size: "LETTER", autoFirstPage: false });
       const filename = `Batch_HallTickets_${program.code}_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.pdf`;
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -1138593,8 +1139160,8 @@ init_drizzle_orm();
 init_auth2();
 var XLSX7 = __toESM(require_xlsx(), 1);
 init_utils5();
-var import_pdfkit6 = __toESM(require_pdfkit(), 1);
-import path13 from "path";
+var import_pdfkit5 = __toESM(require_pdfkit(), 1);
+import path12 from "path";
 import fs13 from "fs/promises";
 var router32 = (0, import_express32.Router)();
 router32.get("/reports/cycle-report", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
@@ -1139035,7 +1139602,7 @@ router32.get("/applications/:id/hall-ticket", requireAuth, async (req, res) => {
       and(eq(documentsTable.candidateId, candidate.id), eq(documentsTable.docType, "PHOTO"))
     );
     if (photoDoc && photoDoc.fileUrl && photoDoc.fileUrl.startsWith("/objects/uploads/")) {
-      const p = path13.join(process.cwd(), "uploads", photoDoc.fileUrl.replace("/objects/uploads/", ""));
+      const p = path12.join(process.cwd(), "uploads", photoDoc.fileUrl.replace("/objects/uploads/", ""));
       try {
         await fs13.stat(p);
         localPhotoPath = p;
@@ -1139045,7 +1139612,7 @@ router32.get("/applications/:id/hall-ticket", requireAuth, async (req, res) => {
     if (!localPhotoPath) {
       const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, candidate.email));
       if (sub && sub.photoUrl && sub.photoUrl.startsWith("/objects/uploads/")) {
-        const p = path13.join(process.cwd(), "uploads", sub.photoUrl.replace("/objects/uploads/", ""));
+        const p = path12.join(process.cwd(), "uploads", sub.photoUrl.replace("/objects/uploads/", ""));
         try {
           await fs13.stat(p);
           localPhotoPath = p;
@@ -1139053,7 +1139620,7 @@ router32.get("/applications/:id/hall-ticket", requireAuth, async (req, res) => {
         }
       }
     }
-    const doc = new import_pdfkit6.default({ size: "A4", margin: 40 });
+    const doc = new import_pdfkit5.default({ size: "A4", margin: 40 });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="HallTicket_${candidate.fullName.replace(/\s+/g, "_")}.pdf"`);
     doc.pipe(res);
@@ -1139235,7 +1139802,7 @@ router32.get("/candidates/:id/hall-ticket", requireAuth, async (req, res) => {
       and(eq(documentsTable.candidateId, candidate.id), eq(documentsTable.docType, "PHOTO"))
     );
     if (photoDoc && photoDoc.fileUrl && photoDoc.fileUrl.startsWith("/objects/uploads/")) {
-      const p = path13.join(process.cwd(), "uploads", photoDoc.fileUrl.replace("/objects/uploads/", ""));
+      const p = path12.join(process.cwd(), "uploads", photoDoc.fileUrl.replace("/objects/uploads/", ""));
       try {
         await fs13.stat(p);
         localPhotoPath = p;
@@ -1139245,7 +1139812,7 @@ router32.get("/candidates/:id/hall-ticket", requireAuth, async (req, res) => {
     if (!localPhotoPath) {
       const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, candidate.email));
       if (sub && sub.photoUrl && sub.photoUrl.startsWith("/objects/uploads/")) {
-        const p = path13.join(process.cwd(), "uploads", sub.photoUrl.replace("/objects/uploads/", ""));
+        const p = path12.join(process.cwd(), "uploads", sub.photoUrl.replace("/objects/uploads/", ""));
         try {
           await fs13.stat(p);
           localPhotoPath = p;
@@ -1139253,7 +1139820,7 @@ router32.get("/candidates/:id/hall-ticket", requireAuth, async (req, res) => {
         }
       }
     }
-    const doc = new import_pdfkit6.default({ size: "A4", margin: 40 });
+    const doc = new import_pdfkit5.default({ size: "A4", margin: 40 });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="HallTicket_${candidate.fullName.replace(/\s+/g, "_")}.pdf"`);
     doc.pipe(res);
@@ -1139414,10 +1139981,10 @@ var reports_default = router32;
 // src/routes/index.ts
 init_src();
 init_drizzle_orm();
-var import_pdfkit7 = __toESM(require_pdfkit(), 1);
+var import_pdfkit6 = __toESM(require_pdfkit(), 1);
 init_auth2();
 init_utils5();
-import path14 from "path";
+import path13 from "path";
 import fs14 from "fs/promises";
 var router33 = (0, import_express33.Router)();
 router33.get("/ping", (req, res) => res.send("pong"));
@@ -1139433,7 +1140000,7 @@ router33.get(
       if (!sub) return res.status(404).json({ error: "Submission not found" });
       const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
       const [program] = form ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
-      const doc = new import_pdfkit7.default({
+      const doc = new import_pdfkit6.default({
         margin: 50,
         size: "A4",
         info: { Title: `Application - ${sub.fullName}`, Author: "Sankara Academy of Vision" }
@@ -1139519,7 +1140086,7 @@ router33.get(
       const photoW = 100;
       const photoH = 120;
       if (photoUrl && photoUrl.startsWith("/objects/")) {
-        const localPath = path14.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
+        const localPath = path13.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
         try {
           doc.image(localPath, photoX, photoY, { width: photoW, height: photoH });
           doc.rect(photoX, photoY, photoW, photoH).strokeColor(colors.border).lineWidth(1).stroke();
@@ -1139605,7 +1140172,7 @@ router33.get(
       let photoDataUrl = "";
       if (sub.photoUrl && sub.photoUrl.startsWith("/objects/")) {
         try {
-          const localPath = path14.join(process.cwd(), "uploads", sub.photoUrl.replace("/objects/", ""));
+          const localPath = path13.join(process.cwd(), "uploads", sub.photoUrl.replace("/objects/", ""));
           const buf = await fs14.readFile(localPath);
           const ext2 = localPath.split(".").pop()?.toLowerCase() || "jpg";
           const mime3 = ext2 === "png" ? "image/png" : "image/jpeg";
@@ -1139914,7 +1140481,7 @@ var routes_default = router33;
 // src/app.ts
 init_src();
 init_drizzle_orm();
-var import_pdfkit8 = __toESM(require_pdfkit(), 1);
+var import_pdfkit7 = __toESM(require_pdfkit(), 1);
 init_auth2();
 
 // src/middleware/mock.ts
@@ -1139969,7 +1140536,7 @@ app.get(
         const [candidate] = await db.select().from(candidatesTable).where(eq(candidatesTable.email, sub.email));
         if (candidate) candidateCode = candidate.candidateCode;
       }
-      const doc = new import_pdfkit8.default({
+      const doc = new import_pdfkit7.default({
         margin: 36,
         size: "LETTER",
         bufferPages: true,
@@ -1140055,7 +1140622,7 @@ app.get(
       const photoW = 85;
       const photoH = 105;
       if (photoUrl && photoUrl.startsWith("/objects/")) {
-        const localPath = path15.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
+        const localPath = path14.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
         try {
           doc.image(localPath, photoX, photoY, { width: photoW, height: photoH });
           doc.rect(photoX, photoY, photoW, photoH).strokeColor(colors.border).lineWidth(1).stroke();
@@ -1140162,12 +1140729,52 @@ app.get(
     }
   }
 );
-app.use("/objects", import_express34.default.static(path15.join(process.cwd(), "uploads")));
+app.use(["/objects", "/api/objects"], async (req, res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    return next();
+  }
+  const fullPath = (req.baseUrl || "") + (req.url || "");
+  const cleanPath = fullPath.replace(/^\/api/, "").split("?")[0];
+  const candidatePaths = [
+    path14.join(process.cwd(), "uploads", cleanPath.replace("/objects/uploads/", "")),
+    path14.join(os4.tmpdir(), "uploads", cleanPath.replace("/objects/uploads/", "")),
+    path14.join(process.cwd(), "uploads", cleanPath.replace("/objects/", "")),
+    path14.join(os4.tmpdir(), "uploads", cleanPath.replace("/objects/", ""))
+  ];
+  for (const cp of candidatePaths) {
+    try {
+      if (fs15.existsSync(cp) && fs15.statSync(cp).isFile()) {
+        return res.sendFile(cp);
+      }
+    } catch (_) {
+    }
+  }
+  try {
+    const normalizedPath = "/objects/uploads/" + cleanPath.replace(/^\/objects\/(uploads\/)?/, "");
+    const result = await db.execute(sql`
+      SELECT file_name, content_type, file_data, file_size 
+      FROM uploaded_files 
+      WHERE file_path = ${cleanPath} OR file_path = ${normalizedPath}
+      LIMIT 1
+    `);
+    if (result.rows.length > 0) {
+      const row = result.rows[0];
+      res.setHeader("Content-Type", row.content_type || "application/octet-stream");
+      res.setHeader("Content-Length", row.file_size);
+      res.setHeader("Content-Disposition", `inline; filename="${row.file_name}"`);
+      return res.end(row.file_data);
+    }
+  } catch (e2) {
+    console.error("[objects serving error]:", e2);
+  }
+  next();
+});
+app.use("/objects", import_express34.default.static(path14.join(process.cwd(), "uploads")));
 var candidateDistPaths = [
-  path15.join(fileURLToPath(new URL(".", import.meta.url)), "../../fellowship-exam/dist"),
-  path15.join(process.cwd(), "artifacts/fellowship-exam/dist"),
-  path15.join(process.cwd(), "public"),
-  path15.join(process.cwd(), "dist/public")
+  path14.join(fileURLToPath(new URL(".", import.meta.url)), "../../fellowship-exam/dist"),
+  path14.join(process.cwd(), "artifacts/fellowship-exam/dist"),
+  path14.join(process.cwd(), "public"),
+  path14.join(process.cwd(), "dist/public")
 ];
 var examDist = candidateDistPaths.find((p) => fs15.existsSync(p));
 if (examDist) {
@@ -1140176,7 +1140783,7 @@ if (examDist) {
     if (req.path.startsWith("/api") || req.path.startsWith("/objects")) {
       return next();
     }
-    res.sendFile(path15.join(examDist, "index.html"));
+    res.sendFile(path14.join(examDist, "index.html"));
   });
 }
 app.use((err, req, res, next) => {

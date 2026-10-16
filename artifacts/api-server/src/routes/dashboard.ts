@@ -154,11 +154,11 @@ router.get("/dashboard/summary", requireAuth, async (req: any, res) => {
         code: s.code || "GEN",
         seats: s.seats || 0,
         applicantCount,
-        totalApplications: specApps.length || applicantCount,
+        totalApplications: specApps.length,
         interviewCompletedCount: completedApps || allCandidates.filter((c) => (c.status === "interview_completed" || c.status === "allocated") && unionCandIds.has(c.id)).length,
         allocatedCount: specAllocated,
-        avgMcqScore: 0,
-        avgInterviewScore: 0,
+        avgMcqScore: specMcqAvg,
+        avgInterviewScore: specInterviewAvg,
       };
     });
 
@@ -233,7 +233,9 @@ router.get("/dashboard/summary", requireAuth, async (req: any, res) => {
     const interviewCompletedCandidatesCount = allCandidates.filter(
       (c) => c.status === "interview_completed" || c.status === "allocated"
     ).length;
-    const paidSubmissionsCount = programSubmissions.filter((s) => s.paidAmount && s.paidAmount > 0).length || allCandidates.length;
+    const paidSubmissionsCount = programSubmissions.filter((s) => (s.paidAmount && s.paidAmount > 0) || s.paymentId).length;
+    const scheduledAppCandIds = new Set(allApps.filter((a) => a.batchId !== null || a.interviewSlot !== null).map((a) => a.candidateId));
+    const callLettersIssuedCount = allCandidates.filter((c) => scheduledAppCandIds.has(c.id)).length;
 
     res.json({
       programs: allPrograms.map((p) => ({
@@ -258,7 +260,7 @@ router.get("/dashboard/summary", requireAuth, async (req: any, res) => {
           approved: approvedCandidatesCount,
           interviewCompleted: interviewCompletedCandidatesCount,
           allocated: allocatedCandidates,
-          callLettersIssued: approvedCandidatesCount,
+          callLettersIssued: callLettersIssuedCount,
         },
         applications: {
           total: allCandidates.length,
@@ -270,8 +272,8 @@ router.get("/dashboard/summary", requireAuth, async (req: any, res) => {
           pendingCount: pendingCandidatesCount,
         },
         callLetters: {
-          issuedCount: approvedCandidatesCount,
-          scheduledCount: allApps.filter((a) => a.batchId !== null || a.interviewSlot !== null).length || approvedCandidatesCount,
+          issuedCount: callLettersIssuedCount,
+          scheduledCount: allApps.filter((a) => a.batchId !== null || a.interviewSlot !== null).length,
         },
         interviews: {
           completedCount: interviewCompletedCandidatesCount,

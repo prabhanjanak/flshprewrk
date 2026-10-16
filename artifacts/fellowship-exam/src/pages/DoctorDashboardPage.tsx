@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { CandidateExamDialog } from "../components/CandidateExamDialog";
+import { SeatMatrixModal } from "../components/SeatMatrixModal";
+import { Grid3x3 } from "lucide-react";
 
 interface DoctorStats {
   panelName: string | null;
@@ -33,6 +35,7 @@ export default function DoctorDashboardPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [selectedCandidateId, setSelectedCandidateId] = useState<number | null>(null);
+  const [seatMatrixOpen, setSeatMatrixOpen] = useState(false);
 
   const { data: stats, isLoading, refetch, isFetching } = useQuery<DoctorStats>({
     queryKey: ["doctor-stats"],
@@ -78,6 +81,16 @@ export default function DoctorDashboardPage() {
             )}
           </div>
           <div className="flex items-center gap-2.5 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSeatMatrixOpen(true)}
+              className="h-11 px-5 rounded-xl bg-white border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-bold text-xs uppercase tracking-wider gap-2 shadow-xs shrink-0"
+              title="Open Live Seat Matrix & Vacancies"
+            >
+              <Grid3x3 className="h-4 w-4 text-indigo-600" />
+              View Seat Matrix
+            </Button>
             <Button
               size="sm"
               onClick={() => setLocation("/interviews")}
@@ -314,6 +327,11 @@ export default function DoctorDashboardPage() {
             open={!!selectedCandidateId}
             onClose={() => setSelectedCandidateId(null)}
             onSaved={() => refetch()}
+          />
+
+          <SeatMatrixModal
+            open={seatMatrixOpen}
+            onClose={() => setSeatMatrixOpen(false)}
           />
         </>
       )}
