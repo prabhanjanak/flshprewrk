@@ -46,6 +46,7 @@ const navItems: NavItem[] = [
   { label: "Applications & Admissions", href: "/application-forms", icon: FormInput,       roles: ["super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "unit_coordinator"] },
   { label: "Letters",                   href: "/letters",           icon: Award,           roles: ["super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "unit_coordinator"] },
   { label: "Interview Evaluation",      href: "/interviews",        icon: Stethoscope,     roles: ["super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "unit_coordinator", "doctor"] },
+  { label: "Application Settings",      href: "/payments",          icon: CreditCard,      roles: ["super_admin", "program_admin", "central_exam_coordinator"] },
   { label: "User Management",           href: "/users",             icon: Users,           roles: ["super_admin"] },
   { label: "My Results",                href: "/results",           icon: FileText,        roles: ["student"] },
 ];

@@ -177,10 +177,10 @@ export default function PaymentsPage() {
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-orange-100 text-sm font-medium">
               <IndianRupee className="h-4 w-4" />
-              <span>Financial Infrastructure</span>
+              <span>Application Settings · Financial Infrastructure</span>
             </div>
-            <h1 className="text-4xl font-extrabold tracking-tight">Payments & Gateway</h1>
-            <p className="text-orange-100/80 max-w-md">Configure Razorpay integrations, manage fee structures, and update institutional bank transfer protocols.</p>
+            <h1 className="text-4xl font-extrabold tracking-tight">Razorpay Gateway & Fee Configuration</h1>
+            <p className="text-orange-100/90 max-w-xl text-sm leading-relaxed">Configure live & test Razorpay API keys, fee models, and institutional banking protocols directly from this UI. Settings update immediately across all application forms.</p>
           </div>
           {canEdit && (
             <Button 

@@ -1135315,6 +1135315,83 @@ router20.delete(
   }
 );
 router20.get(
+  "/application-forms/:id/payment-settings",
+  requireAuth,
+  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, id));
+    if (!form) return res.status(404).json({ error: "Form not found" });
+    const programId = form.programId;
+    const all = await db.select().from(paymentSettingsTable);
+    const specific = programId ? all.find((s2) => s2.programId === programId) : null;
+    const global2 = all.find((s2) => s2.programId === null);
+    const setting = specific ?? global2 ?? null;
+    res.json({
+      id: setting?.id ?? null,
+      programId: programId ?? null,
+      razorpayKeyId: setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "",
+      razorpayKeySecret: setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || "",
+      amountRs: setting ? setting.amount / 100 : 2750,
+      currency: setting?.currency || "INR",
+      description: setting?.description || "Fellowship Application Fee",
+      mode: setting?.mode || "live",
+      upiId: setting?.upiId || "sankaraeye@hdfcbank",
+      isActive: setting ? setting.isActive : true
+    });
+  }
+);
+router20.put(
+  "/application-forms/:id/payment-settings",
+  requireAuth,
+  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, id));
+    if (!form) return res.status(404).json({ error: "Form not found" });
+    const { razorpayKeyId, razorpayKeySecret, amountRs, currency, description, mode, upiId, isActive } = req.body;
+    const programId = form.programId;
+    const [existing] = await db.select().from(paymentSettingsTable).where(eq(paymentSettingsTable.programId, programId));
+    let settingRecord;
+    if (existing) {
+      [settingRecord] = await db.update(paymentSettingsTable).set({
+        razorpayKeyId: razorpayKeyId !== void 0 ? razorpayKeyId : existing.razorpayKeyId,
+        razorpayKeySecret: razorpayKeySecret !== void 0 ? razorpayKeySecret : existing.razorpayKeySecret,
+        amount: amountRs !== void 0 ? Math.round(Number(amountRs) * 100) : existing.amount,
+        currency: currency ?? existing.currency,
+        description: description ?? existing.description,
+        mode: mode ?? existing.mode,
+        upiId: upiId !== void 0 ? upiId : existing.upiId,
+        isActive: isActive !== void 0 ? Boolean(isActive) : existing.isActive
+      }).where(eq(paymentSettingsTable.id, existing.id)).returning();
+    } else {
+      [settingRecord] = await db.insert(paymentSettingsTable).values({
+        programId,
+        razorpayKeyId: razorpayKeyId ?? null,
+        razorpayKeySecret: razorpayKeySecret ?? null,
+        amount: Math.round((Number(amountRs) || 2750) * 100),
+        currency: currency || "INR",
+        description: description || "Fellowship Application Fee",
+        mode: mode || "live",
+        upiId: upiId || "sankaraeye@hdfcbank",
+        isActive: isActive !== void 0 ? Boolean(isActive) : true
+      }).returning();
+    }
+    if (programId) {
+      const progUpdates = {};
+      if (amountRs !== void 0) progUpdates.feeAmount = Math.round(Number(amountRs));
+      if (isActive !== void 0) progUpdates.requiresPayment = Boolean(isActive);
+      if (Object.keys(progUpdates).length > 0) {
+        await db.update(programsTable).set(progUpdates).where(eq(programsTable.id, programId));
+      }
+    }
+    res.json({
+      ...settingRecord,
+      amountRs: settingRecord.amount / 100
+    });
+  }
+);
+router20.get(
   "/application-forms/:id/submissions",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),

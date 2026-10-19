@@ -17,12 +17,12 @@ import { Switch } from "../components/ui/switch";
 import { Separator } from "../components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import {
-  Plus, Link2, Copy, Check, Eye, Users, Clock, ChevronRight, ArrowLeft, ExternalLink,
+  Plus, Link2, Copy, Check, Eye, EyeOff, Users, Clock, ChevronRight, ArrowLeft, ExternalLink,
   FileCheck, FileX, Loader2, Trash2, Download, CreditCard, GripVertical, Settings2, X,
   RefreshCw, CheckCheck, Ban, FileText, ImageIcon, ChevronDown, ChevronUp, Building2, Printer,
   Edit3 as Edit, Save, AlertCircle, FileJson, CheckCircle2, LayoutDashboard, CalendarDays,
   FileSignature, ExternalLink as ExtLink, FileType, CheckCircle, UserPlus, GitMerge,
-  Mail, Send, Search, Phone
+  Mail, Send, Search, Phone, IndianRupee, ShieldCheck, Zap
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { motion, AnimatePresence } from "framer-motion";
@@ -1101,6 +1101,56 @@ export default function ApplicationFormsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editFormGsData, editForm?.id]);
 
+  // Razorpay payment settings state for edit form
+  const [editPaymentConfig, setEditPaymentConfig] = useState({
+    razorpayKeyId: "",
+    razorpayKeySecret: "",
+    amountRs: 2750,
+    currency: "INR",
+    description: "Fellowship Application Fee",
+    mode: "live",
+    upiId: "sankaraeye@hdfcbank",
+    isActive: true,
+  });
+  const [showPaymentSecret, setShowPaymentSecret] = useState(false);
+  const [savingPaymentConfig, setSavingPaymentConfig] = useState(false);
+
+  // Load existing payment config when edit dialog opens
+  const { data: editFormPaymentData } = useQuery<any>({
+    queryKey: ["form-payment-config", editForm?.id],
+    queryFn: () => api.get<any>(`/application-forms/${editForm!.id}/payment-settings`),
+    enabled: editForm !== null,
+  });
+
+  useEffect(() => {
+    if (editFormPaymentData && editForm) {
+      setEditPaymentConfig({
+        razorpayKeyId: editFormPaymentData.razorpayKeyId || "",
+        razorpayKeySecret: editFormPaymentData.razorpayKeySecret || "",
+        amountRs: editFormPaymentData.amountRs || 2750,
+        currency: editFormPaymentData.currency || "INR",
+        description: editFormPaymentData.description || "Fellowship Application Fee",
+        mode: editFormPaymentData.mode || "live",
+        upiId: editFormPaymentData.upiId || "sankaraeye@hdfcbank",
+        isActive: editFormPaymentData.isActive !== false,
+      });
+    }
+  }, [editFormPaymentData, editForm?.id]);
+
+  const saveFormPaymentConfig = async (formId: number) => {
+    try {
+      setSavingPaymentConfig(true);
+      await api.put(`/application-forms/${formId}/payment-settings`, editPaymentConfig);
+      toast({ title: "Razorpay payment settings saved successfully" });
+      qc.invalidateQueries({ queryKey: ["form-payment-config", formId] });
+      qc.invalidateQueries({ queryKey: ["payment-settings"] });
+    } catch (err: any) {
+      toast({ title: "Failed to save payment settings", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingPaymentConfig(false);
+    }
+  };
+
   // Submissions list UI state
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -1175,13 +1225,21 @@ export default function ApplicationFormsPage() {
   });
 
   const updateFormMutation = useMutation({
-    mutationFn: (data: { id: number; title?: string; description?: string; deadline?: string; customFields?: CustomField[]; sectionsConfig?: any[] }) => {
+    mutationFn: async (data: { id: number; title?: string; description?: string; deadline?: string; customFields?: CustomField[]; sectionsConfig?: any[] }) => {
       const { id, ...body } = data;
-      return api.patch<ApplicationForm>(`/application-forms/${id}`, body);
+      const res = await api.patch<ApplicationForm>(`/application-forms/${id}`, body);
+      try {
+        await api.put(`/application-forms/${id}/payment-settings`, editPaymentConfig);
+      } catch (err) {
+        console.error("Auto-saving payment settings failed", err);
+      }
+      return res;
     },
     onSuccess: () => {
-      toast({ title: "Form updated" });
+      toast({ title: "Form and payment gateway settings updated successfully" });
       qc.invalidateQueries({ queryKey: ["application-forms"] });
+      qc.invalidateQueries({ queryKey: ["form-payment-config"] });
+      qc.invalidateQueries({ queryKey: ["payment-settings"] });
       setEditForm(null);
       setEditCustomFields([]);
       setEditSectionsConfig([]);
@@ -3407,6 +3465,19 @@ export default function ApplicationFormsPage() {
                   >
                     <Settings2 className="w-4 h-4 mr-2 text-slate-500" /> Edit Form Config & Fields
                   </Button>
+                  <Button
+                    variant="outline"
+                    className="rounded-2xl border-orange-200 bg-orange-50/50 hover:bg-orange-100 text-orange-700 font-bold text-xs"
+                    onClick={() => {
+                      if (viewedForm) {
+                        setEditForm(viewedForm);
+                        setEditCustomFields(viewedForm.customFields ?? []);
+                        setEditSectionsConfig(viewedForm.sectionsConfig ?? []);
+                      }
+                    }}
+                  >
+                    <CreditCard className="w-4 h-4 mr-2 text-orange-600" /> Razorpay & Gateway Config
+                  </Button>
                 </div>
               </Card>
 
@@ -4001,6 +4072,131 @@ export default function ApplicationFormsPage() {
                   value={editForm.deadline ? new Date(editForm.deadline).toISOString().slice(0, 16) : ""}
                   onChange={(e) => setEditForm((f) => f ? { ...f, deadline: e.target.value || null } : f)}
                 />
+              </div>
+
+              <Separator />
+
+              {/* Razorpay Gateway & Application Payment Configuration */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold flex items-center gap-2">
+                      <CreditCard className="h-4 w-4 text-orange-600" />
+                      Razorpay Payment Gateway & Fee Settings
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Configure live/test Razorpay API keys, application fees, and gateway status directly for this form
+                    </p>
+                  </div>
+                  <Badge variant={editPaymentConfig.isActive ? "default" : "secondary"} className={editPaymentConfig.isActive ? (editPaymentConfig.mode === "live" ? "bg-emerald-600 text-white font-bold" : "bg-blue-600 text-white font-bold") : "bg-slate-200 text-slate-700 font-bold"}>
+                    {editPaymentConfig.isActive ? (editPaymentConfig.mode === "live" ? "Live Gateway Active" : "Test Mode Active") : "Payment Disabled"}
+                  </Badge>
+                </div>
+
+                <div className="space-y-3 rounded-2xl border border-orange-200/80 p-4 bg-orange-50/40 dark:bg-slate-900/40 shadow-sm">
+                  <div className="flex items-center justify-between pb-3 border-b border-orange-200/60 dark:border-slate-800">
+                    <div>
+                      <Label className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                        Enable Online Application Fee Collection
+                      </Label>
+                      <p className="text-[11px] text-muted-foreground">When enabled, candidates must pay before submitting or provide UTR proof</p>
+                    </div>
+                    <Switch
+                      checked={editPaymentConfig.isActive}
+                      onCheckedChange={(checked) => setEditPaymentConfig((c) => ({ ...c, isActive: checked }))}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold">Gateway Mode</Label>
+                      <Select
+                        value={editPaymentConfig.mode}
+                        onValueChange={(val) => setEditPaymentConfig((c) => ({ ...c, mode: val }))}
+                      >
+                        <SelectTrigger className="h-9 text-xs bg-white dark:bg-slate-800 font-semibold border-slate-300">
+                          <SelectValue placeholder="Mode" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="live" className="text-emerald-700 font-bold">🟢 Live (Production Checkout)</SelectItem>
+                          <SelectItem value="test" className="text-blue-700 font-bold">🔵 Test (Sandbox / Simulation)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold flex items-center gap-1">
+                        <IndianRupee className="h-3.5 w-3.5 text-slate-500" /> Fee per Specialization (₹ INR)
+                      </Label>
+                      <Input
+                        type="number"
+                        value={editPaymentConfig.amountRs}
+                        onChange={(e) => setEditPaymentConfig((c) => ({ ...c, amountRs: Number(e.target.value) }))}
+                        className="h-9 text-xs bg-white dark:bg-slate-800 font-bold border-slate-300"
+                        placeholder="2750"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Razorpay Key ID</Label>
+                    <Input
+                      placeholder="rzp_live_... or rzp_test_..."
+                      value={editPaymentConfig.razorpayKeyId}
+                      onChange={(e) => setEditPaymentConfig((c) => ({ ...c, razorpayKeyId: e.target.value }))}
+                      className="h-9 text-xs font-mono bg-white dark:bg-slate-800 border-slate-300"
+                    />
+                    <p className="text-[10px] text-muted-foreground">Find this in Razorpay Dashboard → Settings → API Keys</p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold">Razorpay Key Secret</Label>
+                      <button
+                        type="button"
+                        onClick={() => setShowPaymentSecret(!showPaymentSecret)}
+                        className="text-[11px] text-orange-600 hover:text-orange-700 font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        {showPaymentSecret ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                        {showPaymentSecret ? "Hide Secret" : "Reveal Secret"}
+                      </button>
+                    </div>
+                    <Input
+                      type={showPaymentSecret ? "text" : "password"}
+                      placeholder="Paste Razorpay Secret Key here"
+                      value={editPaymentConfig.razorpayKeySecret}
+                      onChange={(e) => setEditPaymentConfig((c) => ({ ...c, razorpayKeySecret: e.target.value }))}
+                      className="h-9 text-xs font-mono bg-white dark:bg-slate-800 border-slate-300"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Institutional UPI ID (for QR Code & UTR payment fallback)</Label>
+                    <Input
+                      placeholder="e.g. sankaraeye@hdfcbank"
+                      value={editPaymentConfig.upiId}
+                      onChange={(e) => setEditPaymentConfig((c) => ({ ...c, upiId: e.target.value }))}
+                      className="h-9 text-xs font-mono bg-white dark:bg-slate-800 border-slate-300"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-orange-200/50 dark:border-slate-800">
+                    <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                      <Zap className="h-3 w-3 text-orange-500" /> Saved directly to institutional database; active immediately for all applicants.
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={savingPaymentConfig}
+                      onClick={() => saveFormPaymentConfig(editForm.id)}
+                      className="h-8 gap-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-sm self-end sm:self-auto shrink-0"
+                    >
+                      {savingPaymentConfig ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                      Save Payment Settings
+                    </Button>
+                  </div>
+                </div>
               </div>
 
               <Separator />

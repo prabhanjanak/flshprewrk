@@ -483,6 +483,94 @@ router.delete(
   }
 );
 
+// Admin: get payment settings for a specific form
+router.get(
+  "/application-forms/:id/payment-settings",
+  requireAuth,
+  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, id));
+    if (!form) return res.status(404).json({ error: "Form not found" });
+
+    const programId = form.programId;
+    const all = await db.select().from(paymentSettingsTable);
+    const specific = programId ? all.find((s) => s.programId === programId) : null;
+    const global = all.find((s) => s.programId === null);
+    const setting = specific ?? global ?? null;
+
+    res.json({
+      id: setting?.id ?? null,
+      programId: programId ?? null,
+      razorpayKeyId: setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "",
+      razorpayKeySecret: setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || "",
+      amountRs: setting ? setting.amount / 100 : 2750,
+      currency: setting?.currency || "INR",
+      description: setting?.description || "Fellowship Application Fee",
+      mode: setting?.mode || "live",
+      upiId: setting?.upiId || "sankaraeye@hdfcbank",
+      isActive: setting ? setting.isActive : true,
+    });
+  }
+);
+
+// Admin: update payment settings for a specific form
+router.put(
+  "/application-forms/:id/payment-settings",
+  requireAuth,
+  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, id));
+    if (!form) return res.status(404).json({ error: "Form not found" });
+
+    const { razorpayKeyId, razorpayKeySecret, amountRs, currency, description, mode, upiId, isActive } = req.body;
+    const programId = form.programId;
+
+    const [existing] = await db.select().from(paymentSettingsTable).where(eq(paymentSettingsTable.programId, programId));
+    let settingRecord: any;
+
+    if (existing) {
+      [settingRecord] = await db.update(paymentSettingsTable).set({
+        razorpayKeyId: razorpayKeyId !== undefined ? razorpayKeyId : existing.razorpayKeyId,
+        razorpayKeySecret: razorpayKeySecret !== undefined ? razorpayKeySecret : existing.razorpayKeySecret,
+        amount: amountRs !== undefined ? Math.round(Number(amountRs) * 100) : existing.amount,
+        currency: currency ?? existing.currency,
+        description: description ?? existing.description,
+        mode: mode ?? existing.mode,
+        upiId: upiId !== undefined ? upiId : existing.upiId,
+        isActive: isActive !== undefined ? Boolean(isActive) : existing.isActive,
+      }).where(eq(paymentSettingsTable.id, existing.id)).returning();
+    } else {
+      [settingRecord] = await db.insert(paymentSettingsTable).values({
+        programId,
+        razorpayKeyId: razorpayKeyId ?? null,
+        razorpayKeySecret: razorpayKeySecret ?? null,
+        amount: Math.round((Number(amountRs) || 2750) * 100),
+        currency: currency || "INR",
+        description: description || "Fellowship Application Fee",
+        mode: mode || "live",
+        upiId: upiId || "sankaraeye@hdfcbank",
+        isActive: isActive !== undefined ? Boolean(isActive) : true,
+      }).returning();
+    }
+
+    if (programId) {
+      const progUpdates: Record<string, any> = {};
+      if (amountRs !== undefined) progUpdates.feeAmount = Math.round(Number(amountRs));
+      if (isActive !== undefined) progUpdates.requiresPayment = Boolean(isActive);
+      if (Object.keys(progUpdates).length > 0) {
+        await db.update(programsTable).set(progUpdates).where(eq(programsTable.id, programId));
+      }
+    }
+
+    res.json({
+      ...settingRecord,
+      amountRs: settingRecord.amount / 100,
+    });
+  }
+);
+
 router.get(
   "/application-forms/:id/submissions",
   requireAuth,
