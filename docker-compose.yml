@@ -33,6 +33,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 10s
     networks:
       - fellowship_network
 
@@ -48,10 +49,12 @@ services:
     depends_on:
       fellowship-db:
         condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       NODE_ENV: production
       PORT: 3002
-      DATABASE_URL: postgresql://${POSTGRES_USER:-fellowship_admin}:${POSTGRES_PASSWORD:-FellowshipSecure2026!}@fellowship-db:5432/${POSTGRES_DB:-fellowship_db}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-fellowship_admin}:${POSTGRES_PASSWORD:-FellowshipSecure2026!}@fellowship-db:5432/${POSTGRES_DB:-fellowship_db}}
       SESSION_SECRET: ${SESSION_SECRET:-FellowshipSecretKey2026SuperSecureSessionToken}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -71,7 +74,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
-      start_period: 15s
+      start_period: 30s
     networks:
       - fellowship_network
 

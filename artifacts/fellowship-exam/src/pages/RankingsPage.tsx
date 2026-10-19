@@ -11,7 +11,7 @@ import { Label } from "../components/ui/label";
 import { Input } from "../components/ui/input";
 import { useToast } from "../hooks/use-toast";
 import { 
-  Trophy, Medal, Download, RefreshCw, 
+  Trophy, Medal, Award, Download, RefreshCw, 
   Sparkles, Loader2, Stethoscope, Search, FileText,
   User, CheckCircle2, ChevronRight, Filter
 } from "lucide-react";

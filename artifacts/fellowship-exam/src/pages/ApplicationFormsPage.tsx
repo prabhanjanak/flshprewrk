@@ -276,6 +276,17 @@ function parseActualSpecializations(s: any): string[] {
   return parseSpecializations(s.specialization);
 }
 
+function cleanDoctorName(rawName: string | null | undefined): string {
+  if (!rawName) return "";
+  return rawName.replace(/^(?:\s*(?:dr\.?|doctor)\s*)+/gi, "").trim();
+}
+
+function isRetinaSpecialty(spec: string | null | undefined): boolean {
+  if (!spec) return false;
+  const s = spec.toLowerCase();
+  return s.includes("retina") || s.includes("vrs") || s.includes("vitreo");
+}
+
 function SubmissionFormDataEditor({ sectionsConfig, formData, onChange, onFileUpload }: { sectionsConfig: any[], formData: any, onChange: (newData: any) => void, onFileUpload?: (field: string, url: string) => void }) {
   const updateField = (id: string, mapping: string | undefined, value: any, isStandard?: boolean) => {
     if (isStandard && mapping) {
@@ -693,7 +704,10 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 function buildFormLink(token: string) {
-  return `${window.location.origin}/apply/${token}`;
+  if (typeof window !== "undefined" && window.location.hostname === "localhost") {
+    return `${window.location.origin}/apply/${token}`;
+  }
+  return `https://learn.sankaraeye.in/apply/${token}`;
 }
 
 function genId() {
@@ -1120,7 +1134,9 @@ export default function ApplicationFormsPage() {
     queryKey: ["application-forms"],
     queryFn: () => api.get<ApplicationForm[]>("/application-forms"),
   });
-  const filteredForms = activeProgramId ? forms.filter((f) => f.programId === activeProgramId) : forms;
+  const filteredForms = forms
+    .filter((f) => f.token !== "JULY2026" && !/july\s*2026/i.test(f.title || ""))
+    .filter((f) => (activeProgramId ? f.programId === activeProgramId : true));
   const { data: programs = [] } = useQuery<Program[]>({
     queryKey: ["programs"],
     queryFn: () => api.get<Program[]>("/programs"),
@@ -1414,8 +1430,12 @@ export default function ApplicationFormsPage() {
   const sendCallLetterEmail = async (submissionId: number, candidateName: string) => {
     setSendingEmailId(submissionId);
     try {
-      await api.post(`/application-forms/submissions/${submissionId}/send-call-letter`, {});
-      toast({ title: "Call Letter Dispatched", description: `Call Letter with PDF attachment emailed to ${candidateName}.` });
+      const res: any = await api.post(`/application-forms/submissions/${submissionId}/send-call-letter`, {});
+      if (res?.emailSent) {
+        toast({ title: "Call Letter Dispatched", description: `Call Letter with PDF attachment emailed to ${candidateName}.` });
+      } else {
+        toast({ title: "Call Letter Issued", description: res?.message || `PDF generated successfully. Download PDF directly.` });
+      }
     } catch (e: any) {
       toast({ title: "Email Failed", description: e.message || "Failed to send email", variant: "destructive" });
     } finally {
@@ -3863,7 +3883,7 @@ export default function ApplicationFormsPage() {
               <Label>Custom Link Code (optional)</Label>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground whitespace-nowrap bg-muted px-3 py-2 rounded-md border">{window.location.origin}/apply/</span>
-                <Input placeholder="e.g., JULY2026"
+                <Input placeholder="e.g., JAN2027"
                   value={createFormData.customToken} onChange={(e) => setCreateFormData((f) => ({ ...f, customToken: e.target.value.replace(/[^a-zA-Z0-9-]/g, '').toUpperCase() }))} />
               </div>
               <p className="text-xs text-muted-foreground">Leave blank to auto-generate a random link.</p>

@@ -2059,7 +2059,7 @@ router.post("/candidates/:id/send-call-letter", requireAuth, requireRole("super_
     const isRetina = isRetinaSpecialty(spec);
     const fileName = `Interview_Call_Letter_${isRetina ? "Retina" : "Anterior"}_${c.candidateCode}.pdf`;
 
-    await sendCallLetterWithAttachment({
+    const emailResult = await sendCallLetterWithAttachment({
       toEmail: c.email,
       toName: c.fullName,
       pdfBuffer,
@@ -2070,11 +2070,18 @@ router.post("/candidates/:id/send-call-letter", requireAuth, requireRole("super_
       specialization: spec,
     });
 
-    res.json({ success: true, isRetina, fileName });
+    res.json({
+      success: true,
+      isRetina,
+      fileName,
+      emailSent: emailResult.sent,
+      message: emailResult.sent
+        ? "Call letter dispatched by email and ready for download."
+        : "Call letter PDF generated successfully. (Note: Email was not sent because SMTP is not configured. Download PDF directly).",
+    });
   } catch (err: any) {
     console.error("[send-call-letter] Error:", err);
-    const status = err.message?.includes("SMTP") ? 400 : 500;
-    res.status(status).json({ error: err.message || "Failed to send call letter" });
+    res.status(500).json({ error: err.message || "Failed to generate call letter" });
   }
 });
 
@@ -2137,7 +2144,7 @@ router.post("/candidates/:id/send-offer-letter", requireAuth, requireRole("super
 
     const fileName = `Fellowship_Offer_Letter_${c.candidateCode}.pdf`;
 
-    await sendOfferLetterWithAttachment({
+    const emailResult = await sendOfferLetterWithAttachment({
       toEmail: c.email,
       toName: c.fullName,
       pdfBuffer,
@@ -2146,11 +2153,17 @@ router.post("/candidates/:id/send-offer-letter", requireAuth, requireRole("super
       unitName,
     });
 
-    res.json({ success: true, fileName });
+    res.json({
+      success: true,
+      fileName,
+      emailSent: emailResult.sent,
+      message: emailResult.sent
+        ? "Offer letter dispatched by email and ready for download."
+        : "Offer letter PDF generated successfully. (Note: Email was not sent because SMTP is not configured. Download PDF directly).",
+    });
   } catch (err: any) {
     console.error("[send-offer-letter] Error:", err);
-    const status = err.message?.includes("SMTP") ? 400 : 500;
-    res.status(status).json({ error: err.message || "Failed to send offer letter" });
+    res.status(500).json({ error: err.message || "Failed to generate offer letter" });
   }
 });
 

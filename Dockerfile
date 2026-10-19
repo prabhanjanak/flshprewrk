@@ -52,7 +52,8 @@ RUN apk add --no-cache curl tzdata
 ENV TZ=Asia/Kolkata
 
 # Create directories for persistent uploads and static assets
-RUN mkdir -p /app/uploads /app/dist /app/artifacts/fellowship-exam/dist /app/public
+RUN mkdir -p /app/uploads /app/dist /app/artifacts/fellowship-exam/dist /app/public \
+             /app/artifacts/api-server/assets /app/assets /app/api/assets /app/extracted_logos
 
 # Copy compiled backend bundle from builder
 COPY --from=builder /app/artifacts/api-server/dist ./dist
@@ -61,8 +62,12 @@ COPY --from=builder /app/artifacts/api-server/dist ./dist
 COPY --from=builder /app/artifacts/fellowship-exam/dist ./artifacts/fellowship-exam/dist
 COPY --from=builder /app/artifacts/fellowship-exam/dist ./public
 
-# Copy logo and required static assets
+# Copy logo and required static assets for PDF generators and UI
 COPY --from=builder /app/artifacts/fellowship-exam/src/assets ./artifacts/fellowship-exam/src/assets
+COPY --from=builder /app/artifacts/api-server/assets ./artifacts/api-server/assets
+COPY --from=builder /app/artifacts/api-server/assets ./assets
+COPY --from=builder /app/api/assets ./api/assets
+COPY --from=builder /app/extracted_logos ./extracted_logos
 
 # Copy node_modules needed for runtime external modules (e.g. sharp, pdfkit, pg, archiver)
 COPY --from=builder /app/node_modules ./node_modules
@@ -73,8 +78,8 @@ RUN chmod -R 777 /app/uploads
 
 EXPOSE 3002
 
-# Docker Healthcheck
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+# Docker Healthcheck (gives 30s start-period for PostgreSQL & automatic DB bootstrap)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD curl -f http://localhost:3002/api/healthz || exit 1
 
 # Launch production server

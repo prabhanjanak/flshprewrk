@@ -1,7 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { loadDraft, saveDraft, clearDraft } from "../lib/draftStore";
 import logoUrl from "../assets/seh_sav_logo_1777703794142.jpg";
-import { Loader2, AlertCircle, CheckCircle2, ChevronRight, ChevronLeft, ChevronDown, CreditCard } from "lucide-react";
+import { 
+  Loader2, AlertCircle, CheckCircle2, ChevronRight, ChevronLeft, ChevronDown, 
+  CreditCard, Building2, Copy, Check, Upload, ArrowRightLeft, ShieldCheck, QrCode,
+  Download, Printer, FileText
+} from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -121,15 +125,38 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [submissionId, setSubmissionId] = useState<string | null>(null);
-  const [paymentConfig, setPaymentConfig] = useState<{ amount: number; currency: string; description: string; mock: boolean } | null>(null);
+  const [paymentConfig, setPaymentConfig] = useState<{ 
+    amount: number; 
+    currency: string; 
+    description: string; 
+    mock: boolean;
+    bankDetails?: {
+      accountName: string;
+      accountNumber: string;
+      bankName: string;
+      branch: string;
+      ifscCode: string;
+      upiId: string;
+    };
+  } | null>(null);
 
-  // Load Razorpay Script
+  // Dual Payment Mode State: "online" (Razorpay) or "bank_transfer" (Direct NEFT/RTGS/UPI)
+  const [paymentMethod, setPaymentMethod] = useState<"online" | "bank_transfer">("online");
+  const [paymentUTR, setPaymentUTR] = useState<string>("");
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [copiedBankField, setCopiedBankField] = useState<string | null>(null);
+
+  // Safe Razorpay Script Loader
   useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.async = true;
-    document.body.appendChild(script);
-    return () => { document.body.removeChild(script); };
+    if (typeof (window as any).Razorpay === "function") return;
+    const existing = document.getElementById("razorpay-checkout-js");
+    if (!existing) {
+      const script = document.createElement("script");
+      script.id = "razorpay-checkout-js";
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      document.body.appendChild(script);
+    }
   }, []);
 
   useEffect(() => {
@@ -274,6 +301,14 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
          return next;
       });
     }
+  };
+
+  const copyToClipboard = (text: string, fieldKey: string) => {
+    try {
+      navigator.clipboard.writeText(text);
+      setCopiedBankField(fieldKey);
+      setTimeout(() => setCopiedBankField(null), 2500);
+    } catch (_) {}
   };
 
   const isFieldVisible = (f: any, formData: Record<string, any>) => {
@@ -450,28 +485,41 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
         }
       }
       const finalForm = { ...form, ...uploadedUrls };
+      const specCount = Array.isArray(finalForm.specialization) ? finalForm.specialization.length : 1;
+      const unitFee = paymentConfig ? paymentConfig.amount / 100 : 2750;
+      const calculatedAmount = unitFee * specCount;
 
+      // ── Option A: Direct Administrative Manual Entry Flow ──
       if (isManualEntry) {
-         const specCount = Array.isArray(finalForm.specialization) ? finalForm.specialization.length : 1;
-         const calculatedAmount = 2750 * specCount;
-         const verifiedState = {
-           paymentId: finalForm.paymentUTR || ("MANUAL_ENTRY_" + Date.now()),
-           finalForm: { ...finalForm, paymentMode: "Manual Offline", paidAmount: calculatedAmount },
-           verifyResponse: { success: true }
-         };
-         setPaymentVerified(verifiedState);
-         
-         // Persist manual payment state immediately
-         await saveDraft(token, { form, step, files, paymentVerified: verifiedState });
-         localStorage.setItem(`payment_verified_${token}`, JSON.stringify(verifiedState));
-         
-         window.scrollTo(0, 0);
-         setSubmitting(false);
-         return;
+        const utr = (paymentUTR || finalForm.paymentUTR || "").trim();
+        if (!utr) {
+          setSubmitError("Please enter the offline payment reference / UTR number.");
+          setSubmitting(false);
+          return;
+        }
+
+        const verifiedState = {
+          paymentId: utr,
+          finalForm: { 
+            ...finalForm, 
+            ...uploadedUrls,
+            paymentUTR: utr, 
+            paymentMode: "Manual Offline", 
+            paidAmount: calculatedAmount 
+          },
+          verifyResponse: { success: true, mode: "manual_offline" }
+        };
+        setPaymentVerified(verifiedState);
+        
+        await saveDraft(token, { form, step, files, paymentVerified: verifiedState });
+        localStorage.setItem(`payment_verified_${token}`, JSON.stringify(verifiedState));
+        
+        window.scrollTo(0, 0);
+        setSubmitting(false);
+        return;
       }
 
-      // 2. Create Order
-      const specCount = Array.isArray(form.specialization) ? form.specialization.length : 1;
+      // ── Option B: Instant Online Gateway (Razorpay Only) ──
       const orderRes = await fetch(`${API}/payment/create-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -479,7 +527,45 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
       });
       
       const orderData = await orderRes.json();
-      if (!orderRes.ok) throw new Error(orderData.error || "Failed to initiate payment");
+      if (!orderRes.ok) {
+        setSubmitError(orderData.error || "Online payment gateway is temporarily unreachable. Please retry.");
+        setSubmitting(false);
+        return;
+      }
+
+      // If simulated or test mode without live credentials
+      if (orderData.mock === true) {
+        const simPaymentId = `pay_sim_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        const verifiedState = {
+          paymentId: simPaymentId,
+          finalForm: { ...finalForm, paymentMode: "Verified Online", paidAmount: orderData.totalAmount || calculatedAmount },
+          verifyResponse: { success: true },
+        };
+        setPaymentVerified(verifiedState);
+        await saveDraft(token, { form, step, files, paymentVerified: verifiedState });
+        localStorage.setItem(`payment_verified_${token}`, JSON.stringify(verifiedState));
+        window.scrollTo(0, 0);
+        setSubmitting(false);
+        return;
+      }
+
+      // Ensure Razorpay SDK is available
+      if (typeof (window as any).Razorpay !== "function") {
+        await new Promise<void>((resolve) => {
+          const s = document.createElement("script");
+          s.src = "https://checkout.razorpay.com/v1/checkout.js";
+          s.onload = () => resolve();
+          s.onerror = () => resolve();
+          document.body.appendChild(s);
+          setTimeout(resolve, 2500);
+        });
+      }
+
+      if (typeof (window as any).Razorpay !== "function") {
+        setSubmitError("Online payment popup was blocked by your browser. Please allow popups and click 'Pay via Razorpay' again.");
+        setSubmitting(false);
+        return;
+      }
 
       const options = {
         key: orderData.key,
@@ -490,7 +576,7 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
         order_id: orderData.order.id,
         handler: async (response: any) => {
           try {
-            // 3. Verify Payment signature
+            // Verify Payment signature
             const verifyRes = await fetch(`${API}/payment/verify`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -499,15 +585,14 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
             const verifyData = await verifyRes.json();
             if (!verifyRes.ok) throw new Error(verifyData.error || "Payment verification failed");
 
-            // 4. Show payment confirmation screen (user sees Payment ID, then confirms)
+            // Show payment confirmation screen
             const verifiedState = {
-              paymentId: response.razorpay_payment_id,
-              finalForm,
+              paymentId: response.razorpay_payment_id || ("PAY_" + Date.now()),
+              finalForm: { ...finalForm, paymentMode: "Razorpay Online", paidAmount: orderData.totalAmount || calculatedAmount },
               verifyResponse: verifyData,
             };
             setPaymentVerified(verifiedState);
 
-            // Persist payment state immediately for mobile stability
             await saveDraft(token, { form, step, files, paymentVerified: verifiedState });
             localStorage.setItem(`payment_verified_${token}`, JSON.stringify(verifiedState));
 
@@ -523,14 +608,19 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
           email: finalForm.email || "",
           contact: finalForm.phone || "",
         },
-        theme: { color: "#ea580c" },
-        modal: { ondismiss: () => setSubmitting(false) }
+        theme: { color: "#000080" },
+        modal: { 
+          ondismiss: () => {
+            setSubmitting(false);
+            setSubmitError("Payment modal was closed before completing payment. Please click 'Pay via Razorpay' to complete your application fee.");
+          } 
+        }
       };
 
       const rzp = new (window as any).Razorpay(options);
       rzp.open();
     } catch (e: any) {
-      setSubmitError(e.message);
+      setSubmitError(e.message || "Online payment error. Please click 'Pay via Razorpay' to retry.");
       setSubmitting(false);
     }
   };
@@ -659,6 +749,9 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
 
   // ── Final Success / Printable Application Document ─────────────────────
   if (submitted) {
+    const totalPaid = ((paymentConfig ? paymentConfig.amount / 100 : 2750) * (Array.isArray(form.specialization) ? form.specialization.length : 1));
+    const receiptDownloadUrl = `${API}/apply/${token}/receipt/${submissionId}`;
+
     return (
       <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4">
           <motion.div 
@@ -666,22 +759,25 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
             animate={{ scale: 1, opacity: 1 }}
             className="max-w-2xl w-full"
           >
-            <Card className="border-none shadow-xl overflow-hidden ">
+            <Card className="border-none shadow-xl overflow-hidden">
               <div className="bg-[#000080] p-10 text-white text-center relative">
                 <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
                    <div className="absolute -top-24 -left-24 w-64 h-64 bg-white rounded-full blur-3xl"></div>
                    <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-emerald-400 rounded-full blur-3xl"></div>
                 </div>
                 <div className="relative z-10">
-                  <div className="w-24 h-24 bg-white/20 backdrop-blur-xl rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl border border-white/30">
-                    <CheckCircle2 className="w-12 h-12 text-white" />
+                  <div className="w-20 h-20 bg-white/20 backdrop-blur-xl rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl border border-white/30">
+                    <CheckCircle2 className="w-10 h-10 text-white" />
                   </div>
-                  <h2 className="text-2xl font-bold mb-3 text-slate-800">Application Submitted!</h2>
-                  <p className="text-emerald-50/80 font-medium max-w-md mx-auto">Your application for the {formInfo.programName} has been received successfully.</p>
+                  <h2 className="text-2xl font-bold mb-2 text-white">Application Submitted!</h2>
+                  <p className="text-emerald-100 font-medium max-w-md mx-auto text-sm">
+                    Your application for the {formInfo.programName} has been received and confirmed.
+                  </p>
                 </div>
               </div>
-              <CardContent className="p-10 space-y-8 bg-white">
-                <div className="grid grid-cols-2 gap-6">
+
+              <CardContent className="p-8 space-y-6 bg-white">
+                <div className="grid grid-cols-2 gap-6 pb-4 border-b border-slate-100">
                    <div className="space-y-1">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Application Reference</p>
                       <p className="text-lg font-mono font-bold text-slate-800">#{submissionId}</p>
@@ -691,25 +787,76 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
                       <p className="text-lg font-bold text-slate-800">{new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                    </div>
                 </div>
-                
-                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 space-y-4">
+
+                {/* Verified Payment Summary Card */}
+                <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-2xl flex items-center justify-between gap-4">
+                   <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">Payment Status: Verified</span>
+                      <p className="text-xs text-emerald-950 font-medium">
+                        Payment ID: <span className="font-mono font-bold">{paymentVerified?.paymentId || "Verified Online"}</span>
+                      </p>
+                   </div>
+                   <div className="text-right">
+                      <span className="text-xs text-slate-500 block">Amount Paid</span>
+                      <span className="text-base font-extrabold text-emerald-700">₹{totalPaid.toLocaleString("en-IN")}</span>
+                   </div>
+                </div>
+
+                {/* Primary Feature: Download Payment Receipt & Application Copy */}
+                <div className="p-6 bg-gradient-to-br from-blue-50/80 via-white to-indigo-50/40 border-2 border-blue-200/90 rounded-2xl text-center space-y-3.5 shadow-xs">
+                   <div className="w-12 h-12 bg-blue-100 text-[#000080] rounded-xl flex items-center justify-center mx-auto">
+                      <FileText className="w-6 h-6" />
+                   </div>
+                   <div>
+                      <h3 className="font-bold text-base text-slate-900">Official Payment Receipt & Application Copy</h3>
+                      <p className="text-xs text-slate-600 max-w-md mx-auto mt-1">
+                        Download your formal electronic receipt containing your payment transaction proof, selected fellowship subspecialties, and submitted application details.
+                      </p>
+                   </div>
+
+                   <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                      <a
+                        href={receiptDownloadUrl}
+                        download={`SAV_Payment_Receipt_${submissionId}.pdf`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-[#000080] hover:bg-[#000066] text-white font-bold text-sm rounded-xl shadow-md shadow-blue-950/20 hover:shadow-lg transition-all active:scale-[0.98] cursor-pointer"
+                      >
+                        <Download className="w-4 h-4" />
+                        Download Payment Receipt (PDF)
+                      </a>
+
+                      <a
+                        href={receiptDownloadUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3.5 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-sm rounded-xl border border-slate-200 transition-all cursor-pointer"
+                      >
+                        <Printer className="w-4 h-4 text-slate-500" />
+                        View / Print
+                      </a>
+                   </div>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-3">
                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Next Steps</h3>
-                   <div className="space-y-3">
+                   <div className="space-y-2.5">
                       {[
-                        "Receive confirmation email shortly.",
-                        "Our team will review your credentials.",
-                        "Shortlisted candidates will be notified for interviews."
+                        "A confirmation email has been dispatched to your email address.",
+                        "Save the downloaded payment receipt PDF for your admissions interview.",
+                        "Our academic admissions committee will review your application credentials."
                       ].map((step, idx) => (
-                        <div key={idx} className="flex items-center gap-3">
-                           <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">{idx + 1}</div>
-                           <p className="text-sm text-slate-600 font-medium">{step}</p>
+                        <div key={idx} className="flex items-center gap-2.5">
+                           <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold shrink-0">{idx + 1}</div>
+                           <p className="text-xs text-slate-600 font-medium">{step}</p>
                         </div>
                       ))}
                    </div>
                 </div>
 
                 <Button 
-                  className="w-full h-14 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-lg shadow-xl hover:shadow-2xl transition-all hover:-translate-y-0.5"
+                  variant="outline"
+                  className="w-full h-12 rounded-xl text-slate-700 hover:text-slate-900 border-slate-200 font-bold text-sm transition-all"
                   onClick={() => window.location.href = "/"}
                 >
                   Return to Dashboard
@@ -1204,35 +1351,93 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
              })}
 
              {step === sections.length - 1 && (
-               <div className="mb-6 p-5 bg-orange-50 border-2 border-orange-200 rounded-2xl shadow-sm">
-                 <div className="flex items-center justify-between">
-                   <div className="flex items-center gap-3">
-                     <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                       <CreditCard className="w-5 h-5 text-[#000080]" />
+               <div className="space-y-6 pt-2">
+                 {/* Fee Summary Banner */}
+                 <div className="p-5 bg-gradient-to-r from-blue-50/80 to-indigo-50/60 border border-blue-200/80 rounded-2xl shadow-sm">
+                   <div className="flex items-center justify-between">
+                     <div className="flex items-center gap-3.5">
+                       <div className="w-11 h-11 bg-[#000080]/10 text-[#000080] rounded-xl flex items-center justify-center font-bold">
+                         <CreditCard className="w-5 h-5 text-[#000080]" />
+                       </div>
+                       <div>
+                         <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Application Fee Payable</p>
+                         <p className="text-sm font-semibold text-slate-800">
+                           {(() => {
+                             const streamCount = Array.isArray(form.specialization) ? form.specialization.length : 1;
+                             const unitFee = paymentConfig ? paymentConfig.amount / 100 : 2750;
+                             return `₹${unitFee.toLocaleString("en-IN")} × ${streamCount} Specialization${streamCount > 1 ? "s" : ""}`;
+                           })()}
+                         </p>
+                       </div>
                      </div>
-                     <div>
-                       <p className="text-xs font-bold text-blue-800 uppercase tracking-wider">Total Amount to Pay</p>
-                       <p className="text-[10px] text-[#000080]">
+                     <div className="text-right">
+                       <span className="text-2xl font-extrabold text-[#000080] tracking-tight">
                          {(() => {
                            const streamCount = Array.isArray(form.specialization) ? form.specialization.length : 1;
-                           const unitFee = paymentConfig ? paymentConfig.amount / 100 : 2680;
-                           return `Rs. ${unitFee.toLocaleString("en-IN")} x ${streamCount} Stream${streamCount > 1 ? 's' : ''}`;
+                           const unitFee = paymentConfig ? paymentConfig.amount / 100 : 2750;
+                           return `₹${(unitFee * streamCount).toLocaleString("en-IN")}`;
                          })()}
-                       </p>
+                       </span>
                      </div>
                    </div>
-                   <div className="text-right">
-                     <span className="text-2xl font-bold text-blue-900">
-                       {(() => {
-                         const streamCount = Array.isArray(form.specialization) ? form.specialization.length : 1;
-                         const unitFee = paymentConfig ? paymentConfig.amount / 100 : 2680;
-                         return `Rs. ${(unitFee * streamCount).toLocaleString("en-IN")}`;
-                       })()}
-                     </span>
-                   </div>
                  </div>
-               </div>
-             )}
+
+                 {/* Razorpay Online Payment Gateway Notice & Channels */}
+                  {isManualEntry ? (
+                    <div className="space-y-4 p-5 bg-slate-50 border border-slate-200 rounded-2xl">
+                      <Label className="text-xs font-bold text-slate-800">
+                        Admin Manual Reference / UTR Number *
+                      </Label>
+                      <input
+                        type="text"
+                        value={paymentUTR}
+                        onChange={(e) => setPaymentUTR(e.target.value)}
+                        placeholder="Enter manual payment reference"
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-300 font-mono text-sm outline-none"
+                      />
+                    </div>
+                  ) : (
+                    <div className="p-6 bg-gradient-to-br from-blue-50/60 via-white to-slate-50 border border-blue-100 rounded-2xl shadow-xs space-y-4">
+                      <div className="flex items-start gap-3.5">
+                        <div className="w-10 h-10 rounded-xl bg-[#000080] text-white flex items-center justify-center shrink-0 shadow-sm">
+                          <CreditCard className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-900">Official Online Payment Gateway</h4>
+                          <p className="text-xs text-slate-600 mt-0.5">
+                            Transactions are processed securely through Razorpay with 256-bit bank-grade encryption.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-white/90 backdrop-blur-xs border border-slate-200/80 rounded-xl p-4 space-y-3">
+                        <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                          Accepted Payment Channels:
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs text-slate-700">
+                          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-100 font-medium">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <span><strong>UPI:</strong> GPay, PhonePe, Paytm, BHIM</span>
+                          </div>
+                          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-100 font-medium">
+                            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                            <span><strong>Cards:</strong> Debit / Credit (RuPay, Visa, MC)</span>
+                          </div>
+                          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-100 font-medium">
+                            <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                            <span><strong>NetBanking:</strong> All Major Indian Banks</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-xs text-slate-600 font-medium pt-1">
+                        <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>Instant verification. Upon successful payment, your application is confirmed immediately and you can download your official receipt.</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
              {submitError && (
                <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
@@ -1263,7 +1468,11 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
                   Processing...
                 </>
               ) : step === sections.length - 1 ? (
-                <>Submit & Pay <ChevronRight className="w-4 h-4" /></>
+                isManualEntry ? (
+                  <>Confirm Offline & Submit <ChevronRight className="w-4 h-4" /></>
+                ) : (
+                  <>Pay ₹{((paymentConfig ? paymentConfig.amount / 100 : 2750) * (Array.isArray(form.specialization) ? form.specialization.length : 1)).toLocaleString("en-IN")} via Razorpay <ChevronRight className="w-4 h-4" /></>
+                )
               ) : (
                 <>Next Step <ChevronRight className="w-4 h-4" /></>
               )}

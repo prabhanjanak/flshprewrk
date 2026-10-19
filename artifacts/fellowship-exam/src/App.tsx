@@ -111,6 +111,12 @@ function App() {
           <WouterRouter>
             <Switch>
               {/* Public Routes - NO Sidebar, NO Auth needed */}
+              <Route path="/apply">
+                <Redirect to="/apply/JAN2027" />
+              </Route>
+              <Route path="/apply/">
+                <Redirect to="/apply/JAN2027" />
+              </Route>
               <Route path="/apply/:token">
                 {(params) => <ApplyPage token={params.token} />}
               </Route>

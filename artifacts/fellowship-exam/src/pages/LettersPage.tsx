@@ -289,17 +289,24 @@ export default function LettersPage() {
     const key = `send_call_${target.id}`;
     setSendingEmailId(key);
     try {
-      await api.post(`/candidates/${target.id}/send-call-letter`, {
+      const res: any = await api.post(`/candidates/${target.id}/send-call-letter`, {
         interviewDate: customInterviewDate,
         reportingTime: customReportingTime,
         venue: customVenue,
         specialization: customSpecialty,
       });
 
-      toast({
-        title: "Call Letter Dispatched",
-        description: `Official Call Letter with PDF sent to ${target.email} via SMTP.`,
-      });
+      if (res?.emailSent) {
+        toast({
+          title: "Call Letter Dispatched",
+          description: `Official Call Letter with PDF sent to ${target.email} via SMTP.`,
+        });
+      } else {
+        toast({
+          title: "Call Letter PDF Ready",
+          description: res?.message || "Call Letter generated. SMTP is not configured, so please download the PDF directly.",
+        });
+      }
       qc.invalidateQueries({ queryKey: ["candidates"] });
     } catch (e: any) {
       toast({ title: "Failed to Send Email", description: e.response?.data?.error || e.message, variant: "destructive" });
@@ -376,7 +383,7 @@ export default function LettersPage() {
     try {
       const stipendNum = Number(customStipend.replace(/[^0-9]/g, "") || 40000);
 
-      await api.post(`/candidates/${target.id}/send-offer-letter`, {
+      const res: any = await api.post(`/candidates/${target.id}/send-offer-letter`, {
         candidateName: customName || target.fullName,
         address: customAddress || target.address || "",
         specialization: customSpecialty,
@@ -389,10 +396,17 @@ export default function LettersPage() {
         inductionDate: customInductionDate,
       });
 
-      toast({
-        title: "Offer Letter Sent",
-        description: `Formal Fellowship Offer Letter emailed to ${target.email}.`,
-      });
+      if (res?.emailSent) {
+        toast({
+          title: "Offer Letter Sent",
+          description: `Formal Fellowship Offer Letter emailed to ${target.email}.`,
+        });
+      } else {
+        toast({
+          title: "Offer Letter PDF Ready",
+          description: res?.message || "Offer Letter generated. SMTP is not configured, so please download the PDF directly.",
+        });
+      }
       qc.invalidateQueries({ queryKey: ["candidates"] });
     } catch (e: any) {
       toast({ title: "Failed to Send Email", description: e.response?.data?.error || e.message, variant: "destructive" });
@@ -597,20 +611,7 @@ export default function LettersPage() {
                   </span>
                 </div>
 
-                {/* 3. Candidate Code */}
-                <div className="space-y-1.5">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                    Registration Code *
-                  </Label>
-                  <Input
-                    value={customCandidateCode}
-                    onChange={(e) => setCustomCandidateCode(e.target.value)}
-                    placeholder="e.g. SAV-2027-001"
-                    className="rounded-xl border-slate-200 text-xs font-bold font-mono h-10 uppercase"
-                  />
-                </div>
-
-                {/* 4. Subspecialty */}
+                {/* 3. Subspecialty */}
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
                     Interview Subspecialty *
@@ -689,7 +690,7 @@ export default function LettersPage() {
                       Ready to generate Call Letter for Dr. {cleanDoctorName(customName || "Tejaswini")}
                     </p>
                     <p className="text-purple-800 font-medium">
-                      Stream: <strong>{customSpecialty.toLowerCase().includes("retina") ? "Retina Stream (1st June 2026)" : "Anterior Stream (8th June 2026)"}</strong> &bull; Code: <strong>{customCandidateCode}</strong>
+                      Stream: <strong>{customSpecialty.toLowerCase().includes("retina") ? "Retina Stream (1st June 2026)" : "Anterior Stream (8th June 2026)"}</strong>
                     </p>
                   </div>
                 </div>
@@ -752,7 +753,7 @@ export default function LettersPage() {
                       Dear Dr. {cleanDoctorName(customName || activeCandidate?.fullName || "Tejaswini")},
                     </p>
                     <p className="text-[11px] text-slate-600 font-medium">
-                      Registration Code: <strong className="text-slate-900">{customCandidateCode}</strong> &bull; Subspecialty Stream: <strong className="text-slate-900">{customSpecialty}</strong> &bull; Email: <strong className="text-slate-900">{activeCandidate?.email || customEmail}</strong>
+                      Subspecialty Stream: <strong className="text-slate-900">{customSpecialty}</strong> &bull; Email: <strong className="text-slate-900">{activeCandidate?.email || customEmail}</strong>
                     </p>
                   </div>
 
@@ -762,7 +763,7 @@ export default function LettersPage() {
                       Thank you for your interest in the Fellowship programme at Sankara Eye Foundation, India (www.sankaraeye.com).
                     </p>
                     <p>
-                      Sankara Eye Foundation is a group of 13 hospitals across the country with a medical and support team of 3000, performing over 200,000 vision restoring surgeries every year. Training at Sankara is coordinated by the Sankara Academy of Vision with state of the art diagnostic and surgical facilities.
+                      Sankara Eye Foundation is a group of 14 units across the country with a medical and support team of 3000, performing over 3 Lakh vision restoring surgeries every year, with over 3 Million Free surgeries till date. Training at Sankara is coordinated by the Sankara Academy of Vision with state of the art diagnostic and surgical facilities.
                     </p>
                   </div>
 
@@ -1422,8 +1423,6 @@ export default function LettersPage() {
                           </Badge>
                         </div>
                         <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5 mt-0.5">
-                          <span className="font-bold text-[#0b4a8f]">{customCandidateCode || "SAV-2027-001"}</span>
-                          <span>•</span>
                           <span>{customEmail}</span>
                         </div>
                       </td>

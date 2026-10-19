@@ -5,7 +5,7 @@ import fs from "fs";
 
 export interface CallLetterData {
   candidateName: string;
-  candidateCode: string;
+  candidateCode?: string;
   specialization: string;
   email: string;
   phone?: string | null;
@@ -18,7 +18,7 @@ export interface CallLetterData {
 
 export interface OfferLetterData {
   candidateName: string;
-  candidateCode: string;
+  candidateCode?: string;
   specialization: string;
   unitName: string;
   cmoName?: string;
@@ -216,7 +216,7 @@ export async function generateCallLetterPdf(data: CallLetterData): Promise<Buffe
 
       doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(10.5).text(`Dear Dr. ${cleanName},`, left + 14, 115);
       doc.fillColor(colors.slate).font("Helvetica").fontSize(8.2).text(
-        `Registration Code: ${data.candidateCode}   |   Subspecialty Stream: ${data.specialization || "Fellowship"}   |   Email: ${data.email}`,
+        `Subspecialty Stream: ${data.specialization || "Fellowship"}   |   Email: ${data.email}`,
         left + 14, 131
       );
 
@@ -224,7 +224,7 @@ export async function generateCallLetterPdf(data: CallLetterData): Promise<Buffe
       let curY = 154;
       doc.fillColor(colors.dark).font("Helvetica").fontSize(8.4).text(
         "Thank you for your interest in the Fellowship programme at Sankara Eye Foundation, India (www.sankaraeye.com).\n\n" +
-        "Sankara Eye Foundation is a group of 13 hospitals across the country with a medical and support team of 3000, we perform over 200,000 vision restoring surgeries every year. Training at Sankara is coordinated by the Sankara Academy of Vision.\n\n" +
+        "Sankara Eye Foundation is a group of 14 units across the country with a medical and support team of 3000, we perform over 3 Lakh vision restoring surgeries every year, with over 3 Million Free surgeries performed till date. Training at Sankara is coordinated by the Sankara Academy of Vision.\n\n" +
         "With a combination of state of the art diagnostic and surgical facilities, faculty of national eminence and a large inflow of patients, fellows would benefit from a comprehensive training in their specialty; this would enable them a confidence to practice independently. There is an emphasis during the training towards clinical research apart from the surgical training.\n\n" +
         "Training is offered across various units of Sankara and the same would be communicated to you at the interview. Candidates could also be deputed to other sister units during training to maximize surgical exposure.\n\n" +
         "Postgraduates in Ophthalmology recognized by the Medical Council of India would be eligible for applying for the same.\n\n" +
@@ -287,7 +287,7 @@ export async function generateCallLetterPdf(data: CallLetterData): Promise<Buffe
       // Top Running Header Page 2
       doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(10).text("SANKARA ACADEMY OF VISION", left, 28);
       doc.fillColor(colors.lightSlate).font("Helvetica").fontSize(8).text(
-        `Interview Call Letter — Dr. ${cleanName} [ ${data.candidateCode} ]`,
+        `Interview Call Letter — Dr. ${cleanName}`,
         left, 28, { width: contentWidth, align: "right" }
       );
       doc.strokeColor(colors.border).lineWidth(0.8).moveTo(left, 42).lineTo(left + contentWidth, 42).stroke();
@@ -339,8 +339,8 @@ export async function generateCallLetterPdf(data: CallLetterData): Promise<Buffe
         "The Applicants appearing for the interviews will have to clear the results of PG(MS/MD) and DNB (Theory & Practical’s), those appearing for the PG exams and awaiting for the results shall not be eligible for the interview final selection process.",
         "Applicants who are under Government bond or Compulsory Rural Service will have to submit ‘No Objection Certificate’ during the time of examination.",
         "All the selected fellows will need to submit NOC from their State Medical Council within 3 days of accepting the Fellowship Offer, without which the joining will not be agreeable.",
-        "Selected Fellows will have to undergo a 2 day induction program mandatory at Bangalore on 2nd & 3rd January 2027, a security non-refundable deposit of Rs.8850 including GST shall be collected towards this induction program.",
-        "The reporting at the selected units shall be on 6th January 2027. You would be paid a stipend for the duration of the training.",
+        "Selected Fellows will have to undergo a 2 day induction program mandatory at Bangalore on 7th & 8th January 2027 (Thursday & Friday), a security non-refundable deposit of Rs.8850 including GST shall be collected towards this induction program.",
+        "The reporting at the selected units shall be on 11th January 2027 (Monday). You would be paid a stipend for the duration of the training.",
       ];
 
       curY += 26;
@@ -408,7 +408,7 @@ export async function generateOfferLetterPdf(data: OfferLetterData): Promise<Buf
       const defaultInterviewDate = isRetinaSpecialty(data.specialization) ? "7th December 2026" : "8th December 2026";
       const interviewDate = data.interviewDate || defaultInterviewDate;
       const phaseDetails = formatPhaseDurations(data.specialization, data.durationMonths);
-      const effectiveDate = data.effectiveDate || "6th January 2027";
+      const effectiveDate = data.effectiveDate || "11th January 2027 (Monday)";
       const unit = data.unitName || "Bangalore Main Hospital";
       
       // Clean up CMO / Reporting doctor name
@@ -424,7 +424,7 @@ export async function generateOfferLetterPdf(data: OfferLetterData): Promise<Buf
       const issueDate = data.issuanceDate || new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
       const cleanName = cleanDoctorName(data.candidateName);
       const durationText = `${phaseDetails.totalMonths} Months`;
-      const inductionDates = data.inductionDate || "2nd & 3rd July 2026 at Bangalore Main Hospital (For Testing Only)";
+      const inductionDates = data.inductionDate || "7th & 8th January 2027 (Thursday & Friday) at Bengaluru";
 
       // ═══════════════════════════════════════════════════════════════════════
       // PAGE 1: Header, Recipient, Subject, Intro, Table & Section A
@@ -538,7 +538,7 @@ export async function generateOfferLetterPdf(data: OfferLetterData): Promise<Buf
       // Top Running Header Page 2
       doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(10).text("SANKARA ACADEMY OF VISION", left, 26);
       doc.fillColor(colors.lightSlate).font("Helvetica").fontSize(8).text(
-        `Fellowship Offer Letter — Dr. ${cleanName} [ ${data.candidateCode} ]`,
+        `Fellowship Offer Letter — Dr. ${cleanName}`,
         left, 26, { width: contentWidth, align: "right" }
       );
       doc.strokeColor(colors.border).lineWidth(0.8).moveTo(left, 39).lineTo(left + contentWidth, 39).stroke();

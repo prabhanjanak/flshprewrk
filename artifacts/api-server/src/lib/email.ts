@@ -327,12 +327,14 @@ export async function sendCallLetterWithAttachment(opts: {
   reportingTime?: string;
   venue?: string;
   specialization?: string;
-}) {
+}): Promise<{ sent: boolean; reason?: string }> {
   const cfg = await getTransporter();
   if (!cfg) {
-    throw new Error(
-      "SMTP server is not configured. Please configure your hospital SMTP server in Settings → Email Settings, or download the Call Letter PDF directly."
-    );
+    console.warn(`[SMTP Not Configured] Call letter email skipped for ${opts.toEmail} (${opts.fileName}). PDF generated and available for direct download.`);
+    return {
+      sent: false,
+      reason: "SMTP is not configured on this server. Email was skipped, but Call Letter PDF was generated successfully."
+    };
   }
 
   const isRetina = opts.specialization ? (opts.specialization.toLowerCase().includes("retina") || opts.specialization.toLowerCase().includes("vitreo") || /\b(vr|mr)\b/i.test(opts.specialization)) : false;
@@ -344,7 +346,7 @@ export async function sendCallLetterWithAttachment(opts: {
   const success = await sendMailSafely(cfg.transporter, {
     from: `"${cfg.fromName}" <${cfg.from}>`,
     to: opts.toEmail,
-    subject: `Interview Call Letter — Sankara Academy of Vision Fellowship Program 2026`,
+    subject: `Interview Call Letter — Sankara Academy of Vision Fellowship Program 2027`,
     attachments: [
       {
         filename: opts.fileName,
@@ -386,8 +388,14 @@ export async function sendCallLetterWithAttachment(opts: {
   });
 
   if (!success) {
-    throw new Error(`Failed to dispatch email to ${opts.toEmail} via SMTP. Please verify your SMTP credentials.`);
+    console.warn(`[SMTP Dispatch Failed] Could not deliver call letter email to ${opts.toEmail}. PDF remains downloadable.`);
+    return {
+      sent: false,
+      reason: `Failed to dispatch email to ${opts.toEmail} via SMTP. PDF was generated and is available for download.`
+    };
   }
+
+  return { sent: true };
 }
 
 export async function sendOfferLetterWithAttachment(opts: {
@@ -398,12 +406,14 @@ export async function sendOfferLetterWithAttachment(opts: {
   specialization?: string;
   unitName?: string;
   effectiveDate?: string;
-}) {
+}): Promise<{ sent: boolean; reason?: string }> {
   const cfg = await getTransporter();
   if (!cfg) {
-    throw new Error(
-      "SMTP server is not configured. Please configure your hospital SMTP server in Settings → Email Settings, or download the Offer Letter PDF directly."
-    );
+    console.warn(`[SMTP Not Configured] Offer letter email skipped for ${opts.toEmail} (${opts.fileName}). PDF generated and available for direct download.`);
+    return {
+      sent: false,
+      reason: "SMTP server is not configured. Email was skipped, but Offer Letter PDF was generated successfully."
+    };
   }
 
   const success = await sendMailSafely(cfg.transporter, {
@@ -444,8 +454,14 @@ export async function sendOfferLetterWithAttachment(opts: {
   });
 
   if (!success) {
-    throw new Error(`Failed to dispatch email to ${opts.toEmail} via SMTP. Please verify your SMTP credentials.`);
+    console.warn(`[SMTP Dispatch Failed] Could not deliver offer letter email to ${opts.toEmail}. PDF remains downloadable.`);
+    return {
+      sent: false,
+      reason: `Failed to dispatch email to ${opts.toEmail} via SMTP. PDF was generated and is available for download.`
+    };
   }
+
+  return { sent: true };
 }
 
 

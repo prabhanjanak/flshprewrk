@@ -16,7 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { 
   Search, UserPlus, Eye, FolderOpen, ExternalLink, Upload, Filter, 
   ClipboardEdit, Trash2, Building2, CalendarDays, Info, ChevronDown, 
-  ChevronUp, Download, Printer, Users, CheckCircle, Clock, Loader2,
+  ChevronUp, Download, Printer, Users, CheckCircle, CheckCircle2, Clock, Loader2,
   Check, FileText, GitMerge, Edit3, Mail, Award, ArrowRightLeft
 } from "lucide-react";
 import { motion } from "framer-motion";

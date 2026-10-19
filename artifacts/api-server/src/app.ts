@@ -15,7 +15,32 @@ import { requireAuth, requireRole } from "./middleware/auth";
 import { attachMockMode } from "./middleware/mock";
 import { parseSpecializationString, formatDOBToStandard } from "./lib/utils";
 
+import { bootstrapDatabase } from "./lib/db-bootstrap";
+
 const app: Express = express();
+
+let vercelBootstrapped = false;
+let vercelBootstrapPromise: Promise<void> | null = null;
+
+if (process.env.VERCEL) {
+  app.use(async (req, res, next) => {
+    if (!vercelBootstrapped) {
+      if (!vercelBootstrapPromise) {
+        vercelBootstrapPromise = bootstrapDatabase()
+          .then(() => {
+            vercelBootstrapped = true;
+          })
+          .catch((err) => {
+            console.error("[Vercel Serverless Bootstrap Error]:", err);
+            vercelBootstrapPromise = null;
+          });
+      }
+      await vercelBootstrapPromise;
+    }
+    next();
+  });
+}
+
 app.use(attachMockMode);
 
 app.use(
@@ -36,7 +61,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
-app.use("/", router);
+
+// Explicit root health checks for Docker/Load Balancers
+app.get(["/healthz", "/ping"], (req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
 
 // GUARANTEED PRINT ROUTE (Directly on app to avoid router conflicts)
 app.get(
@@ -172,7 +199,6 @@ app.get(
       doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(11).text('APPLICATION SUMMARY', 36, 94, { width: 350 });
       doc.y = 112;
 
-      renderApplicationRecordRow('Registration No.', candidateCode);
       renderApplicationRecordRow('Application ID', `#APP-${id}`);
       renderApplicationRecordRow('Program', program?.name || 'Fellowship Program');
       renderApplicationRecordRow('Submission Date', sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
@@ -326,6 +352,8 @@ app.use("/objects", express.static(path.join(process.cwd(), "uploads")));
 
 const candidateDistPaths = [
   path.join(fileURLToPath(new URL(".", import.meta.url)), "../../fellowship-exam/dist"),
+  path.join(fileURLToPath(new URL(".", import.meta.url)), "../artifacts/fellowship-exam/dist"),
+  path.join(fileURLToPath(new URL(".", import.meta.url)), "../public"),
   path.join(process.cwd(), "artifacts/fellowship-exam/dist"),
   path.join(process.cwd(), "public"),
   path.join(process.cwd(), "dist/public"),

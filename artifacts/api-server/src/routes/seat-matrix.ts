@@ -40,22 +40,22 @@ const SPEC_ALIAS: Record<string, string> = {
 
 export const INTERVIEW_SCHEDULE = [
   {
-    displayDate: "01 June 2026",
-    category: "Posterior Segment",
+    displayDate: "07.12.2026, Monday",
+    category: "Retina Fellowship Entrance & Selection",
     specialities: ["Vitreo Retina", "Medical Retina"],
     venue: "Bengaluru",
   },
   {
-    displayDate: "08 June 2026",
-    category: "Anterior Segment",
+    displayDate: "08.12.2026, Tuesday",
+    category: "Anterior Segment Fellowship Entrance & Selection",
     specialities: ["IOL Fellowship", "Cornea", "Glaucoma", "Oculoplasty", "Pediatric Ophthalmology", "Phaco Refractive"],
     venue: "Bengaluru",
   },
 ];
 
 export const INDUCTION_DATES = [
-  { displayDate: "02–03 July 2026", event: "Fellows Induction", venue: "Bengaluru" },
-  { displayDate: "06 July 2026",    event: "New Fellows Report to Respective Units", venue: "Respective Units" },
+  { displayDate: "07.01.2027 & 08.01.2027 (Thursday & Friday)", event: "Induction New Fellows", venue: "Bengaluru" },
+  { displayDate: "11.01.2027, Monday", event: "New Fellows Reporting", venue: "Respective Units" },
 ];
 
 function findLatestFile(): string | null {
@@ -388,14 +388,14 @@ router.post(
     ];
 
     const MATRIX: Record<string, Record<string, number>> = {
-      "Cornea":                  { Bangalore:1, Coimbatore:1, Hyderabad:3, Jaipur:1, Shimoga:1 },
-      "Glaucoma":                { Bangalore:1, Coimbatore:1, Hyderabad:2, Jaipur:1 },
-      "IOL Fellowship":          { Anand:2, Bangalore:1, Coimbatore:2, Guntur:3, Hyderabad:4, Indore:2, Jaipur:2, Kanpur:2, Krishnankoil:4, Ludhiana:2, Panvel:1, Shimoga:3, Varanasi:3 },
-      "Medical Retina":          { Bangalore:1, Coimbatore:1, Hyderabad:3, Indore:1, Ludhiana:1 },
-      "Oculoplasty":             { Bangalore:1, Panvel:1, Varanasi:1 },
-      "Pediatric Ophthalmology": { Bangalore:1, Hyderabad:1, Ludhiana:1, Shimoga:1 },
-      "Phaco Refractive":        { Bangalore:1 },
-      "Vitreo Retina":           { Bangalore:3, Coimbatore:1, Hyderabad:2, Indore:1, Shimoga:1 },
+      "Cornea":                  { Bangalore: 1, Guntur: 3, Jaipur: 1, Shimoga: 1 },
+      "Glaucoma":                { Bangalore: 1, Coimbatore: 1, Guntur: 2, Shimoga: 1 },
+      "IOL Fellowship":          { Anand: 1, Coimbatore: 2, Guntur: 2, Hyderabad: 2, Indore: 3, Jaipur: 3, Kanpur: 4, Krishnankoil: 4, Ludhiana: 4, Panvel: 2, Shimoga: 1, Varanasi: 3 },
+      "Medical Retina":          { Bangalore: 1, Coimbatore: 2, Guntur: 3, Indore: 1, Shimoga: 2 },
+      "Oculoplasty":             { Coimbatore: 1, Guntur: 1, Varanasi: 1 },
+      "Pediatric Ophthalmology": { Bangalore: 1, Coimbatore: 1, Guntur: 1, Shimoga: 1 },
+      "Phaco Refractive":        { Bangalore: 1, Coimbatore: 1 },
+      "Vitreo Retina":           { Bangalore: 2, Coimbatore: 1, Guntur: 1, Shimoga: 1 },
     };
 
     let program;
@@ -432,7 +432,7 @@ router.post(
       `);
     }
 
-    res.json({ success: true, programId: progId, programName: program.name, specialities: Object.keys(MATRIX).length, units: UNITS.length, total: 66 });
+    res.json({ success: true, programId: progId, programName: program.name, specialities: Object.keys(MATRIX).length, units: UNITS.length, total: 65 });
   }
 );
 

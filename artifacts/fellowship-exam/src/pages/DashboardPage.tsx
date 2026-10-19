@@ -24,8 +24,6 @@ import {
   Clock,
   RefreshCw,
   ShieldCheck,
-  Globe2,
-  Trash2,
   CalendarDays,
   FileSpreadsheet,
   Stethoscope,
@@ -34,8 +32,6 @@ import {
   Layers,
   ArrowUpRight,
   FileCheck2,
-  KeyRound,
-  ShieldAlert,
   FolderGit2,
   Sparkles,
   CreditCard,
@@ -145,43 +141,17 @@ interface DashboardSummaryData {
   recentActivity: ActivityItem[];
 }
 
-const defaultStages = {
+const defaultStages: DashboardSummaryData["stages"] = {
   candidates: { total: 0, approved: 0, interviewCompleted: 0, allocated: 0, paidCount: 0, pendingReview: 0, callLettersIssued: 0 },
+  applications: { total: 0, paidCount: 0, pendingCount: 0 },
+  approvals: { approvedCount: 0, pendingCount: 0 },
+  callLetters: { issuedCount: 0, scheduledCount: 0 },
+  interviews: { completedCount: 0, inProgressCount: 0, activePanelsCount: 0 },
+  selections: { totalSeats: 0, allocatedSeats: 0, vacantSeats: 0, offerLettersIssued: 0 },
   mcq: { totalAssigned: 0, attemptsCount: 0, completedCount: 0, avgScore: 0, maxScore: 0 },
   psychometric: { totalAssigned: 0, completedCount: 0, avgScore: 0 },
   interview: { totalApplications: 0, completedCount: 0, inProgressCount: 0, avgScore: 0, activePanelsCount: 0 },
   merit: { totalSeats: 0, allocatedSeats: 0, vacantSeats: 0 },
-};
-
-const parseDeviceAgent = (ua: string | null | undefined) => {
-  if (!ua) return { type: "Unknown", name: "Unknown Device" };
-  if (ua.includes(" (App)")) {
-    const type = ua.includes("Tablet") || ua.includes("iPad") ? "Tablet" : "Mobile";
-    return { type, name: ua };
-  }
-  const u = ua.toLowerCase();
-  let type = "Desktop";
-  let name = "Unknown Device";
-  if (u.includes("ipad") || (u.includes("macintosh") && typeof navigator !== "undefined" && navigator.maxTouchPoints > 1)) {
-    type = "Tablet";
-    name = "iPad";
-  } else if (u.includes("iphone") || u.includes("ipod")) {
-    type = "Mobile";
-    name = "iPhone";
-  } else if (u.includes("android")) {
-    type = u.includes("mobile") ? "Mobile" : "Tablet";
-    name = "Android Device";
-  } else if (u.includes("windows")) {
-    type = "Desktop";
-    name = "Windows PC";
-  } else if (u.includes("macintosh") || u.includes("mac os")) {
-    type = "Desktop";
-    name = "Mac";
-  } else if (u.includes("linux")) {
-    type = "Desktop";
-    name = "Linux PC";
-  }
-  return { type, name };
 };
 
 export default function DashboardPage() {
@@ -191,8 +161,6 @@ export default function DashboardPage() {
   const role = user?.role ?? "";
   const [, navigate] = useLocation();
 
-  const [timeoutMinutes, setTimeoutMinutes] = useState("30");
-  const [activeTab, setActiveTab] = useState<"overview" | "sessions">("overview");
   const [systemIp, setSystemIp] = useState("");
 
   useEffect(() => {
@@ -212,43 +180,6 @@ export default function DashboardPage() {
       ),
     refetchInterval: 15000,
     retry: false,
-  });
-
-  const { data: activeSessions = [], refetch: refetchSessions } = useQuery<any[]>({
-    queryKey: ["active-sessions"],
-    queryFn: () => api.get<any[]>("/auth/sessions"),
-    enabled: role === "super_admin" || role === "program_admin",
-    refetchInterval: 10000,
-  });
-
-  const { data: timeoutSetting, refetch: refetchTimeout } = useQuery<any>({
-    queryKey: ["session-timeout"],
-    queryFn: () => api.get<any>("/global-settings/session_inactivity_timeout"),
-    enabled: role === "super_admin" || role === "program_admin",
-  });
-
-  useEffect(() => {
-    if (timeoutSetting?.value) {
-      setTimeoutMinutes(timeoutSetting.value);
-    }
-  }, [timeoutSetting]);
-
-  const saveTimeoutMutation = useMutation({
-    mutationFn: (value: string) => api.patch(`/global-settings/session_inactivity_timeout`, { value }),
-    onSuccess: () => {
-      toast({ title: "Inactivity timeout updated" });
-      refetchTimeout();
-    },
-    onError: (e: any) => toast({ title: "Failed to update timeout", description: e.message, variant: "destructive" }),
-  });
-
-  const terminateSessionMutation = useMutation({
-    mutationFn: (sessionId: number) => api.post("/auth/sessions/terminate", { sessionId }),
-    onSuccess: () => {
-      toast({ title: "User session terminated" });
-      refetchSessions();
-    },
-    onError: (e: any) => toast({ title: "Failed to terminate session", description: e.message, variant: "destructive" }),
   });
 
   // ── Candidate / Student View ─────────────────────────────────────────────
@@ -377,7 +308,6 @@ export default function DashboardPage() {
               size="sm"
               onClick={() => {
                 refetchSummary();
-                if (role === "super_admin" || role === "program_admin") refetchSessions();
               }}
               disabled={isFetching}
               className="h-10 px-4 rounded-xl bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs shadow-sm gap-2"
@@ -415,7 +345,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           { label: "Application Forms", sub: "Review & verify submissions", icon: <FileCheck2 className="h-5 w-5 text-blue-600" />, bg: "bg-white hover:bg-blue-50/50 border-slate-200/80 hover:border-blue-200", path: "/application-forms" },
-          { label: "Candidates Directory", sub: "Manage approvals & schedule", icon: <CalendarDays className="h-5 w-5 text-orange-600" />, bg: "bg-white hover:bg-orange-50/50 border-slate-200/80 hover:border-orange-200", path: "/candidates" },
+          { label: "Candidates Directory", sub: "Manage approvals & schedule", icon: <CalendarDays className="h-5 w-5 text-orange-600" />, bg: "bg-white hover:bg-orange-50/50 border-slate-200/80 hover:border-orange-200", path: "/application-forms" },
           { label: "Interview Evaluation", sub: "Doctor full dossier view", icon: <Stethoscope className="h-5 w-5 text-emerald-600" />, bg: "bg-white hover:bg-emerald-50/50 border-slate-200/80 hover:border-emerald-200", path: "/interviews" },
           { label: "Call & Offer Letters", sub: "Generate & download letters", icon: <Award className="h-5 w-5 text-purple-600" />, bg: "bg-white hover:bg-purple-50/50 border-slate-200/80 hover:border-purple-200", path: "/letters" },
         ].map((act) => (
@@ -440,7 +370,7 @@ export default function DashboardPage() {
         
         {/* Stage 1: Applications & Razorpay Payment */}
         <div 
-          onClick={() => navigate("/candidates")}
+          onClick={() => navigate("/application-forms")}
           className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 space-y-3 relative overflow-hidden group cursor-pointer"
         >
           <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 to-indigo-500" />
@@ -465,7 +395,7 @@ export default function DashboardPage() {
 
         {/* Stage 2: Scrutiny & Approval */}
         <div 
-          onClick={() => navigate("/candidates")}
+          onClick={() => navigate("/application-forms")}
           className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 space-y-3 relative overflow-hidden group cursor-pointer"
         >
           <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-500" />
@@ -565,44 +495,29 @@ export default function DashboardPage() {
 
       </div>
 
-      {/* ── 4. VIEW SELECTOR TABS ────────────────────────────────────────── */}
-      <div className="flex border-b border-slate-200 gap-6">
-        <button
-          onClick={() => setActiveTab("overview")}
-          className={`pb-3 font-extrabold text-sm transition-all border-b-2 px-1 flex items-center gap-2 ${
-            activeTab === "overview"
-              ? "border-orange-500 text-slate-900 font-black"
-              : "border-transparent text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          <Layers className="h-4 w-4" />
-          Specialization Matrix & Performance
-          <Badge variant="secondary" className="rounded-full text-[10px] px-2">
-            {specialities.length}
+      {/* ── 4. SPECIALIZATION MATRIX & PROGRAM PERFORMANCE ──────────────── */}
+      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+        <div className="flex items-center gap-2">
+          <Layers className="h-5 w-5 text-orange-600" />
+          <h2 className="text-base font-extrabold text-slate-900">
+            Specialization Matrix & Performance
+          </h2>
+          <Badge variant="secondary" className="rounded-full text-[10px] px-2 font-bold">
+            {specialities.length} Specializations
           </Badge>
-        </button>
-
-        {(role === "super_admin" || role === "program_admin") && (
-          <button
-            onClick={() => setActiveTab("sessions")}
-            className={`pb-3 font-extrabold text-sm transition-all border-b-2 px-1 flex items-center gap-2 ${
-              activeTab === "sessions"
-                ? "border-orange-500 text-slate-900 font-black"
-                : "border-transparent text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            <Globe2 className="h-4 w-4" />
-            Live Logins & Session Security
-            <Badge className="bg-orange-100 text-orange-600 rounded-full px-2 text-[10px] border-none font-bold">
-              {activeSessions.length}
-            </Badge>
-          </button>
-        )}
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate("/rankings")}
+          className="text-xs font-bold text-orange-600 hover:text-orange-700 hover:bg-orange-50 gap-1"
+        >
+          Merit Rankings <ArrowUpRight className="h-3.5 w-3.5" />
+        </Button>
       </div>
 
       {/* ── 5. MAIN CONTENT AREA ─────────────────────────────────────────── */}
-      {activeTab === "overview" ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Specialization Matrix (2 cols) */}
           <div className="lg:col-span-2 space-y-4">
@@ -715,116 +630,6 @@ export default function DashboardPage() {
           </div>
 
         </div>
-      ) : (
-        /* ── 6. ACTIVE SESSIONS & SECURITY TAB ────────────────────────────── */
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden space-y-6 p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
-            <div>
-              <h2 className="text-base font-extrabold text-slate-900">Active User Sessions ({activeSessions.length})</h2>
-              <p className="text-xs text-slate-500">Monitor active administrator and evaluator logins with device and IP tracking</p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetchSessions()}
-              className="text-xs font-bold h-9 gap-1.5"
-            >
-              <RefreshCw className="h-3.5 w-3.5" /> Refresh Sessions
-            </Button>
-          </div>
-
-          {activeSessions.length === 0 ? (
-            <div className="text-center py-12 text-slate-400 text-sm font-bold flex flex-col items-center justify-center gap-2">
-              <ShieldAlert className="h-8 w-8 text-slate-300" />
-              No active logged-in sessions detected
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-slate-50 text-slate-500 text-[10px] uppercase font-bold tracking-wider">
-                    <th className="text-left py-3 px-4">User</th>
-                    <th className="text-left py-3 px-4">IP Address</th>
-                    <th className="text-left py-3 px-4">Device & Browser</th>
-                    <th className="text-left py-3 px-4">Last Active</th>
-                    <th className="text-right py-3 px-4">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {activeSessions.map((sess) => {
-                    const parsedAgent = parseDeviceAgent(sess.deviceInfo);
-                    return (
-                      <tr key={sess.id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="py-3 px-4">
-                          <p className="font-bold text-xs text-slate-900">{sess.userName}</p>
-                          <p className="text-[11px] text-slate-400">{sess.userEmail}</p>
-                          <Badge variant="outline" className="text-[9px] uppercase mt-0.5 font-bold text-slate-600">
-                            {sess.role}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4 font-mono text-xs text-slate-600">{sess.ipAddress || "—"}</td>
-                        <td className="py-3 px-4">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
-                            {parsedAgent.type} • {parsedAgent.name}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-xs text-slate-500 font-mono">
-                          {new Date(sess.lastActivityAt).toLocaleTimeString("en-IN")}
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={terminateSessionMutation.isPending}
-                            onClick={() => {
-                              if (window.confirm(`Terminate session for ${sess.userName}?`)) {
-                                terminateSessionMutation.mutate(sess.id);
-                              }
-                            }}
-                            className="h-8 px-2.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg text-xs font-bold gap-1 ml-auto"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" /> Close Session
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Session Inactivity Timeout Configuration */}
-          <div className="border-t pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50 p-4 rounded-xl">
-            <div className="space-y-0.5">
-              <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                <KeyRound className="h-3.5 w-3.5 text-orange-500" />
-                Session Inactivity Timeout
-              </span>
-              <p className="text-[11px] text-slate-500">Automatically logout inactive users after the specified duration.</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                min={1}
-                max={1440}
-                value={timeoutMinutes}
-                onChange={(e) => setTimeoutMinutes(e.target.value)}
-                placeholder="Minutes"
-                className="w-24 h-9 text-xs font-bold font-mono bg-white"
-              />
-              <Button
-                size="sm"
-                disabled={!timeoutMinutes || saveTimeoutMutation.isPending}
-                onClick={() => saveTimeoutMutation.mutate(timeoutMinutes)}
-                className="h-9 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white"
-              >
-                Save
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );

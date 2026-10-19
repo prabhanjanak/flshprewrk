@@ -1,15 +1,15 @@
 export const DEFAULT_SECTIONS = [
   {
     id: "instructions",
-    title: "Key Instructions",
-    description: "Please read the following instructions carefully before proceeding.",
+    title: "Key Instructions & Schedule (January Intake)",
+    description: "Please read the following instructions and schedule carefully before proceeding.",
     enabled: true,
     fields: [
       { 
         id: "intro_text", 
         type: "info", 
-        label: "Key Instructions", 
-        defaultValue: "<b>1. Multiple Sub-specialties:</b> Candidates can now apply for multiple Sub-specialties in a single application form. Separate fees apply for each specialization.<br/><br/><b>2. Required Documents:</b> Kindly carry your basic and post-graduate educational certificates, current valid medical registration license, and passport-size photograph.<br/><br/><b>3. Selection Process:</b> Selection involves a written test (MCQ pattern) and an interview.<br/><br/><b>4. Application Fee:</b> Rs.2750/- per specialization, payable online during application submission.<br/><br/><b>5. Age Limit:</b> The age limit is 35 years; those beyond 35 years and those awaiting PG results are not eligible.<br/><br/><b>6. Government Bond:</b> Applicants under Government bond or Compulsory Rural Service must submit a 'No Objection Certificate' during the examination.<br/><br/><b>7. NOC Requirement:</b> Selected fellows must submit NOC from their State Medical Council during Fellowship induction.<br/><br/><b>8. Recommendation Letters:</b> Two Letters of Recommendation are required to be uploaded in the last page of this form."
+        label: "Entrance & Induction Schedule — January Intake", 
+        defaultValue: "<b>1. Important Examination & Induction Dates:</b><br/>• <b>07.12.2026, Monday:</b> Retina Fellowship Entrance & Selection (Bengaluru)<br/>• <b>08.12.2026, Tuesday:</b> Anterior Segment Fellowship Entrance & Selection (Bengaluru)<br/>• <b>07.01.2027 & 08.01.2027 (Thursday & Friday):</b> Mandatory Induction for New Fellows (Bengaluru)<br/>• <b>11.01.2027, Monday:</b> New Fellows Reporting at respective Hospital Units<br/><br/><b>2. Multiple Sub-specialties:</b> Candidates can apply for multiple Sub-specialties in a single application form. Separate fees apply for each specialization (Rs. 2750/- per specialization).<br/><br/><b>3. Selection Process:</b> Selection involves an objective assessment of theoretical knowledge (MCQ pattern), OSCE, and skills evaluation with an interview by a panel of faculty.<br/><br/><b>4. Eligibility & Age Limit:</b> The age limit is 35 years. Applicants appearing for interviews must have cleared the results of PG (MS/MD) and DNB (Theory & Practical). Candidates awaiting PG results are not eligible.<br/><br/><b>5. Government Bond / Rural Service:</b> Applicants under Government bond or Compulsory Rural Service must submit a 'No Objection Certificate' during the examination.<br/><br/><b>6. State Medical Council NOC:</b> Selected fellows must submit NOC from their State Medical Council within 3 days of accepting the Fellowship Offer.<br/><br/><b>7. Required Documents:</b> Basic & post-graduate educational certificates, current valid medical registration license, complete CV, passport-size photograph, and two Letters of Recommendation."
       }
     ]
   },
@@ -25,17 +25,17 @@ export const DEFAULT_SECTIONS = [
   {
     id: "units",
     title: "Speciality : Units (Select the preferences)",
-    description: "Choose the preferred center for each fellowship.",
+    description: "Choose the preferred center for each fellowship based on the official Jan-27 Seat Matrix.",
     enabled: true,
     fields: [
-      { id: "unit_cornea", type: "checkbox_group", label: "Cornea Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Jaipur", "Shimoga", "Not Applicable"], visibleIf: { field: "specialization", contains: "Cornea" } },
-      { id: "unit_glaucoma", type: "checkbox_group", label: "Glaucoma Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga", "Not Applicable"], visibleIf: { field: "specialization", contains: "Glaucoma" } },
-      { id: "unit_iol", type: "checkbox_group", label: "IOL Preferred Center", options: ["Anand", "Bangalore", "Coimbatore", "Guntur", "Hyderabad", "Indore", "Jaipur", "Kanpur", "Krishnankoil", "Ludhiana", "Panvel", "Shimoga", "Varanasi", "Not Applicable"], visibleIf: { field: "specialization", contains: "IOL" } },
-      { id: "unit_medical_retina", type: "checkbox_group", label: "Medical Retina Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Jaipur", "Shimoga", "Not Applicable"], visibleIf: { field: "specialization", contains: "Medical Retina" } },
-      { id: "unit_oculoplasty", type: "checkbox_group", label: "Oculoplasty Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Varanasi", "Not Applicable"], visibleIf: { field: "specialization", contains: "Oculoplasty" } },
-      { id: "unit_pediatric", type: "checkbox_group", label: "Pediatric Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga", "Not Applicable"], visibleIf: { field: "specialization", contains: "Pediatric Ophthalmology" } },
-      { id: "unit_phaco", type: "checkbox_group", label: "Phaco Refractive Preferred Center", options: ["Bangalore", "Coimbatore", "Not Applicable"], visibleIf: { field: "specialization", contains: "Phaco Refractive" } },
-      { id: "unit_vitreo_retina", type: "checkbox_group", label: "Vitreo Retina Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga", "Not Applicable"], visibleIf: { field: "specialization", contains: "Vitreo Retina" } },
+      { id: "unit_cornea", type: "checkbox_group", label: "Cornea Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga"], visibleIf: { field: "specialization", contains: "Cornea" } },
+      { id: "unit_glaucoma", type: "checkbox_group", label: "Glaucoma Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga"], visibleIf: { field: "specialization", contains: "Glaucoma" } },
+      { id: "unit_iol", type: "checkbox_group", label: "IOL Preferred Center", options: ["Anand", "Coimbatore", "Guntur", "Hyderabad", "Indore", "Jaipur", "Kanpur", "Krishnankoil", "Ludhiana", "Panvel", "Shimoga", "Varanasi"], visibleIf: { field: "specialization", contains: "IOL" } },
+      { id: "unit_medical_retina", type: "checkbox_group", label: "Medical Retina Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Indore", "Shimoga"], visibleIf: { field: "specialization", contains: "Medical Retina" } },
+      { id: "unit_oculoplasty", type: "checkbox_group", label: "Oculoplasty Preferred Center", options: ["Coimbatore", "Guntur", "Varanasi"], visibleIf: { field: "specialization", contains: "Oculoplasty" } },
+      { id: "unit_pediatric", type: "checkbox_group", label: "Pediatric Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga"], visibleIf: { field: "specialization", contains: "Pediatric Ophthalmology" } },
+      { id: "unit_phaco", type: "checkbox_group", label: "Phaco Refractive Preferred Center", options: ["Bangalore", "Coimbatore"], visibleIf: { field: "specialization", contains: "Phaco Refractive" } },
+      { id: "unit_vitreo_retina", type: "checkbox_group", label: "Vitreo Retina Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga"], visibleIf: { field: "specialization", contains: "Vitreo Retina" } },
       { id: "referralSource", type: "select", label: "Where did you hear about this Fellowship?", required: true, options: ["Sankara Website", "Word of Mouth", "Referred by any Faculty or exiting trainee at Sankara", "IJO Advertisement", "Social Media Platforms (Instagram/Facebook/Whatsapp/LinkedIn)"], isStandard: true, mapping: "referralSource" }
     ]
   },

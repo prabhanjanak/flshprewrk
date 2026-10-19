@@ -49,7 +49,10 @@ async function programSummary(p: Record<string, any>) {
 }
 
 router.get("/programs", requireAuth, async (req: any, res) => {
-  const programs = await db.select().from(programsTable).where(eq(programsTable.isMock, req.isMockMode));
+  let programs = await db.select().from(programsTable).where(eq(programsTable.isMock, req.isMockMode));
+  if (programs.length === 0) {
+    programs = await db.select().from(programsTable);
+  }
   const out = [];
   for (const p of programs) {
     out.push(await programSummary(p));

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { DEFAULT_SECTIONS } from "../lib/default-sections";
-import { eq, desc, inArray, and, or, sql } from "drizzle-orm";
+import { eq, desc, inArray, and, or, sql, ilike } from "drizzle-orm";
 import { 
   db, applicationFormsTable, applicationSubmissionsTable, programsTable, 
   candidatesTable, candidatePreferencesTable, specialitiesTable, paymentSettingsTable, 
@@ -19,7 +19,8 @@ import {
   generateStudentDirectoryPdf, 
   generateCallLetterPdf, 
   generateOfferLetterPdf, 
-  isRetinaSpecialty 
+  isRetinaSpecialty,
+  cleanDoctorName
 } from "../lib/letters";
 import { google } from "googleapis";
 import fs from "fs/promises";
@@ -229,7 +230,6 @@ router.get(
       doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(11).text('APPLICATION SUMMARY', 36, 94, { width: 350 });
       doc.y = 112;
 
-      renderApplicationRecordRow('Registration No.', candidateCode);
       renderApplicationRecordRow('Application ID', `#APP-${id}`);
       renderApplicationRecordRow('Program', program?.name || 'Fellowship Program');
       renderApplicationRecordRow('Submission Date', sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
@@ -383,7 +383,8 @@ router.get(
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
   async (_req, res) => {
-    const forms = await db.select().from(applicationFormsTable).orderBy(desc(applicationFormsTable.createdAt));
+    const rawForms = await db.select().from(applicationFormsTable).orderBy(desc(applicationFormsTable.createdAt));
+    const forms = rawForms.filter((f) => f.token !== "JULY2026" && !/july\s*2026/i.test(f.title || ""));
     const programs = await db.select().from(programsTable);
     const submissions = await db.select().from(applicationSubmissionsTable);
 
@@ -692,7 +693,7 @@ router.post(
 
       const fileName = `Interview_Call_Letter_${candidateCode}.pdf`;
 
-      await sendCallLetterWithAttachment({
+      const emailResult = await sendCallLetterWithAttachment({
         toEmail: sub.email,
         toName: sub.fullName,
         pdfBuffer,
@@ -703,10 +704,24 @@ router.post(
         specialization: spec,
       });
 
-      res.json({ success: true, fileName });
+      // Update submission review notes to reflect letter issuance
+      await db.update(applicationSubmissionsTable)
+        .set({
+          reviewNotes: sub.reviewNotes ? `${sub.reviewNotes} | Call Letter Issued` : "Call Letter Issued",
+        })
+        .where(eq(applicationSubmissionsTable.id, subId));
+
+      res.json({
+        success: true,
+        fileName,
+        emailSent: emailResult.sent,
+        message: emailResult.sent
+          ? "Call letter dispatched by email and ready for download."
+          : "Call letter PDF generated successfully. (Note: Email was not sent because SMTP is not configured. Download PDF directly).",
+      });
     } catch (err: any) {
       console.error("[submission send-call-letter] Error:", err);
-      res.status(500).json({ error: err.message || "Failed to send call letter" });
+      res.status(500).json({ error: err.message || "Failed to generate call letter" });
     }
   }
 );
@@ -2487,15 +2502,58 @@ router.post(
 );
 
 function normalizeToken(t: string): string {
-  if (t === "DEC2026" || t === "dec2026" || t === "december2026") return "DECEMBER2026";
-  return t;
+  if (!t) return "";
+  const trimmed = t.trim();
+  if (
+    trimmed === "JAN2027" || trimmed === "jan2027" || trimmed === "january2027" ||
+    trimmed === "JAN2026" || trimmed === "jan2026" || trimmed === "january2026"
+  ) {
+    return "JAN2027";
+  }
+  if (trimmed === "DEC2026" || trimmed === "dec2026" || trimmed === "december2026") return "DECEMBER2026";
+  return trimmed;
+}
+
+async function resolveFormByToken(rawToken: string) {
+  const token = normalizeToken(rawToken);
+  // If token is explicitly JULY2026, it is retired and hidden
+  if (token.toUpperCase() === "JULY2026") {
+    return null;
+  }
+
+  if (!token || token.toLowerCase() === "active") {
+    const [activeForm] = await db
+      .select()
+      .from(applicationFormsTable)
+      .where(and(eq(applicationFormsTable.isActive, true), ne(applicationFormsTable.token, "JULY2026")))
+      .orderBy(sql`${applicationFormsTable.createdAt} DESC`)
+      .limit(1);
+    return activeForm || null;
+  }
+
+  // Exact match
+  let [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, token));
+  if (form) return form;
+
+  // Fallback alias between JAN2026 and JAN2027
+  if (token === "JAN2026") {
+    [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, "JAN2027"));
+    if (form) return form;
+  }
+  if (token === "JAN2027") {
+    [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, "JAN2026"));
+    if (form) return form;
+  }
+
+  const [ciForm] = await db.select().from(applicationFormsTable).where(ilike(applicationFormsTable.token, token));
+  return ciForm || null;
 }
 
 // Public: request a signed upload URL scoped to an active form token
 router.post("/apply/:token/request-upload-url", async (req, res) => {
-  const token = normalizeToken(req.params.token);
-  const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, token));
+  const form = await resolveFormByToken(req.params.token);
   if (!form) return res.status(404).json({ error: "Form not found" });
+  const token = form.token;
   if (!form.isActive) return res.status(410).json({ error: "This form is no longer accepting submissions" });
   if (form.deadline && new Date() > form.deadline) {
     return res.status(410).json({ error: "The deadline for this form has passed" });
@@ -2595,8 +2653,7 @@ router.put("/apply/:token/local-upload/:folderName/:filename", async (req, res) 
 
 // Public: get form info (includes specialities for dropdown + custom fields)
 router.get("/apply/:token", async (req, res) => {
-  const token = normalizeToken(req.params.token);
-  const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, token));
+  const form = await resolveFormByToken(req.params.token);
   if (!form) return res.status(404).json({ error: "Form not found" });
   if (!form.isActive) return res.status(410).json({ error: "This form is no longer accepting submissions" });
   if (form.deadline && new Date() > form.deadline) {
@@ -2630,20 +2687,64 @@ router.get("/apply/:token", async (req, res) => {
   const dbUnits = (unitResult.rows as { unit_name: string }[]).map((r) => r.unit_name);
   const units = dbUnits.length > 0 ? dbUnits : CANONICAL_UNITS;
 
+  let sectionsConfig = (form.sectionsConfig ?? []) as any[];
+  if (Array.isArray(sectionsConfig) && form.programId) {
+    try {
+      const matrixResult = await db.execute(sql`
+        SELECT speciality, unit_name, total_seats
+        FROM seat_matrix_entries
+        WHERE program_id = ${form.programId} AND total_seats > 0
+        ORDER BY unit_name
+      `);
+      const matrixRows = matrixResult.rows as { speciality: string; unit_name: string; total_seats: number }[];
+      
+      const specToUnits = new Map<string, string[]>();
+      for (const row of matrixRows) {
+        const normSpec = row.speciality.toLowerCase().trim();
+        const list = specToUnits.get(normSpec) || [];
+        if (!list.includes(row.unit_name)) list.push(row.unit_name);
+        specToUnits.set(normSpec, list);
+      }
+
+      sectionsConfig = sectionsConfig.map((sec) => ({
+        ...sec,
+        fields: sec.fields?.map((f: any) => {
+          if (f.id && f.id.startsWith("unit_") && f.visibleIf?.contains) {
+            const specCondition = f.visibleIf.contains.toLowerCase().trim();
+            for (const [sKey, uList] of specToUnits.entries()) {
+              if (
+                sKey === specCondition ||
+                sKey.includes(specCondition) || 
+                specCondition.includes(sKey) || 
+                (specCondition === "iol" && sKey.includes("iol")) ||
+                (specCondition.includes("medical retina") && sKey.includes("medical retina")) ||
+                (specCondition.includes("pediatric") && sKey.includes("pediatric"))
+              ) {
+                if (uList.length > 0) {
+                  return { ...f, options: uList };
+                }
+              }
+            }
+          }
+          return f;
+        })
+      }));
+    } catch (_) {}
+  }
+
   res.json({
     ...form,
     programName: program?.name ?? null,
     specialities,
     units,
     customFields: form.customFields ?? [],
-    sectionsConfig: form.sectionsConfig ?? []
+    sectionsConfig
   });
 });
 
 // Public: payment config
 router.get("/apply/:token/payment-config", async (req, res) => {
-  const token = normalizeToken(req.params.token);
-  const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, token));
+  const form = await resolveFormByToken(req.params.token);
   const programId = form?.programId ?? null;
 
   const all = await db.select().from(paymentSettingsTable).where(eq(paymentSettingsTable.isActive, true));
@@ -2655,25 +2756,27 @@ router.get("/apply/:token/payment-config", async (req, res) => {
   const keySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
   const hasCreds = !!(keyId && keySecret);
 
-  if (!setting && !hasCreds) {
-    return res.json({ mock: true, amount: 275000, currency: "INR", description: "Fellowship Application Fee" });
-  }
-
   res.json({
     mock: !hasCreds,
     keyId: hasCreds ? keyId : undefined,
     amount: setting?.amount || 275000,
     currency: setting?.currency || "INR",
-    description: setting?.description || "Fellowship Application Fee",
-    mode: setting?.mode || "test",
-    upiId: setting?.upiId ?? undefined,
+    description: setting?.description || "Fellowship Application Fee January 2027",
+    mode: setting?.mode || (hasCreds ? "live" : "test"),
+    bankDetails: {
+      accountName: "Sankara Academy of Vision",
+      accountNumber: "50100004642084",
+      bankName: "HDFC Bank",
+      branch: "Saravanampatti Branch, Coimbatore",
+      ifscCode: "HDFC0002231",
+      upiId: setting?.upiId || "sankaraeye@hdfcbank",
+    }
   });
 });
 
 // Public: submit application
 router.post("/apply/:token", async (req, res) => {
-  const token = normalizeToken(req.params.token);
-  const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, token));
+  const form = await resolveFormByToken(req.params.token);
   if (!form) return res.status(404).json({ error: "Form not found" });
   if (!form.isActive) return res.status(410).json({ error: "This form is no longer accepting submissions" });
   if (form.deadline && new Date() > form.deadline) {
@@ -2740,27 +2843,35 @@ router.post("/apply/:token", async (req, res) => {
   }
 
   // Payment mapping
-  const razorpayId = body.paymentId || body.payment_id;
+  const razorpayId = body.paymentId || body.payment_id || body.paymentUTR;
   if (razorpayId) {
-    if (body.paymentMode === "Manual Offline") {
+    let specCount = 1;
+    try {
+      if (subData.specialization) {
+        const parsed = JSON.parse(subData.specialization);
+        if (Array.isArray(parsed)) {
+          specCount = parsed.length;
+        }
+      }
+    } catch (e) {}
+
+    const isDirectBankTransfer = body.paymentMode === "Direct Bank Transfer / UPI" || body.paymentMode === "bank_transfer" || !!body.paymentUTR;
+    const isManualOffline = body.paymentMode === "Manual Offline";
+
+    if (isDirectBankTransfer) {
+      subData.paymentId = razorpayId;
+      subData.paymentMode = "Direct Bank Transfer / UPI";
+      subData.paymentUrl = subData.paymentUrl || body.paymentUrl || `direct_transfer:${razorpayId}`;
+      subData.paidAmount = body.paidAmount ? (body.paidAmount > 100000 ? Math.round(body.paidAmount / 100) : Number(body.paidAmount)) : 2750 * specCount;
+    } else if (isManualOffline) {
       subData.paymentId = razorpayId;
       subData.paymentMode = "Manual Offline";
       subData.paidAmount = body.paidAmount ? Number(body.paidAmount) : 0;
     } else {
       subData.paymentId = razorpayId;
-      subData.paymentUrl = `razorpay:${razorpayId}`;
+      subData.paymentUrl = subData.paymentUrl || `razorpay:${razorpayId}`;
       subData.paymentMode = "Razorpay";
-      // Calculate payment amount based on the number of selected specializations
-      let specCount = 1;
-      try {
-        if (subData.specialization) {
-          const parsed = JSON.parse(subData.specialization);
-          if (Array.isArray(parsed)) {
-            specCount = parsed.length;
-          }
-        }
-      } catch (e) {}
-      subData.paidAmount = 2750 * specCount;
+      subData.paidAmount = body.paidAmount ? (body.paidAmount > 100000 ? Math.round(body.paidAmount / 100) : Number(body.paidAmount)) : 2750 * specCount;
     }
   }
 
@@ -2798,6 +2909,210 @@ router.post("/apply/:token", async (req, res) => {
   }
 
   res.status(201).json({ success: true, submissionId: sub!.id });
+});
+
+// Candidate Public: Download Payment Receipt & Application Copy PDF
+router.get(["/apply/:token/receipt/:submissionId", "/apply/receipt/:submissionId"], async (req, res) => {
+  try {
+    const subId = Number(req.params.submissionId);
+    if (isNaN(subId)) return res.status(400).json({ error: "Invalid submission ID" });
+
+    const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, subId));
+    if (!sub) return res.status(404).json({ error: "Application submission not found" });
+
+    if (req.params.token) {
+      const form = await resolveFormByToken(req.params.token);
+      if (form && sub.formId !== form.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
+
+    const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
+    const [program] = form?.programId ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
+
+    const cleanName = cleanDoctorName(sub.fullName);
+    const doc = new PDFDocument({
+      margin: 36,
+      size: 'LETTER',
+      bufferPages: true,
+      info: {
+        Title: `Payment Receipt & Application - Dr. ${cleanName}`,
+        Author: 'Sankara Academy of Vision'
+      }
+    });
+
+    const filename = `SAV_Payment_Receipt_${sub.id}_${cleanName.replace(/\s+/g, '_')}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+    doc.pipe(res);
+
+    const colors = {
+      navy: '#000080',
+      darkNavy: '#000050',
+      primary: '#0f172a',
+      secondary: '#475569',
+      muted: '#94a3b8',
+      border: '#cbd5e1',
+      bgLight: '#f8fafc',
+      emeraldBg: '#f0fdf4',
+      emeraldBorder: '#86efac',
+      emeraldText: '#15803d',
+      emeraldDark: '#166534'
+    };
+
+    // --- Institutional Top Header Banner ---
+    doc.rect(36, 36, 540, 50).fill(colors.navy);
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(16).text('SANKARA ACADEMY OF VISION', 50, 46);
+    doc.fillColor('#cbd5e1').font('Helvetica').fontSize(8.5).text('Educational unit of Sankara Eye Foundation, India   |   www.sankaraeye.com', 50, 68);
+    
+    doc.fillColor('#93c5fd').font('Helvetica-Bold').fontSize(9).text('OFFICIAL PAYMENT RECEIPT', 360, 46, { width: 200, align: 'right' });
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(10).text(`APP REF: #APP-${sub.id}`, 360, 64, { width: 200, align: 'right' });
+
+    doc.y = 96;
+
+    // --- Official Payment Receipt Box (Hero Emerald Block) ---
+    const receiptBoxY = doc.y;
+    doc.rect(36, receiptBoxY, 540, 92).fill(colors.emeraldBg);
+    doc.strokeColor(colors.emeraldBorder).lineWidth(1.2).rect(36, receiptBoxY, 540, 92).stroke();
+
+    // Emerald Status Badge
+    doc.rect(50, receiptBoxY + 12, 190, 18).fill('#dcfce7');
+    doc.strokeColor(colors.emeraldBorder).lineWidth(0.8).rect(50, receiptBoxY + 12, 190, 18).stroke();
+    doc.fillColor(colors.emeraldDark).font('Helvetica-Bold').fontSize(8.5).text('PAYMENT VERIFIED & CONFIRMED', 56, receiptBoxY + 16, { width: 178, align: 'center' });
+
+    // Payment details on left
+    const receiptNo = `SAV-REC-${sub.id}-${(sub.paymentId || 'ONLINE').slice(-6).toUpperCase()}`;
+    const formattedDate = formatToLocalDateTime(sub.submittedAt || new Date());
+    
+    doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(8).text('RECEIPT NO:', 50, receiptBoxY + 38);
+    doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(8.5).text(receiptNo, 150, receiptBoxY + 38);
+
+    doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(8).text('TRANSACTION ID:', 50, receiptBoxY + 54);
+    doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(8.5).text(sub.paymentId || 'Razorpay Online', 150, receiptBoxY + 54);
+
+    doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(8).text('PAYMENT DATE:', 50, receiptBoxY + 70);
+    doc.fillColor(colors.primary).font('Helvetica').fontSize(8.5).text(formattedDate, 150, receiptBoxY + 70);
+
+    // Amount box on right
+    doc.rect(395, receiptBoxY + 12, 165, 68).fill('#ffffff');
+    doc.strokeColor(colors.emeraldBorder).lineWidth(0.8).rect(395, receiptBoxY + 12, 165, 68).stroke();
+    
+    doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(7.5).text('TOTAL AMOUNT PAID', 405, receiptBoxY + 20, { width: 145, align: 'center' });
+    
+    const displayAmount = (sub.paidAmount && sub.paidAmount > 0)
+      ? (sub.paidAmount > 100000 ? Math.round(sub.paidAmount / 100) : sub.paidAmount)
+      : 2750;
+    
+    doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(17).text(`INR ${displayAmount.toLocaleString('en-IN')}`, 405, receiptBoxY + 34, { width: 145, align: 'center' });
+    doc.fillColor(colors.emeraldDark).font('Helvetica-Bold').fontSize(7.5).text('TRANSACTION SUCCESSFUL', 405, receiptBoxY + 58, { width: 145, align: 'center' });
+
+    doc.y = receiptBoxY + 104;
+
+    // Helper functions for candidate data sections
+    const drawSectionHeader = (title: string) => {
+      if (doc.y > 690) {
+        doc.addPage();
+        doc.y = 36;
+      }
+      doc.moveDown(0.4);
+      const y = doc.y;
+      doc.rect(36, y, 540, 17).fill(colors.bgLight);
+      doc.strokeColor(colors.border).lineWidth(0.6).rect(36, y, 540, 17).stroke();
+      doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(9).text(title.toUpperCase(), 44, y + 4.5, { width: 520 });
+      doc.y = y + 21;
+    };
+
+    const renderRow = (label: string, value: any) => {
+      const valText = (value === null || value === undefined || value === "null" || value === "") ? "—" : String(value);
+      if (doc.y > 720) {
+        doc.addPage();
+        doc.y = 36;
+      }
+      const currentY = doc.y;
+      doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(8).text(label.toUpperCase(), 36, currentY, { width: 150, lineGap: 1 });
+      const labelEndY = doc.y;
+      doc.fillColor(colors.primary).font('Helvetica').fontSize(8.5).text(`: ${valText}`, 190, currentY, { width: 386, lineGap: 1 });
+      const valueEndY = doc.y;
+      doc.y = Math.max(labelEndY, valueEndY) + 3;
+    };
+
+    // 1. Fellowship Program Details
+    drawSectionHeader('1. Fellowship Application Summary');
+    renderRow('Application Reference', `#APP-${sub.id}`);
+    renderRow('Fellowship Program', program?.name || 'Fellowship Program January 2027');
+    
+    const specs = parseSpecializationString(sub.specialization);
+    renderRow('Subspecialties Applied', specs.length > 0 ? specs.join(', ') : (sub.specialization || '—'));
+    
+    // Centers
+    let centerStr = '—';
+    if (sub.centerPreference) {
+      try {
+        const parsed = JSON.parse(sub.centerPreference);
+        if (typeof parsed === 'object') {
+          centerStr = Object.entries(parsed).map(([k, v]) => `${k}: ${v}`).join(' | ');
+        } else {
+          centerStr = String(parsed);
+        }
+      } catch {
+        centerStr = String(sub.centerPreference);
+      }
+    }
+    renderRow('Preferred Centers', centerStr);
+
+    // 2. Candidate Personal Information
+    drawSectionHeader('2. Candidate Information');
+    renderRow('Full Name', `Dr. ${cleanName}`);
+    renderRow('Email Address', sub.email);
+    renderRow('Contact Number', sub.phone || '—');
+    renderRow('Date of Birth', formatDOBToStandard(sub.dateOfBirth));
+    renderRow('Gender / Marital', [sub.gender, sub.maritalStatus].filter(Boolean).join(" · ") || "—");
+    renderRow('Permanent Address', sub.permanentAddress || '—');
+
+    // 3. Medical Qualifications & Registration
+    drawSectionHeader('3. Medical Qualifications & Licensing');
+    renderRow('State Council Reg No', sub.medicalCouncilRegNumber || '—');
+    renderRow('State Medical Council', sub.stateMedicalCouncil || '—');
+    renderRow('MBBS Institution', `${sub.mbbsCollege || '—'} (${sub.mbbsPassingYear || '—'})`);
+    renderRow('Post-Graduate Degree', `${sub.degree || 'MS/MD/DNB/DO'} - ${sub.medicalCollege || '—'} (${sub.postGraduationPassingYear || '—'})`);
+
+    // 4. References
+    drawSectionHeader('4. Recommendations & Documents');
+    renderRow('Referee 1 (LOR)', `${sub.lor1RefName || '—'} (${sub.lor1RefContact || 'No contact specified'})`);
+    renderRow('Referee 2 (LOR)', `${sub.lor2RefName || '—'} (${sub.lor2RefContact || 'No contact specified'})`);
+    
+    const uploaded = [];
+    if (sub.photoUrl) uploaded.push('Candidate Photograph');
+    if (sub.lor1Url) uploaded.push('LOR #1');
+    if (sub.lor2Url) uploaded.push('LOR #2');
+    if (sub.paymentUrl) uploaded.push('Payment Gateway Receipt');
+    renderRow('Uploaded Documents', uploaded.length > 0 ? uploaded.join(', ') : 'Online Application');
+
+    // 5. Official Verification & Certification Footer
+    if (doc.y > 660) {
+      doc.addPage();
+      doc.y = 36;
+    }
+    doc.moveDown(0.8);
+    const certY = doc.y;
+    doc.rect(36, certY, 540, 56).fill('#f8fafc');
+    doc.strokeColor(colors.border).lineWidth(0.6).rect(36, certY, 540, 56).stroke();
+    
+    doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(8.5).text('OFFICIAL ELECTRONIC ADMISSION CERTIFICATION', 46, certY + 8);
+    doc.fillColor(colors.secondary).font('Helvetica').fontSize(7.5).text(
+      'This document is an electronically generated official application fee payment receipt and candidate admission summary issued by Sankara Academy of Vision. Payment has been verified via Razorpay. No physical signature is required.\n' +
+      'Please retain this copy for your admission interview, written test, and original document verification.\n' +
+      'Admissions Office: admissions@sankaraeye.com   |   Central Desk: +91 422 4234500   |   Web: www.sankaraeye.com',
+      46, certY + 22, { width: 520, lineGap: 1.5 }
+    );
+
+    doc.end();
+  } catch (err: any) {
+    console.error("Receipt generation error:", err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Failed to generate payment receipt: " + err.message });
+    }
+  }
 });
 
 // Admin: Manually create a submission
