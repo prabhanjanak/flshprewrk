@@ -149,7 +149,7 @@ async function drawHallTicketPage(doc: any, data: {
   doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(16).text("SANKARA ACADEMY OF VISION", left, 48, { width: contentWidth, align: "center" });
   doc.fillColor(colors.dark).font("Helvetica").fontSize(9).text("Educational unit of Sankara Eye Foundation · Sri Kanchi Kamakoti Medical Trust", left, 68, { width: contentWidth, align: "center" });
   doc.fillColor(colors.accentGold).font("Helvetica-Bold").fontSize(8.5).text("CENTRAL ADMISSIONS & EXAMINATION BOARD", left, 82, { width: contentWidth, align: "center" });
-  doc.fillColor(colors.slate).font("Helvetica").fontSize(7.5).text("Website: admissions.sankaraeye.com · Email: admissions@sankaraeye.com", left, 96, { width: contentWidth, align: "center" });
+  doc.fillColor(colors.slate).font("Helvetica").fontSize(7.5).text("Website: www.sankaraeye.com · Email: radhika@sankaraeye.com", left, 96, { width: contentWidth, align: "center" });
 
   // Document Title Ribbon
   doc.rect(left, 112, contentWidth, 24).fill(colors.navy);

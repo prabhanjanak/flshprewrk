@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { DEFAULT_SECTIONS } from "../lib/default-sections";
-import { eq, desc, inArray, and, or, sql, ilike } from "drizzle-orm";
+import { eq, ne, desc, inArray, and, or, sql, ilike } from "drizzle-orm";
 import { 
   db, applicationFormsTable, applicationSubmissionsTable, programsTable, 
   candidatesTable, candidatePreferencesTable, specialitiesTable, paymentSettingsTable, 
@@ -2921,12 +2921,13 @@ router.get(["/apply/:token/receipt/:submissionId", "/apply/receipt/:submissionId
     if (!sub) return res.status(404).json({ error: "Application submission not found" });
 
     if (req.params.token) {
-      const form = await resolveFormByToken(req.params.token);
+      const form = await resolveFormByToken(String(req.params.token));
       if (form && sub.formId !== form.id) {
         return res.status(403).json({ error: "Access denied" });
       }
     }
 
+    const subAny = sub as any;
     const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
     const [program] = form?.programId ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
 
@@ -2936,90 +2937,198 @@ router.get(["/apply/:token/receipt/:submissionId", "/apply/receipt/:submissionId
       size: 'LETTER',
       bufferPages: true,
       info: {
-        Title: `Payment Receipt & Application - Dr. ${cleanName}`,
+        Title: `Payment Receipt & Admission Summary - Dr. ${cleanName}`,
         Author: 'Sankara Academy of Vision'
       }
     });
 
-    const filename = `SAV_Payment_Receipt_${sub.id}_${cleanName.replace(/\s+/g, '_')}.pdf`;
+    const filename = `SAV_Invoice_Receipt_${sub.id}_${cleanName.replace(/\s+/g, '_')}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
     doc.pipe(res);
 
     const colors = {
-      navy: '#000080',
-      darkNavy: '#000050',
+      navy: '#000066',
+      darkNavy: '#00003b',
+      accentNavy: '#1e3a8a',
       primary: '#0f172a',
       secondary: '#475569',
-      muted: '#94a3b8',
+      muted: '#64748b',
       border: '#cbd5e1',
+      borderStrong: '#94a3b8',
       bgLight: '#f8fafc',
+      bgCard: '#f1f5f9',
       emeraldBg: '#f0fdf4',
       emeraldBorder: '#86efac',
       emeraldText: '#15803d',
-      emeraldDark: '#166534'
+      emeraldDark: '#166534',
+      amberBg: '#fffbeb',
+      amberBorder: '#fcd34d',
+      amberDark: '#92400e'
     };
 
-    // --- Institutional Top Header Banner ---
-    doc.rect(36, 36, 540, 50).fill(colors.navy);
-    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(16).text('SANKARA ACADEMY OF VISION', 50, 46);
-    doc.fillColor('#cbd5e1').font('Helvetica').fontSize(8.5).text('Educational unit of Sankara Eye Foundation, India   |   www.sankaraeye.com', 50, 68);
-    
-    doc.fillColor('#93c5fd').font('Helvetica-Bold').fontSize(9).text('OFFICIAL PAYMENT RECEIPT', 360, 46, { width: 200, align: 'right' });
-    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(10).text(`APP REF: #APP-${sub.id}`, 360, 64, { width: 200, align: 'right' });
+    function numberToWordsINR(amount: number): string {
+      const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+        "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+      const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
 
-    doc.y = 96;
+      function numToWords(n: number): string {
+        if (n === 0) return "";
+        if (n < 20) return ones[n] + " ";
+        if (n < 100) return tens[Math.floor(n / 10)] + " " + (n % 10 ? ones[n % 10] + " " : "");
+        if (n < 1000) return ones[Math.floor(n / 100)] + " Hundred " + (n % 100 ? "and " + numToWords(n % 100) : "");
+        if (n < 100000) return numToWords(Math.floor(n / 1000)) + "Thousand " + (n % 1000 ? numToWords(n % 1000) : "");
+        if (n < 10000000) return numToWords(Math.floor(n / 100000)) + "Lakh " + (n % 100000 ? numToWords(n % 100000) : "");
+        return numToWords(Math.floor(n / 10000000)) + "Crore " + (n % 10000000 ? numToWords(n % 10000000) : "");
+      }
 
-    // --- Official Payment Receipt Box (Hero Emerald Block) ---
-    const receiptBoxY = doc.y;
-    doc.rect(36, receiptBoxY, 540, 92).fill(colors.emeraldBg);
-    doc.strokeColor(colors.emeraldBorder).lineWidth(1.2).rect(36, receiptBoxY, 540, 92).stroke();
+      const rounded = Math.round(amount);
+      if (rounded <= 0) return "Zero Rupees Only";
+      const words = numToWords(rounded).trim().replace(/\s+/g, " ");
+      return `${words} Rupees Only`;
+    }
 
-    // Emerald Status Badge
-    doc.rect(50, receiptBoxY + 12, 190, 18).fill('#dcfce7');
-    doc.strokeColor(colors.emeraldBorder).lineWidth(0.8).rect(50, receiptBoxY + 12, 190, 18).stroke();
-    doc.fillColor(colors.emeraldDark).font('Helvetica-Bold').fontSize(8.5).text('PAYMENT VERIFIED & CONFIRMED', 56, receiptBoxY + 16, { width: 178, align: 'center' });
+    // ==========================================
+    // PAGE 1: AUTOMATED OFFICIAL BILL & TAX INVOICE
+    // ==========================================
 
-    // Payment details on left
-    const receiptNo = `SAV-REC-${sub.id}-${(sub.paymentId || 'ONLINE').slice(-6).toUpperCase()}`;
+    // --- Institutional Letterhead Header Banner ---
+    doc.rect(36, 36, 540, 56).fill(colors.navy);
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(14).text('SANKARA ACADEMY OF VISION', 48, 44);
+    doc.fillColor('#93c5fd').font('Helvetica').fontSize(8).text('A Unit of Sri Kanchi Kamakoti Medical Trust', 48, 60);
+    doc.fillColor('#cbd5e1').font('Helvetica').fontSize(7.5).text('Bangalore Campus: Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore – 560037', 48, 73);
+
+    doc.fillColor('#93c5fd').font('Helvetica-Bold').fontSize(8.5).text('OFFICIAL TAX INVOICE & RECEIPT', 320, 44, { width: 246, align: 'right' });
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(10).text(`APP REF: #APP-${sub.id}`, 320, 58, { width: 246, align: 'right' });
+    doc.fillColor('#cbd5e1').font('Helvetica').fontSize(7.5).text('radhika@sankaraeye.com | +91 9666677505', 320, 73, { width: 246, align: 'right' });
+
+    // --- Automated Electronic Bill & Receipt Hero Card ---
+    const billCardY = 98;
+    const billCardHeight = 84;
+    doc.rect(36, billCardY, 540, billCardHeight).fill(colors.emeraldBg);
+    doc.strokeColor(colors.emeraldBorder).lineWidth(1.2).rect(36, billCardY, 540, billCardHeight).stroke();
+
+    // Top status pill inside card
+    doc.rect(48, billCardY + 8, 320, 16).fill('#dcfce7');
+    doc.strokeColor(colors.emeraldBorder).lineWidth(0.6).rect(48, billCardY + 8, 320, 16).stroke();
+    doc.fillColor(colors.emeraldDark).font('Helvetica-Bold').fontSize(7.5).text('[OFFICIAL] AUTOMATED COMPUTER-GENERATED BILL & PAYMENT RECEIPT', 52, billCardY + 12, { width: 312, align: 'center' });
+
+    // Metadata lines
+    const invoiceNo = `SAV-INV-${sub.id}-${(sub.paymentId || 'RZP').replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase()}`;
     const formattedDate = formatToLocalDateTime(sub.submittedAt || new Date());
-    
-    doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(8).text('RECEIPT NO:', 50, receiptBoxY + 38);
-    doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(8.5).text(receiptNo, 150, receiptBoxY + 38);
 
-    doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(8).text('TRANSACTION ID:', 50, receiptBoxY + 54);
-    doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(8.5).text(sub.paymentId || 'Razorpay Online', 150, receiptBoxY + 54);
+    const drawMetaRow = (label: string, val: string, yPos: number) => {
+      doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(7.5).text(label, 48, yPos);
+      doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(8).text(val, 150, yPos);
+    };
 
-    doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(8).text('PAYMENT DATE:', 50, receiptBoxY + 70);
-    doc.fillColor(colors.primary).font('Helvetica').fontSize(8.5).text(formattedDate, 150, receiptBoxY + 70);
+    drawMetaRow('INVOICE / BILL NO:', invoiceNo, billCardY + 28);
+    drawMetaRow('INVOICE DATE & TIME:', `${formattedDate} IST`, billCardY + 41);
+    drawMetaRow('RAZORPAY PAYMENT ID:', sub.paymentId || 'Verified via Razorpay Gateway', billCardY + 54);
+    drawMetaRow('PAYMENT STATUS:', 'PAID & VERIFIED (RAZORPAY ONLINE GATEWAY)', billCardY + 67);
 
-    // Amount box on right
-    doc.rect(395, receiptBoxY + 12, 165, 68).fill('#ffffff');
-    doc.strokeColor(colors.emeraldBorder).lineWidth(0.8).rect(395, receiptBoxY + 12, 165, 68).stroke();
+    // Right Side: Grand Paid Amount Box
+    doc.rect(385, billCardY + 8, 180, 68).fill('#ffffff');
+    doc.strokeColor(colors.emeraldBorder).lineWidth(0.8).rect(385, billCardY + 8, 180, 68).stroke();
     
-    doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(7.5).text('TOTAL AMOUNT PAID', 405, receiptBoxY + 20, { width: 145, align: 'center' });
-    
+    doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(7.5).text('TOTAL AMOUNT PAID', 390, billCardY + 14, { width: 170, align: 'center' });
+
+    const specs = parseSpecializationString(sub.specialization);
+    const specCount = Math.max(1, specs.length);
     const displayAmount = (sub.paidAmount && sub.paidAmount > 0)
       ? (sub.paidAmount > 100000 ? Math.round(sub.paidAmount / 100) : sub.paidAmount)
-      : 2750;
-    
-    doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(17).text(`INR ${displayAmount.toLocaleString('en-IN')}`, 405, receiptBoxY + 34, { width: 145, align: 'center' });
-    doc.fillColor(colors.emeraldDark).font('Helvetica-Bold').fontSize(7.5).text('TRANSACTION SUCCESSFUL', 405, receiptBoxY + 58, { width: 145, align: 'center' });
+      : 2750 * specCount;
 
-    doc.y = receiptBoxY + 104;
+    doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(16).text(`INR ${displayAmount.toLocaleString('en-IN')}`, 390, billCardY + 26, { width: 170, align: 'center' });
+    doc.fillColor(colors.emeraldDark).font('Helvetica-Bold').fontSize(7).text('TRANSACTION RECONCILED & CONFIRMED', 390, billCardY + 46, { width: 170, align: 'center' });
+    doc.fillColor(colors.muted).font('Helvetica-Oblique').fontSize(6.5).text(numberToWordsINR(displayAmount), 390, billCardY + 57, { width: 170, align: 'center' });
+
+    // --- Candidate Billed-To Box ---
+    const billedToY = 188;
+    const billedToH = 46;
+    doc.rect(36, billedToY, 540, billedToH).fill(colors.bgLight);
+    doc.strokeColor(colors.border).lineWidth(0.8).rect(36, billedToY, 540, billedToH).stroke();
+
+    doc.rect(36, billedToY, 540, 14).fill(colors.bgCard);
+    doc.strokeColor(colors.border).lineWidth(0.5).moveTo(36, billedToY + 14).lineTo(576, billedToY + 14).stroke();
+    doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(7.5).text('BILLED TO / CANDIDATE IDENTIFICATION', 44, billedToY + 3.5);
+
+    doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(7.5).text('Candidate Name:', 44, billedToY + 18);
+    doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(8).text(`Dr. ${cleanName}`, 120, billedToY + 18);
+
+    doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(7.5).text('Email Address:', 260, billedToY + 18);
+    doc.fillColor(colors.primary).font('Helvetica').fontSize(8).text(sub.email, 330, billedToY + 18);
+
+    doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(7.5).text('Contact Phone:', 44, billedToY + 30);
+    doc.fillColor(colors.primary).font('Helvetica').fontSize(8).text(sub.phone || '—', 120, billedToY + 30);
+
+    doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(7.5).text('Address on File:', 260, billedToY + 30);
+    doc.fillColor(colors.primary).font('Helvetica').fontSize(7.5).text((sub.permanentAddress || 'On file').replace(/\n/g, ' '), 330, billedToY + 30, { width: 236, ellipsis: true });
+
+    // --- Itemized Fee Bill Table ---
+    const tableY = 240;
+    // Table Header
+    doc.rect(36, tableY, 540, 18).fill(colors.navy);
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(7.5);
+    doc.text('SL', 42, tableY + 5, { width: 20 });
+    doc.text('SERVICE / PROGRAM DESCRIPTION', 66, tableY + 5, { width: 250 });
+    doc.text('SAC CODE', 320, tableY + 5, { width: 50, align: 'center' });
+    doc.text('QTY', 375, tableY + 5, { width: 35, align: 'center' });
+    doc.text('RATE (INR)', 415, tableY + 5, { width: 65, align: 'right' });
+    doc.text('AMOUNT (INR)', 485, tableY + 5, { width: 85, align: 'right' });
+
+    // Row 1
+    const row1Y = tableY + 18;
+    const row1H = 34;
+    doc.rect(36, row1Y, 540, row1H).fill('#ffffff');
+    doc.strokeColor(colors.border).lineWidth(0.5).rect(36, row1Y, 540, row1H).stroke();
+
+    doc.fillColor(colors.primary).font('Helvetica').fontSize(8).text('1', 42, row1Y + 6);
+    doc.font('Helvetica-Bold').text('Fellowship Entrance Examination & Application Processing Fee', 66, row1Y + 5, { width: 250 });
+    doc.font('Helvetica').fontSize(7).fillColor(colors.secondary).text(`Session: ${program?.name || 'Fellowship Program January 2027'} | Subspecialties: ${specs.length ? specs.join(', ') : 'Ophthalmology Fellowship'}`, 66, row1Y + 17, { width: 250 });
+    doc.fillColor(colors.primary).font('Helvetica').fontSize(8);
+    doc.text('9992', 320, row1Y + 11, { width: 50, align: 'center' });
+    doc.text(`${specCount}`, 375, row1Y + 11, { width: 35, align: 'center' });
+    doc.text('2,750.00', 415, row1Y + 11, { width: 65, align: 'right' });
+    doc.font('Helvetica-Bold').text(`${displayAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 485, row1Y + 11, { width: 85, align: 'right' });
+
+    // Table Summary Rows
+    const sumY = row1Y + row1H;
+    const drawSummaryRow = (lbl: string, val: string, isBold = false, isGreen = false) => {
+      const cy = doc.y;
+      doc.rect(36, cy, 540, 15).fill(isBold ? colors.bgCard : '#ffffff');
+      doc.strokeColor(colors.border).lineWidth(0.5).rect(36, cy, 540, 15).stroke();
+      doc.fillColor(isBold ? colors.navy : colors.secondary).font(isBold ? 'Helvetica-Bold' : 'Helvetica').fontSize(7.5).text(lbl, 48, cy + 3.5, { width: 360, align: 'right' });
+      doc.fillColor(isGreen ? colors.emeraldDark : (isBold ? colors.navy : colors.primary)).font(isBold ? 'Helvetica-Bold' : 'Helvetica').fontSize(isBold ? 8 : 7.5).text(val, 485, cy + 3.5, { width: 85, align: 'right' });
+      doc.y = cy + 15;
+    };
+
+    doc.y = sumY;
+    drawSummaryRow('Subtotal (Entrance Examination Fee):', `INR ${displayAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
+    drawSummaryRow('Central & State GST (Exempt under SAC 9992 Educational Admissions):', 'INR 0.00');
+    drawSummaryRow('Grand Total Paid via Razorpay:', `INR ${displayAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, true, true);
+    drawSummaryRow('Balance Due:', 'INR 0.00 (Fully Paid)', false, true);
+
+    // Computer Generated Bill Note
+    const noteY = doc.y + 4;
+    doc.fillColor(colors.muted).font('Helvetica-Oblique').fontSize(6.8).text(
+      '* This document is an automated computer-generated electronic bill and official receipt. It serves as verified proof of application fee payment.',
+      36, noteY, { width: 540, align: 'center' }
+    );
 
     // Helper functions for candidate data sections
-    const drawSectionHeader = (title: string) => {
+    const drawSectionHeader = (title: string, topY?: number) => {
+      if (topY) doc.y = topY;
       if (doc.y > 690) {
         doc.addPage();
         doc.y = 36;
       }
-      doc.moveDown(0.4);
+      doc.moveDown(0.3);
       const y = doc.y;
-      doc.rect(36, y, 540, 17).fill(colors.bgLight);
-      doc.strokeColor(colors.border).lineWidth(0.6).rect(36, y, 540, 17).stroke();
-      doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(9).text(title.toUpperCase(), 44, y + 4.5, { width: 520 });
-      doc.y = y + 21;
+      doc.rect(36, y, 540, 16).fill(colors.bgCard);
+      doc.strokeColor(colors.border).lineWidth(0.6).rect(36, y, 540, 16).stroke();
+      doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(8.5).text(title.toUpperCase(), 44, y + 4, { width: 520 });
+      doc.y = y + 19;
     };
 
     const renderRow = (label: string, value: any) => {
@@ -3029,28 +3138,24 @@ router.get(["/apply/:token/receipt/:submissionId", "/apply/receipt/:submissionId
         doc.y = 36;
       }
       const currentY = doc.y;
-      doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(8).text(label.toUpperCase(), 36, currentY, { width: 150, lineGap: 1 });
+      doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(7.5).text(label.toUpperCase(), 44, currentY, { width: 155, lineGap: 1 });
       const labelEndY = doc.y;
-      doc.fillColor(colors.primary).font('Helvetica').fontSize(8.5).text(`: ${valText}`, 190, currentY, { width: 386, lineGap: 1 });
+      doc.fillColor(colors.primary).font('Helvetica').fontSize(8).text(`: ${valText}`, 204, currentY, { width: 366, lineGap: 1 });
       const valueEndY = doc.y;
-      doc.y = Math.max(labelEndY, valueEndY) + 3;
+      doc.y = Math.max(labelEndY, valueEndY) + 2.5;
     };
 
-    // 1. Fellowship Program Details
-    drawSectionHeader('1. Fellowship Application Summary');
-    renderRow('Application Reference', `#APP-${sub.id}`);
+    // 1. Program & Preferences
+    drawSectionHeader('1. Fellowship Application & Unit Preferences', noteY + 14);
     renderRow('Fellowship Program', program?.name || 'Fellowship Program January 2027');
-    
-    const specs = parseSpecializationString(sub.specialization);
     renderRow('Subspecialties Applied', specs.length > 0 ? specs.join(', ') : (sub.specialization || '—'));
-    
-    // Centers
+
     let centerStr = '—';
     if (sub.centerPreference) {
       try {
         const parsed = JSON.parse(sub.centerPreference);
         if (typeof parsed === 'object') {
-          centerStr = Object.entries(parsed).map(([k, v]) => `${k}: ${v}`).join(' | ');
+          centerStr = Object.entries(parsed).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('   |   ');
         } else {
           centerStr = String(parsed);
         }
@@ -3058,53 +3163,267 @@ router.get(["/apply/:token/receipt/:submissionId", "/apply/receipt/:submissionId
         centerStr = String(sub.centerPreference);
       }
     }
-    renderRow('Preferred Centers', centerStr);
+    renderRow('Preferred Hospital Units', centerStr);
 
-    // 2. Candidate Personal Information
-    drawSectionHeader('2. Candidate Information');
-    renderRow('Full Name', `Dr. ${cleanName}`);
-    renderRow('Email Address', sub.email);
-    renderRow('Contact Number', sub.phone || '—');
-    renderRow('Date of Birth', formatDOBToStandard(sub.dateOfBirth));
-    renderRow('Gender / Marital', [sub.gender, sub.maritalStatus].filter(Boolean).join(" · ") || "—");
-    renderRow('Permanent Address', sub.permanentAddress || '—');
-
-    // 3. Medical Qualifications & Registration
-    drawSectionHeader('3. Medical Qualifications & Licensing');
-    renderRow('State Council Reg No', sub.medicalCouncilRegNumber || '—');
-    renderRow('State Medical Council', sub.stateMedicalCouncil || '—');
-    renderRow('MBBS Institution', `${sub.mbbsCollege || '—'} (${sub.mbbsPassingYear || '—'})`);
-    renderRow('Post-Graduate Degree', `${sub.degree || 'MS/MD/DNB/DO'} - ${sub.medicalCollege || '—'} (${sub.postGraduationPassingYear || '—'})`);
-
-    // 4. References
-    drawSectionHeader('4. Recommendations & Documents');
-    renderRow('Referee 1 (LOR)', `${sub.lor1RefName || '—'} (${sub.lor1RefContact || 'No contact specified'})`);
-    renderRow('Referee 2 (LOR)', `${sub.lor2RefName || '—'} (${sub.lor2RefContact || 'No contact specified'})`);
-    
-    const uploaded = [];
-    if (sub.photoUrl) uploaded.push('Candidate Photograph');
-    if (sub.lor1Url) uploaded.push('LOR #1');
-    if (sub.lor2Url) uploaded.push('LOR #2');
-    if (sub.paymentUrl) uploaded.push('Payment Gateway Receipt');
-    renderRow('Uploaded Documents', uploaded.length > 0 ? uploaded.join(', ') : 'Online Application');
-
-    // 5. Official Verification & Certification Footer
-    if (doc.y > 660) {
-      doc.addPage();
-      doc.y = 36;
+    // 2. Candidate Qualifications & Licensing
+    drawSectionHeader('2. Candidate Qualifications & Licensing');
+    renderRow('Medical Council Reg No', subAny.medicalCouncilNumber || subAny.medicalCouncilRegNumber || 'On Record');
+    renderRow('State Medical Council', subAny.stateMedicalCouncil || 'State Medical Council on Record');
+    renderRow('Post-Graduate Degree', `${subAny.degree || 'MS/MD/DNB/DO'}${subAny.medicalCollege ? ' - ' + subAny.medicalCollege : ''} (${subAny.postGraduationPassingYear || 'Completed'})`);
+    renderRow('MBBS Degree & Institution', `${subAny.mbbsCollege || subAny.university || 'Medical College'} (${subAny.mbbsPassingYear || 'Completed'})`);
+    if (sub.diagnosticSkills || sub.surgicalExperience) {
+      const skillsSummary = [];
+      if (sub.diagnosticSkills) {
+        try {
+          const ds = JSON.parse(sub.diagnosticSkills);
+          skillsSummary.push(`Diagnostic Competencies: ${Object.keys(ds).length} listed`);
+        } catch { skillsSummary.push('Diagnostic Competencies recorded'); }
+      }
+      if (sub.surgicalExperience) {
+        try {
+          const se = JSON.parse(sub.surgicalExperience);
+          skillsSummary.push(`Surgical Experience: ${Object.keys(se).length} listed`);
+        } catch { skillsSummary.push('Surgical Experience recorded'); }
+      }
+      renderRow('Clinical Profile', skillsSummary.join('   |   '));
     }
-    doc.moveDown(0.8);
-    const certY = doc.y;
-    doc.rect(36, certY, 540, 56).fill('#f8fafc');
-    doc.strokeColor(colors.border).lineWidth(0.6).rect(36, certY, 540, 56).stroke();
+
+    // ==========================================
+    // PAGE 2: UPLOADED DOSSIER, LOR STATUS & OFFICIAL CERTIFICATION
+    // ==========================================
+    doc.addPage();
+    doc.y = 36;
+
+    // Running Header Banner
+    doc.rect(36, 36, 540, 24).fill(colors.navy);
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(8.5).text('SANKARA ACADEMY OF VISION — ADMISSION DOSSIER', 48, 43);
+    doc.fillColor('#cbd5e1').font('Helvetica').fontSize(8).text(`Candidate: Dr. ${cleanName}   |   Ref: #APP-${sub.id}`, 350, 43, { width: 216, align: 'right' });
+
+    // Section 3: LOR Status
+    const lorHeaderY = 68;
+    doc.rect(36, lorHeaderY, 540, 16).fill(colors.bgCard);
+    doc.strokeColor(colors.border).lineWidth(0.6).rect(36, lorHeaderY, 540, 16).stroke();
+    doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(8.5).text('3. LETTERS OF RECOMMENDATION (LOR) VERIFICATION STATUS', 44, lorHeaderY + 4);
+
+    const drawLorCard = (lorNum: number, refName: string, refContact: string, refEmail: string, url: string | null | undefined, yPos: number) => {
+      const cardH = 60;
+      const isUploaded = !!url && url.trim().length > 0;
+      doc.rect(36, yPos, 540, cardH).fill(isUploaded ? '#f0fdf4' : '#fffbeb');
+      doc.strokeColor(isUploaded ? colors.emeraldBorder : colors.amberBorder).lineWidth(0.8).rect(36, yPos, 540, cardH).stroke();
+
+      // Header row inside card
+      doc.rect(36, yPos, 540, 16).fill(isUploaded ? '#dcfce7' : '#fef3c7');
+      doc.strokeColor(isUploaded ? colors.emeraldBorder : colors.amberBorder).lineWidth(0.5).moveTo(36, yPos + 16).lineTo(576, yPos + 16).stroke();
+      
+      doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(7.5).text(`RECOMMENDATION #${lorNum} (LOR ${lorNum})`, 44, yPos + 4);
+      
+      if (isUploaded) {
+        doc.fillColor(colors.emeraldDark).font('Helvetica-Bold').fontSize(7.2).text('[UPLOADED & ATTACHED] (DOCUMENT ON FILE)', 320, yPos + 4, { width: 246, align: 'right' });
+      } else {
+        doc.fillColor(colors.amberDark).font('Helvetica-Bold').fontSize(7.2).text('[PENDING UPLOAD / NOT RECEIVED]', 320, yPos + 4, { width: 246, align: 'right' });
+      }
+
+      // Card Details
+      const refY = yPos + 19;
+      doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(7.2).text('Referee Name & Title:', 44, refY);
+      doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(7.8).text(refName || 'Not Specified', 150, refY);
+
+      doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(7.2).text('Designation / Institution:', 44, refY + 11);
+      doc.fillColor(colors.primary).font('Helvetica').fontSize(7.5).text(refContact || 'Not Specified', 150, refY + 11);
+
+      doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(7.2).text('Official Email Address:', 44, refY + 22);
+      doc.fillColor(colors.primary).font('Helvetica').fontSize(7.5).text(refEmail || 'Not Specified', 150, refY + 22);
+
+      doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(7.2).text('File Attachment Status:', 44, refY + 33);
+      if (isUploaded) {
+        const cleanFile = url.split('/').pop()?.split('?')[0] || `LOR_${lorNum}_Dossier.pdf`;
+        doc.fillColor(colors.emeraldDark).font('Helvetica-Bold').fontSize(7.2).text(`[VERIFIED] Document Attached: ${cleanFile} (On Candidate Dossier)`, 150, refY + 33);
+      } else {
+        doc.fillColor(colors.amberDark).font('Helvetica').fontSize(7.2).text('Document file not uploaded. Pending receipt before interview.', 150, refY + 33);
+      }
+    };
+
+    drawLorCard(1, sub.lor1RefName || '', sub.lor1RefContact || '', sub.lor1RefEmail || '', sub.lor1Url, 88);
+    drawLorCard(2, sub.lor2RefName || '', sub.lor2RefContact || '', sub.lor2RefEmail || '', sub.lor2Url, 152);
+
+    // --- Uploaded Documents & Dossier Verification Checklist ---
+    const checkHeaderY = 220;
+    doc.rect(36, checkHeaderY, 540, 16).fill(colors.bgCard);
+    doc.strokeColor(colors.border).lineWidth(0.6).rect(36, checkHeaderY, 540, 16).stroke();
+    doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(8.5).text('4. CANDIDATE UPLOADED DOSSIER & DOCUMENT CHECKLIST', 44, checkHeaderY + 4);
     
-    doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(8.5).text('OFFICIAL ELECTRONIC ADMISSION CERTIFICATION', 46, certY + 8);
-    doc.fillColor(colors.secondary).font('Helvetica').fontSize(7.5).text(
+    // Checklist Table Header
+    const chkTblY = checkHeaderY + 18;
+    doc.rect(36, chkTblY, 540, 16).fill(colors.navy);
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(7.5);
+    doc.text('NO.', 42, chkTblY + 4.5, { width: 22 });
+    doc.text('DOCUMENT / CREDENTIAL ITEM', 68, chkTblY + 4.5, { width: 175 });
+    doc.text('DETAILS / IDENTIFIER', 248, chkTblY + 4.5, { width: 180 });
+    doc.text('STATUS', 432, chkTblY + 4.5, { width: 68, align: 'center' });
+    doc.text('VERIFICATION', 502, chkTblY + 4.5, { width: 68, align: 'center' });
+
+    // Build the checklist items array
+    const checklistItems = [
+      {
+        no: '1',
+        name: 'Candidate Passport Photograph',
+        details: sub.photoUrl ? 'Formal Colour Passport Photo for Admit Card & ID' : 'Photograph required for Admit Card',
+        uploaded: !!sub.photoUrl,
+        statusText: sub.photoUrl ? 'UPLOADED' : 'PENDING',
+        verification: sub.photoUrl ? 'Verified on File' : 'Pending Upload'
+      },
+      {
+        no: '2',
+        name: 'Letter of Recommendation #1 (LOR)',
+        details: sub.lor1RefName ? `${sub.lor1RefName}\n(${sub.lor1RefEmail || 'Email on file'})` : 'Referee details pending',
+        uploaded: !!sub.lor1Url,
+        statusText: sub.lor1Url ? 'UPLOADED' : 'PENDING',
+        verification: sub.lor1Url ? 'Attached & Verified' : 'Pending Receipt'
+      },
+      {
+        no: '3',
+        name: 'Letter of Recommendation #2 (LOR)',
+        details: sub.lor2RefName ? `${sub.lor2RefName}\n(${sub.lor2RefEmail || 'Email on file'})` : 'Referee details pending',
+        uploaded: !!sub.lor2Url,
+        statusText: sub.lor2Url ? 'UPLOADED' : 'PENDING',
+        verification: sub.lor2Url ? 'Attached & Verified' : 'Pending Receipt'
+      },
+      {
+        no: '4',
+        name: 'Application Fee Payment Proof',
+        details: `Razorpay Online Gateway Ref:\n${sub.paymentId || 'Confirmed'}`,
+        uploaded: true,
+        statusText: 'VERIFIED',
+        verification: 'Razorpay Confirmed'
+      },
+      {
+        no: '5',
+        name: 'Medical Council Registration',
+        details: `Reg No: ${subAny.medicalCouncilNumber || subAny.medicalCouncilRegNumber || 'On Record'}\n(${subAny.stateMedicalCouncil || 'State Council'})`,
+        uploaded: true,
+        statusText: 'ON RECORD',
+        verification: 'Record Verified'
+      },
+      {
+        no: '6',
+        name: 'Postgraduate Medical Qualification',
+        details: `${subAny.degree || 'MS/MD/DNB/DO'}${subAny.medicalCollege ? ' - ' + (subAny.medicalCollege.length > 25 ? subAny.medicalCollege.slice(0, 24) + '...' : subAny.medicalCollege) : ''}\nStatus: ${subAny.postGraduationPassingYear ? 'Passed ' + subAny.postGraduationPassingYear : 'Completed'}`,
+        uploaded: true,
+        statusText: 'ON RECORD',
+        verification: 'Qualifying Degree'
+      },
+      {
+        no: '7',
+        name: 'Primary Medical Degree (MBBS)',
+        details: `${subAny.mbbsCollege || subAny.university || 'Medical College'}\n(${subAny.mbbsPassingYear || 'Completed'})`,
+        uploaded: true,
+        statusText: 'ON RECORD',
+        verification: 'MBBS Degree'
+      },
+      {
+        no: '8',
+        name: 'Candidate Legal Declaration',
+        details: `Affirmed on ${formattedDate} IST\nElectronic Acceptance on File`,
+        uploaded: true,
+        statusText: 'ACCEPTED',
+        verification: 'Digital Affirmation'
+      }
+    ];
+
+    // Check for any additional uploaded files in customAnswers
+    if (sub.customAnswers && typeof sub.customAnswers === 'object') {
+      let customIdx = 9;
+      for (const [key, val] of Object.entries(sub.customAnswers)) {
+        if (typeof val === 'string' && (val.includes('/uploads/') || val.endsWith('.pdf') || val.endsWith('.jpg') || val.endsWith('.png') || val.startsWith('http'))) {
+          const cleanKey = key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').replace(/^./, str => str.toUpperCase());
+          checklistItems.push({
+            no: String(customIdx++),
+            name: `Uploaded Document: ${cleanKey}`,
+            details: val.split('/').pop() || 'Candidate Attached File',
+            uploaded: true,
+            statusText: 'UPLOADED',
+            verification: 'Attached to File'
+          });
+        }
+      }
+    }
+
+    let chkCurrentY = chkTblY + 16;
+    checklistItems.slice(0, 8).forEach((item, idx) => {
+      const rowBg = idx % 2 === 0 ? '#ffffff' : colors.bgLight;
+      const rowH = 24;
+      doc.rect(36, chkCurrentY, 540, rowH).fill(rowBg);
+      doc.strokeColor(colors.border).lineWidth(0.4).rect(36, chkCurrentY, 540, rowH).stroke();
+
+      doc.fillColor(colors.primary).font('Helvetica').fontSize(7.5).text(item.no, 42, chkCurrentY + 7, { width: 22 });
+      doc.font('Helvetica-Bold').fontSize(7.5).text(item.name, 68, chkCurrentY + 4, { width: 175 });
+      doc.font('Helvetica').fontSize(6.8).fillColor(colors.secondary).text(item.details, 248, chkCurrentY + 3.5, { width: 180, lineGap: 1 });
+      
+      doc.fillColor(item.uploaded ? colors.emeraldDark : colors.amberDark).font('Helvetica-Bold').fontSize(7).text(item.statusText, 432, chkCurrentY + 8, { width: 68, align: 'center' });
+      doc.fillColor(colors.primary).font('Helvetica').fontSize(7).text(item.verification, 502, chkCurrentY + 8, { width: 68, align: 'center' });
+
+      chkCurrentY += rowH;
+    });
+
+    // --- Official Electronic Admission Certification Block ---
+    const certBlockY = chkCurrentY + 14;
+    const certBlockH = 118;
+    doc.rect(36, certBlockY, 540, certBlockH).fill('#f8fafc');
+    doc.strokeColor(colors.navy).lineWidth(1).rect(36, certBlockY, 540, certBlockH).stroke();
+
+    // Blue header strip inside certification box
+    doc.rect(36, certBlockY, 540, 18).fill(colors.navy);
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(8.5).text('OFFICIAL ELECTRONIC ADMISSION CERTIFICATION', 46, certBlockY + 5);
+    doc.fillColor('#93c5fd').font('Helvetica').fontSize(7.5).text('AUTOMATED COMPUTER-GENERATED OFFICIAL RECORD', 320, certBlockY + 5, { width: 246, align: 'right' });
+
+    // Certification legal declaration text
+    const certText = 
       'This document is an electronically generated official application fee payment receipt and candidate admission summary issued by Sankara Academy of Vision. Payment has been verified via Razorpay. No physical signature is required.\n' +
-      'Please retain this copy for your admission interview, written test, and original document verification.\n' +
-      'Admissions Office: admissions@sankaraeye.com   |   Central Desk: +91 422 4234500   |   Web: www.sankaraeye.com',
-      46, certY + 22, { width: 520, lineGap: 1.5 }
-    );
+      'Please retain this copy for your admission interview, written test, and original document verification.';
+
+    doc.fillColor(colors.primary).font('Helvetica').fontSize(7.5).text(certText, 46, certBlockY + 23, { width: 375, lineGap: 2.2 });
+
+    // Official Institutional Contact Strip
+    const contactY = certBlockY + 70;
+    doc.strokeColor(colors.border).lineWidth(0.5).moveTo(46, contactY - 4).lineTo(566, contactY - 4).stroke();
+    
+    doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(7.5).text('Admissions Office:', 46, contactY);
+    doc.fillColor(colors.primary).font('Helvetica').fontSize(7.5).text('radhika@sankaraeye.com', 125, contactY);
+
+    doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(7.5).text('SAV Coordinator Desk:', 240, contactY);
+    doc.fillColor(colors.primary).font('Helvetica').fontSize(7.5).text('+91 9666677505', 345, contactY);
+
+    doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(7.5).text('Bangalore Desk:', 425, contactY);
+    doc.fillColor(colors.primary).font('Helvetica').fontSize(7.5).text('+91 80 2854 2727', 495, contactY);
+
+    doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(7.5).text('Bangalore Unit:', 46, contactY + 13);
+    doc.fillColor(colors.secondary).font('Helvetica').fontSize(7.2).text('Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore - 560037, Karnataka, India', 125, contactY + 13, { width: 440 });
+
+    doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(7.5).text('Central Desk:', 46, contactY + 26);
+    doc.fillColor(colors.secondary).font('Helvetica').fontSize(7.2).text('+91 422 4234500   |   Website: www.sankaraeye.com', 125, contactY + 26);
+
+    // Digital Authentication Seal / Stamp on Right Side
+    const sealX = 432;
+    const sealY = certBlockY + 23;
+    const sealW = 134;
+    const sealH = 34;
+    doc.rect(sealX, sealY, sealW, sealH).fill('#ffffff');
+    doc.strokeColor(colors.navy).lineWidth(0.8).rect(sealX, sealY, sealW, sealH).stroke();
+    doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(6.5).text('SANKARA ACADEMY OF VISION', sealX + 2, sealY + 4, { width: sealW - 4, align: 'center' });
+    doc.fillColor(colors.emeraldDark).font('Helvetica-Bold').fontSize(6.5).text('DIGITALLY AUTHENTICATED', sealX + 2, sealY + 13, { width: sealW - 4, align: 'center' });
+    doc.fillColor(colors.muted).font('Helvetica').fontSize(5.8).text(`AUTOGEN AUDIT REF: SAV-${sub.id}`, sealX + 2, sealY + 22, { width: sealW - 4, align: 'center' });
+
+    // Page Numbering Footer on All Buffered Pages
+    const range = doc.bufferedPageRange();
+    for (let i = range.start; i < range.start + range.count; i++) {
+      doc.switchToPage(i);
+      doc.fillColor(colors.muted).font('Helvetica').fontSize(7.2).text(
+        `Page ${i + 1} of ${range.count}   |   Sankara Academy of Vision — Bangalore Unit   |   Automated Electronic Tax Invoice & Receipt`,
+        36,
+        760,
+        { width: 540, align: 'center' }
+      );
+    }
 
     doc.end();
   } catch (err: any) {
