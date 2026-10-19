@@ -19,8 +19,8 @@
 > 3. **Canonical Data Seeding & Healing**:
 >    - Provisions and activates canonical Super Admins (`saravanan@sankaraeye.com`, `prabhanjan@sankaraeye.com`, `radhika@sankaraeye.com`).
 >    - Provisions official units and 65-seat matrix across all 13 hospital locations.
->    - Provisions active Fellowship Program January 2027 (`FP-JAN-2027`) and VCT 2026 (`SAV-VCT-2026`).
->    - Automatically purges obsolete legacy programs (`FP-JUL-2026`, `FP-DEC-2026`, `Test`).
+>    - Provisions active Fellowship Program January 2027 (`FP-JAN-2027`).
+>    - Automatically purges all obsolete legacy or non-Jan2027 programs (`FP-JUL-2026`, `FP-DEC-2026`, `VCT-2026`, `Test`).
 >    - Configures active application form with token `JAN2027` (canonical URL: `https://learn.sankaraeye.in/apply/JAN2027`).
 >    - Connects Razorpay for online checkout with fallback to Direct Bank Transfer / UTR.
 > **Zero manual SQL migrations required.**

@@ -342,7 +342,7 @@ router.get("/hall-tickets/download/:identifier", async (req: Request, res: Respo
       candidateName,
       candidateCode,
       hallTicketNumber,
-      programName: program?.name || "Fellowship / VCT Examination",
+      programName: program?.name || "Fellowship Program January 2027",
       examDate: program?.examDate || "June / August 2026 Session",
       examVenue: program?.examVenue || "Sankara Academy of Vision Campus",
       examInstructions: program?.examInstructions || "",

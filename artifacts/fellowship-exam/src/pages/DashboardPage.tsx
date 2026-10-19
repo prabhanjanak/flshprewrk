@@ -193,7 +193,7 @@ export default function DashboardPage() {
               Candidate Examination Portal
             </span>
             <h1 className="text-3xl font-extrabold tracking-tight">Welcome, {user?.fullName}</h1>
-            <p className="text-orange-100 text-sm">Fellowship & VCT Selection Center</p>
+            <p className="text-orange-100 text-sm">Fellowship Admissions Center · January 2027</p>
           </div>
         </div>
 

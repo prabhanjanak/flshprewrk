@@ -1139601,7 +1139601,7 @@ router30.get("/hall-tickets/download/:identifier", async (req, res) => {
       candidateName,
       candidateCode,
       hallTicketNumber,
-      programName: program?.name || "Fellowship / VCT Examination",
+      programName: program?.name || "Fellowship Program January 2027",
       examDate: program?.examDate || "June / August 2026 Session",
       examVenue: program?.examVenue || "Sankara Academy of Vision Campus",
       examInstructions: program?.examInstructions || "",
@@ -1142048,32 +1142048,17 @@ async function seedAndHealBaselineData() {
     }).where(eq(paymentSettingsTable.id, jan27Payment.id));
     logger.info("[DB-BOOTSTRAP] Synchronized January 2027 payment settings with Razorpay credentials");
   }
-  let [vctProg] = await db.select().from(programsTable).where(or(ilike(programsTable.name, "%VCT%"), ilike(programsTable.name, "%Vision Care%")));
-  if (!vctProg) {
-    [vctProg] = await db.insert(programsTable).values({
-      name: "Vision Care Technician (VCT) Program 2026",
-      code: "VCT-2026",
-      academicYear: "2026",
-      category: "vct",
-      description: "Sankara Academy of Vision Care Technician (VCT) Admissions 2026",
-      requiresApplicationForm: true,
-      requiresTheoryExam: true,
-      requiresInterviewViva: true,
-      requiresPsychometry: false
-    }).returning();
-    logger.info("[DB-BOOTSTRAP] Provisioned Vision Care Technician (VCT) 2026 program");
-  }
   try {
-    await db.delete(applicationFormsTable).where(eq(applicationFormsTable.token, "JULY2026"));
-    await db.delete(applicationFormsTable).where(eq(applicationFormsTable.token, "DECEMBER2026"));
+    await db.delete(applicationFormsTable).where(
+      and(
+        ne(applicationFormsTable.token, "JAN2027"),
+        ne(applicationFormsTable.programId, jan27Prog.id)
+      )
+    );
     const oldPrograms = await db.select().from(programsTable).where(
-      or(
-        eq(programsTable.code, "FP-JUL-2026"),
-        eq(programsTable.code, "FP-DEC-2026"),
-        eq(programsTable.code, "SAVVCGDHJA"),
-        ilike(programsTable.name, "%July 2026%"),
-        ilike(programsTable.name, "%December 2026%"),
-        eq(programsTable.name, "Test")
+      and(
+        ne(programsTable.id, jan27Prog.id),
+        ne(programsTable.code, "FP-JAN-2027")
       )
     );
     for (const op of oldPrograms) {
@@ -1142081,12 +1142066,15 @@ async function seedAndHealBaselineData() {
       await db.execute(sql`DELETE FROM specialities WHERE program_id = ${op.id}`);
       await db.execute(sql`DELETE FROM payment_settings WHERE program_id = ${op.id}`);
       await db.execute(sql`DELETE FROM application_forms WHERE program_id = ${op.id}`);
+      await db.execute(sql`DELETE FROM document_templates WHERE program_id = ${op.id}`);
+      await db.execute(sql`DELETE FROM interview_panels WHERE program_id = ${op.id}`);
+      await db.execute(sql`DELETE FROM allocations WHERE program_id = ${op.id}`);
       await db.execute(sql`DELETE FROM programs WHERE id = ${op.id}`);
-      logger.info(`[DB-BOOTSTRAP] Permanently purged obsolete program: ${op.name} (${op.code})`);
+      logger.info(`[DB-BOOTSTRAP] Permanently purged non-Jan2027 program: ${op.name} (${op.code})`);
     }
-    logger.info("[DB-BOOTSTRAP] Successfully retired legacy forms and purged obsolete programs.");
+    logger.info("[DB-BOOTSTRAP] Verified ONLY Fellowship Program January 2027 exists in database.");
   } catch (err) {
-    logger.warn({ err }, "[DB-BOOTSTRAP] Notice on legacy form/program retirement");
+    logger.warn({ err }, "[DB-BOOTSTRAP] Notice on non-Jan2027 program purge");
   }
   const [mockSetting] = await db.select().from(globalSettingsTable).where(eq(globalSettingsTable.key, "mock_mode"));
   if (!mockSetting) {

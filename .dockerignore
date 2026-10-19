@@ -14,4 +14,3 @@ coverage
 *.DS_Store
 .env
 tmp_doc_extract
-extracted_logos
