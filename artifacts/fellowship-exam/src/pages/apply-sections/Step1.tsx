@@ -9,12 +9,14 @@ import { User, Stethoscope, FileText, Info } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 
 export const specializationsMap: Record<string, string[]> = {
-  "Cornea": ["Bangalore", "Guntur", "Shimoga", "Jaipur", "Not Applicable"],
+  "Cornea": ["Bangalore", "Coimbatore", "Guntur", "Shimoga", "Not Applicable"],
   "Glaucoma": ["Bangalore", "Coimbatore", "Guntur", "Shimoga", "Not Applicable"],
-  "IOL": ["Anand", "Bangalore", "Coimbatore", "Guntur", "Hyderabad", "Indore", "Jaipur", "Kanpur", "Krishnankoil", "Ludhiana", "Panvel", "Shimoga", "Varanasi", "Not Applicable"],
-  "Oculoplasty": ["Bangalore", "Varanasi", "Not Applicable"],
+  "IOL": ["Anand", "Coimbatore", "Guntur", "Hyderabad", "Indore", "Jaipur", "Kanpur", "Krishnankoil", "Ludhiana", "Panvel", "Shimoga", "Varanasi", "Not Applicable"],
+  "Medical Retina": ["Bangalore", "Coimbatore", "Guntur", "Indore", "Shimoga", "Not Applicable"],
+  "Oculoplasty": ["Coimbatore", "Guntur", "Varanasi", "Not Applicable"],
   "Pediatric Ophthalmology": ["Bangalore", "Coimbatore", "Guntur", "Shimoga", "Not Applicable"],
-  "Phaco Refractive": ["Coimbatore", "Not Applicable"],
+  "Phaco Refractive": ["Bangalore", "Coimbatore", "Not Applicable"],
+  "Vitreo Retina": ["Bangalore", "Coimbatore", "Guntur", "Shimoga", "Not Applicable"],
 };
 
 export default function Step1({ form, set, err, formInfo }: any) {
@@ -47,7 +49,7 @@ export default function Step1({ form, set, err, formInfo }: any) {
   };
 
   const specializationsList = [
-    "IOL", "Cornea", "Glaucoma", "Oculoplasty", "Pediatric Ophthalmology", "Phaco Refractive"
+    "Cornea", "Glaucoma", "IOL", "Medical Retina", "Oculoplasty", "Pediatric Ophthalmology", "Phaco Refractive", "Vitreo Retina"
   ];
 
   return (
