@@ -1064,8 +1064,8 @@ async function seedAndHealBaselineData(): Promise<void> {
       .set({
         token: "JAN2027",
         programId: jan27Prog.id,
-        title: "Fellowship Program - January 2027",
-        description: "Sankara Academy of Vision Fellowship Program for January 2027 intake.",
+        title: "Fellowship Program - January 2027 (Entrance Exam: December 2026)",
+        description: "Sankara Academy of Vision Fellowship Program for January 2027 intake (Entrance Examination: 07.12.2026 & 08.12.2026).",
         isActive: true,
         sectionsConfig: DEFAULT_SECTIONS as any,
       })
@@ -1074,8 +1074,8 @@ async function seedAndHealBaselineData(): Promise<void> {
   } else {
     await db.insert(applicationFormsTable).values({
       programId: jan27Prog.id,
-      title: "Fellowship Program - January 2027",
-      description: "Sankara Academy of Vision Fellowship Program for January 2027 intake.",
+      title: "Fellowship Program - January 2027 (Entrance Exam: December 2026)",
+      description: "Sankara Academy of Vision Fellowship Program for January 2027 intake (Entrance Examination: 07.12.2026 & 08.12.2026).",
       isActive: true,
       token: "JAN2027",
       sectionsConfig: DEFAULT_SECTIONS as any,

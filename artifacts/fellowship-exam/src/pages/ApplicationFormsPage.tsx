@@ -22,8 +22,10 @@ import {
   RefreshCw, CheckCheck, Ban, FileText, ImageIcon, ChevronDown, ChevronUp, Building2, Printer,
   Edit3 as Edit, Save, AlertCircle, FileJson, CheckCircle2, LayoutDashboard, CalendarDays,
   FileSignature, ExternalLink as ExtLink, FileType, CheckCircle, UserPlus, GitMerge,
-  Mail, Send, Search, Phone, IndianRupee, ShieldCheck, Zap
+  Mail, Send, Search, Phone, IndianRupee, ShieldCheck, Zap,
+  Share2
 } from "lucide-react";
+import { ShareApplicationDialog } from "../components/ShareApplicationDialog";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "../hooks/use-toast";
@@ -1169,6 +1171,7 @@ export default function ApplicationFormsPage() {
   const [downloadingLetterId, setDownloadingLetterId] = useState<number | null>(null);
   const [sendingEmailId, setSendingEmailId] = useState<number | null>(null);
   const [downloadingDirectoryPdf, setDownloadingDirectoryPdf] = useState(false);
+  const [shareForm, setShareForm] = useState<ApplicationForm | null>(null);
 
   const { data: units = [] } = useQuery<any[]>({
     queryKey: ["units"],
@@ -3417,14 +3420,23 @@ export default function ApplicationFormsPage() {
                       {viewedForm ? buildFormLink(viewedForm.token) : "—"}
                     </div>
                     {viewedForm && (
-                      <Button
-                        variant="outline"
-                        onClick={() => copyLink(viewedForm)}
-                        className="rounded-2xl border-slate-200 font-bold text-xs h-10 px-4"
-                      >
-                        {copiedId === viewedForm.id ? <Check className="w-4 h-4 mr-1 text-emerald-600" /> : <Copy className="w-4 h-4 mr-1" />}
-                        {copiedId === viewedForm.id ? "Copied" : "Copy Link"}
-                      </Button>
+                      <>
+                        <Button
+                          variant="outline"
+                          onClick={() => copyLink(viewedForm)}
+                          className="rounded-2xl border-slate-200 font-bold text-xs h-10 px-4"
+                        >
+                          {copiedId === viewedForm.id ? <Check className="w-4 h-4 mr-1 text-emerald-600" /> : <Copy className="w-4 h-4 mr-1" />}
+                          {copiedId === viewedForm.id ? "Copied" : "Copy Link"}
+                        </Button>
+                        <Button
+                          variant="default"
+                          onClick={() => setShareForm(viewedForm)}
+                          className="rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs h-10 px-4 gap-1.5 shadow-sm"
+                        >
+                          <Share2 className="w-4 h-4" /> Share Link
+                        </Button>
+                      </>
                     )}
                     {viewedForm?.token && (
                       <Button
@@ -3895,8 +3907,17 @@ export default function ApplicationFormsPage() {
                            <code className="text-[10px] font-bold text-slate-600 truncate">{buildFormLink(form.token)}</code>
                         </div>
                         <Button variant="ghost" size="sm" className="rounded-xl h-8 text-[10px] font-black uppercase tracking-widest hover:bg-slate-200" onClick={() => copyLink(form)}>
-                           {copiedId === form.id ? <Check className="w-3 h-3 mr-1.5" /> : <Copy className="w-3 h-3 mr-1.5" />}
+                           {copiedId === form.id ? <Check className="w-3 h-3 mr-1.5 text-emerald-600" /> : <Copy className="w-3 h-3 mr-1.5" />}
                            {copiedId === form.id ? "Copied" : "Copy"}
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="rounded-xl h-8 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-wider px-3 shadow-xs flex items-center gap-1.5 shrink-0"
+                          onClick={() => setShareForm(form)}
+                        >
+                          <Share2 className="w-3 h-3" />
+                          Share Link
                         </Button>
                      </div>
                      <div className="flex items-center gap-2 shrink-0">
@@ -4659,6 +4680,16 @@ export default function ApplicationFormsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ShareApplicationDialog
+        open={!!shareForm}
+        onOpenChange={(open) => {
+          if (!open) setShareForm(null);
+        }}
+        token={shareForm?.token || "JAN2027"}
+        title={shareForm?.title || "Fellowship Program - January 2027"}
+        subtitle="Entrance Examination: December 2026 • Sankara Academy of Vision"
+      />
     </div>
   );
 }

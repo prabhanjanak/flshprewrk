@@ -37,7 +37,9 @@ import {
   CreditCard,
   CheckCircle2,
   Mail,
+  Share2,
 } from "lucide-react";
+import { ShareApplicationDialog } from "../components/ShareApplicationDialog";
 
 interface ProgramItem {
   id: number;
@@ -162,6 +164,7 @@ export default function DashboardPage() {
   const [, navigate] = useLocation();
 
   const [systemIp, setSystemIp] = useState("");
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/system-ip")
@@ -303,6 +306,13 @@ export default function DashboardPage() {
 
           {/* Header Action Buttons */}
           <div className="flex items-center gap-2.5 shrink-0">
+            <Button
+              onClick={() => setShareDialogOpen(true)}
+              className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/10 gap-2"
+            >
+              <Share2 className="h-4 w-4" />
+              Share Application Link
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -630,6 +640,14 @@ export default function DashboardPage() {
           </div>
 
         </div>
+
+        <ShareApplicationDialog
+          open={shareDialogOpen}
+          onOpenChange={setShareDialogOpen}
+          token="JAN2027"
+          title="Fellowship Program - January 2027"
+          subtitle="Entrance Examination: December 2026 • Sankara Academy of Vision"
+        />
 
     </div>
   );
