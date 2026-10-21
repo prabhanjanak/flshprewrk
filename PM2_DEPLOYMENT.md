@@ -227,6 +227,9 @@ SMTP_FROM=admissions@sankaraeye.com
 # Razorpay credentials can also be configured directly in App UI under Application Settings
 RAZORPAY_KEY_ID=
 RAZORPAY_KEY_SECRET=
+
+# IMPORTANT: Do NOT set VITE_API_URL in .env!
+# Leaving it unset allows the web frontend to use relative '/api' URLs automatically.
 ```
 
 ---

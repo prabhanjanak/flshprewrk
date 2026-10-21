@@ -1,4 +1,16 @@
-const API_BASE = (import.meta.env.VITE_API_URL as string) || "/api";
+function getApiBase(): string {
+  const envUrl = (import.meta.env.VITE_API_URL as string)?.trim();
+  if (typeof window !== "undefined") {
+    const isLocalhostBrowser = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    // If accessing from a live production domain (e.g. learn.sankaraeye.in) and envUrl points to localhost, ignore it and use relative /api
+    if (!isLocalhostBrowser && envUrl && (envUrl.includes("localhost") || envUrl.includes("127.0.0.1"))) {
+      return "/api";
+    }
+  }
+  return envUrl || "/api";
+}
+
+const API_BASE = getApiBase();
 
 export type Role =
   | "super_admin"
