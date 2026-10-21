@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: "fellowship-api",
-      script: "artifacts/api-server/dist/index.js",
+      script: "artifacts/api-server/dist/index.mjs",
       instances: 1,
       exec_mode: "fork",
       autorestart: true,
@@ -10,7 +10,6 @@ module.exports = {
       max_memory_restart: "1G",
       env: {
         NODE_ENV: "production",
-        PORT: 5001,
       },
       error_file: "logs/pm2-api-error.log",
       out_file: "logs/pm2-api-out.log",
