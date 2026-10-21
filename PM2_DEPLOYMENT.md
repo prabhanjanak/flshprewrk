@@ -18,6 +18,7 @@ git pull origin main && pnpm install && pnpm run build && pm2 restart fellowship
 ---
 
 ## 📋 Table of Contents
+0. [Connecting the Server to GitHub (If Origin is Not Set)](#0-connecting-the-server-to-github-if-origin-is-not-set)
 1. [Standard Update Workflow (Every Time You Pull Code)](#1-standard-update-workflow)
 2. [First-Time PM2 Service Setup](#2-first-time-pm2-service-setup)
 3. [Essential PM2 Commands Cheat Sheet](#3-essential-pm2-commands-cheat-sheet)
@@ -28,9 +29,88 @@ git pull origin main && pnpm install && pnpm run build && pm2 restart fellowship
 
 ---
 
-## 1. Standard Update Workflow
+## 0. Connecting the Server to GitHub (If Origin is Not Set)
 
-Follow these steps on the server whenever applying updates from GitHub:
+> **Repository URL:** `https://github.com/prabhanjanak/flshprewrk.git`  
+> **Visibility:** **PUBLIC** (No GitHub username, password, or SSH keys required!)
+
+Choose one of the three options below depending on the server's current state:
+
+### Option A: The server directory has git, but origin is missing or wrong
+Run inside the project directory on the server:
+```bash
+# 1. Back up your production .env first
+cp .env .env.production.backup
+
+# 2. Check if a remote is currently configured
+git remote -v
+
+# 3. Add or update the origin to this repository
+git remote remove origin 2>/dev/null || true
+git remote add origin https://github.com/prabhanjanak/flshprewrk.git
+
+# 4. Fetch and point local main branch to origin/main
+git fetch origin
+git branch -M main
+git reset --hard origin/main
+git branch -u origin/main main
+
+# 5. Restore your production .env
+cp .env.production.backup .env
+
+# 6. Build and restart PM2
+pnpm install && pnpm run build
+pm2 restart fellowship-api
+```
+
+### Option B: The server directory was uploaded as a raw ZIP (Not a Git repo)
+If running `git status` prints `fatal: not a git repository`:
+```bash
+# 1. Back up your production .env
+cp .env /tmp/fellowship.env
+
+# 2. Initialize git in the existing directory
+git init
+git remote add origin https://github.com/prabhanjanak/flshprewrk.git
+git fetch origin
+git checkout -f -B main origin/main
+
+# 3. Restore your production .env
+cp /tmp/fellowship.env .env
+
+# 4. Build and restart PM2
+pnpm install && pnpm run build
+pm2 restart fellowship-api
+```
+
+### Option C: Clean Fresh Clone into a New Folder (Cleanest & Recommended)
+If the admin prefers to keep the existing running folder intact and clone clean:
+```bash
+# 1. Back up the current production .env
+cp /path/to/current_project/.env /tmp/fellowship.env
+
+# 2. Clone the public repository into a new folder
+git clone https://github.com/prabhanjanak/flshprewrk.git /opt/fellowship_new
+cd /opt/fellowship_new
+
+# 3. Copy .env into the new folder
+cp /tmp/fellowship.env .env
+
+# 4. Install dependencies and compile
+pnpm install
+pnpm run build
+
+# 5. Point PM2 to the new build and restart
+pm2 delete fellowship-api 2>/dev/null || true
+pm2 start ecosystem.config.cjs
+pm2 save
+```
+
+---
+
+## 1. Standard Update Workflow (After Origin is Set)
+
+Once origin is linked, updating in the future takes just one simple command:
 
 ```bash
 # Step 1: Navigate to repository root directory
