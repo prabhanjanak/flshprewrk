@@ -1138883,6 +1138883,7 @@ router25.post("/payment/create-order", async (req, res) => {
       [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.isActive, true)).limit(1);
     }
     if (!form) return res.status(404).json({ error: "Form not found" });
+    if (!form.isActive) return res.status(410).json({ error: "This form is no longer accepting submissions" });
     const programId = form.programId;
     const all = await db.select().from(paymentSettingsTable).where(eq(paymentSettingsTable.isActive, true));
     const specific = programId ? all.find((s2) => s2.programId === programId) : null;

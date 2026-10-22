@@ -673,16 +673,49 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
   }
 
   if (formError) {
+    const isPaused = /no longer accepting|deadline|closed|inactive/i.test(formError);
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] p-4">
-        <Card className="max-w-md w-full text-center p-8 border-slate-200 shadow-md">
-          <AlertCircle className="w-16 h-16 text-[#000080] mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">Application Unavailable</h2>
-          <p className="text-slate-600 mb-6">{formError}</p>
-          <Button onClick={() => window.location.reload()} className="bg-[#000080] hover:bg-blue-900">
-            Try Again
-          </Button>
-        </Card>
+      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4">
+        <div className="max-w-md w-full space-y-6">
+          <Card className="border-none shadow-xl rounded-3xl overflow-hidden bg-white text-center p-8 space-y-6">
+            <div className="flex justify-center">
+              <img src={logoUrl} alt="Sankara Logo" className="h-16 w-auto object-contain mx-auto" />
+            </div>
+
+            <div className="space-y-2">
+              <div className="w-14 h-14 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-center mx-auto text-amber-600 shadow-xs">
+                <AlertCircle className="w-7 h-7" />
+              </div>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+                {isPaused ? "Admissions Currently Closed" : "Application Notice"}
+              </h2>
+              <p className="text-sm text-slate-600 font-medium leading-relaxed">
+                {formError}
+              </p>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 text-xs text-slate-600 space-y-2.5 text-left">
+              <p className="font-bold text-slate-800 uppercase tracking-wider text-[10px]">Admissions Desk Support</p>
+              <div className="space-y-1">
+                <p>
+                  <span className="font-semibold text-slate-700">Admissions Coordinator:</span>{" "}
+                  <a href="mailto:radhika@sankaraeye.com" className="text-blue-600 hover:underline font-bold">radhika@sankaraeye.com</a>
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-700">Official Helpline:</span>{" "}
+                  <span className="font-bold text-slate-800">+91 9666677505 / +91 80 2854 2727</span>
+                </p>
+                <p className="text-[11px] text-slate-500 pt-1">
+                  Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore - 560037
+                </p>
+              </div>
+            </div>
+
+            <Button onClick={() => window.location.reload()} className="w-full h-11 rounded-xl bg-[#000080] hover:bg-blue-900 text-white font-bold text-xs uppercase tracking-wider">
+              Refresh Page
+            </Button>
+          </Card>
+        </div>
       </div>
     );
   }

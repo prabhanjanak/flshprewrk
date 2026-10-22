@@ -1284,7 +1284,18 @@ export default function ApplicationFormsPage() {
   const toggleActive = useMutation({
     mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) =>
       api.patch<ApplicationForm>(`/application-forms/${id}`, { isActive }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["application-forms"] }),
+    onSuccess: (updated) => {
+      toast({
+        title: updated.isActive ? "Application Form Activated" : "Application Form Disabled",
+        description: updated.isActive
+          ? "Form is now open and accepting public submissions."
+          : "Form is paused. Candidates will see an Admissions Closed notice.",
+      });
+      qc.invalidateQueries({ queryKey: ["application-forms"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to update form status", description: err.message, variant: "destructive" });
+    }
   });
 
   const updateFormMutation = useMutation({
@@ -2447,13 +2458,27 @@ export default function ApplicationFormsPage() {
               <ArrowLeft className="w-5 h-5 text-slate-600" />
             </Button>
             <div>
-               <div className="flex items-center gap-2 mb-1">
+               <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <Badge className="bg-orange-500 text-white border-none rounded-full px-3 py-0.5 text-[10px] font-black uppercase tracking-widest">
-                     December 2026 Intake
+                     January 2027 Intake
                   </Badge>
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
                      <FileText className="w-3 h-3" /> {viewedForm?.title}
                   </span>
+                  {viewedForm && (
+                    <div className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200/80 transition-all border border-slate-200/90 rounded-full px-3 py-1 shadow-xs ml-2">
+                      <span className="text-[11px] font-bold text-slate-700">Form Status:</span>
+                      <Badge className={`${viewedForm.isActive ? "bg-emerald-500" : "bg-slate-400"} text-white border-none rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider`}>
+                        {viewedForm.isActive ? "Active (Accepting)" : "Disabled (Closed)"}
+                      </Badge>
+                      <Switch
+                        checked={viewedForm.isActive}
+                        onCheckedChange={(checked) => toggleActive.mutate({ id: viewedForm.id, isActive: checked })}
+                        className="data-[state=checked]:bg-emerald-500 scale-90"
+                        title={viewedForm.isActive ? "Click to Pause / Disable Form" : "Click to Activate Form"}
+                      />
+                    </div>
+                  )}
                </div>
                <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none">Applications & Admissions</h1>
             </div>
@@ -3491,8 +3516,30 @@ export default function ApplicationFormsPage() {
                   </div>
                   <h3 className="text-2xl font-black text-slate-900">{viewedForm?.title}</h3>
                   <p className="text-sm text-slate-500 font-medium mt-1">
-                    {viewedForm?.description || "Official candidate registration and admissions form for December 2026 fellowship intake."}
+                    {viewedForm?.description || "Official candidate registration and admissions form for January 2027 fellowship intake."}
                   </p>
+                </div>
+
+                {/* Form Intake Toggle Card */}
+                <div className="flex items-center justify-between p-5 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-bold text-slate-900">Application Intake Status</Label>
+                      <Badge className={viewedForm?.isActive ? "bg-emerald-500 text-white font-bold" : "bg-slate-400 text-white font-bold"}>
+                        {viewedForm?.isActive ? "Accepting Applications (Open)" : "Intake Paused (Disabled)"}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-slate-500 font-medium">
+                      Toggle to immediately enable or disable public applicant registration. When disabled, applicants will see an Admissions Closed notice.
+                    </p>
+                  </div>
+                  {viewedForm && (
+                    <Switch
+                      checked={viewedForm.isActive}
+                      onCheckedChange={(checked) => toggleActive.mutate({ id: viewedForm.id, isActive: checked })}
+                      className="data-[state=checked]:bg-emerald-500"
+                    />
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -3973,11 +4020,14 @@ export default function ApplicationFormsPage() {
                         </div>
                       </div>
                       
-                      <div className="flex flex-col gap-2 shrink-0">
+                      <div className="flex flex-col items-end gap-2 shrink-0">
                          <Button variant="ghost" size="icon" className="rounded-2xl hover:bg-red-50 hover:text-red-600 transition-all" onClick={() => setDeleteConfirmId(form.id)}>
                             <Trash2 className="w-4 h-4" />
                          </Button>
-                         <Switch checked={form.isActive} onCheckedChange={(v) => toggleActive.mutate({ id: form.id, isActive: v })} className="data-[state=checked]:bg-emerald-500" />
+                         <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/90 rounded-xl px-2 py-1 shadow-xs" title={form.isActive ? "Form is Active (Click to Pause)" : "Form is Paused (Click to Activate)"}>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{form.isActive ? "Open" : "Paused"}</span>
+                            <Switch checked={form.isActive} onCheckedChange={(v) => toggleActive.mutate({ id: form.id, isActive: v })} className="data-[state=checked]:bg-emerald-500 scale-90" />
+                         </div>
                       </div>
                     </div>
                   </div>
