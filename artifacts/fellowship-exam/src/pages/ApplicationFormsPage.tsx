@@ -1210,6 +1210,29 @@ export default function ApplicationFormsPage() {
     }
   };
 
+  const [syncingRazorpay, setSyncingRazorpay] = useState(false);
+  const syncRazorpayPayments = async () => {
+    setSyncingRazorpay(true);
+    try {
+      const res: any = await api.post("/payment/sync-razorpay", {});
+      toast({
+        title: "Razorpay Sync Complete",
+        description: res.message || `Imported ${res.importedCount} payments.`,
+      });
+      qc.invalidateQueries({ queryKey: ["submissions", viewFormId] });
+      qc.invalidateQueries({ queryKey: ["application-forms"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-summary"] });
+    } catch (err: any) {
+      toast({
+        title: "Sync Failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingRazorpay(false);
+    }
+  };
+
   const { data: units = [] } = useQuery<any[]>({
     queryKey: ["units"],
     queryFn: () => api.get("/units"),
@@ -2456,6 +2479,16 @@ export default function ApplicationFormsPage() {
             <Button variant="outline" size="sm" className="rounded-xl border-slate-200 font-bold px-4" onClick={() => exportExcel(viewFormId)} disabled={exporting || submissions.length === 0}>
               {exporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
               Excel Export
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              disabled={syncingRazorpay}
+              className="rounded-xl border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold px-4 shadow-sm"
+              onClick={syncRazorpayPayments}
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 text-blue-600 ${syncingRazorpay ? "animate-spin" : ""}`} />
+              {syncingRazorpay ? "Syncing Razorpay..." : "Sync Live Payments"}
             </Button>
             <Button 
               size="sm" 

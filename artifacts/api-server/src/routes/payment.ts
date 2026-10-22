@@ -42,7 +42,7 @@ router.post("/payment/create-order", async (req, res) => {
     // 3. Check program fee model and amount
     const [program] = programId ? await db.select().from(programsTable).where(eq(programsTable.id, programId)) : [null];
     const pricingModel = program?.feePricingModel || "per_specialty"; // "per_specialty" | "flat" | "free"
-    
+
     // Fee in paise (1 INR = 100 paise; official fee: ₹2750 = 275000 paise)
     let unitFeeInPaise = 275000;
     if (program?.feeAmount && program.feeAmount > 0) {
@@ -125,9 +125,9 @@ router.post("/payment/verify", async (req, res) => {
     // Simulated, offline, manual, or test verification fallback
     if (
       !razorpay_signature ||
-      razorpay_payment_id?.startsWith("pay_sim_") || 
-      razorpay_payment_id?.startsWith("pay_mock_") || 
-      razorpay_payment_id?.startsWith("MANUAL_") || 
+      razorpay_payment_id?.startsWith("pay_sim_") ||
+      razorpay_payment_id?.startsWith("pay_mock_") ||
+      razorpay_payment_id?.startsWith("MANUAL_") ||
       razorpay_payment_id?.startsWith("UTR-") ||
       razorpay_payment_id?.startsWith("TXN-") ||
       razorpay_order_id?.startsWith("order_sim_") ||

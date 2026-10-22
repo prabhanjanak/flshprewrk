@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { loadDraft, saveDraft, clearDraft } from "../lib/draftStore";
 import logoUrl from "../assets/seh_sav_logo_1777703794142.jpg";
-import { 
-  Loader2, AlertCircle, CheckCircle2, ChevronRight, ChevronLeft, ChevronDown, 
+import {
+  Loader2, AlertCircle, CheckCircle2, ChevronRight, ChevronLeft, ChevronDown,
   CreditCard, Building2, Copy, Check, Upload, ArrowRightLeft, ShieldCheck, QrCode,
   Download, Printer, FileText
 } from "lucide-react";
@@ -114,21 +114,21 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<Record<string, any>>(INITIAL_FORM);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  
+
   const [files, setFiles] = useState<Record<string, File>>({});
-  
+
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   // Post-payment confirmation state
-  const [paymentVerified, setPaymentVerified] = useState<{paymentId: string; finalForm: Record<string,any>; verifyResponse: any} | null>(null);
+  const [paymentVerified, setPaymentVerified] = useState<{ paymentId: string; finalForm: Record<string, any>; verifyResponse: any } | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [submissionId, setSubmissionId] = useState<string | null>(null);
-  const [paymentConfig, setPaymentConfig] = useState<{ 
-    amount: number; 
-    currency: string; 
-    description: string; 
+  const [paymentConfig, setPaymentConfig] = useState<{
+    amount: number;
+    currency: string;
+    description: string;
     mock: boolean;
     bankDetails?: {
       accountName: string;
@@ -161,7 +161,7 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
 
   useEffect(() => {
     let active = true;
-    
+
     async function loadFormAndDraft() {
       try {
         const r = await fetch(`${API}/apply/${token}?t=${Date.now()}`, {
@@ -173,61 +173,61 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
         }
         const data = await r.json();
         if (!active) return;
-        
+
         setFormInfo(data);
         if (data.sectionsConfig && data.sectionsConfig.length > 0) {
-           // Check for draft in IndexedDB
-           const savedDraft = await loadDraft(token);
-           if (active && savedDraft) {
-             console.log(`[AutoSave] Found IndexedDB draft for ${token}, restoring step ${savedDraft.step}`);
-             setForm(savedDraft.form);
-             setStep(savedDraft.step);
-             if (savedDraft.files) {
-               setFiles(savedDraft.files);
-             }
-             if (savedDraft.paymentVerified) {
-               console.log(`[AutoSave] Restored verified payment details from draft`, savedDraft.paymentVerified);
-               setPaymentVerified(savedDraft.paymentVerified);
-             } else {
-               // Try fallback to localStorage
-               const localPaymentStr = localStorage.getItem(`payment_verified_${token}`);
-               if (localPaymentStr) {
-                 try {
-                   const localPayment = JSON.parse(localPaymentStr);
-                   if (localPayment && localPayment.paymentId && localPayment.finalForm) {
-                     console.log(`[AutoSave] Restored verified payment details from localStorage`, localPayment);
-                     setPaymentVerified(localPayment);
-                   }
-                 } catch (e) {
-                   console.error("Failed to parse local payment verification state", e);
-                 }
-               }
-             }
-             return;
-           }
+          // Check for draft in IndexedDB
+          const savedDraft = await loadDraft(token);
+          if (active && savedDraft) {
+            console.log(`[AutoSave] Found IndexedDB draft for ${token}, restoring step ${savedDraft.step}`);
+            setForm(savedDraft.form);
+            setStep(savedDraft.step);
+            if (savedDraft.files) {
+              setFiles(savedDraft.files);
+            }
+            if (savedDraft.paymentVerified) {
+              console.log(`[AutoSave] Restored verified payment details from draft`, savedDraft.paymentVerified);
+              setPaymentVerified(savedDraft.paymentVerified);
+            } else {
+              // Try fallback to localStorage
+              const localPaymentStr = localStorage.getItem(`payment_verified_${token}`);
+              if (localPaymentStr) {
+                try {
+                  const localPayment = JSON.parse(localPaymentStr);
+                  if (localPayment && localPayment.paymentId && localPayment.finalForm) {
+                    console.log(`[AutoSave] Restored verified payment details from localStorage`, localPayment);
+                    setPaymentVerified(localPayment);
+                  }
+                } catch (e) {
+                  console.error("Failed to parse local payment verification state", e);
+                }
+              }
+            }
+            return;
+          }
 
-           if (active) {
-             const localPaymentStr = localStorage.getItem(`payment_verified_${token}`);
-             if (localPaymentStr) {
-               try {
-                 const localPayment = JSON.parse(localPaymentStr);
-                 if (localPayment && localPayment.paymentId && localPayment.finalForm) {
-                   console.log(`[AutoSave] Restored verified payment details from localStorage (no IndexedDB draft)`, localPayment);
-                   setPaymentVerified(localPayment);
-                 }
-               } catch (e) {
-                 console.error("Failed to parse local payment verification state", e);
-               }
-             }
-           }
+          if (active) {
+            const localPaymentStr = localStorage.getItem(`payment_verified_${token}`);
+            if (localPaymentStr) {
+              try {
+                const localPayment = JSON.parse(localPaymentStr);
+                if (localPayment && localPayment.paymentId && localPayment.finalForm) {
+                  console.log(`[AutoSave] Restored verified payment details from localStorage (no IndexedDB draft)`, localPayment);
+                  setPaymentVerified(localPayment);
+                }
+              } catch (e) {
+                console.error("Failed to parse local payment verification state", e);
+              }
+            }
+          }
 
-           const initial: Record<string, any> = { ...INITIAL_FORM };
-           data.sectionsConfig.forEach((sec: any) => {
-             sec.fields.forEach((f: any) => {
-               if (f.defaultValue !== undefined) initial[f.id] = f.defaultValue;
-             });
-           });
-           if (active) setForm(initial);
+          const initial: Record<string, any> = { ...INITIAL_FORM };
+          data.sectionsConfig.forEach((sec: any) => {
+            sec.fields.forEach((f: any) => {
+              if (f.defaultValue !== undefined) initial[f.id] = f.defaultValue;
+            });
+          });
+          if (active) setForm(initial);
         }
       } catch (e: any) {
         if (active) setFormError(e.message);
@@ -245,13 +245,13 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
 
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
-  
+
   // Effect to save draft whenever form, step, or files change
   useEffect(() => {
     if (formInfo && !submitted) {
       console.log(`[AutoSave] Saving draft to IndexedDB for token: ${token}`);
       setIsSaving(true);
-      
+
       saveDraft(token, { form, step, files, paymentVerified }).then(() => {
         setIsSaving(false);
         setLastSaved(new Date().toLocaleTimeString("en-IN", { hour: '2-digit', minute: '2-digit' }));
@@ -296,9 +296,9 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
     if (file) {
       setFiles(prev => ({ ...prev, [field]: file }));
       setErrors(prev => {
-         const next = { ...prev };
-         delete next[field];
-         return next;
+        const next = { ...prev };
+        delete next[field];
+        return next;
       });
     }
   };
@@ -308,7 +308,7 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
       navigator.clipboard.writeText(text);
       setCopiedBankField(fieldKey);
       setTimeout(() => setCopiedBankField(null), 2500);
-    } catch (_) {}
+    } catch (_) { }
   };
 
   const isFieldVisible = (f: any, formData: Record<string, any>) => {
@@ -431,7 +431,7 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
 
   const handlePaymentAndSubmit = async () => {
     if (!validateStep(step)) return;
-    
+
     setSubmitting(true);
     setSubmitError(null);
 
@@ -500,20 +500,20 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
 
         const verifiedState = {
           paymentId: utr,
-          finalForm: { 
-            ...finalForm, 
+          finalForm: {
+            ...finalForm,
             ...uploadedUrls,
-            paymentUTR: utr, 
-            paymentMode: "Manual Offline", 
-            paidAmount: calculatedAmount 
+            paymentUTR: utr,
+            paymentMode: "Manual Offline",
+            paidAmount: calculatedAmount
           },
           verifyResponse: { success: true, mode: "manual_offline" }
         };
         setPaymentVerified(verifiedState);
-        
+
         await saveDraft(token, { form, step, files, paymentVerified: verifiedState });
         localStorage.setItem(`payment_verified_${token}`, JSON.stringify(verifiedState));
-        
+
         window.scrollTo(0, 0);
         setSubmitting(false);
         return;
@@ -525,7 +525,7 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, specializationCount: specCount }),
       });
-      
+
       const orderData = await orderRes.json();
       if (!orderRes.ok) {
         setSubmitError(orderData.error || "Online payment gateway is temporarily unreachable. Please retry.");
@@ -632,11 +632,11 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
           contact: finalForm.phone || "",
         },
         theme: { color: "#000080" },
-        modal: { 
+        modal: {
           ondismiss: () => {
             setSubmitting(false);
             setSubmitError("Payment modal was closed before completing payment. Please click 'Pay via Razorpay' to complete your application fee.");
-          } 
+          }
         }
       };
 
@@ -788,148 +788,148 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
 
     return (
       <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4">
-          <motion.div 
-            initial={{ scale: 0.9, opacity: 0 }} 
-            animate={{ scale: 1, opacity: 1 }}
-            className="max-w-2xl w-full"
-          >
-            <Card className="border-none shadow-xl overflow-hidden">
-              <div className="bg-[#000080] p-10 text-white text-center relative">
-                <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-                   <div className="absolute -top-24 -left-24 w-64 h-64 bg-white rounded-full blur-3xl"></div>
-                   <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-emerald-400 rounded-full blur-3xl"></div>
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="max-w-2xl w-full"
+        >
+          <Card className="border-none shadow-xl overflow-hidden">
+            <div className="bg-[#000080] p-10 text-white text-center relative">
+              <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
+                <div className="absolute -top-24 -left-24 w-64 h-64 bg-white rounded-full blur-3xl"></div>
+                <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-emerald-400 rounded-full blur-3xl"></div>
+              </div>
+              <div className="relative z-10">
+                <div className="w-20 h-20 bg-white/20 backdrop-blur-xl rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl border border-white/30">
+                  <CheckCircle2 className="w-10 h-10 text-white" />
                 </div>
-                <div className="relative z-10">
-                  <div className="w-20 h-20 bg-white/20 backdrop-blur-xl rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl border border-white/30">
-                    <CheckCircle2 className="w-10 h-10 text-white" />
-                  </div>
-                  <h2 className="text-2xl font-bold mb-2 text-white">Application Submitted!</h2>
-                  <p className="text-emerald-100 font-medium max-w-md mx-auto text-sm">
-                    Your application for the {formInfo.programName} has been received and confirmed.
-                  </p>
+                <h2 className="text-2xl font-bold mb-2 text-white">Application Submitted!</h2>
+                <p className="text-emerald-100 font-medium max-w-md mx-auto text-sm">
+                  Your application for the {formInfo.programName} has been received and confirmed.
+                </p>
+              </div>
+            </div>
+
+            <CardContent className="p-8 space-y-6 bg-white">
+              <div className="grid grid-cols-2 gap-6 pb-4 border-b border-slate-100">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Application Reference</p>
+                  <p className="text-lg font-mono font-bold text-slate-800">#{submissionId}</p>
+                </div>
+                <div className="space-y-1 text-right">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Submitted On</p>
+                  <p className="text-lg font-bold text-slate-800">{new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                 </div>
               </div>
 
-              <CardContent className="p-8 space-y-6 bg-white">
-                <div className="grid grid-cols-2 gap-6 pb-4 border-b border-slate-100">
-                   <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Application Reference</p>
-                      <p className="text-lg font-mono font-bold text-slate-800">#{submissionId}</p>
-                   </div>
-                   <div className="space-y-1 text-right">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Submitted On</p>
-                      <p className="text-lg font-bold text-slate-800">{new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                   </div>
+              {/* Verified Payment Summary Card */}
+              <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-2xl flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">Payment Status: Verified</span>
+                  <p className="text-xs text-emerald-950 font-medium">
+                    Payment ID: <span className="font-mono font-bold">{paymentVerified?.paymentId || "Verified Online"}</span>
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-slate-500 block">Amount Paid</span>
+                  <span className="text-base font-extrabold text-emerald-700">₹{totalPaid.toLocaleString("en-IN")}</span>
+                </div>
+              </div>
+
+              {/* Primary Feature: Download Payment Receipt & Application Copy */}
+              <div className="p-6 bg-gradient-to-br from-blue-50/80 via-white to-indigo-50/40 border-2 border-blue-200/90 rounded-2xl text-center space-y-3.5 shadow-xs">
+                <div className="w-12 h-12 bg-blue-100 text-[#000080] rounded-xl flex items-center justify-center mx-auto">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900">Official Payment Receipt & Application Copy</h3>
+                  <p className="text-xs text-slate-600 max-w-md mx-auto mt-1">
+                    Download your formal electronic receipt containing your payment transaction proof, selected fellowship subspecialties, and submitted application details.
+                  </p>
                 </div>
 
-                {/* Verified Payment Summary Card */}
-                <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-2xl flex items-center justify-between gap-4">
-                   <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">Payment Status: Verified</span>
-                      <p className="text-xs text-emerald-950 font-medium">
-                        Payment ID: <span className="font-mono font-bold">{paymentVerified?.paymentId || "Verified Online"}</span>
-                      </p>
-                   </div>
-                   <div className="text-right">
-                      <span className="text-xs text-slate-500 block">Amount Paid</span>
-                      <span className="text-base font-extrabold text-emerald-700">₹{totalPaid.toLocaleString("en-IN")}</span>
-                   </div>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                  <a
+                    href={receiptDownloadUrl}
+                    download={`SAV_Payment_Receipt_${submissionId}.pdf`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-[#000080] hover:bg-[#000066] text-white font-bold text-sm rounded-xl shadow-md shadow-blue-950/20 hover:shadow-lg transition-all active:scale-[0.98] cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download Payment Receipt (PDF)
+                  </a>
+
+                  <a
+                    href={receiptDownloadUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3.5 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-sm rounded-xl border border-slate-200 transition-all cursor-pointer"
+                  >
+                    <Printer className="w-4 h-4 text-slate-500" />
+                    View / Print
+                  </a>
                 </div>
+              </div>
 
-                {/* Primary Feature: Download Payment Receipt & Application Copy */}
-                <div className="p-6 bg-gradient-to-br from-blue-50/80 via-white to-indigo-50/40 border-2 border-blue-200/90 rounded-2xl text-center space-y-3.5 shadow-xs">
-                   <div className="w-12 h-12 bg-blue-100 text-[#000080] rounded-xl flex items-center justify-center mx-auto">
-                      <FileText className="w-6 h-6" />
-                   </div>
-                   <div>
-                      <h3 className="font-bold text-base text-slate-900">Official Payment Receipt & Application Copy</h3>
-                      <p className="text-xs text-slate-600 max-w-md mx-auto mt-1">
-                        Download your formal electronic receipt containing your payment transaction proof, selected fellowship subspecialties, and submitted application details.
-                      </p>
-                   </div>
-
-                   <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-                      <a
-                        href={receiptDownloadUrl}
-                        download={`SAV_Payment_Receipt_${submissionId}.pdf`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-[#000080] hover:bg-[#000066] text-white font-bold text-sm rounded-xl shadow-md shadow-blue-950/20 hover:shadow-lg transition-all active:scale-[0.98] cursor-pointer"
-                      >
-                        <Download className="w-4 h-4" />
-                        Download Payment Receipt (PDF)
-                      </a>
-
-                      <a
-                        href={receiptDownloadUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3.5 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-sm rounded-xl border border-slate-200 transition-all cursor-pointer"
-                      >
-                        <Printer className="w-4 h-4 text-slate-500" />
-                        View / Print
-                      </a>
-                   </div>
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-3">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Next Steps</h3>
+                <div className="space-y-2.5">
+                  {[
+                    "A confirmation email has been dispatched to your email address.",
+                    "Save the downloaded payment receipt PDF for your admissions interview.",
+                    "Our academic admissions committee will review your application credentials."
+                  ].map((step, idx) => (
+                    <div key={idx} className="flex items-center gap-2.5">
+                      <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold shrink-0">{idx + 1}</div>
+                      <p className="text-xs text-slate-600 font-medium">{step}</p>
+                    </div>
+                  ))}
                 </div>
+              </div>
 
-                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-3">
-                   <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Next Steps</h3>
-                   <div className="space-y-2.5">
-                      {[
-                        "A confirmation email has been dispatched to your email address.",
-                        "Save the downloaded payment receipt PDF for your admissions interview.",
-                        "Our academic admissions committee will review your application credentials."
-                      ].map((step, idx) => (
-                        <div key={idx} className="flex items-center gap-2.5">
-                           <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold shrink-0">{idx + 1}</div>
-                           <p className="text-xs text-slate-600 font-medium">{step}</p>
-                        </div>
-                      ))}
-                   </div>
-                </div>
-
-                <Button 
-                  variant="outline"
-                  className="w-full h-12 rounded-xl text-slate-700 hover:text-slate-900 border-slate-200 font-bold text-sm transition-all"
-                  onClick={() => window.location.href = "/"}
-                >
-                  Return to Dashboard
-                </Button>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
-      );
-   }
-
-    const sections = getVisibleSections(form);
-    const currentSection = sections[step] || sections[sections.length - 1];
-  if (!currentSection) {
-     return (
-        <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] p-4">
-          <Card className="max-w-md w-full text-center p-8 border-orange-100 shadow-xl">
-            <AlertCircle className="w-16 h-16 text-[#000080] mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">Form Configuration Missing</h2>
-            <p className="text-slate-600 mb-6">This application form has no sections configured yet. Please contact the administrator.</p>
-            <Button onClick={() => window.location.href = "/"} className="bg-[#000080] hover:bg-blue-900">
-              Go to Homepage
-            </Button>
+              <Button
+                variant="outline"
+                className="w-full h-12 rounded-xl text-slate-700 hover:text-slate-900 border-slate-200 font-bold text-sm transition-all"
+                onClick={() => window.location.href = "/"}
+              >
+                Return to Dashboard
+              </Button>
+            </CardContent>
           </Card>
-        </div>
-     );
+        </motion.div>
+      </div>
+    );
+  }
+
+  const sections = getVisibleSections(form);
+  const currentSection = sections[step] || sections[sections.length - 1];
+  if (!currentSection) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] p-4">
+        <Card className="max-w-md w-full text-center p-8 border-orange-100 shadow-xl">
+          <AlertCircle className="w-16 h-16 text-[#000080] mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Form Configuration Missing</h2>
+          <p className="text-slate-600 mb-6">This application form has no sections configured yet. Please contact the administrator.</p>
+          <Button onClick={() => window.location.href = "/"} className="bg-[#000080] hover:bg-blue-900">
+            Go to Homepage
+          </Button>
+        </Card>
+      </div>
+    );
   }
   const progress = ((step + 1) / sections.length) * 100;
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20 font-sans">
-      
-      
+
+
       <div className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
         <div className="max-w-4xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-[#000080] flex items-center justify-center text-white rounded-lg">
-                 <img src={logoUrl} alt="Logo" className="h-8 w-8 object-contain invert" />
+                <img src={logoUrl} alt="Logo" className="h-8 w-8 object-contain invert" />
               </div>
               <div>
                 <h1 className="text-xl md:text-2xl font-bold tracking-tight text-slate-900 leading-tight font-outfit">{formInfo.title}</h1>
@@ -937,19 +937,19 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
               </div>
             </div>
             <div className="flex items-center gap-4">
-               <div className="text-right hidden sm:block">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Progress</p>
-                  <p className="text-sm font-bold text-slate-900">{step + 1} / {sections.length} Steps</p>
-               </div>
+              <div className="text-right hidden sm:block">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Progress</p>
+                <p className="text-sm font-bold text-slate-900">{step + 1} / {sections.length} Steps</p>
+              </div>
             </div>
           </div>
-          
+
           <div className="mt-4 h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
-            <motion.div 
+            <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${progress}%` }}
               transition={{ duration: 0.5 }}
-              className="h-full bg-[#ea580c]" 
+              className="h-full bg-[#ea580c]"
             />
           </div>
         </div>
@@ -967,10 +967,10 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
             <Card className="border-none shadow-2xl rounded-3xl overflow-hidden ">
               <div className="bg-white px-8 py-10 border-b border-slate-100">
                 <div className="flex items-center gap-3 mb-3">
-                   <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight font-outfit">{currentSection.title}</h2>
+                  <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight font-outfit">{currentSection.title}</h2>
                 </div>
                 {currentSection.description && (
-                  <div 
+                  <div
                     className="text-slate-600 leading-relaxed prose prose-sm max-w-none prose-slate opacity-80 mb-4"
                     dangerouslySetInnerHTML={{ __html: currentSection.description }}
                   />
@@ -985,549 +985,549 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
                   </div>
                 </div>
               </div>
-          
-          <CardContent className="p-6 md:p-8 space-y-8">
-             {currentSection.fields.map((field: any) => {
-               if (!isFieldVisible(field, form)) return null;
 
-               return (
-                 <div key={field.id} className="space-y-3">
-                   {field.type !== 'info' && field.type !== 'heading' && field.type !== 'static_text' && (
-                     <Label className="text-[15px] font-bold text-slate-800 flex items-center gap-1.5 tracking-tight">
-                       {field.label}
-                       <span className="text-red-500 font-extrabold">*</span>
-                     </Label>
-                   )}
+              <CardContent className="p-6 md:p-8 space-y-8">
+                {currentSection.fields.map((field: any) => {
+                  if (!isFieldVisible(field, form)) return null;
 
-                  {field.type === 'file' && (
-                     <div className={`relative border-2 border-dashed rounded-2xl p-10 transition-all ${files[field.id] ? 'border-emerald-400 bg-emerald-50/20' : errors[field.id] ? 'border-red-300 bg-red-50/20' : 'border-slate-200 hover:border-orange-500 hover:bg-orange-50/5 bg-slate-50/30'}`}>
-                       <input
-                         type="file"
-                         name={field.id}
-                         onChange={(e) => onFileChange(field.id, e.target.files?.[0] || null)}
-                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                         accept="*/*"
-                       />
-                       <div className="text-center">
-                         {files[field.id] ? (
-                           <>
-                             <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                               <CheckCircle2 className="w-6 h-6 text-green-600" />
-                             </div>
-                             <p className="text-sm font-bold text-green-700">{files[field.id].name}</p>
-                             <p className="text-xs text-green-600 mt-1">File selected & ready for automatic formatting</p>
-                           </>
-                         ) : (
-                           <>
-                             <div className="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-3">
-                               <Loader2 className="w-6 h-6 text-slate-400" />
-                             </div>
-                             <p className="text-sm font-medium text-slate-600">Click to upload or drag & drop</p>
-                             <p className="text-xs text-slate-400 mt-1">
-                               All file formats (PDF, JPG, PNG, DOC, DOCX, images) and all file sizes supported
-                             </p>
-                           </>
-                         )}
-                       </div>
-                     </div>
-                  )}{field.type === 'info' && (
-                      <div className="bg-blue-50 border-l-4 border-[#000080] p-6 rounded-r-xl shadow-sm">
-                         <div className="flex items-start gap-4">
-                           <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
-                             <CreditCard className="w-5 h-5 text-[#000080]" />
-                           </div>
-                           <div>
-                             <h4 className="text-sm font-bold text-blue-900 uppercase tracking-wider mb-1">{field.label || "Instruction"}</h4>
-                             <div 
-                               className="text-sm text-blue-800 leading-relaxed font-medium prose prose-sm max-w-none prose-blue"
-                               dangerouslySetInnerHTML={{ __html: field.defaultValue || "" }}
-                             />
-                           </div>
-                         </div>
-                      </div>
-                    )}
+                  return (
+                    <div key={field.id} className="space-y-3">
+                      {field.type !== 'info' && field.type !== 'heading' && field.type !== 'static_text' && (
+                        <Label className="text-[15px] font-bold text-slate-800 flex items-center gap-1.5 tracking-tight">
+                          {field.label}
+                          <span className="text-red-500 font-extrabold">*</span>
+                        </Label>
+                      )}
 
-                 {field.type === 'heading' && (
-                   <div className="pt-4 pb-2 border-b border-slate-200">
-                     <h3 className="text-xl font-bold text-slate-800">{field.label}</h3>
-                     {field.description && <p className="text-sm text-slate-500 mt-1">{field.description}</p>}
-                   </div>
-                 )}
+                      {field.type === 'file' && (
+                        <div className={`relative border-2 border-dashed rounded-2xl p-10 transition-all ${files[field.id] ? 'border-emerald-400 bg-emerald-50/20' : errors[field.id] ? 'border-red-300 bg-red-50/20' : 'border-slate-200 hover:border-orange-500 hover:bg-orange-50/5 bg-slate-50/30'}`}>
+                          <input
+                            type="file"
+                            name={field.id}
+                            onChange={(e) => onFileChange(field.id, e.target.files?.[0] || null)}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            accept="*/*"
+                          />
+                          <div className="text-center">
+                            {files[field.id] ? (
+                              <>
+                                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                  <CheckCircle2 className="w-6 h-6 text-green-600" />
+                                </div>
+                                <p className="text-sm font-bold text-green-700">{files[field.id].name}</p>
+                                <p className="text-xs text-green-600 mt-1">File selected & ready for automatic formatting</p>
+                              </>
+                            ) : (
+                              <>
+                                <div className="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-3">
+                                  <Loader2 className="w-6 h-6 text-slate-400" />
+                                </div>
+                                <p className="text-sm font-medium text-slate-600">Click to upload or drag & drop</p>
+                                <p className="text-xs text-slate-400 mt-1">
+                                  All file formats (PDF, JPG, PNG, DOC, DOCX, images) and all file sizes supported
+                                </p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}{field.type === 'info' && (
+                        <div className="bg-blue-50 border-l-4 border-[#000080] p-6 rounded-r-xl shadow-sm">
+                          <div className="flex items-start gap-4">
+                            <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                              <CreditCard className="w-5 h-5 text-[#000080]" />
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-bold text-blue-900 uppercase tracking-wider mb-1">{field.label || "Instruction"}</h4>
+                              <div
+                                className="text-sm text-blue-800 leading-relaxed font-medium prose prose-sm max-w-none prose-blue"
+                                dangerouslySetInnerHTML={{ __html: field.defaultValue || "" }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
-                 {field.type === 'static_text' && (
-                   <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">
-                     {field.label}
-                   </div>
-                 )}
+                      {field.type === 'heading' && (
+                        <div className="pt-4 pb-2 border-b border-slate-200">
+                          <h3 className="text-xl font-bold text-slate-800">{field.label}</h3>
+                          {field.description && <p className="text-sm text-slate-500 mt-1">{field.description}</p>}
+                        </div>
+                      )}
 
-                 {field.type === 'phone' && (
-                   <div className="flex gap-2">
-                     <div className="relative group">
-                       <div className="h-full px-5 py-4 rounded-2xl border-2 border-slate-200/80 bg-slate-50 flex items-center gap-3 cursor-pointer hover:border-orange-300 hover:bg-orange-50/20 transition-all shadow-sm">
-                         <div className="w-6 h-6 rounded-full overflow-hidden border border-slate-200 flex-shrink-0 shadow-sm relative">
-                           <div className="absolute inset-0 flex flex-col">
-                             <div className="flex-1 bg-[#FF9933]"></div>
-                             <div className="flex-1 bg-white flex items-center justify-center">
-                               <div className="w-1.5 h-1.5 rounded-full border-[0.5px] border-[#000080] flex items-center justify-center">
-                                 <div className="w-[0.5px] h-full bg-[#000080] rotate-0"></div>
-                                 <div className="w-[0.5px] h-full bg-[#000080] rotate-45 absolute"></div>
-                                 <div className="w-[0.5px] h-full bg-[#000080] rotate-90 absolute"></div>
-                                 <div className="w-[0.5px] h-full bg-[#000080] rotate-135 absolute"></div>
-                               </div>
-                             </div>
-                             <div className="flex-1 bg-[#128807]"></div>
-                           </div>
-                         </div>
-                         <span className="text-sm font-bold text-slate-700 tracking-tight">+91</span>
-                         <ChevronDown className="w-3 h-3 text-slate-400 group-hover:text-orange-500 transition-colors" />
-                       </div>
-                     </div>
-                     <input
-                       type="text"
-                       name={field.id}
-                       autoComplete="new-password"
-                       value={form[field.id] || ""}
-                       onChange={(e) => {
-                         const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                         set(field.id, val);
-                       }}
-                       className={`flex-1 px-5 py-4 rounded-2xl border-2 ${errors[field.id] ? 'border-red-500 shadow-sm shadow-red-100' : 'border-slate-200/80 hover:border-slate-300'} focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all outline-none font-bold text-slate-800 text-[16px] tracking-widest`}
-                       placeholder="10 digit mobile number"
-                     />
-                   </div>
-                 )}
+                      {field.type === 'static_text' && (
+                        <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">
+                          {field.label}
+                        </div>
+                      )}
 
-                 {field.type === 'text' && (
-                    <div>
-                      <input
-                        type="text"
-                        name={field.id}
-                        autoComplete="new-password"
-                        value={form[field.id] || ""}
-                        onChange={(e) => {
-                          let val = e.target.value;
-                          if (field.id === 'fullName' || field.id === 'name') {
-                            val = val.replace(/^(?:\s*(?:dr\.?|doctor)\s*)+/gi, '');
-                          }
-                          set(field.id, val);
-                        }}
-                        className={`w-full px-4 py-3 rounded-lg border ${errors[field.id] ? 'border-red-500 shadow-sm shadow-red-100' : 'border-slate-200'} focus:ring-2 focus:ring-blue-500/20 focus:border-[#000080] transition-all outline-none`}
-                        placeholder={
-                          field.id === 'fullName' || field.id === 'name'
-                            ? "e.g. Aakanksha Bindal (Enter name ONLY - exclude 'Dr.')"
-                            : (field.placeholder || `${field.label} (Put 'NA' if not applicable)`)
-                        }
-                      />
-                      {(field.id === 'fullName' || field.id === 'name') && (
-                        <p className="text-[11px] text-amber-700 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200 mt-1.5 font-medium flex items-center gap-1.5">
-                          <span>⚠️</span>
-                          <span>Please enter <strong>First and Last Name only</strong>. Do <u>not</u> type <strong>'Dr.'</strong> before your name.</span>
+                      {field.type === 'phone' && (
+                        <div className="flex gap-2">
+                          <div className="relative group">
+                            <div className="h-full px-5 py-4 rounded-2xl border-2 border-slate-200/80 bg-slate-50 flex items-center gap-3 cursor-pointer hover:border-orange-300 hover:bg-orange-50/20 transition-all shadow-sm">
+                              <div className="w-6 h-6 rounded-full overflow-hidden border border-slate-200 flex-shrink-0 shadow-sm relative">
+                                <div className="absolute inset-0 flex flex-col">
+                                  <div className="flex-1 bg-[#FF9933]"></div>
+                                  <div className="flex-1 bg-white flex items-center justify-center">
+                                    <div className="w-1.5 h-1.5 rounded-full border-[0.5px] border-[#000080] flex items-center justify-center">
+                                      <div className="w-[0.5px] h-full bg-[#000080] rotate-0"></div>
+                                      <div className="w-[0.5px] h-full bg-[#000080] rotate-45 absolute"></div>
+                                      <div className="w-[0.5px] h-full bg-[#000080] rotate-90 absolute"></div>
+                                      <div className="w-[0.5px] h-full bg-[#000080] rotate-135 absolute"></div>
+                                    </div>
+                                  </div>
+                                  <div className="flex-1 bg-[#128807]"></div>
+                                </div>
+                              </div>
+                              <span className="text-sm font-bold text-slate-700 tracking-tight">+91</span>
+                              <ChevronDown className="w-3 h-3 text-slate-400 group-hover:text-orange-500 transition-colors" />
+                            </div>
+                          </div>
+                          <input
+                            type="text"
+                            name={field.id}
+                            autoComplete="new-password"
+                            value={form[field.id] || ""}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                              set(field.id, val);
+                            }}
+                            className={`flex-1 px-5 py-4 rounded-2xl border-2 ${errors[field.id] ? 'border-red-500 shadow-sm shadow-red-100' : 'border-slate-200/80 hover:border-slate-300'} focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all outline-none font-bold text-slate-800 text-[16px] tracking-widest`}
+                            placeholder="10 digit mobile number"
+                          />
+                        </div>
+                      )}
+
+                      {field.type === 'text' && (
+                        <div>
+                          <input
+                            type="text"
+                            name={field.id}
+                            autoComplete="new-password"
+                            value={form[field.id] || ""}
+                            onChange={(e) => {
+                              let val = e.target.value;
+                              if (field.id === 'fullName' || field.id === 'name') {
+                                val = val.replace(/^(?:\s*(?:dr\.?|doctor)\s*)+/gi, '');
+                              }
+                              set(field.id, val);
+                            }}
+                            className={`w-full px-4 py-3 rounded-lg border ${errors[field.id] ? 'border-red-500 shadow-sm shadow-red-100' : 'border-slate-200'} focus:ring-2 focus:ring-blue-500/20 focus:border-[#000080] transition-all outline-none`}
+                            placeholder={
+                              field.id === 'fullName' || field.id === 'name'
+                                ? "e.g. Aakanksha Bindal (Enter name ONLY - exclude 'Dr.')"
+                                : (field.placeholder || `${field.label} (Put 'NA' if not applicable)`)
+                            }
+                          />
+                          {(field.id === 'fullName' || field.id === 'name') && (
+                            <p className="text-[11px] text-amber-700 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200 mt-1.5 font-medium flex items-center gap-1.5">
+                              <span>⚠️</span>
+                              <span>Please enter <strong>First and Last Name only</strong>. Do <u>not</u> type <strong>'Dr.'</strong> before your name.</span>
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {field.type === 'email' && (
+                        <input
+                          type="email"
+                          name={field.id}
+                          autoComplete="new-password"
+                          value={form[field.id] || ""}
+                          onChange={(e) => set(field.id, e.target.value)}
+                          className={`w-full px-4 py-3 rounded-lg border ${errors[field.id] ? 'border-red-500 shadow-sm shadow-red-100' : 'border-slate-200'} focus:ring-2 focus:ring-blue-500/20 focus:border-[#000080] transition-all outline-none`}
+                          placeholder={field.placeholder || "example@domain.com"}
+                        />
+                      )}
+
+                      {field.type === 'textarea' && (
+                        <textarea
+                          name={field.id}
+                          autoComplete="new-password"
+                          value={form[field.id] || ""}
+                          onChange={(e) => set(field.id, e.target.value)}
+                          rows={4}
+                          className={`w-full px-4 py-3 rounded-lg border ${errors[field.id] ? 'border-red-500 shadow-sm shadow-red-100' : 'border-slate-200'} focus:ring-2 focus:ring-blue-500/20 focus:border-[#000080] transition-all outline-none`}
+                          placeholder={field.placeholder || `${field.label} (Put 'NA' if not applicable)`}
+                        />
+                      )}
+
+                      {field.type === 'select' && (
+                        <select
+                          value={form[field.id] || ""}
+                          onChange={(e) => set(field.id, e.target.value)}
+                          className={`w-full px-5 py-4 rounded-2xl border-2 ${errors[field.id] ? 'border-red-500 shadow-sm shadow-red-100' : 'border-slate-200/80 hover:border-slate-300'} focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all outline-none bg-white font-medium text-slate-800 text-[15px]`}
+                        >
+                          <option value="">Select Option</option>
+                          {field.options.map((opt: string) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      )}
+
+                      {field.type === 'radio' && (
+                        <div className="flex flex-wrap gap-4">
+                          {field.options.map((opt: string) => (
+                            <label key={opt} className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all ${form[field.id] === opt ? 'border-[#000080] bg-blue-50 text-[#000080]' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
+                              <input
+                                type="radio"
+                                name={field.id}
+                                checked={form[field.id] === opt}
+                                onChange={() => set(field.id, opt)}
+                                className="w-4 h-4 text-[#000080] border-slate-300 focus:ring-[#000080]"
+                              />
+                              <span className="text-sm font-medium">{opt}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+
+                      {field.type === 'date' && (
+                        <input
+                          type="date"
+                          value={form[field.id] || ""}
+                          onChange={(e) => set(field.id, e.target.value)}
+                          className={`w-full px-4 py-3 rounded-lg border ${errors[field.id] ? 'border-red-500 shadow-sm shadow-red-100' : 'border-slate-200'} focus:ring-2 focus:ring-blue-500/20 focus:border-[#000080] transition-all outline-none`}
+                        />
+                      )}
+
+                      {field.type === 'time' && (
+                        <input
+                          type="time"
+                          value={form[field.id] || ""}
+                          onChange={(e) => set(field.id, e.target.value)}
+                          className={`w-full px-4 py-3 rounded-lg border ${errors[field.id] ? 'border-red-500 shadow-sm shadow-red-100' : 'border-slate-200'} focus:ring-2 focus:ring-blue-500/20 focus:border-[#000080] transition-all outline-none`}
+                        />
+                      )}
+
+                      {field.type === 'checkbox' && (
+                        <label className="flex items-start gap-3 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            checked={!!form[field.id]}
+                            onChange={(e) => set(field.id, e.target.checked)}
+                            className="mt-1 w-5 h-5 rounded text-[#000080] border-slate-300 focus:ring-[#000080]"
+                          />
+                          <span className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors leading-relaxed">
+                            {field.label}
+                          </span>
+                        </label>
+                      )}
+
+                      {field.type === 'checkbox_group' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {field.options.map((opt: string) => (
+                            <label key={opt} className={`flex items-center gap-3 px-4 py-3 rounded-lg border cursor-pointer transition-all ${Array.isArray(form[field.id]) && form[field.id].includes(opt) ? 'border-[#000080] bg-blue-50' : 'border-slate-100 hover:border-slate-200'}`}>
+                              <input
+                                type="checkbox"
+                                checked={Array.isArray(form[field.id]) && form[field.id].includes(opt)}
+                                onChange={(e) => {
+                                  let current = Array.isArray(form[field.id]) ? [...form[field.id]] : [];
+                                  if (e.target.checked) {
+                                    if (opt === "None of the Above") {
+                                      current = [opt];
+                                    } else {
+                                      current = current.filter((i: string) => i !== "None of the Above");
+                                      current.push(opt);
+                                    }
+                                  } else {
+                                    current = current.filter((i: string) => i !== opt);
+                                  }
+                                  set(field.id, current);
+                                }}
+                                className="w-5 h-5 rounded text-[#000080] border-slate-300 focus:ring-[#000080]"
+                              />
+                              <span className="text-sm font-medium text-slate-700">{opt}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+
+                      {field.type === 'skills_table' && (
+                        <div className="overflow-x-auto border rounded-lg">
+                          <table className="w-full text-sm">
+                            <thead className="bg-slate-50 border-b">
+                              <tr>
+                                <th className="px-4 py-3 text-left font-bold text-slate-700">Skill</th>
+                                {field.options.map((opt: string) => (
+                                  <th key={opt} className="px-4 py-3 text-center font-bold text-slate-700">{opt}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                              {field.rows.map((row: string) => (
+                                <tr key={row} className="hover:bg-slate-50/50">
+                                  <td className="px-4 py-3 font-medium text-slate-800">{row}</td>
+                                  {field.options.map((opt: string) => (
+                                    <td key={opt} className="px-4 py-3 text-center">
+                                      <input
+                                        type="radio"
+                                        name={`${field.id}_${row}`}
+                                        checked={form[field.id]?.[row] === opt}
+                                        onChange={() => {
+                                          const current = form[field.id] || {};
+                                          set(field.id, { ...current, [row]: opt });
+                                        }}
+                                        className="w-4 h-4 text-[#000080]"
+                                      />
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      {field.type === 'qualification_matrix' && (
+                        <div className="overflow-x-auto border rounded-lg">
+                          <table className="w-full text-sm">
+                            <thead className="bg-slate-50 border-b">
+                              <tr>
+                                <th className="px-4 py-3 text-left font-bold text-slate-700">Qualification</th>
+                                <th className="px-4 py-3 text-center font-bold text-slate-700">Yes</th>
+                                <th className="px-4 py-3 text-center font-bold text-slate-700">No</th>
+                                <th className="px-4 py-3 text-center font-bold text-slate-700">N/A</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                              {['DO (Diploma Ophthlmology)', 'MS/MD ( Masters in Ophthalmology)', 'DNB'].map((q: string) => (
+                                <tr key={q}>
+                                  <td className="px-4 py-3 font-medium text-slate-800">{q}</td>
+                                  {['Yes', 'No', 'N/A'].map((v: string) => (
+                                    <td key={v} className="px-4 py-3 text-center">
+                                      <input
+                                        type="radio"
+                                        name={`${field.id}_${q}`}
+                                        checked={form[field.id]?.[q] === v}
+                                        onChange={() => {
+                                          const current = form[field.id] || {};
+                                          set(field.id, { ...current, [q]: v });
+                                        }}
+                                        className="w-4 h-4 text-[#000080]"
+                                      />
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      {field.type === 'surgery_table' && (
+                        <div className="space-y-6">
+                          <div className="overflow-x-auto border rounded-xl overflow-hidden shadow-sm">
+                            <table className="w-full text-sm">
+                              <thead className="bg-slate-50 border-b border-slate-200">
+                                <tr>
+                                  <th className="px-6 py-4 text-left font-bold text-slate-700 uppercase tracking-wider">Surgery Type</th>
+                                  <th className="px-6 py-4 text-center font-bold text-slate-700 uppercase tracking-wider bg-orange-50/30">Under Supervision</th>
+                                  <th className="px-6 py-4 text-center font-bold text-slate-700 uppercase tracking-wider bg-green-50/30">Independently</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {field.rows.map((row: string) => (
+                                  <tr key={row} className="hover:bg-slate-50/50 transition-colors">
+                                    <td className="px-6 py-4 font-semibold text-slate-800">{row}</td>
+                                    <td className="px-6 py-4 bg-orange-50/10">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        value={form[field.id]?.[row]?.supervision || ""}
+                                        onChange={(e) => {
+                                          const current = form[field.id] || {};
+                                          const rowData = current[row] || {};
+                                          set(field.id, { ...current, [row]: { ...rowData, supervision: parseInt(e.target.value) || 0 } });
+                                        }}
+                                        className="w-full px-3 py-2 text-center rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 focus:border-[#000080] outline-none transition-all font-medium"
+                                        placeholder="0 (Put '0' if not applicable)"
+                                      />
+                                    </td>
+                                    <td className="px-6 py-4 bg-green-50/10">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        value={form[field.id]?.[row]?.independent || ""}
+                                        onChange={(e) => {
+                                          const current = form[field.id] || {};
+                                          const rowData = current[row] || {};
+                                          set(field.id, { ...current, [row]: { ...rowData, independent: parseInt(e.target.value) || 0 } });
+                                        }}
+                                        className="w-full px-3 py-2 text-center rounded-lg border border-slate-200 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all font-medium"
+                                        placeholder="0"
+                                      />
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {field.type === 'number' && (
+                        <input
+                          type="number"
+                          value={form[field.id] || ""}
+                          onChange={(e) => set(field.id, e.target.value)}
+                          className={`w-full px-5 py-4 rounded-2xl border-2 ${errors[field.id] ? 'border-red-500 shadow-sm shadow-red-100' : 'border-slate-200/80 hover:border-slate-300'} focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all outline-none font-medium text-slate-800 text-[15px]`}
+                          placeholder="0"
+                        />
+                      )}
+
+                      {errors[field.id] && (
+                        <p className="text-xs font-bold text-red-500 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> {errors[field.id]}
                         </p>
                       )}
                     </div>
-                  )}
+                  );
+                })}
 
-                 {field.type === 'email' && (
-                   <input
-                     type="email"
-                     name={field.id}
-                     autoComplete="new-password"
-                     value={form[field.id] || ""}
-                     onChange={(e) => set(field.id, e.target.value)}
-                     className={`w-full px-4 py-3 rounded-lg border ${errors[field.id] ? 'border-red-500 shadow-sm shadow-red-100' : 'border-slate-200'} focus:ring-2 focus:ring-blue-500/20 focus:border-[#000080] transition-all outline-none`}
-                     placeholder={field.placeholder || "example@domain.com"}
-                   />
-                 )}
-
-                 {field.type === 'textarea' && (
-                   <textarea
-                     name={field.id}
-                     autoComplete="new-password"
-                     value={form[field.id] || ""}
-                     onChange={(e) => set(field.id, e.target.value)}
-                     rows={4}
-                     className={`w-full px-4 py-3 rounded-lg border ${errors[field.id] ? 'border-red-500 shadow-sm shadow-red-100' : 'border-slate-200'} focus:ring-2 focus:ring-blue-500/20 focus:border-[#000080] transition-all outline-none`}
-                     placeholder={field.placeholder || `${field.label} (Put 'NA' if not applicable)`}
-                   />
-                 )}
-
-                 {field.type === 'select' && (
-                   <select
-                     value={form[field.id] || ""}
-                     onChange={(e) => set(field.id, e.target.value)}
-                     className={`w-full px-5 py-4 rounded-2xl border-2 ${errors[field.id] ? 'border-red-500 shadow-sm shadow-red-100' : 'border-slate-200/80 hover:border-slate-300'} focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all outline-none bg-white font-medium text-slate-800 text-[15px]`}
-                   >
-                     <option value="">Select Option</option>
-                     {field.options.map((opt: string) => (
-                       <option key={opt} value={opt}>{opt}</option>
-                     ))}
-                   </select>
-                 )}
-
-                 {field.type === 'radio' && (
-                   <div className="flex flex-wrap gap-4">
-                     {field.options.map((opt: string) => (
-                       <label key={opt} className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all ${form[field.id] === opt ? 'border-[#000080] bg-blue-50 text-[#000080]' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
-                         <input
-                           type="radio"
-                           name={field.id}
-                           checked={form[field.id] === opt}
-                           onChange={() => set(field.id, opt)}
-                           className="w-4 h-4 text-[#000080] border-slate-300 focus:ring-[#000080]"
-                         />
-                         <span className="text-sm font-medium">{opt}</span>
-                       </label>
-                     ))}
-                   </div>
-                 )}
-
-                 {field.type === 'date' && (
-                   <input
-                     type="date"
-                     value={form[field.id] || ""}
-                     onChange={(e) => set(field.id, e.target.value)}
-                     className={`w-full px-4 py-3 rounded-lg border ${errors[field.id] ? 'border-red-500 shadow-sm shadow-red-100' : 'border-slate-200'} focus:ring-2 focus:ring-blue-500/20 focus:border-[#000080] transition-all outline-none`}
-                   />
-                 )}
-
-                 {field.type === 'time' && (
-                   <input
-                     type="time"
-                     value={form[field.id] || ""}
-                     onChange={(e) => set(field.id, e.target.value)}
-                     className={`w-full px-4 py-3 rounded-lg border ${errors[field.id] ? 'border-red-500 shadow-sm shadow-red-100' : 'border-slate-200'} focus:ring-2 focus:ring-blue-500/20 focus:border-[#000080] transition-all outline-none`}
-                   />
-                 )}
-
-                 {field.type === 'checkbox' && (
-                   <label className="flex items-start gap-3 cursor-pointer group">
-                      <input
-                        type="checkbox"
-                        checked={!!form[field.id]}
-                        onChange={(e) => set(field.id, e.target.checked)}
-                        className="mt-1 w-5 h-5 rounded text-[#000080] border-slate-300 focus:ring-[#000080]"
-                      />
-                      <span className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors leading-relaxed">
-                        {field.label}
-                      </span>
-                   </label>
-                 )}
-
-                 {field.type === 'checkbox_group' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {field.options.map((opt: string) => (
-                        <label key={opt} className={`flex items-center gap-3 px-4 py-3 rounded-lg border cursor-pointer transition-all ${Array.isArray(form[field.id]) && form[field.id].includes(opt) ? 'border-[#000080] bg-blue-50' : 'border-slate-100 hover:border-slate-200'}`}>
-                          <input
-                            type="checkbox"
-                            checked={Array.isArray(form[field.id]) && form[field.id].includes(opt)}
-                            onChange={(e) => {
-                               let current = Array.isArray(form[field.id]) ? [...form[field.id]] : [];
-                               if (e.target.checked) {
-                                  if (opt === "None of the Above") {
-                                    current = [opt];
-                                  } else {
-                                    current = current.filter((i: string) => i !== "None of the Above");
-                                    current.push(opt);
-                                  }
-                               } else {
-                                  current = current.filter((i: string) => i !== opt);
-                               }
-                               set(field.id, current);
-                            }}
-                            className="w-5 h-5 rounded text-[#000080] border-slate-300 focus:ring-[#000080]"
-                          />
-                          <span className="text-sm font-medium text-slate-700">{opt}</span>
-                        </label>
-                      ))}
-                    </div>
-                 )}
-
-                 {field.type === 'skills_table' && (
-                    <div className="overflow-x-auto border rounded-lg">
-                      <table className="w-full text-sm">
-                        <thead className="bg-slate-50 border-b">
-                          <tr>
-                            <th className="px-4 py-3 text-left font-bold text-slate-700">Skill</th>
-                            {field.options.map((opt: string) => (
-                              <th key={opt} className="px-4 py-3 text-center font-bold text-slate-700">{opt}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {field.rows.map((row: string) => (
-                            <tr key={row} className="hover:bg-slate-50/50">
-                              <td className="px-4 py-3 font-medium text-slate-800">{row}</td>
-                              {field.options.map((opt: string) => (
-                                <td key={opt} className="px-4 py-3 text-center">
-                                  <input
-                                    type="radio"
-                                    name={`${field.id}_${row}`}
-                                    checked={form[field.id]?.[row] === opt}
-                                    onChange={() => {
-                                      const current = form[field.id] || {};
-                                      set(field.id, { ...current, [row]: opt });
-                                    }}
-                                    className="w-4 h-4 text-[#000080]"
-                                  />
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                 )}
-
-                 {field.type === 'qualification_matrix' && (
-                    <div className="overflow-x-auto border rounded-lg">
-                      <table className="w-full text-sm">
-                        <thead className="bg-slate-50 border-b">
-                          <tr>
-                            <th className="px-4 py-3 text-left font-bold text-slate-700">Qualification</th>
-                            <th className="px-4 py-3 text-center font-bold text-slate-700">Yes</th>
-                            <th className="px-4 py-3 text-center font-bold text-slate-700">No</th>
-                            <th className="px-4 py-3 text-center font-bold text-slate-700">N/A</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {['DO (Diploma Ophthlmology)', 'MS/MD ( Masters in Ophthalmology)', 'DNB'].map((q: string) => (
-                            <tr key={q}>
-                              <td className="px-4 py-3 font-medium text-slate-800">{q}</td>
-                              {['Yes', 'No', 'N/A'].map((v: string) => (
-                                <td key={v} className="px-4 py-3 text-center">
-                                  <input
-                                    type="radio"
-                                    name={`${field.id}_${q}`}
-                                    checked={form[field.id]?.[q] === v}
-                                    onChange={() => {
-                                       const current = form[field.id] || {};
-                                       set(field.id, { ...current, [q]: v });
-                                    }}
-                                    className="w-4 h-4 text-[#000080]"
-                                  />
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                 )}
-
-                 {field.type === 'surgery_table' && (
-                    <div className="space-y-6">
-                      <div className="overflow-x-auto border rounded-xl overflow-hidden shadow-sm">
-                        <table className="w-full text-sm">
-                          <thead className="bg-slate-50 border-b border-slate-200">
-                            <tr>
-                              <th className="px-6 py-4 text-left font-bold text-slate-700 uppercase tracking-wider">Surgery Type</th>
-                              <th className="px-6 py-4 text-center font-bold text-slate-700 uppercase tracking-wider bg-orange-50/30">Under Supervision</th>
-                              <th className="px-6 py-4 text-center font-bold text-slate-700 uppercase tracking-wider bg-green-50/30">Independently</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {field.rows.map((row: string) => (
-                              <tr key={row} className="hover:bg-slate-50/50 transition-colors">
-                                <td className="px-6 py-4 font-semibold text-slate-800">{row}</td>
-                                <td className="px-6 py-4 bg-orange-50/10">
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    value={form[field.id]?.[row]?.supervision || ""}
-                                    onChange={(e) => {
-                                      const current = form[field.id] || {};
-                                      const rowData = current[row] || {};
-                                      set(field.id, { ...current, [row]: { ...rowData, supervision: parseInt(e.target.value) || 0 } });
-                                    }}
-                                    className="w-full px-3 py-2 text-center rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500/20 focus:border-[#000080] outline-none transition-all font-medium"
-                                    placeholder="0 (Put '0' if not applicable)"
-                                  />
-                                </td>
-                                <td className="px-6 py-4 bg-green-50/10">
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    value={form[field.id]?.[row]?.independent || ""}
-                                    onChange={(e) => {
-                                      const current = form[field.id] || {};
-                                      const rowData = current[row] || {};
-                                      set(field.id, { ...current, [row]: { ...rowData, independent: parseInt(e.target.value) || 0 } });
-                                    }}
-                                    className="w-full px-3 py-2 text-center rounded-lg border border-slate-200 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all font-medium"
-                                    placeholder="0"
-                                  />
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                {step === sections.length - 1 && (
+                  <div className="space-y-6 pt-2">
+                    {/* Fee Summary Banner */}
+                    <div className="p-5 bg-gradient-to-r from-blue-50/80 to-indigo-50/60 border border-blue-200/80 rounded-2xl shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3.5">
+                          <div className="w-11 h-11 bg-[#000080]/10 text-[#000080] rounded-xl flex items-center justify-center font-bold">
+                            <CreditCard className="w-5 h-5 text-[#000080]" />
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Application Fee Payable</p>
+                            <p className="text-sm font-semibold text-slate-800">
+                              {(() => {
+                                const streamCount = Array.isArray(form.specialization) ? form.specialization.length : 1;
+                                const unitFee = paymentConfig ? paymentConfig.amount / 100 : 2750;
+                                return `₹${unitFee.toLocaleString("en-IN")} × ${streamCount} Specialization${streamCount > 1 ? "s" : ""}`;
+                              })()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-2xl font-extrabold text-[#000080] tracking-tight">
+                            {(() => {
+                              const streamCount = Array.isArray(form.specialization) ? form.specialization.length : 1;
+                              const unitFee = paymentConfig ? paymentConfig.amount / 100 : 2750;
+                              return `₹${(unitFee * streamCount).toLocaleString("en-IN")}`;
+                            })()}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  )}
 
-                 {field.type === 'number' && (
-                    <input
-                      type="number"
-                      value={form[field.id] || ""}
-                      onChange={(e) => set(field.id, e.target.value)}
-                      className={`w-full px-5 py-4 rounded-2xl border-2 ${errors[field.id] ? 'border-red-500 shadow-sm shadow-red-100' : 'border-slate-200/80 hover:border-slate-300'} focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 transition-all outline-none font-medium text-slate-800 text-[15px]`}
-                      placeholder="0"
-                    />
-                 )}
+                    {/* Razorpay Online Payment Gateway Notice & Channels */}
+                    {isManualEntry ? (
+                      <div className="space-y-4 p-5 bg-slate-50 border border-slate-200 rounded-2xl">
+                        <Label className="text-xs font-bold text-slate-800">
+                          Admin Manual Reference / UTR Number *
+                        </Label>
+                        <input
+                          type="text"
+                          value={paymentUTR}
+                          onChange={(e) => setPaymentUTR(e.target.value)}
+                          placeholder="Enter manual payment reference"
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-300 font-mono text-sm outline-none"
+                        />
+                      </div>
+                    ) : (
+                      <div className="p-6 bg-gradient-to-br from-blue-50/60 via-white to-slate-50 border border-blue-100 rounded-2xl shadow-xs space-y-4">
+                        <div className="flex items-start gap-3.5">
+                          <div className="w-10 h-10 rounded-xl bg-[#000080] text-white flex items-center justify-center shrink-0 shadow-sm">
+                            <CreditCard className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold text-slate-900">Official Online Payment Gateway</h4>
+                            <p className="text-xs text-slate-600 mt-0.5">
+                              Transactions are processed securely through Razorpay with 256-bit bank-grade encryption.
+                            </p>
+                          </div>
+                        </div>
 
-                 {errors[field.id] && (
-                   <p className="text-xs font-bold text-red-500 flex items-center gap-1">
-                     <AlertCircle className="w-3 h-3" /> {errors[field.id]}
-                   </p>
-                 )}
-                 </div>
-               );
-             })}
+                        <div className="bg-white/90 backdrop-blur-xs border border-slate-200/80 rounded-xl p-4 space-y-3">
+                          <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                            Accepted Payment Channels:
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs text-slate-700">
+                            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-100 font-medium">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                              <span><strong>UPI:</strong> GPay, PhonePe, Paytm, BHIM</span>
+                            </div>
+                            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-100 font-medium">
+                              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                              <span><strong>Cards:</strong> Debit / Credit (RuPay, Visa, MC)</span>
+                            </div>
+                            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-100 font-medium">
+                              <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                              <span><strong>NetBanking:</strong> All Major Indian Banks</span>
+                            </div>
+                          </div>
+                        </div>
 
-             {step === sections.length - 1 && (
-               <div className="space-y-6 pt-2">
-                 {/* Fee Summary Banner */}
-                 <div className="p-5 bg-gradient-to-r from-blue-50/80 to-indigo-50/60 border border-blue-200/80 rounded-2xl shadow-sm">
-                   <div className="flex items-center justify-between">
-                     <div className="flex items-center gap-3.5">
-                       <div className="w-11 h-11 bg-[#000080]/10 text-[#000080] rounded-xl flex items-center justify-center font-bold">
-                         <CreditCard className="w-5 h-5 text-[#000080]" />
-                       </div>
-                       <div>
-                         <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Application Fee Payable</p>
-                         <p className="text-sm font-semibold text-slate-800">
-                           {(() => {
-                             const streamCount = Array.isArray(form.specialization) ? form.specialization.length : 1;
-                             const unitFee = paymentConfig ? paymentConfig.amount / 100 : 2750;
-                             return `₹${unitFee.toLocaleString("en-IN")} × ${streamCount} Specialization${streamCount > 1 ? "s" : ""}`;
-                           })()}
-                         </p>
-                       </div>
-                     </div>
-                     <div className="text-right">
-                       <span className="text-2xl font-extrabold text-[#000080] tracking-tight">
-                         {(() => {
-                           const streamCount = Array.isArray(form.specialization) ? form.specialization.length : 1;
-                           const unitFee = paymentConfig ? paymentConfig.amount / 100 : 2750;
-                           return `₹${(unitFee * streamCount).toLocaleString("en-IN")}`;
-                         })()}
-                       </span>
-                     </div>
-                   </div>
-                 </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-600 font-medium pt-1">
+                          <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Instant verification. Upon successful payment, your application is confirmed immediately and you can download your official receipt.</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                 {/* Razorpay Online Payment Gateway Notice & Channels */}
-                  {isManualEntry ? (
-                    <div className="space-y-4 p-5 bg-slate-50 border border-slate-200 rounded-2xl">
-                      <Label className="text-xs font-bold text-slate-800">
-                        Admin Manual Reference / UTR Number *
-                      </Label>
-                      <input
-                        type="text"
-                        value={paymentUTR}
-                        onChange={(e) => setPaymentUTR(e.target.value)}
-                        placeholder="Enter manual payment reference"
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-300 font-mono text-sm outline-none"
-                      />
-                    </div>
+                {submitError && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                    <p className="text-sm font-medium text-red-800">{submitError}</p>
+                  </div>
+                )}
+              </CardContent>
+
+              <div className="bg-slate-50 px-6 py-4 flex items-center justify-between border-t border-slate-100">
+                <Button
+                  variant="outline"
+                  onClick={prev}
+                  disabled={step === 0 || submitting}
+                  className="h-10 px-5 border border-slate-200 hover:bg-slate-100 rounded-xl text-slate-700 font-semibold text-sm transition-all active:scale-[0.98] cursor-pointer font-outfit"
+                >
+                  <ChevronLeft className="w-4 h-4 mr-1.5" /> Previous
+                </Button>
+
+                <Button
+                  onClick={next}
+                  disabled={submitting}
+                  className="bg-[#000080] hover:bg-[#000066] text-white h-10 px-6 rounded-xl flex items-center gap-2 text-sm font-bold transition-all shadow-md shadow-blue-950/10 hover:shadow-lg active:scale-[0.98] cursor-pointer font-outfit"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : step === sections.length - 1 ? (
+                    isManualEntry ? (
+                      <>Confirm Offline & Submit <ChevronRight className="w-4 h-4" /></>
+                    ) : (
+                      <>Pay ₹{((paymentConfig ? paymentConfig.amount / 100 : 2750) * (Array.isArray(form.specialization) ? form.specialization.length : 1)).toLocaleString("en-IN")} via Razorpay <ChevronRight className="w-4 h-4" /></>
+                    )
                   ) : (
-                    <div className="p-6 bg-gradient-to-br from-blue-50/60 via-white to-slate-50 border border-blue-100 rounded-2xl shadow-xs space-y-4">
-                      <div className="flex items-start gap-3.5">
-                        <div className="w-10 h-10 rounded-xl bg-[#000080] text-white flex items-center justify-center shrink-0 shadow-sm">
-                          <CreditCard className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-900">Official Online Payment Gateway</h4>
-                          <p className="text-xs text-slate-600 mt-0.5">
-                            Transactions are processed securely through Razorpay with 256-bit bank-grade encryption.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="bg-white/90 backdrop-blur-xs border border-slate-200/80 rounded-xl p-4 space-y-3">
-                        <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                          Accepted Payment Channels:
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs text-slate-700">
-                          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-100 font-medium">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                            <span><strong>UPI:</strong> GPay, PhonePe, Paytm, BHIM</span>
-                          </div>
-                          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-100 font-medium">
-                            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                            <span><strong>Cards:</strong> Debit / Credit (RuPay, Visa, MC)</span>
-                          </div>
-                          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-100 font-medium">
-                            <span className="w-2 h-2 rounded-full bg-purple-500"></span>
-                            <span><strong>NetBanking:</strong> All Major Indian Banks</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 text-xs text-slate-600 font-medium pt-1">
-                        <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>Instant verification. Upon successful payment, your application is confirmed immediately and you can download your official receipt.</span>
-                      </div>
-                    </div>
+                    <>Next Step <ChevronRight className="w-4 h-4" /></>
                   )}
+                </Button>
+              </div>
+              <div className="mt-4 p-4 bg-slate-50 border border-slate-100 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                  <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
+                    Your progress is <strong>automatically saved</strong>. You can close this window and return later to continue where you left off.
+                    <br />
+                    <span className="text-[#000080]">Note: Applications cannot be modified after final submission.</span>
+                  </p>
                 </div>
-              )}
-
-             {submitError && (
-               <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
-                 <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-                 <p className="text-sm font-medium text-red-800">{submitError}</p>
-               </div>
-             )}
-          </CardContent>
-
-          <div className="bg-slate-50 px-6 py-4 flex items-center justify-between border-t border-slate-100">
-            <Button
-              variant="outline"
-              onClick={prev}
-              disabled={step === 0 || submitting}
-              className="h-10 px-5 border border-slate-200 hover:bg-slate-100 rounded-xl text-slate-700 font-semibold text-sm transition-all active:scale-[0.98] cursor-pointer font-outfit"
-            >
-              <ChevronLeft className="w-4 h-4 mr-1.5" /> Previous
-            </Button>
-
-            <Button 
-              onClick={next} 
-              disabled={submitting}
-              className="bg-[#000080] hover:bg-[#000066] text-white h-10 px-6 rounded-xl flex items-center gap-2 text-sm font-bold transition-all shadow-md shadow-blue-950/10 hover:shadow-lg active:scale-[0.98] cursor-pointer font-outfit"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Processing...
-                </>
-              ) : step === sections.length - 1 ? (
-                isManualEntry ? (
-                  <>Confirm Offline & Submit <ChevronRight className="w-4 h-4" /></>
-                ) : (
-                  <>Pay ₹{((paymentConfig ? paymentConfig.amount / 100 : 2750) * (Array.isArray(form.specialization) ? form.specialization.length : 1)).toLocaleString("en-IN")} via Razorpay <ChevronRight className="w-4 h-4" /></>
-                )
-              ) : (
-                <>Next Step <ChevronRight className="w-4 h-4" /></>
-              )}
-            </Button>
-          </div>
-          <div className="mt-4 p-4 bg-slate-50 border border-slate-100 rounded-xl">
-             <div className="flex items-start gap-3">
-               <AlertCircle className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
-               <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
-                 Your progress is <strong>automatically saved</strong>. You can close this window and return later to continue where you left off. 
-                 <br />
-                 <span className="text-[#000080]">Note: Applications cannot be modified after final submission.</span>
-               </p>
-             </div>
-          </div>
-        </Card>
-      </motion.div>
-    </AnimatePresence>
-  </main>
-</div>
-);
+              </div>
+            </Card>
+          </motion.div>
+        </AnimatePresence>
+      </main>
+    </div>
+  );
 }
 
 
