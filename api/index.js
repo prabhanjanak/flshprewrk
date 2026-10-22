@@ -1137362,114 +1137362,228 @@ router20.get("/apply/:token/payment-config", async (req, res) => {
     }
   });
 });
-router20.post("/apply/:token", async (req, res) => {
-  const form = await resolveFormByToken(req.params.token);
-  if (!form) return res.status(404).json({ error: "Form not found" });
-  if (!form.isActive) return res.status(410).json({ error: "This form is no longer accepting submissions" });
-  if (form.deadline && /* @__PURE__ */ new Date() > form.deadline) {
-    return res.status(410).json({ error: "The deadline for this form has passed" });
-  }
-  const body = req.body;
-  const sections = form.sectionsConfig || [];
-  const subData = {
-    formId: form.id,
-    status: body.saveAsDraft ? "draft" : "pending",
-    saveAsDraft: body.saveAsDraft ?? false,
-    source: "internal",
-    customAnswers: {},
-    submittedAt: /* @__PURE__ */ new Date()
-  };
-  const centerPrefs = {};
-  sections.forEach((sec) => {
-    if (!sec.enabled) return;
-    sec.fields.forEach((f3) => {
-      let val = body[f3.id];
-      if (val === void 0) return;
-      if (f3.id.startsWith("unit_") && val) {
-        const specName = f3.label.replace(" Preferred Center", "");
-        centerPrefs[specName] = Array.isArray(val) ? val.join(", ") : String(val);
-      }
-      if (f3.isStandard && f3.mapping) {
-        if (["specialization", "medicalConditions", "diagnosticSkills", "surgicalExperience", "qualificationMatrix"].includes(f3.mapping)) {
-          if (val && typeof val !== "string") val = JSON.stringify(val);
-        }
-        subData[f3.mapping] = val;
-      } else {
-        subData.customAnswers[f3.id] = val;
-      }
-    });
-  });
-  if (Object.keys(centerPrefs).length > 0 && !subData.centerPreference) {
-    subData.centerPreference = JSON.stringify(centerPrefs);
-  }
-  if (!subData.fullName && body.fullName) subData.fullName = body.fullName;
-  if (!subData.email && body.email) subData.email = body.email;
-  if (!subData.fullName || !subData.email) {
-    return res.status(400).json({ error: "Full name and email are required" });
-  }
-  const fileFields = ["lor1Url", "lor2Url", "photoUrl", "paymentUrl"];
-  for (const f3 of fileFields) {
-    const val = subData[f3] || body[f3];
-    if (val && !subData[f3]) subData[f3] = val;
-  }
-  const razorpayId = body.paymentId || body.payment_id || body.paymentUTR;
-  if (razorpayId) {
-    let specCount = 1;
+async function saveBase64FileIfPresent(dataUrl, candidateName, fieldName) {
+  if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:")) return dataUrl;
+  try {
+    const matches = dataUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) return dataUrl;
+    const contentType = matches[1];
+    const buffer = Buffer.from(matches[2], "base64");
+    const ext2 = contentType.includes("pdf") ? "pdf" : contentType.includes("png") ? "png" : "jpg";
+    const folderName = candidateName ? candidateName.trim().replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_") : "candidate";
+    const filename = `${fieldName}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext2}`;
+    const objectPath = `/objects/uploads/${folderName}/${filename}`;
     try {
-      if (subData.specialization) {
-        const parsed = JSON.parse(subData.specialization);
-        if (Array.isArray(parsed)) {
-          specCount = parsed.length;
+      const localDir = path7.join(process.cwd(), "uploads", folderName);
+      await fs9.mkdir(localDir, { recursive: true });
+      await fs9.writeFile(path7.join(localDir, filename), buffer);
+    } catch (_) {
+    }
+    try {
+      const tmpDir = path7.join(os2.tmpdir(), "uploads", folderName);
+      await fs9.mkdir(tmpDir, { recursive: true });
+      await fs9.writeFile(path7.join(tmpDir, filename), buffer);
+    } catch (_) {
+    }
+    await db.execute(sql`
+      INSERT INTO uploaded_files (file_path, file_name, content_type, file_data, file_size)
+      VALUES (${objectPath}, ${filename}, ${contentType}, ${buffer}, ${buffer.length})
+      ON CONFLICT (file_path) DO UPDATE SET
+        file_data = EXCLUDED.file_data,
+        file_size = EXCLUDED.file_size,
+        content_type = EXCLUDED.content_type,
+        created_at = NOW()
+    `);
+    return objectPath;
+  } catch (err) {
+    console.error("Failed to convert base64 upload:", err);
+    return dataUrl;
+  }
+}
+router20.post("/apply/:token", async (req, res) => {
+  try {
+    const form = await resolveFormByToken(req.params.token);
+    if (!form) return res.status(404).json({ error: "Form not found" });
+    if (!form.isActive) return res.status(410).json({ error: "This form is no longer accepting submissions" });
+    if (form.deadline && /* @__PURE__ */ new Date() > form.deadline) {
+      return res.status(410).json({ error: "The deadline for this form has passed" });
+    }
+    const body = req.body;
+    const sections = form.sectionsConfig || [];
+    const subData = {
+      formId: form.id,
+      status: body.saveAsDraft ? "draft" : "pending",
+      saveAsDraft: body.saveAsDraft ?? false,
+      source: "internal",
+      customAnswers: {},
+      submittedAt: /* @__PURE__ */ new Date()
+    };
+    const centerPrefs = {};
+    sections.forEach((sec) => {
+      if (!sec.enabled) return;
+      sec.fields.forEach((f3) => {
+        let val = body[f3.id];
+        if (val === void 0) return;
+        if (f3.id.startsWith("unit_") && val) {
+          const specName = f3.label.replace(" Preferred Center", "");
+          centerPrefs[specName] = Array.isArray(val) ? val.join(", ") : String(val);
         }
-      }
-    } catch (e2) {
+        if (f3.isStandard && f3.mapping) {
+          if (["specialization", "medicalConditions", "diagnosticSkills", "surgicalExperience", "qualificationMatrix"].includes(f3.mapping)) {
+            if (val && typeof val !== "string") val = JSON.stringify(val);
+          }
+          subData[f3.mapping] = val;
+        } else {
+          subData.customAnswers[f3.id] = val;
+        }
+      });
+    });
+    if (Object.keys(centerPrefs).length > 0 && !subData.centerPreference) {
+      subData.centerPreference = JSON.stringify(centerPrefs);
     }
-    const isDirectBankTransfer = body.paymentMode === "Direct Bank Transfer / UPI" || body.paymentMode === "bank_transfer" || !!body.paymentUTR;
-    const isManualOffline = body.paymentMode === "Manual Offline";
-    if (isDirectBankTransfer) {
-      subData.paymentId = razorpayId;
-      subData.paymentMode = "Direct Bank Transfer / UPI";
-      subData.paymentUrl = subData.paymentUrl || body.paymentUrl || `direct_transfer:${razorpayId}`;
-      subData.paidAmount = body.paidAmount ? body.paidAmount > 1e5 ? Math.round(body.paidAmount / 100) : Number(body.paidAmount) : 2750 * specCount;
-    } else if (isManualOffline) {
-      subData.paymentId = razorpayId;
-      subData.paymentMode = "Manual Offline";
-      subData.paidAmount = body.paidAmount ? Number(body.paidAmount) : 0;
-    } else {
-      subData.paymentId = razorpayId;
-      subData.paymentUrl = subData.paymentUrl || `razorpay:${razorpayId}`;
-      subData.paymentMode = "Razorpay";
-      subData.paidAmount = body.paidAmount ? body.paidAmount > 1e5 ? Math.round(body.paidAmount / 100) : Number(body.paidAmount) : 2750 * specCount;
+    if (!subData.fullName && body.fullName) subData.fullName = body.fullName;
+    if (!subData.email && body.email) subData.email = body.email;
+    if (!subData.fullName || !subData.email) {
+      return res.status(400).json({ error: "Full name and email are required" });
     }
-  }
-  const isComplete = checkCompleteness(subData);
-  const [sub] = await db.insert(applicationSubmissionsTable).values({
-    ...subData,
-    readyForReview: isComplete
-  }).returning();
-  if (sub && subData.email) {
-    (async () => {
+    const fileFields = ["lor1Url", "lor2Url", "photoUrl", "paymentUrl"];
+    for (const f3 of fileFields) {
+      const val = subData[f3] || body[f3];
+      if (val && !subData[f3]) subData[f3] = val;
+    }
+    const candidateName = subData.fullName || "candidate";
+    if (subData.lor1Url && subData.lor1Url.startsWith("data:")) {
+      subData.lor1Url = await saveBase64FileIfPresent(subData.lor1Url, candidateName, "lor1");
+    }
+    if (subData.lor2Url && subData.lor2Url.startsWith("data:")) {
+      subData.lor2Url = await saveBase64FileIfPresent(subData.lor2Url, candidateName, "lor2");
+    }
+    if (subData.photoUrl && subData.photoUrl.startsWith("data:")) {
+      subData.photoUrl = await saveBase64FileIfPresent(subData.photoUrl, candidateName, "photo");
+    }
+    if (subData.paymentUrl && subData.paymentUrl.startsWith("data:")) {
+      subData.paymentUrl = await saveBase64FileIfPresent(subData.paymentUrl, candidateName, "payment_proof");
+    }
+    const razorpayId = body.paymentId || body.payment_id || body.paymentUTR;
+    if (razorpayId) {
+      let specCount = 1;
       try {
-        const formRecord = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
-        const programRecord = formRecord[0]?.programId ? await db.select().from(programsTable).where(eq(programsTable.id, formRecord[0].programId)) : [];
-        await sendApplicationSubmissionConfirmationEmail({
-          toEmail: subData.email,
-          toName: subData.fullName || "Applicant",
-          submissionId: sub.id,
-          programName: programRecord[0]?.name ?? "Sankara Fellowship Examination Program",
-          formTitle: formRecord[0]?.title ?? "Fellowship Application",
-          specialization: subData.specialization,
-          paymentId: subData.paymentId,
-          paymentMode: subData.paymentMode,
-          paidAmount: subData.paidAmount
-        });
-      } catch (err) {
-        console.warn("[email] Failed to send submission confirmation email:", err.message);
+        if (subData.specialization) {
+          const parsed = JSON.parse(subData.specialization);
+          if (Array.isArray(parsed)) {
+            specCount = parsed.length;
+          }
+        }
+      } catch (e2) {
       }
-    })();
+      const isDirectBankTransfer = body.paymentMode === "Direct Bank Transfer / UPI" || body.paymentMode === "bank_transfer" || !!body.paymentUTR;
+      const isManualOffline = body.paymentMode === "Manual Offline";
+      if (isDirectBankTransfer) {
+        subData.paymentId = razorpayId;
+        subData.paymentMode = "Direct Bank Transfer / UPI";
+        subData.paymentUrl = subData.paymentUrl || body.paymentUrl || `direct_transfer:${razorpayId}`;
+        subData.paidAmount = body.paidAmount ? body.paidAmount > 1e5 ? Math.round(body.paidAmount / 100) : Number(body.paidAmount) : 2750 * specCount;
+      } else if (isManualOffline) {
+        subData.paymentId = razorpayId;
+        subData.paymentMode = "Manual Offline";
+        subData.paidAmount = body.paidAmount ? Number(body.paidAmount) : 0;
+      } else {
+        subData.paymentId = razorpayId;
+        subData.paymentUrl = subData.paymentUrl || `razorpay:${razorpayId}`;
+        subData.paymentMode = "Razorpay";
+        subData.paidAmount = body.paidAmount ? body.paidAmount > 1e5 ? Math.round(body.paidAmount / 100) : Number(body.paidAmount) : 2750 * specCount;
+      }
+      const existingSub = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.paymentId, razorpayId));
+      if (existingSub.length > 0) {
+        const isComplete2 = checkCompleteness(subData);
+        await db.update(applicationSubmissionsTable).set({ ...subData, readyForReview: isComplete2 }).where(eq(applicationSubmissionsTable.id, existingSub[0].id));
+        return res.status(200).json({ success: true, submissionId: existingSub[0].id });
+      }
+    }
+    const isComplete = checkCompleteness(subData);
+    const [sub] = await db.insert(applicationSubmissionsTable).values({
+      ...subData,
+      readyForReview: isComplete
+    }).returning();
+    if (sub && subData.email) {
+      (async () => {
+        try {
+          const formRecord = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
+          const programRecord = formRecord[0]?.programId ? await db.select().from(programsTable).where(eq(programsTable.id, formRecord[0].programId)) : [];
+          await sendApplicationSubmissionConfirmationEmail({
+            toEmail: subData.email,
+            toName: subData.fullName || "Applicant",
+            submissionId: sub.id,
+            programName: programRecord[0]?.name ?? "Sankara Fellowship Examination Program",
+            formTitle: formRecord[0]?.title ?? "Fellowship Application",
+            specialization: subData.specialization,
+            paymentId: subData.paymentId,
+            paymentMode: subData.paymentMode,
+            paidAmount: subData.paidAmount
+          });
+        } catch (err) {
+          console.warn("[email] Failed to send submission confirmation email:", err.message);
+        }
+      })();
+    }
+    res.status(201).json({ success: true, submissionId: sub.id });
+  } catch (err) {
+    console.error("[POST /apply/:token fatal error]:", err);
+    res.status(500).json({
+      error: err.message || "Failed to process application submission. Please contact admissions with your Payment ID."
+    });
   }
-  res.status(201).json({ success: true, submissionId: sub.id });
 });
+router20.post(
+  "/application-forms/reconcile-payment",
+  requireAuth,
+  requireRole("super_admin", "program_admin", "central_exam_coordinator"),
+  async (req, res) => {
+    try {
+      const { paymentId, fullName, email: email3, phone, specialization, formToken = "JAN2027", notes } = req.body;
+      if (!paymentId || !String(paymentId).trim()) {
+        return res.status(400).json({ error: "Payment ID is required" });
+      }
+      const cleanPaymentId = String(paymentId).trim();
+      const existing = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.paymentId, cleanPaymentId));
+      if (existing.length > 0) {
+        return res.json({
+          success: true,
+          message: "Payment is already linked to submission ID #" + existing[0].id,
+          submission: existing[0]
+        });
+      }
+      let form = await resolveFormByToken(formToken);
+      if (!form) {
+        [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.isActive, true)).limit(1);
+      }
+      if (!form) return res.status(404).json({ error: "Active application form not found" });
+      const [newSub] = await db.insert(applicationSubmissionsTable).values({
+        formId: form.id,
+        status: "pending",
+        fullName: fullName || "Applicant (" + cleanPaymentId + ")",
+        email: email3 || `recovered_${cleanPaymentId.replace(/[^a-zA-Z0-9]/g, "")}@sankaraeye.com`,
+        phone: phone || null,
+        specialization: specialization ? Array.isArray(specialization) ? JSON.stringify(specialization) : String(specialization) : '["IOL"]',
+        paymentId: cleanPaymentId,
+        paymentMode: "Razorpay (Reconciled)",
+        paidAmount: 2750,
+        source: "reconciliation",
+        readyForReview: true,
+        reviewNotes: notes || "Payment reconciled by administrator",
+        submittedAt: /* @__PURE__ */ new Date()
+      }).returning();
+      return res.status(201).json({
+        success: true,
+        message: "Application submission successfully recovered and linked to Payment ID " + cleanPaymentId,
+        submissionId: newSub.id
+      });
+    } catch (err) {
+      console.error("[reconcile-payment error]:", err);
+      return res.status(500).json({ error: err.message || "Failed to reconcile payment" });
+    }
+  }
+);
 router20.get(["/apply/:token/receipt/:submissionId", "/apply/receipt/:submissionId"], async (req, res) => {
   try {
     let numberToWordsINR2 = function(amount) {
@@ -1142384,8 +1142498,8 @@ app.use(
   })
 );
 app.use((0, import_cors.default)());
-app.use(import_express34.default.json());
-app.use(import_express34.default.urlencoded({ extended: true }));
+app.use(import_express34.default.json({ limit: "50mb" }));
+app.use(import_express34.default.urlencoded({ limit: "50mb", extended: true }));
 app.use("/api", routes_default);
 app.get(["/healthz", "/ping"], (req, res) => res.json({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() }));
 app.get(

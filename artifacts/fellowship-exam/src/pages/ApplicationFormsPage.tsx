@@ -1172,6 +1172,43 @@ export default function ApplicationFormsPage() {
   const [sendingEmailId, setSendingEmailId] = useState<number | null>(null);
   const [downloadingDirectoryPdf, setDownloadingDirectoryPdf] = useState(false);
   const [shareForm, setShareForm] = useState<ApplicationForm | null>(null);
+  const [reconcileModalOpen, setReconcileModalOpen] = useState(false);
+  const [reconcileData, setReconcileData] = useState({
+    paymentId: "",
+    fullName: "",
+    email: "",
+    phone: "",
+    specialization: "IOL",
+    notes: "",
+  });
+  const [reconciling, setReconciling] = useState(false);
+
+  const handleReconcilePayment = async () => {
+    if (!reconcileData.paymentId.trim()) {
+      toast({ title: "Error", description: "Razorpay Payment ID is required", variant: "destructive" });
+      return;
+    }
+    setReconciling(true);
+    try {
+      const res = await api.post("/application-forms/reconcile-payment", {
+        ...reconcileData,
+        formToken: viewedForm?.token || "JAN2027",
+      });
+      toast({ 
+        title: "Payment Reconciled & Recovered!", 
+        description: (res as any)?.message || "Submission created successfully." 
+      });
+      setReconcileModalOpen(false);
+      setReconcileData({ paymentId: "", fullName: "", email: "", phone: "", specialization: "IOL", notes: "" });
+      qc.invalidateQueries({ queryKey: ["submissions", viewFormId] });
+      qc.invalidateQueries({ queryKey: ["application-forms"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-summary"] });
+    } catch (err: any) {
+      toast({ title: "Reconciliation Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setReconciling(false);
+    }
+  };
 
   const { data: units = [] } = useQuery<any[]>({
     queryKey: ["units"],
@@ -2419,6 +2456,18 @@ export default function ApplicationFormsPage() {
             <Button variant="outline" size="sm" className="rounded-xl border-slate-200 font-bold px-4" onClick={() => exportExcel(viewFormId)} disabled={exporting || submissions.length === 0}>
               {exporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
               Excel Export
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="rounded-xl border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold px-4 shadow-sm"
+              onClick={() => {
+                setReconcileData(prev => ({ ...prev, paymentId: "" }));
+                setReconcileModalOpen(true);
+              }}
+            >
+              <CreditCard className="w-4 h-4 mr-2 text-emerald-600" />
+              Recover Paid Application
             </Button>
             <Button size="sm" className="rounded-xl orange-gradient text-white border-none shadow-lg shadow-orange-500/20 font-bold px-6 hover:scale-[1.02] active:scale-[0.98] transition-all" onClick={() => {
               if (viewedForm?.token) {
@@ -4690,6 +4739,128 @@ export default function ApplicationFormsPage() {
         title={shareForm?.title || "Fellowship Program - January 2027"}
         subtitle="Entrance Examination: December 2026 • Sankara Academy of Vision"
       />
+
+      {/* Reconcile / Recover Paid Application Dialog */}
+      <Dialog open={reconcileModalOpen} onOpenChange={setReconcileModalOpen}>
+        <DialogContent className="max-w-md rounded-3xl p-6 border-slate-200 shadow-2xl">
+          <DialogHeader>
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 mb-2">
+              <CreditCard className="w-5 h-5" />
+            </div>
+            <DialogTitle className="text-xl font-black text-slate-900">
+              Recover Paid Application
+            </DialogTitle>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              If an applicant's bank account was debited or payment was captured on Razorpay, but the application was not posted, enter their Payment ID below to immediately link and create their submission.
+            </p>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-700">
+                Razorpay Payment ID <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                placeholder="e.g. pay_TqwyGtNqnIluit"
+                value={reconcileData.paymentId}
+                onChange={(e) => setReconcileData(d => ({ ...d, paymentId: e.target.value.trim() }))}
+                className="font-mono font-bold text-xs bg-slate-50 border-slate-300"
+              />
+              <p className="text-[10px] text-slate-400">
+                Visible on candidate's screen or in Razorpay Dashboard → Transactions
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Candidate Name</Label>
+                <Input
+                  placeholder="Applicant Name"
+                  value={reconcileData.fullName}
+                  onChange={(e) => setReconcileData(d => ({ ...d, fullName: e.target.value }))}
+                  className="text-xs"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Specialization</Label>
+                <Select
+                  value={reconcileData.specialization}
+                  onValueChange={(val) => setReconcileData(d => ({ ...d, specialization: val }))}
+                >
+                  <SelectTrigger className="text-xs">
+                    <SelectValue placeholder="Specialization" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="IOL">IOL Fellowship</SelectItem>
+                    <SelectItem value="Vitreo Retina">Vitreo Retina</SelectItem>
+                    <SelectItem value="Medical Retina">Medical Retina</SelectItem>
+                    <SelectItem value="Cornea">Cornea</SelectItem>
+                    <SelectItem value="Glaucoma">Glaucoma</SelectItem>
+                    <SelectItem value="Pediatric Ophthalmology">Pediatric Ophthalmology</SelectItem>
+                    <SelectItem value="Phaco Refractive">Phaco Refractive</SelectItem>
+                    <SelectItem value="Oculoplasty">Oculoplasty</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Email Address</Label>
+                <Input
+                  type="email"
+                  placeholder="applicant@email.com"
+                  value={reconcileData.email}
+                  onChange={(e) => setReconcileData(d => ({ ...d, email: e.target.value }))}
+                  className="text-xs"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Mobile Number</Label>
+                <Input
+                  type="tel"
+                  placeholder="10-digit mobile"
+                  value={reconcileData.phone}
+                  onChange={(e) => setReconcileData(d => ({ ...d, phone: e.target.value }))}
+                  className="text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">Admin Recovery Notes</Label>
+              <Input
+                placeholder="e.g. Candidate paid Rs 2,750, verified on Razorpay dashboard"
+                value={reconcileData.notes}
+                onChange={(e) => setReconcileData(d => ({ ...d, notes: e.target.value }))}
+                className="text-xs"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t border-slate-100">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setReconcileModalOpen(false)}
+              className="rounded-xl border-slate-300 text-xs font-bold"
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={reconciling || !reconcileData.paymentId.trim()}
+              onClick={handleReconcilePayment}
+              className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-5 gap-1.5 shadow-md shadow-emerald-500/20"
+            >
+              {reconciling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+              {reconciling ? "Recovering..." : "Recover & Link Submission"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

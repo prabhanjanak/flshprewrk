@@ -2862,142 +2862,274 @@ router.get("/apply/:token/payment-config", async (req, res) => {
   });
 });
 
+async function saveBase64FileIfPresent(dataUrl: string | undefined, candidateName: string, fieldName: string): Promise<string | undefined> {
+  if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:")) return dataUrl;
+  try {
+    const matches = dataUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) return dataUrl;
+    const contentType = matches[1];
+    const buffer = Buffer.from(matches[2], "base64");
+    const ext = contentType.includes("pdf") ? "pdf" : (contentType.includes("png") ? "png" : "jpg");
+    const folderName = candidateName ? candidateName.trim().replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_") : "candidate";
+    const filename = `${fieldName}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
+    const objectPath = `/objects/uploads/${folderName}/${filename}`;
+
+    try {
+      const localDir = path.join(process.cwd(), "uploads", folderName);
+      await fs.mkdir(localDir, { recursive: true });
+      await fs.writeFile(path.join(localDir, filename), buffer);
+    } catch (_) {}
+    try {
+      const tmpDir = path.join(os.tmpdir(), "uploads", folderName);
+      await fs.mkdir(tmpDir, { recursive: true });
+      await fs.writeFile(path.join(tmpDir, filename), buffer);
+    } catch (_) {}
+
+    await db.execute(sql`
+      INSERT INTO uploaded_files (file_path, file_name, content_type, file_data, file_size)
+      VALUES (${objectPath}, ${filename}, ${contentType}, ${buffer}, ${buffer.length})
+      ON CONFLICT (file_path) DO UPDATE SET
+        file_data = EXCLUDED.file_data,
+        file_size = EXCLUDED.file_size,
+        content_type = EXCLUDED.content_type,
+        created_at = NOW()
+    `);
+    return objectPath;
+  } catch (err) {
+    console.error("Failed to convert base64 upload:", err);
+    return dataUrl;
+  }
+}
+
 // Public: submit application
 router.post("/apply/:token", async (req, res) => {
-  const form = await resolveFormByToken(req.params.token);
-  if (!form) return res.status(404).json({ error: "Form not found" });
-  if (!form.isActive) return res.status(410).json({ error: "This form is no longer accepting submissions" });
-  if (form.deadline && new Date() > form.deadline) {
-    return res.status(410).json({ error: "The deadline for this form has passed" });
-  }
+  try {
+    const form = await resolveFormByToken(req.params.token);
+    if (!form) return res.status(404).json({ error: "Form not found" });
+    if (!form.isActive) return res.status(410).json({ error: "This form is no longer accepting submissions" });
+    if (form.deadline && new Date() > form.deadline) {
+      return res.status(410).json({ error: "The deadline for this form has passed" });
+    }
 
-  const body = req.body as Record<string, any>;
-  const sections = (form.sectionsConfig as any[]) || [];
+    const body = req.body as Record<string, any>;
+    const sections = (form.sectionsConfig as any[]) || [];
 
-  const subData: Record<string, any> = {
-    formId: form.id,
-    status: (body.saveAsDraft as boolean) ? "draft" : "pending",
-    saveAsDraft: (body.saveAsDraft as boolean) ?? false,
-    source: "internal",
-    customAnswers: {},
-    submittedAt: new Date(),
-  };
+    const subData: Record<string, any> = {
+      formId: form.id,
+      status: (body.saveAsDraft as boolean) ? "draft" : "pending",
+      saveAsDraft: (body.saveAsDraft as boolean) ?? false,
+      source: "internal",
+      customAnswers: {},
+      submittedAt: new Date(),
+    };
 
-  // Map fields from body based on sectionsConfig
-  const centerPrefs: Record<string, string> = {};
-  sections.forEach((sec: any) => {
-    if (!sec.enabled) return;
-    sec.fields.forEach((f: any) => {
-      let val = body[f.id];
-      if (val === undefined) return;
+    // Map fields from body based on sectionsConfig
+    const centerPrefs: Record<string, string> = {};
+    sections.forEach((sec: any) => {
+      if (!sec.enabled) return;
+      sec.fields.forEach((f: any) => {
+        let val = body[f.id];
+        if (val === undefined) return;
 
-      // Special aggregate for unit preferences if centerPreference is not explicitly set
-      if (f.id.startsWith("unit_") && val) {
-        const specName = f.label.replace(" Preferred Center", "");
-        centerPrefs[specName] = Array.isArray(val) ? val.join(", ") : String(val);
-      }
-
-      // If standard mapping exists, use it
-      if (f.isStandard && f.mapping) {
-        // Special handling for JSON fields if they come as arrays/objects
-        if (['specialization', 'medicalConditions', 'diagnosticSkills', 'surgicalExperience', 'qualificationMatrix'].includes(f.mapping)) {
-          if (val && typeof val !== 'string') val = JSON.stringify(val);
+        // Special aggregate for unit preferences if centerPreference is not explicitly set
+        if (f.id.startsWith("unit_") && val) {
+          const specName = f.label.replace(" Preferred Center", "");
+          centerPrefs[specName] = Array.isArray(val) ? val.join(", ") : String(val);
         }
-        subData[f.mapping] = val;
-      } else {
-        // Otherwise put in customAnswers
-        subData.customAnswers[f.id] = val;
-      }
+
+        // If standard mapping exists, use it
+        if (f.isStandard && f.mapping) {
+          // Special handling for JSON fields if they come as arrays/objects
+          if (['specialization', 'medicalConditions', 'diagnosticSkills', 'surgicalExperience', 'qualificationMatrix'].includes(f.mapping)) {
+            if (val && typeof val !== 'string') val = JSON.stringify(val);
+          }
+          subData[f.mapping] = val;
+        } else {
+          // Otherwise put in customAnswers
+          subData.customAnswers[f.id] = val;
+        }
+      });
     });
-  });
 
-  if (Object.keys(centerPrefs).length > 0 && !subData.centerPreference) {
-    subData.centerPreference = JSON.stringify(centerPrefs);
-  }
+    if (Object.keys(centerPrefs).length > 0 && !subData.centerPreference) {
+      subData.centerPreference = JSON.stringify(centerPrefs);
+    }
 
-  // Fallback for mandatory fields if not mapped
-  if (!subData.fullName && body.fullName) subData.fullName = body.fullName;
-  if (!subData.email && body.email) subData.email = body.email;
+    // Fallback for mandatory fields if not mapped
+    if (!subData.fullName && body.fullName) subData.fullName = body.fullName;
+    if (!subData.email && body.email) subData.email = body.email;
 
-  if (!subData.fullName || !subData.email) {
-    return res.status(400).json({ error: "Full name and email are required" });
-  }
+    if (!subData.fullName || !subData.email) {
+      return res.status(400).json({ error: "Full name and email are required" });
+    }
 
-  // File path mapping (support all valid uploads and object URLs)
-  const fileFields = ['lor1Url', 'lor2Url', 'photoUrl', 'paymentUrl'];
-  for (const f of fileFields) {
-    const val = subData[f] || body[f];
-    if (val && !subData[f]) subData[f] = val;
-  }
+    // File path mapping (support all valid uploads and object URLs)
+    const fileFields = ['lor1Url', 'lor2Url', 'photoUrl', 'paymentUrl'];
+    for (const f of fileFields) {
+      const val = subData[f] || body[f];
+      if (val && !subData[f]) subData[f] = val;
+    }
 
-  // Payment mapping
-  const razorpayId = body.paymentId || body.payment_id || body.paymentUTR;
-  if (razorpayId) {
-    let specCount = 1;
-    try {
-      if (subData.specialization) {
-        const parsed = JSON.parse(subData.specialization);
-        if (Array.isArray(parsed)) {
-          specCount = parsed.length;
+    // Convert any Base64 data URLs into persistent files
+    const candidateName = subData.fullName || "candidate";
+    if (subData.lor1Url && subData.lor1Url.startsWith("data:")) {
+      subData.lor1Url = await saveBase64FileIfPresent(subData.lor1Url, candidateName, "lor1");
+    }
+    if (subData.lor2Url && subData.lor2Url.startsWith("data:")) {
+      subData.lor2Url = await saveBase64FileIfPresent(subData.lor2Url, candidateName, "lor2");
+    }
+    if (subData.photoUrl && subData.photoUrl.startsWith("data:")) {
+      subData.photoUrl = await saveBase64FileIfPresent(subData.photoUrl, candidateName, "photo");
+    }
+    if (subData.paymentUrl && subData.paymentUrl.startsWith("data:")) {
+      subData.paymentUrl = await saveBase64FileIfPresent(subData.paymentUrl, candidateName, "payment_proof");
+    }
+
+    // Payment mapping
+    const razorpayId = body.paymentId || body.payment_id || body.paymentUTR;
+    if (razorpayId) {
+      let specCount = 1;
+      try {
+        if (subData.specialization) {
+          const parsed = JSON.parse(subData.specialization);
+          if (Array.isArray(parsed)) {
+            specCount = parsed.length;
+          }
         }
+      } catch (e) {}
+
+      const isDirectBankTransfer = body.paymentMode === "Direct Bank Transfer / UPI" || body.paymentMode === "bank_transfer" || !!body.paymentUTR;
+      const isManualOffline = body.paymentMode === "Manual Offline";
+
+      if (isDirectBankTransfer) {
+        subData.paymentId = razorpayId;
+        subData.paymentMode = "Direct Bank Transfer / UPI";
+        subData.paymentUrl = subData.paymentUrl || body.paymentUrl || `direct_transfer:${razorpayId}`;
+        subData.paidAmount = body.paidAmount ? (body.paidAmount > 100000 ? Math.round(body.paidAmount / 100) : Number(body.paidAmount)) : 2750 * specCount;
+      } else if (isManualOffline) {
+        subData.paymentId = razorpayId;
+        subData.paymentMode = "Manual Offline";
+        subData.paidAmount = body.paidAmount ? Number(body.paidAmount) : 0;
+      } else {
+        subData.paymentId = razorpayId;
+        subData.paymentUrl = subData.paymentUrl || `razorpay:${razorpayId}`;
+        subData.paymentMode = "Razorpay";
+        subData.paidAmount = body.paidAmount ? (body.paidAmount > 100000 ? Math.round(body.paidAmount / 100) : Number(body.paidAmount)) : 2750 * specCount;
       }
-    } catch (e) {}
 
-    const isDirectBankTransfer = body.paymentMode === "Direct Bank Transfer / UPI" || body.paymentMode === "bank_transfer" || !!body.paymentUTR;
-    const isManualOffline = body.paymentMode === "Manual Offline";
+      // Idempotency: If this exact payment ID was already submitted, update and return success
+      const existingSub = await db.select().from(applicationSubmissionsTable)
+        .where(eq(applicationSubmissionsTable.paymentId, razorpayId));
+      if (existingSub.length > 0) {
+        const isComplete = checkCompleteness(subData);
+        await db.update(applicationSubmissionsTable)
+          .set({ ...subData, readyForReview: isComplete })
+          .where(eq(applicationSubmissionsTable.id, existingSub[0].id));
+        return res.status(200).json({ success: true, submissionId: existingSub[0].id });
+      }
+    }
 
-    if (isDirectBankTransfer) {
-      subData.paymentId = razorpayId;
-      subData.paymentMode = "Direct Bank Transfer / UPI";
-      subData.paymentUrl = subData.paymentUrl || body.paymentUrl || `direct_transfer:${razorpayId}`;
-      subData.paidAmount = body.paidAmount ? (body.paidAmount > 100000 ? Math.round(body.paidAmount / 100) : Number(body.paidAmount)) : 2750 * specCount;
-    } else if (isManualOffline) {
-      subData.paymentId = razorpayId;
-      subData.paymentMode = "Manual Offline";
-      subData.paidAmount = body.paidAmount ? Number(body.paidAmount) : 0;
-    } else {
-      subData.paymentId = razorpayId;
-      subData.paymentUrl = subData.paymentUrl || `razorpay:${razorpayId}`;
-      subData.paymentMode = "Razorpay";
-      subData.paidAmount = body.paidAmount ? (body.paidAmount > 100000 ? Math.round(body.paidAmount / 100) : Number(body.paidAmount)) : 2750 * specCount;
+    const isComplete = checkCompleteness(subData);
+
+    const [sub] = await db.insert(applicationSubmissionsTable).values({
+      ...subData,
+      readyForReview: isComplete,
+    } as any).returning();
+
+    // Send confirmation email asynchronously with payment details
+    if (sub && subData.email) {
+      (async () => {
+        try {
+          const formRecord = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
+          const programRecord = formRecord[0]?.programId
+            ? await db.select().from(programsTable).where(eq(programsTable.id, formRecord[0].programId))
+            : [];
+
+          await sendApplicationSubmissionConfirmationEmail({
+            toEmail: subData.email,
+            toName: subData.fullName || "Applicant",
+            submissionId: sub.id,
+            programName: programRecord[0]?.name ?? "Sankara Fellowship Examination Program",
+            formTitle: formRecord[0]?.title ?? "Fellowship Application",
+            specialization: subData.specialization,
+            paymentId: subData.paymentId,
+            paymentMode: subData.paymentMode,
+            paidAmount: subData.paidAmount,
+          });
+        } catch (err: any) {
+          console.warn("[email] Failed to send submission confirmation email:", err.message);
+        }
+      })();
+    }
+
+    res.status(201).json({ success: true, submissionId: sub!.id });
+  } catch (err: any) {
+    console.error("[POST /apply/:token fatal error]:", err);
+    res.status(500).json({ 
+      error: err.message || "Failed to process application submission. Please contact admissions with your Payment ID." 
+    });
+  }
+});
+
+// Admin: Reconcile and recover a paid submission that failed to post
+router.post(
+  "/application-forms/reconcile-payment",
+  requireAuth,
+  requireRole("super_admin", "program_admin", "central_exam_coordinator"),
+  async (req, res) => {
+    try {
+      const { paymentId, fullName, email, phone, specialization, formToken = "JAN2027", notes } = req.body;
+      if (!paymentId || !String(paymentId).trim()) {
+        return res.status(400).json({ error: "Payment ID is required" });
+      }
+      const cleanPaymentId = String(paymentId).trim();
+
+      // Check if already in submissions
+      const existing = await db.select().from(applicationSubmissionsTable)
+        .where(eq(applicationSubmissionsTable.paymentId, cleanPaymentId));
+      if (existing.length > 0) {
+        return res.json({ 
+          success: true, 
+          message: "Payment is already linked to submission ID #" + existing[0].id,
+          submission: existing[0] 
+        });
+      }
+
+      // Find active form
+      let form = await resolveFormByToken(formToken);
+      if (!form) {
+        [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.isActive, true)).limit(1);
+      }
+      if (!form) return res.status(404).json({ error: "Active application form not found" });
+
+      const [newSub] = await db.insert(applicationSubmissionsTable).values({
+        formId: form.id,
+        status: "pending",
+        fullName: fullName || "Applicant (" + cleanPaymentId + ")",
+        email: email || `recovered_${cleanPaymentId.replace(/[^a-zA-Z0-9]/g, "")}@sankaraeye.com`,
+        phone: phone || null,
+        specialization: specialization ? (Array.isArray(specialization) ? JSON.stringify(specialization) : String(specialization)) : '["IOL"]',
+        paymentId: cleanPaymentId,
+        paymentMode: "Razorpay (Reconciled)",
+        paidAmount: 2750,
+        source: "reconciliation",
+        readyForReview: true,
+        reviewNotes: notes || "Payment reconciled by administrator",
+        submittedAt: new Date(),
+      } as any).returning();
+
+      return res.status(201).json({
+        success: true,
+        message: "Application submission successfully recovered and linked to Payment ID " + cleanPaymentId,
+        submissionId: newSub.id,
+      });
+    } catch (err: any) {
+      console.error("[reconcile-payment error]:", err);
+      return res.status(500).json({ error: err.message || "Failed to reconcile payment" });
     }
   }
+);
 
-  const isComplete = checkCompleteness(subData);
-
-  const [sub] = await db.insert(applicationSubmissionsTable).values({
-    ...subData,
-    readyForReview: isComplete,
-  } as any).returning();
-
-  // Send confirmation email asynchronously with payment details
-  if (sub && subData.email) {
-    (async () => {
-      try {
-        const formRecord = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
-        const programRecord = formRecord[0]?.programId
-          ? await db.select().from(programsTable).where(eq(programsTable.id, formRecord[0].programId))
-          : [];
-
-        await sendApplicationSubmissionConfirmationEmail({
-          toEmail: subData.email,
-          toName: subData.fullName || "Applicant",
-          submissionId: sub.id,
-          programName: programRecord[0]?.name ?? "Sankara Fellowship Examination Program",
-          formTitle: formRecord[0]?.title ?? "Fellowship Application",
-          specialization: subData.specialization,
-          paymentId: subData.paymentId,
-          paymentMode: subData.paymentMode,
-          paidAmount: subData.paidAmount,
-        });
-      } catch (err: any) {
-        console.warn("[email] Failed to send submission confirmation email:", err.message);
-      }
-    })();
-  }
-
-  res.status(201).json({ success: true, submissionId: sub!.id });
-});
 
 // Candidate Public: Download Payment Receipt & Application Copy PDF
 router.get(["/apply/:token/receipt/:submissionId", "/apply/receipt/:submissionId"], async (req, res) => {

@@ -586,8 +586,9 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
             if (!verifyRes.ok) throw new Error(verifyData.error || "Payment verification failed");
 
             // Show payment confirmation screen
+            const verifiedPaymentId = response.razorpay_payment_id || ("PAY_" + Date.now());
             const verifiedState = {
-              paymentId: response.razorpay_payment_id || ("PAY_" + Date.now()),
+              paymentId: verifiedPaymentId,
               finalForm: { ...finalForm, paymentMode: "Razorpay Online", paidAmount: orderData.totalAmount || calculatedAmount },
               verifyResponse: verifyData,
             };
@@ -595,6 +596,28 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
 
             await saveDraft(token, { form, step, files, paymentVerified: verifiedState });
             localStorage.setItem(`payment_verified_${token}`, JSON.stringify(verifiedState));
+
+            // Immediate auto-submit so candidate is never stuck
+            try {
+              const autoSubmitRes = await fetch(`${API}/apply/${token}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ...finalForm, payment_id: verifiedPaymentId, paymentMode: "Razorpay Online", paidAmount: orderData.totalAmount || calculatedAmount }),
+              });
+              const autoText = await autoSubmitRes.text();
+              const autoData = JSON.parse(autoText);
+              if (autoSubmitRes.ok && autoData?.submissionId) {
+                setSubmissionId(String(autoData.submissionId));
+                setSubmitted(true);
+                localStorage.removeItem(`fellowship_draft_${token}`);
+                localStorage.removeItem(`payment_verified_${token}`);
+                await clearDraft(token);
+                window.scrollTo(0, 0);
+                return;
+              }
+            } catch (autoErr) {
+              console.warn("Auto-submit deferred to confirmation screen:", autoErr);
+            }
 
             window.scrollTo(0, 0);
           } catch (e: any) {
@@ -677,11 +700,22 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...finalForm, payment_id: paymentId }),
         });
-        if (!submitRes.ok) {
-          const errData = await submitRes.json();
-          throw new Error(errData.error || "Submission failed. Please contact support with Payment ID: " + paymentId);
+
+        const resText = await submitRes.text();
+        let resData: any = {};
+        try {
+          resData = JSON.parse(resText);
+        } catch {
+          if (submitRes.status === 413) {
+            throw new Error("Application data or uploaded files exceed server size limit. Please contact admissions support at radhika@sankaraeye.com with Payment ID: " + paymentId);
+          }
+          throw new Error(`Server returned error (${submitRes.status}). Please contact admissions desk with Payment ID: ${paymentId}`);
         }
-        const resData = await submitRes.json();
+
+        if (!submitRes.ok) {
+          throw new Error(resData.error || resData.message || "Submission failed. Please contact support with Payment ID: " + paymentId);
+        }
+
         setSubmissionId(resData.submissionId ? String(resData.submissionId) : null);
         setSubmitted(true);
         // Clear draft on success
