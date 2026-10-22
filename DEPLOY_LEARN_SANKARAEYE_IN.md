@@ -159,3 +159,21 @@ sudo certbot --nginx -d learn.sankaraeye.in
 | **Dr. Saravanan** | `saravanan@sankaraeye.com` | `Saravanan@2026` | Super Administrator |
 | **Prabhanjan** | `prabhanjan@sankaraeye.com` | `Prabhanjan@2026` | Super Administrator |
 | **Radhika Saranam** | `radhika@sankaraeye.com` | `Radhika@2026` | Super Administrator |
+
+---
+
+## 5. Recovering / Reconciling Past Paid Applications
+
+If any applicants paid before the Nginx upload limit was raised, their payments are saved in Razorpay.
+Run this one command inside the project directory to automatically fetch them from Razorpay and create their application submissions:
+
+```bash
+docker compose exec fellowship-app pnpm run reconcile-razorpay
+```
+*(Or if running directly with Node/PM2: `pnpm run reconcile-razorpay`)*
+
+This script automatically:
+1. Queries Razorpay for all successful charges in the last 48 hours.
+2. Identifies any payments missing in the database.
+3. Automatically inserts the application record, generates their reference ID, and emails them their receipt!
+
