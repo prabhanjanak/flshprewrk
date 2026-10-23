@@ -1,12 +1,57 @@
-import { db, applicationFormsTable, applicationSubmissionsTable, paymentSettingsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import fs from "node:fs";
+import path from "node:path";
 import Razorpay from "razorpay";
+
+function autoLoadEnv() {
+  const candidatePaths = [
+    path.resolve(process.cwd(), ".env"),
+    path.resolve(process.cwd(), "artifacts/api-server/.env"),
+    path.resolve(process.cwd(), "../.env"),
+  ];
+
+  for (const envPath of candidatePaths) {
+    if (fs.existsSync(envPath)) {
+      try {
+        const content = fs.readFileSync(envPath, "utf-8");
+        for (const rawLine of content.split("\n")) {
+          const line = rawLine.trim();
+          if (!line || line.startsWith("#")) continue;
+          const eq = line.indexOf("=");
+          if (eq > 0) {
+            const k = line.substring(0, eq).trim();
+            const v = line.substring(eq + 1).trim().replace(/^["']|["']$/g, "");
+            if (!process.env[k]) {
+              process.env[k] = v;
+            }
+          }
+        }
+      } catch {}
+    }
+  }
+
+  // If DATABASE_URL is not directly in .env, check if POSTGRES vars were loaded
+  if (!process.env.DATABASE_URL) {
+    const user = process.env.POSTGRES_USER || "fellowship_admin";
+    const pass = process.env.POSTGRES_PASSWORD || "FellowshipSecure2026!";
+    const db = process.env.POSTGRES_DB || "fellowship_db";
+    const port = process.env.HOST_DB_PORT || "5433";
+    // Check if docker port 5433 or local port 5432 is intended
+    process.env.DATABASE_URL = `postgresql://${user}:${pass}@localhost:${port}/${db}`;
+  }
+}
+
+// Run auto-loader BEFORE dynamic imports
+autoLoadEnv();
 
 async function main() {
   console.log("=================================================");
   console.log("   RAZORPAY AUTOMATIC PAYMENT RECOVERY TOOL      ");
   console.log("   Sankara Academy of Vision — Fellowship 2027   ");
   console.log("=================================================\n");
+
+  // Dynamically import DB after environment is populated
+  const { db, applicationFormsTable, applicationSubmissionsTable, paymentSettingsTable } = await import("@workspace/db");
+  const { eq } = await import("drizzle-orm");
 
   // 1. Fetch active Razorpay settings
   const allSettings = await db.select().from(paymentSettingsTable).where(eq(paymentSettingsTable.isActive, true));
