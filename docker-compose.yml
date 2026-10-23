@@ -61,8 +61,8 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-admissions@sankaraeye.com}
-      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
-      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-rzp_live_ddDz3Yp0860GqG}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-LGVG9K6XjOwpHnfjfGMmgwxZ}
     volumes:
       # Persistent volume for candidate document uploads and photos
       - fellowship_uploads:/app/uploads

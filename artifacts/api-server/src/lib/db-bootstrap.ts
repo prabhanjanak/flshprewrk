@@ -1085,8 +1085,8 @@ async function seedAndHealBaselineData(): Promise<void> {
 
   // Payment Settings for Jan 2027
   const [jan27Payment] = await db.select().from(paymentSettingsTable).where(eq(paymentSettingsTable.programId, jan27Prog.id));
-  const defaultKeyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "rzp_test_SlgNbXAEE5rBdc";
-  const defaultSecret = process.env.RAZORPAY_KEY_SECRET || "uyKxr4J1QCHDlBb9FBoMn3pd";
+  const defaultKeyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "rzp_live_ddDz3Yp0860GqG";
+  const defaultSecret = process.env.RAZORPAY_KEY_SECRET || "LGVG9K6XjOwpHnfjfGMmgwxZ";
 
   if (!jan27Payment) {
     await db.insert(paymentSettingsTable).values({
@@ -1094,22 +1094,33 @@ async function seedAndHealBaselineData(): Promise<void> {
       amount: 275000,
       currency: "INR",
       description: "Fellowship Application Fee January 2027",
-      mode: "test",
+      mode: "live",
       razorpayKeyId: defaultKeyId,
       razorpayKeySecret: defaultSecret,
       isActive: true,
     });
-    logger.info("[DB-BOOTSTRAP] Provisioned default payment settings for January 2027 with Razorpay configuration");
-  } else if (!jan27Payment.razorpayKeyId) {
+    logger.info("[DB-BOOTSTRAP] Provisioned default LIVE payment settings for January 2027 with Razorpay configuration");
+  } else {
     await db.update(paymentSettingsTable)
       .set({
+        mode: "live",
         razorpayKeyId: defaultKeyId,
         razorpayKeySecret: defaultSecret,
         updatedAt: new Date(),
       })
       .where(eq(paymentSettingsTable.id, jan27Payment.id));
-    logger.info("[DB-BOOTSTRAP] Synchronized January 2027 payment settings with Razorpay credentials");
+    logger.info("[DB-BOOTSTRAP] Synchronized January 2027 payment settings with default LIVE Razorpay credentials");
   }
+
+  // Ensure any other active payment settings are also synchronized with live credentials
+  await db.update(paymentSettingsTable)
+    .set({
+      mode: "live",
+      razorpayKeyId: defaultKeyId,
+      razorpayKeySecret: defaultSecret,
+      updatedAt: new Date(),
+    })
+    .where(eq(paymentSettingsTable.isActive, true));
 
   // Ensure ONLY Fellowship Program January 2027 is active and purge all legacy, mock, or obsolete programs
   try {

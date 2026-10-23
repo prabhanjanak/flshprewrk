@@ -56,8 +56,8 @@ async function main() {
   // 1. Fetch active Razorpay settings
   const allSettings = await db.select().from(paymentSettingsTable).where(eq(paymentSettingsTable.isActive, true));
   const setting = allSettings[0];
-  const keyId = setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID;
-  const keySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
+  const keyId = setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "rzp_live_ddDz3Yp0860GqG";
+  const keySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || "LGVG9K6XjOwpHnfjfGMmgwxZ";
 
   if (!keyId || !keySecret || keyId.startsWith("rzp_test_sim")) {
     console.error("❌ Error: No active Razorpay live API credentials found in database or environment.");

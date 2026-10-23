@@ -74,9 +74,9 @@ POSTGRES_PASSWORD=FellowshipSecure2027!
 HOST_DB_PORT=5433
 
 # Razorpay Online Payment Gateway
-RAZORPAY_KEY_ID=rzp_test_SlgNbXAEE5rBdc
-RAZORPAY_KEY_SECRET=uyKxr4J1QCHDlBb9FBoMn3pd
-VITE_RAZORPAY_KEY_ID=rzp_test_SlgNbXAEE5rBdc
+RAZORPAY_KEY_ID=rzp_live_ddDz3Yp0860GqG
+RAZORPAY_KEY_SECRET=LGVG9K6XjOwpHnfjfGMmgwxZ
+VITE_RAZORPAY_KEY_ID=rzp_live_ddDz3Yp0860GqG
 
 # Session Secret (random 64-char string)
 SESSION_SECRET=a8f5c9e2b4d7f1a3c6e9d2b5f8a1c4e7d0b3f6a9c2e5d8b1f4a7c0e3d6b9f2a5

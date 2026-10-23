@@ -37,8 +37,8 @@ router.post("/payment/create-order", async (req, res) => {
     const global = all.find((s) => s.programId === null);
     const setting = specific ?? global;
 
-    const razorpayKeyId = setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID;
-    const razorpayKeySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
+    const razorpayKeyId = setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "rzp_live_ddDz3Yp0860GqG";
+    const razorpayKeySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || "LGVG9K6XjOwpHnfjfGMmgwxZ";
 
     // 3. Check program fee model and amount
     const [program] = programId ? await db.select().from(programsTable).where(eq(programsTable.id, programId)) : [null];
@@ -152,7 +152,7 @@ router.post("/payment/verify", async (req, res) => {
     const global = all.find((s) => s.programId === null);
     const setting = specific ?? global;
 
-    const razorpayKeySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
+    const razorpayKeySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || "LGVG9K6XjOwpHnfjfGMmgwxZ";
 
     if (!razorpayKeySecret) {
       // In absence of secret on staging/dev, allow verification

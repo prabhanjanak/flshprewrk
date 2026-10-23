@@ -1138889,8 +1138889,8 @@ router25.post("/payment/create-order", async (req, res) => {
     const specific = programId ? all.find((s2) => s2.programId === programId) : null;
     const global2 = all.find((s2) => s2.programId === null);
     const setting = specific ?? global2;
-    const razorpayKeyId = setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID;
-    const razorpayKeySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
+    const razorpayKeyId = setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "rzp_live_ddDz3Yp0860GqG";
+    const razorpayKeySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || "LGVG9K6XjOwpHnfjfGMmgwxZ";
     const [program] = programId ? await db.select().from(programsTable).where(eq(programsTable.id, programId)) : [null];
     const pricingModel = program?.feePricingModel || "per_specialty";
     let unitFeeInPaise = 275e3;
@@ -1138970,7 +1138970,7 @@ router25.post("/payment/verify", async (req, res) => {
     const specific = programId ? all.find((s2) => s2.programId === programId) : null;
     const global2 = all.find((s2) => s2.programId === null);
     const setting = specific ?? global2;
-    const razorpayKeySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
+    const razorpayKeySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || "LGVG9K6XjOwpHnfjfGMmgwxZ";
     if (!razorpayKeySecret) {
       return res.json({ success: true, status: "ok", note: "offline_approved" });
     }
@@ -1142218,28 +1142218,35 @@ async function seedAndHealBaselineData() {
     logger.info("[DB-BOOTSTRAP] Created new application form for January intake (token: JAN2027).");
   }
   const [jan27Payment] = await db.select().from(paymentSettingsTable).where(eq(paymentSettingsTable.programId, jan27Prog.id));
-  const defaultKeyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "rzp_test_SlgNbXAEE5rBdc";
-  const defaultSecret = process.env.RAZORPAY_KEY_SECRET || "uyKxr4J1QCHDlBb9FBoMn3pd";
+  const defaultKeyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "rzp_live_ddDz3Yp0860GqG";
+  const defaultSecret = process.env.RAZORPAY_KEY_SECRET || "LGVG9K6XjOwpHnfjfGMmgwxZ";
   if (!jan27Payment) {
     await db.insert(paymentSettingsTable).values({
       programId: jan27Prog.id,
       amount: 275e3,
       currency: "INR",
       description: "Fellowship Application Fee January 2027",
-      mode: "test",
+      mode: "live",
       razorpayKeyId: defaultKeyId,
       razorpayKeySecret: defaultSecret,
       isActive: true
     });
-    logger.info("[DB-BOOTSTRAP] Provisioned default payment settings for January 2027 with Razorpay configuration");
-  } else if (!jan27Payment.razorpayKeyId) {
+    logger.info("[DB-BOOTSTRAP] Provisioned default LIVE payment settings for January 2027 with Razorpay configuration");
+  } else {
     await db.update(paymentSettingsTable).set({
+      mode: "live",
       razorpayKeyId: defaultKeyId,
       razorpayKeySecret: defaultSecret,
       updatedAt: /* @__PURE__ */ new Date()
     }).where(eq(paymentSettingsTable.id, jan27Payment.id));
-    logger.info("[DB-BOOTSTRAP] Synchronized January 2027 payment settings with Razorpay credentials");
+    logger.info("[DB-BOOTSTRAP] Synchronized January 2027 payment settings with default LIVE Razorpay credentials");
   }
+  await db.update(paymentSettingsTable).set({
+    mode: "live",
+    razorpayKeyId: defaultKeyId,
+    razorpayKeySecret: defaultSecret,
+    updatedAt: /* @__PURE__ */ new Date()
+  }).where(eq(paymentSettingsTable.isActive, true));
   try {
     await db.delete(applicationFormsTable).where(
       and(
