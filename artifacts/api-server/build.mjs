@@ -99,6 +99,7 @@ async function buildAll() {
     entryPoints: [
       path.resolve(artifactDir, "src/index.ts"),
       path.resolve(artifactDir, "src/seed-cli.ts"),
+      path.resolve(artifactDir, "src/reconcile-cli.ts"),
     ],
     platform: "node",
     bundle: true,

@@ -8,11 +8,12 @@
     "db:inject": "node artifacts/api-server/dist/seed-cli.mjs",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
-    "reconcile-razorpay": "tsx scripts/reconcile-razorpay.ts"
+    "reconcile-razorpay": "node artifacts/api-server/dist/reconcile-cli.mjs"
   },
   "private": true,
   "devDependencies": {
     "prettier": "^3.8.1",
+    "tsx": "^4.19.2",
     "typescript": "~5.9.2"
   },
   "dependencies": {
