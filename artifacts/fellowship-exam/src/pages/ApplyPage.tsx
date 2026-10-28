@@ -3,8 +3,7 @@ import { loadDraft, saveDraft, clearDraft } from "../lib/draftStore";
 import logoUrl from "../assets/seh_sav_logo_1777703794142.jpg";
 import {
   Loader2, AlertCircle, CheckCircle2, ChevronRight, ChevronLeft, ChevronDown,
-  CreditCard, Building2, Copy, Check, Upload, ArrowRightLeft, ShieldCheck, QrCode,
-  Download, Printer, FileText
+  CreditCard, Building2, Copy, Check, Upload, ArrowRightLeft, ShieldCheck, QrCode
 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -814,10 +813,9 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
     );
   }
 
-  // ── Final Success / Printable Application Document ─────────────────────
+  // ── Final Success / Electronic Registration Confirmation ─────────────────────
   if (submitted) {
     const totalPaid = ((paymentConfig ? paymentConfig.amount / 100 : 2750) * (Array.isArray(form.specialization) ? form.specialization.length : 1));
-    const receiptDownloadUrl = `${API}/apply/${token}/receipt/${submissionId}`;
 
     return (
       <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4">
@@ -836,9 +834,9 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
                 <div className="w-20 h-20 bg-white/20 backdrop-blur-xl rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl border border-white/30">
                   <CheckCircle2 className="w-10 h-10 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold mb-2 text-white">Application Submitted!</h2>
+                <h2 className="text-2xl font-bold mb-2 text-white">Application Successfully Submitted!</h2>
                 <p className="text-emerald-100 font-medium max-w-md mx-auto text-sm">
-                  Your application for the {formInfo.programName} has been received and confirmed.
+                  Your official application for the {formInfo.programName} has been received and confirmed by Sankara Academy of Vision.
                 </p>
               </div>
             </div>
@@ -869,53 +867,69 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
                 </div>
               </div>
 
-              {/* Primary Feature: Download Payment Receipt & Application Copy */}
-              <div className="p-6 bg-gradient-to-br from-blue-50/80 via-white to-indigo-50/40 border-2 border-blue-200/90 rounded-2xl text-center space-y-3.5 shadow-xs">
-                <div className="w-12 h-12 bg-blue-100 text-[#000080] rounded-xl flex items-center justify-center mx-auto">
-                  <FileText className="w-6 h-6" />
+              {/* Candidate & Dossier Registration Card (No PDF Download Needed) */}
+              <div className="p-5 bg-slate-50/90 border border-slate-200/90 rounded-2xl space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Candidate Name</span>
+                    <h3 className="text-base font-bold text-slate-900">{form.fullName || "Candidate"}</h3>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Registered Email</span>
+                    <p className="text-xs font-semibold text-slate-700">{form.email || "—"}</p>
+                  </div>
                 </div>
+
                 <div>
-                  <h3 className="font-bold text-base text-slate-900">Official Payment Receipt & Application Copy</h3>
-                  <p className="text-xs text-slate-600 max-w-md mx-auto mt-1">
-                    Download your formal electronic receipt containing your payment transaction proof, selected fellowship subspecialties, and submitted application details.
-                  </p>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Applied Subspecialties</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Array.isArray(form.specialization) && form.specialization.length > 0 ? (
+                      form.specialization.map((spec: string, i: number) => (
+                        <Badge key={i} className="bg-[#000080] text-white hover:bg-[#000080] text-xs font-semibold px-2.5 py-1">
+                          {spec}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-xs text-slate-600 font-medium">{form.specialization || "General Fellowship"}</span>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-                  <a
-                    href={receiptDownloadUrl}
-                    download={`SAV_Payment_Receipt_${submissionId}.pdf`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-[#000080] hover:bg-[#000066] text-white font-bold text-sm rounded-xl shadow-md shadow-blue-950/20 hover:shadow-lg transition-all active:scale-[0.98] cursor-pointer"
-                  >
-                    <Download className="w-4 h-4" />
-                    Download Payment Receipt (PDF)
-                  </a>
+                {form.centerPreference && Object.keys(form.centerPreference).length > 0 && (
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Preferred Hospital Centers</span>
+                    <div className="space-y-1 text-xs text-slate-700 bg-white p-3 rounded-xl border border-slate-200/70">
+                      {Object.entries(form.centerPreference).map(([spec, units]: [string, any]) => (
+                        <div key={spec} className="flex flex-wrap items-baseline gap-1.5">
+                          <span className="font-bold text-[#000080]">{spec}:</span>
+                          <span className="text-slate-600 font-medium">
+                            {Array.isArray(units) ? units.filter((u: string) => u !== "Not Applicable").join(", ") || "All Available Centers" : String(units)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-                  <a
-                    href={receiptDownloadUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3.5 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-sm rounded-xl border border-slate-200 transition-all cursor-pointer"
-                  >
-                    <Printer className="w-4 h-4 text-slate-500" />
-                    View / Print
-                  </a>
+                <div className="pt-2 text-center text-xs text-slate-500 font-medium border-t border-slate-200/80">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 inline mr-1 align-text-bottom" />
+                  Your dossier is registered with the Central Admissions Desk. No physical submission or PDF download is required.
                 </div>
               </div>
 
+              {/* Next Steps */}
               <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-3">
-                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Next Steps</h3>
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Next Steps & Important Information</h3>
                 <div className="space-y-2.5">
                   {[
-                    "A confirmation email has been dispatched to your email address.",
-                    "Save the downloaded payment receipt PDF for your admissions interview.",
-                    "Our academic admissions committee will review your application credentials."
+                    `Please note your Application Reference (#${submissionId}) and Payment ID (${paymentVerified?.paymentId || "Verified"}) for all future correspondence.`,
+                    "Our academic admissions committee will review your educational qualifications, registration certificate, and recommendation letters.",
+                    `Entrance examination schedule, written test syllabus, and interview call details will be communicated directly to your email (${form.email || "registered email"}).`,
+                    "Admissions Office Desk: radhika@sankaraeye.com | Phone: +91 9666677505 / +91 80 2854 2727 (Bangalore Unit)."
                   ].map((step, idx) => (
-                    <div key={idx} className="flex items-center gap-2.5">
-                      <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold shrink-0">{idx + 1}</div>
-                      <p className="text-xs text-slate-600 font-medium">{step}</p>
+                    <div key={idx} className="flex items-start gap-2.5">
+                      <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">{idx + 1}</div>
+                      <p className="text-xs text-slate-600 font-medium leading-relaxed">{step}</p>
                     </div>
                   ))}
                 </div>
@@ -924,9 +938,9 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
               <Button
                 variant="outline"
                 className="w-full h-12 rounded-xl text-slate-700 hover:text-slate-900 border-slate-200 font-bold text-sm transition-all"
-                onClick={() => window.location.href = "/"}
+                onClick={() => window.location.href = "https://www.sankaraeye.com"}
               >
-                Return to Dashboard
+                Close / Visit Sankara Eye Foundation
               </Button>
             </CardContent>
           </Card>
@@ -1499,7 +1513,7 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
 
                         <div className="flex items-center gap-2 text-xs text-slate-600 font-medium pt-1">
                           <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                          <span>Instant verification. Upon successful payment, your application is confirmed immediately and you can download your official receipt.</span>
+                          <span>Instant verification. Upon successful payment, your application and fee payment are confirmed immediately by the Central Admissions Desk.</span>
                         </div>
                       </div>
                     )}

@@ -28,7 +28,7 @@ export const DEFAULT_SECTIONS = [
     description: "Choose the preferred center for each fellowship based on the official Jan-27 Seat Matrix.",
     enabled: true,
     fields: [
-      { id: "unit_cornea", type: "checkbox_group", label: "Cornea Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga"], visibleIf: { field: "specialization", contains: "Cornea" } },
+      { id: "unit_cornea", type: "checkbox_group", label: "Cornea Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Jaipur", "Shimoga"], visibleIf: { field: "specialization", contains: "Cornea" } },
       { id: "unit_glaucoma", type: "checkbox_group", label: "Glaucoma Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga"], visibleIf: { field: "specialization", contains: "Glaucoma" } },
       { id: "unit_iol", type: "checkbox_group", label: "IOL Preferred Center", options: ["Anand", "Coimbatore", "Guntur", "Hyderabad", "Indore", "Jaipur", "Kanpur", "Krishnankoil", "Ludhiana", "Panvel", "Shimoga", "Varanasi"], visibleIf: { field: "specialization", contains: "IOL" } },
       { id: "unit_medical_retina", type: "checkbox_group", label: "Medical Retina Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Indore", "Shimoga"], visibleIf: { field: "specialization", contains: "Medical Retina" } },

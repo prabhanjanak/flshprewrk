@@ -9,7 +9,7 @@ import { User, Stethoscope, FileText, Info } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 
 export const specializationsMap: Record<string, string[]> = {
-  "Cornea": ["Bangalore", "Coimbatore", "Guntur", "Shimoga", "Not Applicable"],
+  "Cornea": ["Bangalore", "Coimbatore", "Guntur", "Jaipur", "Shimoga", "Not Applicable"],
   "Glaucoma": ["Bangalore", "Coimbatore", "Guntur", "Shimoga", "Not Applicable"],
   "IOL": ["Anand", "Coimbatore", "Guntur", "Hyderabad", "Indore", "Jaipur", "Kanpur", "Krishnankoil", "Ludhiana", "Panvel", "Shimoga", "Varanasi", "Not Applicable"],
   "Medical Retina": ["Bangalore", "Coimbatore", "Guntur", "Indore", "Shimoga", "Not Applicable"],
