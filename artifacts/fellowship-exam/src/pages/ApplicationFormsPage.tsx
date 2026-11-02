@@ -1031,14 +1031,14 @@ function RichTextArea({ value, onChange, placeholder, label }: { value: string; 
       {label && <Label className="text-[10px] font-bold text-muted-foreground uppercase">{label}</Label>}
       <div className="border rounded-md overflow-hidden bg-white dark:bg-slate-950 flex flex-col">
         <div className="flex items-center gap-0.5 p-1 bg-muted/30 border-b flex-wrap">
-          <Button variant="ghost" size="sm" className="h-7 px-2 font-bold hover:bg-muted" onClick={() => execCommand("bold")}>B</Button>
-          <Button variant="ghost" size="sm" className="h-7 px-2 italic hover:bg-muted" onClick={() => execCommand("italic")}>I</Button>
-          <Button variant="ghost" size="sm" className="h-7 px-2 underline hover:bg-muted" onClick={() => execCommand("underline")}>U</Button>
+          <Button type="button" variant="ghost" size="sm" className="h-7 px-2 font-bold hover:bg-muted" onClick={() => execCommand("bold")}>B</Button>
+          <Button type="button" variant="ghost" size="sm" className="h-7 px-2 italic hover:bg-muted" onClick={() => execCommand("italic")}>I</Button>
+          <Button type="button" variant="ghost" size="sm" className="h-7 px-2 underline hover:bg-muted" onClick={() => execCommand("underline")}>U</Button>
           <Separator orientation="vertical" className="h-4 mx-1" />
-          <Button variant="ghost" size="sm" className="h-7 px-2 hover:bg-muted" onClick={() => execCommand("insertOrderedList")}>1.</Button>
-          <Button variant="ghost" size="sm" className="h-7 px-2 hover:bg-muted" onClick={() => execCommand("insertUnorderedList")}>•</Button>
+          <Button type="button" variant="ghost" size="sm" className="h-7 px-2 hover:bg-muted" onClick={() => execCommand("insertOrderedList")}>1.</Button>
+          <Button type="button" variant="ghost" size="sm" className="h-7 px-2 hover:bg-muted" onClick={() => execCommand("insertUnorderedList")}>•</Button>
           <Separator orientation="vertical" className="h-4 mx-1" />
-          <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] uppercase font-bold hover:bg-muted" onClick={() => execCommand("removeFormat")}>Clear</Button>
+          <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[10px] uppercase font-bold hover:bg-muted" onClick={() => execCommand("removeFormat")}>Clear</Button>
         </div>
         <div
           ref={editorRef}
@@ -1105,11 +1105,11 @@ export default function ApplicationFormsPage() {
 
   // Razorpay payment settings state for edit form
   const [editPaymentConfig, setEditPaymentConfig] = useState({
-    razorpayKeyId: "",
-    razorpayKeySecret: "",
+    razorpayKeyId: "rzp_live_ddDz3Yp0860GqG",
+    razorpayKeySecret: "LGVG9K6XjOwpHnfjfGMmgwxZ",
     amountRs: 2750,
     currency: "INR",
-    description: "Fellowship Application Fee",
+    description: "Fellowship Application Fee January 2027",
     mode: "live",
     upiId: "sankaraeye@hdfcbank",
     isActive: true,
@@ -1127,12 +1127,16 @@ export default function ApplicationFormsPage() {
   useEffect(() => {
     if (editFormPaymentData && editForm) {
       setEditPaymentConfig({
-        razorpayKeyId: editFormPaymentData.razorpayKeyId || "",
-        razorpayKeySecret: editFormPaymentData.razorpayKeySecret || "",
+        razorpayKeyId: (editFormPaymentData.razorpayKeyId && !editFormPaymentData.razorpayKeyId.startsWith("rzp_test") && editFormPaymentData.razorpayKeyId !== "[SENSITIVE]")
+          ? editFormPaymentData.razorpayKeyId
+          : "rzp_live_ddDz3Yp0860GqG",
+        razorpayKeySecret: (editFormPaymentData.razorpayKeySecret && !editFormPaymentData.razorpayKeySecret.startsWith("test_") && editFormPaymentData.razorpayKeySecret !== "[SENSITIVE]")
+          ? editFormPaymentData.razorpayKeySecret
+          : "LGVG9K6XjOwpHnfjfGMmgwxZ",
         amountRs: editFormPaymentData.amountRs || 2750,
         currency: editFormPaymentData.currency || "INR",
-        description: editFormPaymentData.description || "Fellowship Application Fee",
-        mode: editFormPaymentData.mode || "live",
+        description: editFormPaymentData.description || "Fellowship Application Fee January 2027",
+        mode: "live",
         upiId: editFormPaymentData.upiId || "sankaraeye@hdfcbank",
         isActive: editFormPaymentData.isActive !== false,
       });
@@ -1303,7 +1307,12 @@ export default function ApplicationFormsPage() {
       const { id, ...body } = data;
       const res = await api.patch<ApplicationForm>(`/application-forms/${id}`, body);
       try {
-        await api.put(`/application-forms/${id}/payment-settings`, editPaymentConfig);
+        if (editPaymentConfig.razorpayKeyId && editPaymentConfig.razorpayKeyId !== "[SENSITIVE]") {
+          await api.put(`/application-forms/${id}/payment-settings`, {
+            ...editPaymentConfig,
+            mode: "live",
+          });
+        }
       } catch (err) {
         console.error("Auto-saving payment settings failed", err);
       }
@@ -4402,53 +4411,127 @@ export default function ApplicationFormsPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold flex items-center gap-2"><FileCheck className="h-4 w-4" /> Form Sections (Standard)</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Enable/disable or rename built-in form sections and fields</p>
+                    <p className="text-sm font-semibold flex items-center gap-2"><FileCheck className="h-4 w-4" /> Form Sections & Fields</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Customize, add, reorder, or enable/disable form sections, questions, and options</p>
                   </div>
-                  {editSectionsConfig.length === 0 && (
+                  <div className="flex items-center gap-2">
                     <Button
+                      type="button"
                       size="sm"
                       variant="outline"
-                      className="gap-1.5 h-8 text-blue-600 border-blue-200 hover:bg-blue-50"
-                      onClick={async () => {
-                        try {
-                          const res = await api.get<any[]>("/application-forms/default-sections");
-                          setEditSectionsConfig(res);
-                          toast({ title: "Template loaded" });
-                        } catch (e) {
-                          toast({ title: "Failed to load template", variant: "destructive" });
-                        }
+                      className="gap-1.5 h-8 font-semibold text-blue-600 border-blue-200 hover:bg-blue-50"
+                      onClick={() => {
+                        const newCfg = JSON.parse(JSON.stringify(editSectionsConfig));
+                        const newSecId = `section_${Date.now()}`;
+                        newCfg.push({
+                          id: newSecId,
+                          title: "New Section",
+                          description: "",
+                          enabled: true,
+                          fields: [
+                            { id: `field_${Date.now()}`, type: "text", label: "Question / Field Label", required: false }
+                          ]
+                        });
+                        setEditSectionsConfig(newCfg);
                       }}
                     >
-                      <Plus className="h-3.5 w-3.5" /> Load Standard Template
+                      <Plus className="h-3.5 w-3.5" /> Add Section
                     </Button>
-                  )}
+                    {editSectionsConfig.length === 0 && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 h-8 text-slate-600 border-slate-200 hover:bg-slate-50"
+                        onClick={async () => {
+                          try {
+                            const res = await api.get<any[]>("/application-forms/default-sections");
+                            setEditSectionsConfig(res);
+                            toast({ title: "Template loaded" });
+                          } catch (e) {
+                            toast({ title: "Failed to load template", variant: "destructive" });
+                          }
+                        }}
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Load Standard Template
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-3">
                   {editSectionsConfig.map((section, sIdx) => (
-                    <div key={section.id} className="border rounded-xl p-4 bg-muted/10 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 mr-4">
+                    <div key={section.id || sIdx} className="border rounded-xl p-4 bg-muted/10 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={sIdx === 0}
+                            className="h-7 w-7 p-0"
+                            onClick={() => {
+                              const newCfg = JSON.parse(JSON.stringify(editSectionsConfig));
+                              [newCfg[sIdx - 1], newCfg[sIdx]] = [newCfg[sIdx], newCfg[sIdx - 1]];
+                              setEditSectionsConfig(newCfg);
+                            }}
+                          >
+                            <ChevronUp className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={sIdx === editSectionsConfig.length - 1}
+                            className="h-7 w-7 p-0"
+                            onClick={() => {
+                              const newCfg = JSON.parse(JSON.stringify(editSectionsConfig));
+                              [newCfg[sIdx + 1], newCfg[sIdx]] = [newCfg[sIdx], newCfg[sIdx + 1]];
+                              setEditSectionsConfig(newCfg);
+                            }}
+                          >
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                        <div className="flex-1">
                           <Input
-                            value={section.title}
+                            value={section.title || ""}
                             onChange={(e) => {
-                              const newCfg = [...editSectionsConfig];
+                              const newCfg = JSON.parse(JSON.stringify(editSectionsConfig));
                               newCfg[sIdx].title = e.target.value;
                               setEditSectionsConfig(newCfg);
                             }}
-                            className="h-8 font-bold text-sm bg-transparent border-none focus-visible:ring-0 px-0"
+                            className="h-8 font-bold text-sm bg-white dark:bg-slate-900 border px-2 rounded-md"
+                            placeholder="Section Title"
                           />
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">Section ID: {section.id}</p>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mt-0.5">Section ID: {section.id}</p>
                         </div>
-                        <Switch
-                          checked={section.enabled}
-                          onCheckedChange={(v) => {
-                            const newCfg = [...editSectionsConfig];
-                            newCfg[sIdx].enabled = v;
-                            setEditSectionsConfig(newCfg);
-                          }}
-                        />
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-muted-foreground">{section.enabled ? "Enabled" : "Disabled"}</span>
+                            <Switch
+                              checked={section.enabled}
+                              onCheckedChange={(v) => {
+                                const newCfg = JSON.parse(JSON.stringify(editSectionsConfig));
+                                newCfg[sIdx].enabled = v;
+                                setEditSectionsConfig(newCfg);
+                              }}
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                            onClick={() => {
+                              const newCfg = JSON.parse(JSON.stringify(editSectionsConfig));
+                              newCfg.splice(sIdx, 1);
+                              setEditSectionsConfig(newCfg);
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </div>
 
                       {section.enabled && (
@@ -4458,7 +4541,7 @@ export default function ApplicationFormsPage() {
                             placeholder="Add instructions or details for this section..."
                             value={section.description || ""}
                             onChange={(v) => {
-                              const newCfg = [...editSectionsConfig];
+                              const newCfg = JSON.parse(JSON.stringify(editSectionsConfig));
                               newCfg[sIdx].description = v;
                               setEditSectionsConfig(newCfg);
                             }}
@@ -4469,15 +4552,45 @@ export default function ApplicationFormsPage() {
                       {section.enabled && section.fields && (
                         <div className="pl-4 border-l-2 border-muted space-y-3 mt-2">
                           {section.fields.map((field: any, fIdx: number) => (
-                            <div key={field.id} className="flex items-start gap-3 bg-white dark:bg-slate-900 p-2 rounded-lg border shadow-sm group relative">
-                              <div className="flex-1 space-y-1">
-                                <div className="flex items-center justify-between">
+                            <div key={field.id || fIdx} className="flex items-start gap-3 bg-white dark:bg-slate-900 p-2.5 rounded-lg border shadow-xs group relative">
+                              <div className="flex flex-col gap-0.5 mt-1 shrink-0">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={fIdx === 0}
+                                  className="h-5 w-5 p-0"
+                                  onClick={() => {
+                                    const newCfg = JSON.parse(JSON.stringify(editSectionsConfig));
+                                    [newCfg[sIdx].fields[fIdx - 1], newCfg[sIdx].fields[fIdx]] = [newCfg[sIdx].fields[fIdx], newCfg[sIdx].fields[fIdx - 1]];
+                                    setEditSectionsConfig(newCfg);
+                                  }}
+                                >
+                                  <ChevronUp className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={fIdx === section.fields.length - 1}
+                                  className="h-5 w-5 p-0"
+                                  onClick={() => {
+                                    const newCfg = JSON.parse(JSON.stringify(editSectionsConfig));
+                                    [newCfg[sIdx].fields[fIdx + 1], newCfg[sIdx].fields[fIdx]] = [newCfg[sIdx].fields[fIdx], newCfg[sIdx].fields[fIdx + 1]];
+                                    setEditSectionsConfig(newCfg);
+                                  }}
+                                >
+                                  <ChevronDown className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              <div className="flex-1 space-y-2">
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
                                   <div className="flex items-center gap-2">
-                                    <Label className="text-[10px] font-bold text-muted-foreground uppercase">Field Label</Label>
+                                    <Label className="text-[10px] font-bold text-muted-foreground uppercase">Field Type</Label>
                                     <Select
                                       value={field.type}
                                       onValueChange={(v) => {
-                                        const newCfg = [...editSectionsConfig];
+                                        const newCfg = JSON.parse(JSON.stringify(editSectionsConfig));
                                         newCfg[sIdx].fields[fIdx].type = v;
                                         if (["select", "radio", "checkbox_group"].includes(v) && !newCfg[sIdx].fields[fIdx].options) {
                                           newCfg[sIdx].fields[fIdx].options = ["Option 1"];
@@ -4502,41 +4615,63 @@ export default function ApplicationFormsPage() {
                                       </SelectContent>
                                     </Select>
                                   </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-600 transition-opacity"
-                                    onClick={() => {
-                                      const newCfg = [...editSectionsConfig];
-                                      newCfg[sIdx].fields.splice(fIdx, 1);
-                                      setEditSectionsConfig(newCfg);
-                                    }}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
+
+                                  <div className="flex items-center gap-2">
+                                    <label className="flex items-center gap-1.5 cursor-pointer select-none text-[10px] font-semibold text-slate-700 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200">
+                                      <input
+                                        type="checkbox"
+                                        checked={Boolean(field.required)}
+                                        onChange={(e) => {
+                                          const newCfg = JSON.parse(JSON.stringify(editSectionsConfig));
+                                          newCfg[sIdx].fields[fIdx].required = e.target.checked;
+                                          setEditSectionsConfig(newCfg);
+                                        }}
+                                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3 w-3"
+                                      />
+                                      Required
+                                    </label>
+
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                                      onClick={() => {
+                                        const newCfg = JSON.parse(JSON.stringify(editSectionsConfig));
+                                        newCfg[sIdx].fields.splice(fIdx, 1);
+                                        setEditSectionsConfig(newCfg);
+                                      }}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
                                 </div>
+
                                 <Input
-                                  value={field.label}
+                                  value={field.label || ""}
                                   onChange={(e) => {
-                                    const newCfg = [...editSectionsConfig];
+                                    const newCfg = JSON.parse(JSON.stringify(editSectionsConfig));
                                     newCfg[sIdx].fields[fIdx].label = e.target.value;
                                     setEditSectionsConfig(newCfg);
                                   }}
                                   className="h-7 text-xs"
+                                  placeholder="Field Question / Prompt"
                                 />
+
                                 {field.type === 'info' && (
                                   <div className="mt-2">
                                     <RichTextArea
                                       label="Instruction Content"
                                       value={field.defaultValue || ""}
                                       onChange={(v) => {
-                                        const newCfg = [...editSectionsConfig];
+                                        const newCfg = JSON.parse(JSON.stringify(editSectionsConfig));
                                         newCfg[sIdx].fields[fIdx].defaultValue = v;
                                         setEditSectionsConfig(newCfg);
                                       }}
                                     />
                                   </div>
                                 )}
+
                                 {field.options && ["select", "radio", "checkbox_group"].includes(field.type) && (
                                   <div className="mt-2 space-y-1.5 p-2 bg-muted/20 border rounded text-xs">
                                     <Label className="text-[10px] font-bold text-muted-foreground uppercase">Options</Label>
@@ -4548,7 +4683,7 @@ export default function ApplicationFormsPage() {
                                         <Input
                                           value={opt}
                                           onChange={(e) => {
-                                            const newCfg = [...editSectionsConfig];
+                                            const newCfg = JSON.parse(JSON.stringify(editSectionsConfig));
                                             newCfg[sIdx].fields[fIdx].options[oIdx] = e.target.value;
                                             setEditSectionsConfig(newCfg);
                                           }}
@@ -4556,11 +4691,12 @@ export default function ApplicationFormsPage() {
                                           placeholder={`Option ${oIdx + 1}`}
                                         />
                                         <Button
+                                          type="button"
                                           variant="ghost"
                                           size="sm"
                                           className="h-6 w-6 p-0 text-muted-foreground hover:text-red-600 shrink-0"
                                           onClick={() => {
-                                            const newCfg = [...editSectionsConfig];
+                                            const newCfg = JSON.parse(JSON.stringify(editSectionsConfig));
                                             newCfg[sIdx].fields[fIdx].options.splice(oIdx, 1);
                                             setEditSectionsConfig(newCfg);
                                           }}
@@ -4570,11 +4706,12 @@ export default function ApplicationFormsPage() {
                                       </div>
                                     ))}
                                     <Button
+                                      type="button"
                                       variant="ghost"
                                       size="sm"
                                       className="h-6 text-[10px] gap-1 px-2 mt-1 hover:bg-muted"
                                       onClick={() => {
-                                        const newCfg = [...editSectionsConfig];
+                                        const newCfg = JSON.parse(JSON.stringify(editSectionsConfig));
                                         if (!newCfg[sIdx].fields[fIdx].options) newCfg[sIdx].fields[fIdx].options = [];
                                         newCfg[sIdx].fields[fIdx].options.push(`Option ${(newCfg[sIdx].fields[fIdx].options.length || 0) + 1}`);
                                         setEditSectionsConfig(newCfg);
@@ -4588,15 +4725,17 @@ export default function ApplicationFormsPage() {
                             </div>
                           ))}
                           <Button
+                            type="button"
                             variant="ghost"
                             size="sm"
                             className="w-full h-8 border-dashed border-2 text-[10px] uppercase tracking-wider font-bold gap-2"
                             onClick={() => {
-                              const newCfg = [...editSectionsConfig];
+                              const newCfg = JSON.parse(JSON.stringify(editSectionsConfig));
+                              if (!newCfg[sIdx].fields) newCfg[sIdx].fields = [];
                               newCfg[sIdx].fields.push({
                                 id: `field_${Date.now()}`,
                                 type: "text",
-                                label: "New Field",
+                                label: "New Question",
                                 required: false
                               });
                               setEditSectionsConfig(newCfg);

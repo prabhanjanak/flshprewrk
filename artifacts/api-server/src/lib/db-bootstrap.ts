@@ -983,9 +983,9 @@ async function seedAndHealBaselineData(): Promise<void> {
     logger.info("[DB-BOOTSTRAP] Provisioned Fellowship Program January 2027 (FP-JAN-2027)");
   }
 
-  // Specialities for Jan 2027 (Total 65 Seats)
+  // Specialities for Jan 2027 (Total 66 Seats)
   const jan27Specialities = [
-    { name: "Cornea", code: "COR", seats: 6 },
+    { name: "Cornea", code: "COR", seats: 7 },
     { name: "Glaucoma", code: "GLA", seats: 5 },
     { name: "IOL Fellowship", code: "IOL", seats: 31 },
     { name: "Medical Retina", code: "MR", seats: 9 },
@@ -1016,9 +1016,9 @@ async function seedAndHealBaselineData(): Promise<void> {
     }
   }
 
-  // Seat Matrix for Jan 2027 (Verified exact 65 seats from official intake chart)
+  // Seat Matrix for Jan 2027 (Verified 66 seats across official intake chart including Cornea-Jaipur)
   const JAN27_MATRIX: Record<string, Record<string, number>> = {
-    "Cornea":                  { Bangalore: 1, Coimbatore: 3, Guntur: 1, Shimoga: 1 },
+    "Cornea":                  { Bangalore: 1, Coimbatore: 3, Guntur: 1, Jaipur: 1, Shimoga: 1 },
     "Glaucoma":                { Bangalore: 1, Coimbatore: 1, Guntur: 2, Shimoga: 1 },
     "IOL Fellowship":          { Anand: 1, Coimbatore: 2, Guntur: 2, Hyderabad: 2, Indore: 3, Jaipur: 3, Kanpur: 4, Krishnankoil: 4, Ludhiana: 4, Panvel: 2, Shimoga: 1, Varanasi: 3 },
     "Medical Retina":          { Bangalore: 1, Coimbatore: 2, Guntur: 3, Indore: 1, Shimoga: 2 },
@@ -1045,7 +1045,7 @@ async function seedAndHealBaselineData(): Promise<void> {
       `);
     }
   }
-  logger.info("[DB-BOOTSTRAP] Provisioned and synchronized official Jan-27 seat matrix (65 seats across 13 units).");
+  logger.info("[DB-BOOTSTRAP] Provisioned and synchronized official Jan-27 seat matrix (66 seats across 13 units).");
 
   // Application Form for January intake (token: JAN2027)
   const [janForm] = await db.select().from(applicationFormsTable).where(
@@ -1060,17 +1060,21 @@ async function seedAndHealBaselineData(): Promise<void> {
   );
 
   if (janForm) {
+    const existingSections = Array.isArray(janForm.sectionsConfig) && (janForm.sectionsConfig as any[]).length > 0
+      ? janForm.sectionsConfig
+      : DEFAULT_SECTIONS;
+
     await db.update(applicationFormsTable)
       .set({
         token: "JAN2027",
         programId: jan27Prog.id,
-        title: "Fellowship Program - January 2027 (Entrance Exam: December 2026)",
-        description: "Sankara Academy of Vision Fellowship Program for January 2027 intake (Entrance Examination: 07.12.2026 & 08.12.2026).",
+        title: janForm.title || "Fellowship Program - January 2027 (Entrance Exam: December 2026)",
+        description: janForm.description || "Sankara Academy of Vision Fellowship Program for January 2027 intake (Entrance Examination: 07.12.2026 & 08.12.2026).",
         isActive: true,
-        sectionsConfig: DEFAULT_SECTIONS as any,
+        sectionsConfig: existingSections as any,
       })
       .where(eq(applicationFormsTable.id, janForm.id));
-    logger.info("[DB-BOOTSTRAP] Synchronized active application form for January intake (token: JAN2027).");
+    logger.info("[DB-BOOTSTRAP] Synchronized active application form for January intake (token: JAN2027), preserving custom sectionsConfig.");
   } else {
     await db.insert(applicationFormsTable).values({
       programId: jan27Prog.id,
@@ -1083,10 +1087,17 @@ async function seedAndHealBaselineData(): Promise<void> {
     logger.info("[DB-BOOTSTRAP] Created new application form for January intake (token: JAN2027).");
   }
 
-  // Payment Settings for Jan 2027
+  // Payment Settings for Jan 2027 (Enforcing LIVE credentials and live mode)
+  const LIVE_KEY_ID = "rzp_live_ddDz3Yp0860GqG";
+  const LIVE_SECRET = "LGVG9K6XjOwpHnfjfGMmgwxZ";
+  const defaultKeyId = (process.env.RAZORPAY_KEY_ID && !process.env.RAZORPAY_KEY_ID.includes("test") && process.env.RAZORPAY_KEY_ID !== "[SENSITIVE]")
+    ? process.env.RAZORPAY_KEY_ID
+    : LIVE_KEY_ID;
+  const defaultSecret = (process.env.RAZORPAY_KEY_SECRET && !process.env.RAZORPAY_KEY_SECRET.includes("test") && process.env.RAZORPAY_KEY_SECRET !== "[SENSITIVE]")
+    ? process.env.RAZORPAY_KEY_SECRET
+    : LIVE_SECRET;
+
   const [jan27Payment] = await db.select().from(paymentSettingsTable).where(eq(paymentSettingsTable.programId, jan27Prog.id));
-  const defaultKeyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "rzp_live_ddDz3Yp0860GqG";
-  const defaultSecret = process.env.RAZORPAY_KEY_SECRET || "LGVG9K6XjOwpHnfjfGMmgwxZ";
 
   if (!jan27Payment) {
     await db.insert(paymentSettingsTable).values({
@@ -1112,15 +1123,19 @@ async function seedAndHealBaselineData(): Promise<void> {
     logger.info("[DB-BOOTSTRAP] Synchronized January 2027 payment settings with default LIVE Razorpay credentials");
   }
 
-  // Ensure any other active payment settings are also synchronized with live credentials
-  await db.update(paymentSettingsTable)
-    .set({
-      mode: "live",
-      razorpayKeyId: defaultKeyId,
-      razorpayKeySecret: defaultSecret,
-      updatedAt: new Date(),
-    })
-    .where(eq(paymentSettingsTable.isActive, true));
+  // Ensure any legacy test-mode, blank, or placeholder payment settings are upgraded to live credentials
+  await db.execute(sql`
+    UPDATE payment_settings
+    SET mode = 'live',
+        razorpay_key_id = ${LIVE_KEY_ID},
+        razorpay_key_secret = ${LIVE_SECRET},
+        updated_at = NOW()
+    WHERE mode = 'test'
+       OR razorpay_key_id LIKE 'rzp_test%'
+       OR razorpay_key_id IS NULL
+       OR razorpay_key_id = ''
+       OR razorpay_key_id = '[SENSITIVE]'
+  `);
 
   // Ensure ONLY Fellowship Program January 2027 is active and purge all legacy, mock, or obsolete programs
   try {

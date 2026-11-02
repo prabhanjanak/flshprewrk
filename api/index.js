@@ -1135351,28 +1135351,42 @@ router20.put(
     if (!form) return res.status(404).json({ error: "Form not found" });
     const { razorpayKeyId, razorpayKeySecret, amountRs, currency, description, mode, upiId, isActive } = req.body;
     const programId = form.programId;
+    const LIVE_KEY_ID = "rzp_live_ddDz3Yp0860GqG";
+    const LIVE_SECRET = "LGVG9K6XjOwpHnfjfGMmgwxZ";
     const [existing] = await db.select().from(paymentSettingsTable).where(eq(paymentSettingsTable.programId, programId));
     let settingRecord;
+    const resolveKey = (incoming, existingVal) => {
+      if (incoming !== void 0 && incoming.trim() !== "" && incoming !== "[SENSITIVE]") return incoming.trim();
+      if (existingVal && existingVal.trim() !== "" && !existingVal.startsWith("rzp_test") && existingVal !== "[SENSITIVE]") return existingVal;
+      return LIVE_KEY_ID;
+    };
+    const resolveSecret = (incoming, existingVal) => {
+      if (incoming !== void 0 && incoming.trim() !== "" && incoming !== "[SENSITIVE]") return incoming.trim();
+      if (existingVal && existingVal.trim() !== "" && !existingVal.startsWith("test_") && existingVal !== "[SENSITIVE]") return existingVal;
+      return LIVE_SECRET;
+    };
+    const finalKeyId = resolveKey(razorpayKeyId, existing?.razorpayKeyId ?? null);
+    const finalSecret = resolveSecret(razorpayKeySecret, existing?.razorpayKeySecret ?? null);
     if (existing) {
       [settingRecord] = await db.update(paymentSettingsTable).set({
-        razorpayKeyId: razorpayKeyId !== void 0 ? razorpayKeyId : existing.razorpayKeyId,
-        razorpayKeySecret: razorpayKeySecret !== void 0 ? razorpayKeySecret : existing.razorpayKeySecret,
+        razorpayKeyId: finalKeyId,
+        razorpayKeySecret: finalSecret,
         amount: amountRs !== void 0 ? Math.round(Number(amountRs) * 100) : existing.amount,
         currency: currency ?? existing.currency,
         description: description ?? existing.description,
-        mode: mode ?? existing.mode,
+        mode: "live",
         upiId: upiId !== void 0 ? upiId : existing.upiId,
         isActive: isActive !== void 0 ? Boolean(isActive) : existing.isActive
       }).where(eq(paymentSettingsTable.id, existing.id)).returning();
     } else {
       [settingRecord] = await db.insert(paymentSettingsTable).values({
         programId,
-        razorpayKeyId: razorpayKeyId ?? null,
-        razorpayKeySecret: razorpayKeySecret ?? null,
+        razorpayKeyId: finalKeyId,
+        razorpayKeySecret: finalSecret,
         amount: Math.round((Number(amountRs) || 2750) * 100),
         currency: currency || "INR",
-        description: description || "Fellowship Application Fee",
-        mode: mode || "live",
+        description: description || "Fellowship Application Fee January 2027",
+        mode: "live",
         upiId: upiId || "sankaraeye@hdfcbank",
         isActive: isActive !== void 0 ? Boolean(isActive) : true
       }).returning();
@@ -1137315,7 +1137329,9 @@ router20.get("/apply/:token", async (req, res) => {
             for (const [sKey, uList] of specToUnits.entries()) {
               if (sKey === specCondition || sKey.includes(specCondition) || specCondition.includes(sKey) || specCondition === "iol" && sKey.includes("iol") || specCondition.includes("medical retina") && sKey.includes("medical retina") || specCondition.includes("pediatric") && sKey.includes("pediatric")) {
                 if (uList.length > 0) {
-                  return { ...f3, options: uList };
+                  const existingOpts = Array.isArray(f3.options) ? f3.options : [];
+                  const merged = Array.from(/* @__PURE__ */ new Set([...existingOpts, ...uList]));
+                  return { ...f3, options: merged };
                 }
               }
             }
@@ -1137342,16 +1137358,23 @@ router20.get("/apply/:token/payment-config", async (req, res) => {
   const specific = programId ? all.find((s2) => s2.programId === programId) : null;
   const global2 = all.find((s2) => s2.programId === null);
   const setting = specific ?? global2 ?? null;
-  const keyId = setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID;
-  const keySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
-  const hasCreds = !!(keyId && keySecret);
+  const LIVE_KEY_ID = "rzp_live_ddDz3Yp0860GqG";
+  const LIVE_SECRET = "LGVG9K6XjOwpHnfjfGMmgwxZ";
+  let keyId = setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || LIVE_KEY_ID;
+  if (!keyId || keyId.startsWith("rzp_test") || keyId === "[SENSITIVE]") {
+    keyId = LIVE_KEY_ID;
+  }
+  let keySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || LIVE_SECRET;
+  if (!keySecret || keySecret.startsWith("test_") || keySecret === "[SENSITIVE]") {
+    keySecret = LIVE_SECRET;
+  }
   res.json({
-    mock: !hasCreds,
-    keyId: hasCreds ? keyId : void 0,
+    mock: false,
+    keyId,
     amount: setting?.amount || 275e3,
     currency: setting?.currency || "INR",
     description: setting?.description || "Fellowship Application Fee January 2027",
-    mode: setting?.mode || (hasCreds ? "live" : "test"),
+    mode: "live",
     bankDetails: {
       accountName: "Sankara Academy of Vision",
       accountNumber: "50100004642084",
@@ -1138889,8 +1138912,16 @@ router25.post("/payment/create-order", async (req, res) => {
     const specific = programId ? all.find((s2) => s2.programId === programId) : null;
     const global2 = all.find((s2) => s2.programId === null);
     const setting = specific ?? global2;
-    const razorpayKeyId = setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "rzp_live_ddDz3Yp0860GqG";
-    const razorpayKeySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || "LGVG9K6XjOwpHnfjfGMmgwxZ";
+    const LIVE_KEY_ID = "rzp_live_ddDz3Yp0860GqG";
+    const LIVE_SECRET = "LGVG9K6XjOwpHnfjfGMmgwxZ";
+    let razorpayKeyId = setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || LIVE_KEY_ID;
+    let razorpayKeySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || LIVE_SECRET;
+    if (!razorpayKeyId || razorpayKeyId.startsWith("rzp_test") || razorpayKeyId === "[SENSITIVE]") {
+      razorpayKeyId = LIVE_KEY_ID;
+    }
+    if (!razorpayKeySecret || razorpayKeySecret.startsWith("test_") || razorpayKeySecret === "[SENSITIVE]") {
+      razorpayKeySecret = LIVE_SECRET;
+    }
     const [program] = programId ? await db.select().from(programsTable).where(eq(programsTable.id, programId)) : [null];
     const pricingModel = program?.feePricingModel || "per_specialty";
     let unitFeeInPaise = 275e3;
@@ -1138944,7 +1138975,7 @@ router25.post("/payment/create-order", async (req, res) => {
       pricingModel,
       unitFee: unitFeeInPaise / 100,
       totalAmount: finalAmountPaise / 100,
-      mode: setting?.mode || "live"
+      mode: "live"
     });
   } catch (error40) {
     console.error("Order creation failed:", error40);
@@ -1142122,7 +1142153,7 @@ async function seedAndHealBaselineData() {
     logger.info("[DB-BOOTSTRAP] Provisioned Fellowship Program January 2027 (FP-JAN-2027)");
   }
   const jan27Specialities = [
-    { name: "Cornea", code: "COR", seats: 6 },
+    { name: "Cornea", code: "COR", seats: 7 },
     { name: "Glaucoma", code: "GLA", seats: 5 },
     { name: "IOL Fellowship", code: "IOL", seats: 31 },
     { name: "Medical Retina", code: "MR", seats: 9 },
@@ -1142150,7 +1142181,7 @@ async function seedAndHealBaselineData() {
     }
   }
   const JAN27_MATRIX = {
-    "Cornea": { Bangalore: 1, Coimbatore: 3, Guntur: 1, Shimoga: 1 },
+    "Cornea": { Bangalore: 1, Coimbatore: 3, Guntur: 1, Jaipur: 1, Shimoga: 1 },
     "Glaucoma": { Bangalore: 1, Coimbatore: 1, Guntur: 2, Shimoga: 1 },
     "IOL Fellowship": { Anand: 1, Coimbatore: 2, Guntur: 2, Hyderabad: 2, Indore: 3, Jaipur: 3, Kanpur: 4, Krishnankoil: 4, Ludhiana: 4, Panvel: 2, Shimoga: 1, Varanasi: 3 },
     "Medical Retina": { Bangalore: 1, Coimbatore: 2, Guntur: 3, Indore: 1, Shimoga: 2 },
@@ -1142185,7 +1142216,7 @@ async function seedAndHealBaselineData() {
       `);
     }
   }
-  logger.info("[DB-BOOTSTRAP] Provisioned and synchronized official Jan-27 seat matrix (65 seats across 13 units).");
+  logger.info("[DB-BOOTSTRAP] Provisioned and synchronized official Jan-27 seat matrix (66 seats across 13 units).");
   const [janForm] = await db.select().from(applicationFormsTable).where(
     or(
       eq(applicationFormsTable.token, "JAN2027"),
@@ -1142197,15 +1142228,16 @@ async function seedAndHealBaselineData() {
     )
   );
   if (janForm) {
+    const existingSections = Array.isArray(janForm.sectionsConfig) && janForm.sectionsConfig.length > 0 ? janForm.sectionsConfig : DEFAULT_SECTIONS;
     await db.update(applicationFormsTable).set({
       token: "JAN2027",
       programId: jan27Prog.id,
-      title: "Fellowship Program - January 2027 (Entrance Exam: December 2026)",
-      description: "Sankara Academy of Vision Fellowship Program for January 2027 intake (Entrance Examination: 07.12.2026 & 08.12.2026).",
+      title: janForm.title || "Fellowship Program - January 2027 (Entrance Exam: December 2026)",
+      description: janForm.description || "Sankara Academy of Vision Fellowship Program for January 2027 intake (Entrance Examination: 07.12.2026 & 08.12.2026).",
       isActive: true,
-      sectionsConfig: DEFAULT_SECTIONS
+      sectionsConfig: existingSections
     }).where(eq(applicationFormsTable.id, janForm.id));
-    logger.info("[DB-BOOTSTRAP] Synchronized active application form for January intake (token: JAN2027).");
+    logger.info("[DB-BOOTSTRAP] Synchronized active application form for January intake (token: JAN2027), preserving custom sectionsConfig.");
   } else {
     await db.insert(applicationFormsTable).values({
       programId: jan27Prog.id,
@@ -1142217,9 +1142249,11 @@ async function seedAndHealBaselineData() {
     });
     logger.info("[DB-BOOTSTRAP] Created new application form for January intake (token: JAN2027).");
   }
+  const LIVE_KEY_ID = "rzp_live_ddDz3Yp0860GqG";
+  const LIVE_SECRET = "LGVG9K6XjOwpHnfjfGMmgwxZ";
+  const defaultKeyId = process.env.RAZORPAY_KEY_ID && !process.env.RAZORPAY_KEY_ID.includes("test") && process.env.RAZORPAY_KEY_ID !== "[SENSITIVE]" ? process.env.RAZORPAY_KEY_ID : LIVE_KEY_ID;
+  const defaultSecret = process.env.RAZORPAY_KEY_SECRET && !process.env.RAZORPAY_KEY_SECRET.includes("test") && process.env.RAZORPAY_KEY_SECRET !== "[SENSITIVE]" ? process.env.RAZORPAY_KEY_SECRET : LIVE_SECRET;
   const [jan27Payment] = await db.select().from(paymentSettingsTable).where(eq(paymentSettingsTable.programId, jan27Prog.id));
-  const defaultKeyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "rzp_live_ddDz3Yp0860GqG";
-  const defaultSecret = process.env.RAZORPAY_KEY_SECRET || "LGVG9K6XjOwpHnfjfGMmgwxZ";
   if (!jan27Payment) {
     await db.insert(paymentSettingsTable).values({
       programId: jan27Prog.id,
@@ -1142241,12 +1142275,18 @@ async function seedAndHealBaselineData() {
     }).where(eq(paymentSettingsTable.id, jan27Payment.id));
     logger.info("[DB-BOOTSTRAP] Synchronized January 2027 payment settings with default LIVE Razorpay credentials");
   }
-  await db.update(paymentSettingsTable).set({
-    mode: "live",
-    razorpayKeyId: defaultKeyId,
-    razorpayKeySecret: defaultSecret,
-    updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq(paymentSettingsTable.isActive, true));
+  await db.execute(sql`
+    UPDATE payment_settings
+    SET mode = 'live',
+        razorpay_key_id = ${LIVE_KEY_ID},
+        razorpay_key_secret = ${LIVE_SECRET},
+        updated_at = NOW()
+    WHERE mode = 'test'
+       OR razorpay_key_id LIKE 'rzp_test%'
+       OR razorpay_key_id IS NULL
+       OR razorpay_key_id = ''
+       OR razorpay_key_id = '[SENSITIVE]'
+  `);
   try {
     await db.delete(applicationFormsTable).where(
       and(

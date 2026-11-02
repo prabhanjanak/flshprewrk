@@ -37,8 +37,18 @@ router.post("/payment/create-order", async (req, res) => {
     const global = all.find((s) => s.programId === null);
     const setting = specific ?? global;
 
-    const razorpayKeyId = setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "rzp_live_ddDz3Yp0860GqG";
-    const razorpayKeySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || "LGVG9K6XjOwpHnfjfGMmgwxZ";
+    const LIVE_KEY_ID = "rzp_live_ddDz3Yp0860GqG";
+    const LIVE_SECRET = "LGVG9K6XjOwpHnfjfGMmgwxZ";
+
+    let razorpayKeyId = setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || LIVE_KEY_ID;
+    let razorpayKeySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || LIVE_SECRET;
+
+    if (!razorpayKeyId || razorpayKeyId.startsWith("rzp_test") || razorpayKeyId === "[SENSITIVE]") {
+      razorpayKeyId = LIVE_KEY_ID;
+    }
+    if (!razorpayKeySecret || razorpayKeySecret.startsWith("test_") || razorpayKeySecret === "[SENSITIVE]") {
+      razorpayKeySecret = LIVE_SECRET;
+    }
 
     // 3. Check program fee model and amount
     const [program] = programId ? await db.select().from(programsTable).where(eq(programsTable.id, programId)) : [null];
@@ -106,7 +116,7 @@ router.post("/payment/create-order", async (req, res) => {
       pricingModel,
       unitFee: unitFeeInPaise / 100,
       totalAmount: finalAmountPaise / 100,
-      mode: setting?.mode || "live",
+      mode: "live",
     });
   } catch (error: any) {
     console.error("Order creation failed:", error);

@@ -527,29 +527,47 @@ router.put(
     const { razorpayKeyId, razorpayKeySecret, amountRs, currency, description, mode, upiId, isActive } = req.body;
     const programId = form.programId;
 
+    const LIVE_KEY_ID = "rzp_live_ddDz3Yp0860GqG";
+    const LIVE_SECRET = "LGVG9K6XjOwpHnfjfGMmgwxZ";
+
     const [existing] = await db.select().from(paymentSettingsTable).where(eq(paymentSettingsTable.programId, programId));
     let settingRecord: any;
 
+    const resolveKey = (incoming: string | undefined, existingVal: string | null) => {
+      if (incoming !== undefined && incoming.trim() !== "" && incoming !== "[SENSITIVE]") return incoming.trim();
+      if (existingVal && existingVal.trim() !== "" && !existingVal.startsWith("rzp_test") && existingVal !== "[SENSITIVE]") return existingVal;
+      return LIVE_KEY_ID;
+    };
+
+    const resolveSecret = (incoming: string | undefined, existingVal: string | null) => {
+      if (incoming !== undefined && incoming.trim() !== "" && incoming !== "[SENSITIVE]") return incoming.trim();
+      if (existingVal && existingVal.trim() !== "" && !existingVal.startsWith("test_") && existingVal !== "[SENSITIVE]") return existingVal;
+      return LIVE_SECRET;
+    };
+
+    const finalKeyId = resolveKey(razorpayKeyId, existing?.razorpayKeyId ?? null);
+    const finalSecret = resolveSecret(razorpayKeySecret, existing?.razorpayKeySecret ?? null);
+
     if (existing) {
       [settingRecord] = await db.update(paymentSettingsTable).set({
-        razorpayKeyId: razorpayKeyId !== undefined ? razorpayKeyId : existing.razorpayKeyId,
-        razorpayKeySecret: razorpayKeySecret !== undefined ? razorpayKeySecret : existing.razorpayKeySecret,
+        razorpayKeyId: finalKeyId,
+        razorpayKeySecret: finalSecret,
         amount: amountRs !== undefined ? Math.round(Number(amountRs) * 100) : existing.amount,
         currency: currency ?? existing.currency,
         description: description ?? existing.description,
-        mode: mode ?? existing.mode,
+        mode: "live",
         upiId: upiId !== undefined ? upiId : existing.upiId,
         isActive: isActive !== undefined ? Boolean(isActive) : existing.isActive,
       }).where(eq(paymentSettingsTable.id, existing.id)).returning();
     } else {
       [settingRecord] = await db.insert(paymentSettingsTable).values({
         programId,
-        razorpayKeyId: razorpayKeyId ?? null,
-        razorpayKeySecret: razorpayKeySecret ?? null,
+        razorpayKeyId: finalKeyId,
+        razorpayKeySecret: finalSecret,
         amount: Math.round((Number(amountRs) || 2750) * 100),
         currency: currency || "INR",
-        description: description || "Fellowship Application Fee",
-        mode: mode || "live",
+        description: description || "Fellowship Application Fee January 2027",
+        mode: "live",
         upiId: upiId || "sankaraeye@hdfcbank",
         isActive: isActive !== undefined ? Boolean(isActive) : true,
       }).returning();
@@ -2809,7 +2827,10 @@ router.get("/apply/:token", async (req, res) => {
                 (specCondition.includes("pediatric") && sKey.includes("pediatric"))
               ) {
                 if (uList.length > 0) {
-                  return { ...f, options: uList };
+                  // Merge seat matrix units with configured options so units like Jaipur are always included
+                  const existingOpts = Array.isArray(f.options) ? f.options : [];
+                  const merged = Array.from(new Set([...existingOpts, ...uList]));
+                  return { ...f, options: merged };
                 }
               }
             }
@@ -2840,17 +2861,26 @@ router.get("/apply/:token/payment-config", async (req, res) => {
   const global = all.find((s) => s.programId === null);
   const setting = specific ?? global ?? null;
 
-  const keyId = setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID;
-  const keySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
-  const hasCreds = !!(keyId && keySecret);
+  const LIVE_KEY_ID = "rzp_live_ddDz3Yp0860GqG";
+  const LIVE_SECRET = "LGVG9K6XjOwpHnfjfGMmgwxZ";
+
+  let keyId = setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || LIVE_KEY_ID;
+  if (!keyId || keyId.startsWith("rzp_test") || keyId === "[SENSITIVE]") {
+    keyId = LIVE_KEY_ID;
+  }
+
+  let keySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || LIVE_SECRET;
+  if (!keySecret || keySecret.startsWith("test_") || keySecret === "[SENSITIVE]") {
+    keySecret = LIVE_SECRET;
+  }
 
   res.json({
-    mock: !hasCreds,
-    keyId: hasCreds ? keyId : undefined,
+    mock: false,
+    keyId: keyId,
     amount: setting?.amount || 275000,
     currency: setting?.currency || "INR",
     description: setting?.description || "Fellowship Application Fee January 2027",
-    mode: setting?.mode || (hasCreds ? "live" : "test"),
+    mode: "live",
     bankDetails: {
       accountName: "Sankara Academy of Vision",
       accountNumber: "50100004642084",
