@@ -1928,9 +1928,9 @@ router.get("/candidates/:id/call-letter-pdf", requireAuth, async (req, res) => {
       phone: (req.query.phone as string) || c?.phone || "",
       address: (req.query.address as string) || c?.address || "",
       applicationId: sub?.id || (c?.id || 1),
-      interviewDate: (req.query.interviewDate as string) || (isRetinaSpecialty(spec) ? "1st June 2026, Monday" : "8th June 2026, Monday"),
+      interviewDate: (req.query.interviewDate as string) || (isRetinaSpecialty(spec) ? "07.12.2026, Monday" : "08.12.2026, Tuesday"),
       reportingTime: (req.query.reportingTime as string) || "8:00 AM Sharp",
-      venue: (req.query.venue as string) || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore – 560037",
+      venue: (req.query.venue as string) || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bengaluru – 560037",
     });
 
     const isRetina = isRetinaSpecialty(spec);
@@ -1994,7 +1994,7 @@ router.get("/candidates/:id/offer-letter-pdf", requireAuth, async (req, res) => 
     }
 
     const duration = req.query.duration ? Number(req.query.duration) : (isRetinaSpecialty(specialization) ? 24 : 18);
-    const effectiveDate = (req.query.effectiveDate as string) || "1st January 2027";
+    const effectiveDate = (req.query.effectiveDate as string) || "11.01.2027, Monday";
     const candidateName = (req.query.candidateName as string) || c?.fullName || "Dr. Tejaswini";
     const candidateCode = (req.query.candidateCode as string) || c?.candidateCode || "SAV-2027-001";
 
@@ -2009,7 +2009,7 @@ router.get("/candidates/:id/offer-letter-pdf", requireAuth, async (req, res) => 
       effectiveDate,
       stipendAmount: stipendFormatted,
       interviewDate: req.query.interviewDate as string,
-      inductionDate: (req.query.inductionDate as string) || "2nd & 3rd July 2026 at Bangalore Main Hospital (For Testing Only)",
+      inductionDate: (req.query.inductionDate as string) || "07.01.2027 & 08.01.2027 (Thursday & Friday) at Bengaluru",
     });
 
     const filename = `Fellowship_Offer_Letter_${candidateCode}.pdf`;
@@ -2125,8 +2125,8 @@ router.post("/candidates/:id/send-offer-letter", requireAuth, requireRole("super
     }
 
     const duration = req.body.duration ? Number(String(req.body.duration).replace(/[^0-9]/g, "")) : (isRetinaSpecialty(specialization) ? 24 : 18);
-    const effectiveDate = (req.body.effectiveDate || req.body.start_date as string) || "6th January 2027";
-    const interviewDate = (req.body.interviewDate || req.body.interview_date as string) || (isRetinaSpecialty(specialization) ? "7th December 2026" : "8th December 2026");
+    const effectiveDate = (req.body.effectiveDate || req.body.start_date as string) || "11.01.2027, Monday";
+    const interviewDate = (req.body.interviewDate || req.body.interview_date as string) || (isRetinaSpecialty(specialization) ? "07.12.2026, Monday" : "08.12.2026, Tuesday");
 
     const pdfBuffer = await generateOfferLetterPdf({
       candidateName: req.body.candidateName || c.fullName,
@@ -2139,7 +2139,7 @@ router.post("/candidates/:id/send-offer-letter", requireAuth, requireRole("super
       effectiveDate,
       stipendAmount: stipendFormatted,
       interviewDate,
-      inductionDate: req.body.inductionDate || "2nd & 3rd July 2026 at Bangalore Main Hospital (For Testing Only)",
+      inductionDate: req.body.inductionDate || "07.01.2027 & 08.01.2027 (Thursday & Friday) at Bengaluru",
     });
 
     const fileName = `Fellowship_Offer_Letter_${c.candidateCode}.pdf`;

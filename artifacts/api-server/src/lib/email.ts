@@ -338,10 +338,10 @@ export async function sendCallLetterWithAttachment(opts: {
   }
 
   const isRetina = opts.specialization ? (opts.specialization.toLowerCase().includes("retina") || opts.specialization.toLowerCase().includes("vitreo") || /\b(vr|mr)\b/i.test(opts.specialization)) : false;
-  const defaultDate = isRetina ? "7th December 2026, Monday" : "8th December 2026, Tuesday";
+  const defaultDate = isRetina ? "07.12.2026, Monday" : "08.12.2026, Tuesday";
   const dateStr = opts.interviewDate || defaultDate;
   const timeStr = opts.reportingTime || "8:00 AM Sharp";
-  const venueStr = opts.venue || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore – 560037";
+  const venueStr = opts.venue || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bengaluru – 560037";
 
   const success = await sendMailSafely(cfg.transporter, {
     from: `"${cfg.fromName}" <${cfg.from}>`,

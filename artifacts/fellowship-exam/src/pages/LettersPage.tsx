@@ -108,15 +108,15 @@ export default function LettersPage() {
   const [customUnitName, setCustomUnitName] = useState<string>("Bangalore");
   const [customCmo, setCustomCmo] = useState<string>("Dr. Kaushik Murali - Chief Medical Officer");
   const [customStipend, setCustomStipend] = useState<string>("40000");
-  const [customEffectiveDate, setCustomEffectiveDate] = useState<string>("1st January 2027");
+  const [customEffectiveDate, setCustomEffectiveDate] = useState<string>("11.01.2027, Monday");
   const [customDuration, setCustomDuration] = useState<number>(24);
-  const [customInterviewDate, setCustomInterviewDate] = useState<string>("1st June 2026, Monday");
+  const [customInterviewDate, setCustomInterviewDate] = useState<string>("07.12.2026, Monday");
   const [customReportingTime, setCustomReportingTime] = useState<string>("8:00 AM Sharp");
   const [customVenue, setCustomVenue] = useState<string>(
-    "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore – 560037"
+    "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bengaluru – 560037"
   );
   const [customInductionDate, setCustomInductionDate] = useState<string>(
-    "2nd & 3rd July 2026 at Bangalore Main Hospital (For Testing Only)"
+    "07.01.2027 & 08.01.2027 (Thursday & Friday) at Bengaluru"
   );
 
   // Loading states
@@ -182,7 +182,9 @@ export default function LettersPage() {
 
     const isRet = isRetina(cand);
     setCustomDuration(isRet ? 24 : 18);
-    setCustomInterviewDate(isRet ? "1st June 2026, Monday" : "8th June 2026, Monday");
+    setCustomInterviewDate(isRet ? "07.12.2026, Monday" : "08.12.2026, Tuesday");
+    setCustomInductionDate("07.01.2027 & 08.01.2027 (Thursday & Friday) at Bengaluru");
+    setCustomEffectiveDate("11.01.2027, Monday");
 
     const uId = cand.unitId || 1;
     setCustomUnitId(uId);
@@ -460,7 +462,7 @@ export default function LettersPage() {
             <Eye className="w-4 h-4 text-purple-600" />
           </div>
           <p className="text-2xl font-black text-purple-900 mt-2">{retinaCount}</p>
-          <span className="text-[10px] text-purple-700 font-semibold">1st June 2026 (8:00 AM)</span>
+          <span className="text-[10px] text-purple-700 font-semibold">07.12.2026, Monday (8:00 AM)</span>
         </Card>
 
         <Card className="rounded-2xl border-blue-100 bg-blue-50/40 shadow-sm p-4">
@@ -469,7 +471,7 @@ export default function LettersPage() {
             <GraduationCap className="w-4 h-4 text-blue-600" />
           </div>
           <p className="text-2xl font-black text-blue-900 mt-2">{anteriorCount}</p>
-          <span className="text-[10px] text-blue-700 font-semibold">8th June 2026 (8:00 AM)</span>
+          <span className="text-[10px] text-blue-700 font-semibold">08.12.2026, Tuesday (8:00 AM)</span>
         </Card>
 
         <Card className="rounded-2xl border-emerald-100 bg-emerald-50/40 shadow-sm p-4">
@@ -513,7 +515,7 @@ export default function LettersPage() {
                 <span className="font-black text-purple-950 block text-sm">Retina Fellowship Interviews</span>
                 <p className="text-purple-900 font-semibold flex items-center gap-2">
                   <Calendar className="w-3.5 h-3.5 text-purple-700" />
-                  <strong>Date:</strong> 1st June 2026, Monday · 8:00 AM Sharp
+                  <strong>Date:</strong> 07.12.2026, Monday · 8:00 AM Sharp
                 </p>
                 <p className="text-purple-800 text-[11px]">
                   <strong>Streams:</strong> Vitreo Retina (24 Months) & Medical Retina (18 Months)
@@ -529,7 +531,7 @@ export default function LettersPage() {
                 <span className="font-black text-blue-950 block text-sm">Anterior Segment & Subspecialties</span>
                 <p className="text-blue-900 font-semibold flex items-center gap-2">
                   <Calendar className="w-3.5 h-3.5 text-blue-700" />
-                  <strong>Date:</strong> 8th June 2026, Monday · 8:00 AM Sharp
+                  <strong>Date:</strong> 08.12.2026, Tuesday · 8:00 AM Sharp
                 </p>
                 <p className="text-blue-800 text-[11px]">
                   <strong>Streams:</strong> Cornea, Glaucoma, Cataract/IOL, Paediatrics, Refractive, Oculoplasty
@@ -575,7 +577,7 @@ export default function LettersPage() {
                         setCustomCandidateCode("SAV-2027-001");
                         setCustomSpecialty("Vitreo Retina");
                         setCustomDuration(24);
-                        setCustomInterviewDate("1st June 2026, Monday");
+                        setCustomInterviewDate("07.12.2026, Monday");
                       } else {
                         const c = candidates.find((x) => x.id === val);
                         if (c) handleSelectCandidate(c);
@@ -623,7 +625,7 @@ export default function LettersPage() {
                       setCustomSpecialty(val);
                       const isRet = val.toLowerCase().includes("retina");
                       setCustomDuration(isRet ? 24 : 18);
-                      setCustomInterviewDate(isRet ? "1st June 2026, Monday" : "8th June 2026, Monday");
+                      setCustomInterviewDate(isRet ? "07.12.2026, Monday" : "08.12.2026, Tuesday");
                     }}
                     className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-900 shadow-sm"
                   >
@@ -647,7 +649,7 @@ export default function LettersPage() {
                   <Input
                     value={customInterviewDate}
                     onChange={(e) => setCustomInterviewDate(e.target.value)}
-                    placeholder="e.g. 1st June 2026, Monday"
+                    placeholder="e.g. 07.12.2026, Monday or 08.12.2026, Tuesday"
                     className="rounded-xl border-slate-200 text-xs font-medium h-10"
                   />
                 </div>
@@ -690,7 +692,7 @@ export default function LettersPage() {
                       Ready to generate Call Letter for Dr. {cleanDoctorName(customName || "Tejaswini")}
                     </p>
                     <p className="text-purple-800 font-medium">
-                      Stream: <strong>{customSpecialty.toLowerCase().includes("retina") ? "Retina Stream (1st June 2026)" : "Anterior Stream (8th June 2026)"}</strong>
+                      Stream: <strong>{customSpecialty.toLowerCase().includes("retina") ? "Retina Stream (07.12.2026, Monday)" : "Anterior Stream (08.12.2026, Tuesday)"}</strong>
                     </p>
                   </div>
                 </div>
@@ -796,7 +798,7 @@ export default function LettersPage() {
                   {/* Selection Assessment & Interview Schedule Card */}
                   <div className="rounded-xl border-2 border-[#0b4a8f] overflow-hidden bg-slate-50/60 shadow-xs">
                     <div className="bg-[#0b4a8f] text-white px-3 py-1.5 font-bold text-xs uppercase tracking-wider flex items-center justify-between">
-                      <span>Selection Assessment & Interview Schedule</span>
+                      <span>Candidate Designated Selection & Interview Schedule</span>
                       <span className="text-[10px] text-blue-200">Mandatory In-Person Presence</span>
                     </div>
                     <div className="p-3 space-y-2 text-xs">
@@ -815,6 +817,45 @@ export default function LettersPage() {
                     </div>
                   </div>
 
+                  {/* Official Entrance, Selection, Induction & Joining Schedule Table */}
+                  <div className="rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+                    <div className="bg-[#062b54] text-white px-3 py-1.5 font-bold text-xs uppercase tracking-wider flex items-center justify-between">
+                      <span>Official Fellowship Entrance, Induction & Joining Schedule</span>
+                      <span className="text-[10px] text-blue-200">Official SAV Calendar</span>
+                    </div>
+                    <table className="w-full text-left text-[11px]">
+                      <thead>
+                        <tr className="bg-slate-100 text-[10px] font-black text-slate-700 uppercase border-b border-slate-200">
+                          <th className="py-2 px-3">Dates</th>
+                          <th className="py-2 px-3">Event</th>
+                          <th className="py-2 px-3">Location</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        <tr className={customSpecialty.toLowerCase().includes("retina") ? "bg-purple-50/80 font-bold" : "bg-white"}>
+                          <td className="py-2 px-3 text-[#0b4a8f]">07.12.2026, Monday</td>
+                          <td className="py-2 px-3">Retina Fellowship entrance & selection</td>
+                          <td className="py-2 px-3">Bengaluru</td>
+                        </tr>
+                        <tr className={!customSpecialty.toLowerCase().includes("retina") ? "bg-blue-50/80 font-bold" : "bg-slate-50/50"}>
+                          <td className="py-2 px-3 text-[#0b4a8f]">08.12.2026, Tuesday</td>
+                          <td className="py-2 px-3">Anterior Segment Fellowship entrance & selection</td>
+                          <td className="py-2 px-3">Bengaluru</td>
+                        </tr>
+                        <tr className="bg-white">
+                          <td className="py-2 px-3 text-[#0b4a8f]">07.01.2027 & 08.01.2027, Thursday & Friday</td>
+                          <td className="py-2 px-3">Induction new fellows</td>
+                          <td className="py-2 px-3">Bengaluru</td>
+                        </tr>
+                        <tr className="bg-slate-50/50">
+                          <td className="py-2 px-3 text-[#0b4a8f]">11.01.2027, Monday</td>
+                          <td className="py-2 px-3">New Fellows Reporting</td>
+                          <td className="py-2 px-3">Units</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
                   {/* Key Updates */}
                   <div className="space-y-1 text-[11px] text-slate-700">
                     <p className="font-bold text-xs text-[#0b4a8f] uppercase tracking-wide">
@@ -824,8 +865,8 @@ export default function LettersPage() {
                       <li>PG (MS/MD/DNB) results must be cleared prior to final fellowship admission.</li>
                       <li>Applicants under Government bond or Compulsory Rural Service must submit 'No Objection Certificate' (NOC).</li>
                       <li>Selected fellows must submit State Medical Council NOC within 3 days of accepting the offer.</li>
-                      <li>Mandatory 2-day induction program scheduled at Bangalore on 2nd & 3rd January 2027.</li>
-                      <li>Unit reporting scheduled for 6th January 2027 with applicable monthly stipend.</li>
+                      <li>Mandatory 2-day induction program scheduled at Bengaluru on 07.01.2027 & 08.01.2027 (Thursday & Friday).</li>
+                      <li>Unit reporting scheduled for 11.01.2027 (Monday) with applicable monthly stipend.</li>
                     </ol>
                   </div>
 
@@ -967,11 +1008,11 @@ export default function LettersPage() {
 
                           <td className="py-3.5 px-4">
                             <div className="font-black text-slate-900">
-                              {retinaStream ? "1st June 2026, Monday" : "8th June 2026, Monday"}
+                              {retinaStream ? "07.12.2026, Monday" : "08.12.2026, Tuesday"}
                             </div>
                             <div className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
                               <Clock className="w-3 h-3 text-slate-400" />
-                              <span>8:00 AM Sharp · Bangalore Main Hospital</span>
+                              <span>8:00 AM Sharp · Bengaluru Main Hospital</span>
                             </div>
                           </td>
 
@@ -1063,7 +1104,7 @@ export default function LettersPage() {
                         setCustomCandidateCode("SAV-2027-001");
                         setCustomSpecialty("Vitreo Retina");
                         setCustomDuration(24);
-                        setCustomInterviewDate("1st June 2026, Monday");
+                        setCustomInterviewDate("07.12.2026, Monday");
                       } else {
                         const c = candidates.find((x) => x.id === val);
                         if (c) handleSelectCandidate(c);
@@ -1187,21 +1228,21 @@ export default function LettersPage() {
                   />
                 </div>
 
-                {/* 8. Mandatory Induction (Editable & Marked for Testing) */}
+                {/* 8. Mandatory Induction (Editable) */}
                 <div className="sm:col-span-2 space-y-1.5">
                   <div className="flex items-center justify-between">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
                       Mandatory Induction Program *
                     </Label>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300">
-                      For Testing Only
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      Bengaluru Central
                     </span>
                   </div>
                   <Input
                     value={customInductionDate}
                     onChange={(e) => setCustomInductionDate(e.target.value)}
-                    placeholder="e.g. 2nd & 3rd July 2026 at Bangalore Main Hospital (For Testing Only)"
-                    className="rounded-xl border-amber-300 bg-amber-50/20 text-xs font-semibold h-10"
+                    placeholder="e.g. 07.01.2027 & 08.01.2027 (Thursday & Friday) at Bengaluru"
+                    className="rounded-xl border-slate-200 text-xs font-semibold h-10"
                   />
                 </div>
               </div>
@@ -1296,9 +1337,6 @@ export default function LettersPage() {
                           <td className="py-2 px-3 font-bold text-slate-500">Mandatory Induction</td>
                           <td className="py-2 px-3 font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
                             <span>{customInductionDate}</span>
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300">
-                              For Testing Only
-                            </span>
                           </td>
                         </tr>
                       </tbody>
@@ -1311,7 +1349,7 @@ export default function LettersPage() {
                       Section A: Stipend, Deposit & Core Leave Rules
                     </h4>
                     <ol className="list-decimal pl-5 space-y-1 text-[11px] leading-relaxed text-slate-700 font-sans">
-                      <li><strong>Induction Program:</strong> Mandatory 2-day induction program scheduled at Sankara Eye Hospital, Bangalore on <strong>{customInductionDate}</strong>.</li>
+                      <li><strong>Induction Program:</strong> Mandatory 2-day induction program scheduled at Sankara Eye Hospital, Bengaluru on <strong>{customInductionDate}</strong>.</li>
                       <li><strong>Monthly Stipend:</strong> Stipend of ₹ {Number(customStipend || 40000).toLocaleString("en-IN")}/- per month subject to statutory deductions.</li>
                       <li><strong>Security Deposit:</strong> Entire 1st month stipend + 15 days of 2nd & 3rd months held interest-free until completion.</li>
                       <li><strong>Earned Leave:</strong> 1-day leave earned per month of tenure apart from declared holidays.</li>

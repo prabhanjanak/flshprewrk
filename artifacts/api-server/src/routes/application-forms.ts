@@ -731,7 +731,7 @@ router.get(
       const spec = specs.length > 0 ? specs.join(", ") : (sub.specialization || "Ophthalmology Fellowship");
 
       const isRetina = isRetinaSpecialty(spec);
-      const defaultInterviewDate = isRetina ? "7th December 2026, Monday" : "8th December 2026, Tuesday";
+      const defaultInterviewDate = isRetina ? "07.12.2026, Monday" : "08.12.2026, Tuesday";
 
       const pdfBuffer = await generateCallLetterPdf({
         candidateName: sub.fullName,
@@ -743,7 +743,7 @@ router.get(
         applicationId: sub.id,
         interviewDate: (req.query.interviewDate as string) || defaultInterviewDate,
         reportingTime: (req.query.reportingTime as string) || "8:00 AM Sharp",
-        venue: (req.query.venue as string) || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore – 560037",
+        venue: (req.query.venue as string) || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bengaluru – 560037",
       });
 
       const filename = `Interview_Call_Letter_${candidateCode}.pdf`;
@@ -780,9 +780,9 @@ router.post(
       const spec = (req.body.specialization as string) || (specs.length > 0 ? specs.join(", ") : (sub.specialization || "Ophthalmology Fellowship"));
 
       const isRetina = isRetinaSpecialty(spec);
-      const interviewDate = (req.body.interviewDate as string) || (isRetina ? "7th December 2026, Monday" : "8th December 2026, Tuesday");
+      const interviewDate = (req.body.interviewDate as string) || (isRetina ? "07.12.2026, Monday" : "08.12.2026, Tuesday");
       const reportingTime = (req.body.reportingTime as string) || "8:00 AM Sharp";
-      const venue = (req.body.venue as string) || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore – 560037";
+      const venue = (req.body.venue as string) || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bengaluru – 560037";
 
       const pdfBuffer = await generateCallLetterPdf({
         candidateName: sub.fullName,

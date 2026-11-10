@@ -176,11 +176,11 @@ export async function generateCallLetterPdf(data: CallLetterData): Promise<Buffe
       const contentWidth = 515;
       const { sefLogo, savLogo } = getLogoPaths();
 
-      const defaultInterviewDate = isRetina ? "7th December 2026, Monday" : "8th December 2026, Tuesday";
+      const defaultInterviewDate = isRetina ? "07.12.2026, Monday" : "08.12.2026, Tuesday";
       const interviewDate = data.interviewDate || defaultInterviewDate;
       const reportingTime = data.reportingTime || "8:00 AM Sharp";
-      const venue = data.venue || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore – 560037";
-      const offerDayText = isRetina ? "7th December 2026" : "8th December 2026";
+      const venue = data.venue || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bengaluru – 560037";
+      const offerDayText = isRetina ? "07.12.2026 (Monday)" : "08.12.2026 (Tuesday)";
 
       const letterTitle = isRetina
         ? "FELLOWSHIP INTERVIEW CALL LETTER — VITREO RETINA (VR) & MEDICAL RETINA (MR)"
@@ -293,74 +293,106 @@ export async function generateCallLetterPdf(data: CallLetterData): Promise<Buffe
       doc.strokeColor(colors.border).lineWidth(0.8).moveTo(left, 42).lineTo(left + contentWidth, 42).stroke();
 
       // Selection Process Intro
-      curY = 56;
-      doc.fillColor(colors.dark).font("Helvetica").fontSize(8.6).text(
-        "The selection process would comprise of an objective assessment of your theoretical knowledge and an OSCE and skills evaluation with an interview by a panel of faculty.",
-        left, curY, { width: contentWidth, lineGap: 2.2 }
-      );
-
-      // Interview Schedule & Venue Card
-      curY = doc.y + 14;
-      doc.rect(left, curY, contentWidth, 96).fill("#f8fafc");
-      doc.strokeColor(colors.navy).lineWidth(1.2).rect(left, curY, contentWidth, 96).stroke();
-
-      doc.rect(left, curY, contentWidth, 20).fill(colors.navy);
-      doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(8.5).text("SELECTION ASSESSMENT & INTERVIEW SCHEDULE", left + 10, curY + 6);
-
-      let sy = curY + 28;
-      doc.fillColor(colors.slate).font("Helvetica-Bold").fontSize(8).text("DATE & DAY:", left + 14, sy);
-      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(9.5).text(interviewDate, left + 120, sy);
-
-      sy += 20;
-      doc.fillColor(colors.slate).font("Helvetica-Bold").fontSize(8).text("REPORTING TIME:", left + 14, sy);
-      doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(9.5).text(reportingTime, left + 120, sy);
-
-      sy += 20;
-      doc.fillColor(colors.slate).font("Helvetica-Bold").fontSize(8).text("VENUE ADDRESS:", left + 14, sy);
+      curY = 50;
       doc.fillColor(colors.dark).font("Helvetica").fontSize(8.2).text(
-        "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore – 560037",
-        left + 120, sy, { width: 375 }
+        "The selection process comprises an objective assessment of theoretical knowledge, an OSCE, and a clinical skills evaluation with a panel interview by faculty members.",
+        left, curY, { width: contentWidth, lineGap: 1.8 }
       );
+
+      // Candidate's Designated Schedule Card
+      curY = doc.y + 10;
+      doc.rect(left, curY, contentWidth, 72).fill("#f8fafc");
+      doc.strokeColor(colors.navy).lineWidth(1).rect(left, curY, contentWidth, 72).stroke();
+
+      doc.rect(left, curY, contentWidth, 18).fill(colors.navy);
+      doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(8).text("CANDIDATE DESIGNATED SELECTION & INTERVIEW SCHEDULE", left + 10, curY + 5);
+
+      let sy = curY + 24;
+      doc.fillColor(colors.slate).font("Helvetica-Bold").fontSize(7.8).text("DATE & DAY:", left + 12, sy);
+      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(8.8).text(interviewDate, left + 115, sy);
+
+      sy += 16;
+      doc.fillColor(colors.slate).font("Helvetica-Bold").fontSize(7.8).text("REPORTING TIME:", left + 12, sy);
+      doc.fillColor(colors.dark).font("Helvetica-Bold").fontSize(8.8).text(reportingTime, left + 115, sy);
+
+      sy += 16;
+      doc.fillColor(colors.slate).font("Helvetica-Bold").fontSize(7.8).text("VENUE ADDRESS:", left + 12, sy);
+      doc.fillColor(colors.dark).font("Helvetica").fontSize(8).text(venue, left + 115, sy, { width: 380 });
+
+      // Official Master Schedule Table (Exact Dates as Mandated)
+      curY += 80;
+      doc.rect(left, curY, contentWidth, 18).fill(colors.tableHeader);
+      doc.strokeColor(colors.border).lineWidth(0.8).rect(left, curY, contentWidth, 18).stroke();
+      doc.fillColor(colors.darkNavy).font("Helvetica-Bold").fontSize(8.2).text("OFFICIAL FELLOWSHIP ENTRANCE, INDUCTION & JOINING SCHEDULE", left + 8, curY + 5);
+
+      curY += 18;
+      // Table Header
+      doc.rect(left, curY, contentWidth, 15).fill("#eef2f6");
+      doc.strokeColor(colors.border).lineWidth(0.5).rect(left, curY, contentWidth, 15).stroke();
+      doc.fillColor(colors.darkNavy).font("Helvetica-Bold").fontSize(7.5).text("Dates", left + 8, curY + 4);
+      doc.fillColor(colors.darkNavy).font("Helvetica-Bold").fontSize(7.5).text("Event", left + 175, curY + 4);
+      doc.fillColor(colors.darkNavy).font("Helvetica-Bold").fontSize(7.5).text("Location", left + 420, curY + 4);
+
+      curY += 15;
+      const scheduleRows = [
+        { date: "07.12.2026, Monday", event: "Retina Fellowship entrance & selection", loc: "Bengaluru", active: isRetina },
+        { date: "08.12.2026, Tuesday", event: "Anterior Segment Fellowship entrance & selection", loc: "Bengaluru", active: !isRetina },
+        { date: "07.01.2027 & 08.01.2027\nThursday & Friday", event: "Induction new fellows", loc: "Bengaluru", active: false },
+        { date: "11.01.2027, Monday", event: "New Fellows Reporting", loc: "Units", active: false },
+      ];
+
+      scheduleRows.forEach((row, idx) => {
+        const rowH = row.date.includes("\n") ? 22 : 15;
+        const rowBg = row.active ? "#eff6ff" : (idx % 2 === 0 ? "#ffffff" : "#f8fafc");
+        doc.rect(left, curY, contentWidth, rowH).fill(rowBg);
+        doc.strokeColor(colors.border).lineWidth(0.3).rect(left, curY, contentWidth, rowH).stroke();
+
+        doc.fillColor(row.active ? colors.navy : colors.dark).font(row.active ? "Helvetica-Bold" : "Helvetica").fontSize(7.5).text(row.date, left + 8, curY + 3, { width: 160 });
+        doc.fillColor(colors.dark).font("Helvetica").fontSize(7.5).text(row.event, left + 175, curY + (row.date.includes("\n") ? 6 : 3), { width: 235 });
+        doc.fillColor(colors.slate).font("Helvetica-Bold").fontSize(7.5).text(row.loc, left + 420, curY + (row.date.includes("\n") ? 6 : 3));
+
+        curY += rowH;
+      });
 
       // Physical Verification & Offer Release Note
-      curY += 108;
-      doc.fillColor(colors.dark).font("Helvetica").fontSize(8.4).text(
-        `You are requested to carry your educational credentials and a complete CV, one passport size color photograph and relevant original certificates for verification at the interview. Selected candidates will be given an offer by close of day on the ${offerDayText}, other candidates in the merit list would be in the waiting list.`,
-        left, curY, { width: contentWidth, lineGap: 2.2 }
+      curY += 8;
+      doc.fillColor(colors.dark).font("Helvetica").fontSize(8).text(
+        `You are requested to carry your educational credentials, a complete CV, one passport-size color photograph, and relevant original certificates for verification at the interview. Selected candidates will be given an offer by close of day on the selection day (${offerDayText}); other candidates in the merit list would be placed on the waiting list.`,
+        left, curY, { width: contentWidth, lineGap: 1.8 }
       );
 
       // Key Updates Box
-      curY = doc.y + 16;
-      doc.rect(left, curY, contentWidth, 18).fill(colors.tableHeader);
-      doc.strokeColor(colors.border).lineWidth(0.8).rect(left, curY, contentWidth, 18).stroke();
-      doc.fillColor(colors.darkNavy).font("Helvetica-Bold").fontSize(8.5).text("KEY UPDATES & MANDATORY REGULATIONS", left + 10, curY + 5);
+      curY = doc.y + 10;
+      doc.rect(left, curY, contentWidth, 16).fill(colors.tableHeader);
+      doc.strokeColor(colors.border).lineWidth(0.8).rect(left, curY, contentWidth, 16).stroke();
+      doc.fillColor(colors.darkNavy).font("Helvetica-Bold").fontSize(8).text("KEY UPDATES & MANDATORY REGULATIONS", left + 8, curY + 4);
 
       const keyUpdates = [
-        "The Applicants appearing for the interviews will have to clear the results of PG(MS/MD) and DNB (Theory & Practical’s), those appearing for the PG exams and awaiting for the results shall not be eligible for the interview final selection process.",
-        "Applicants who are under Government bond or Compulsory Rural Service will have to submit ‘No Objection Certificate’ during the time of examination.",
-        "All the selected fellows will need to submit NOC from their State Medical Council within 3 days of accepting the Fellowship Offer, without which the joining will not be agreeable.",
-        "Selected Fellows will have to undergo a 2 day induction program mandatory at Bangalore on 7th & 8th January 2027 (Thursday & Friday), a security non-refundable deposit of Rs.8850 including GST shall be collected towards this induction program.",
-        "The reporting at the selected units shall be on 11th January 2027 (Monday). You would be paid a stipend for the duration of the training.",
+        "Applicants appearing for interviews must have cleared the results of PG (MS/MD) and DNB (Theory & Practical). Candidates appearing for PG exams and awaiting results are not eligible for the interview final selection process.",
+        "Applicants under Government bond or Compulsory Rural Service must submit a 'No Objection Certificate' (NOC) during the examination.",
+        "All selected fellows must submit an NOC from their State Medical Council within 3 days of accepting the Fellowship Offer, without which joining will not be approved.",
+        "Selected Fellows will have to undergo a 2-day mandatory induction program at Bengaluru on 07.01.2027 & 08.01.2027 (Thursday & Friday). A security non-refundable deposit of Rs. 8,850 including GST shall be collected towards this induction program.",
+        "The reporting at the selected hospital units shall be on 11.01.2027 (Monday). Fellows would be paid the prescribed stipend for the training duration.",
       ];
 
-      curY += 26;
+      curY += 20;
       keyUpdates.forEach((item, idx) => {
-        doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(8.2).text(`${idx + 1}.`, left + 6, curY);
-        doc.fillColor(colors.dark).font("Helvetica").fontSize(8.2).text(item, left + 20, curY, {
-          width: contentWidth - 26,
-          lineGap: 2,
+        doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(7.6).text(`${idx + 1}.`, left + 6, curY);
+        doc.fillColor(colors.dark).font("Helvetica").fontSize(7.6).text(item, left + 18, curY, {
+          width: contentWidth - 24,
+          lineGap: 1.5,
         });
-        curY = doc.y + 7;
+        curY = doc.y + 4.5;
       });
 
       // Coordinator Clarifications Box
-      curY += 14;
-      doc.rect(left, curY, contentWidth, 32).fill("#fffbeb");
-      doc.strokeColor("#f59e0b").lineWidth(0.8).rect(left, curY, contentWidth, 32).stroke();
+      curY += 6;
+      doc.rect(left, curY, contentWidth, 26).fill("#fffbeb");
+      doc.strokeColor("#f59e0b").lineWidth(0.8).rect(left, curY, contentWidth, 26).stroke();
 
-      doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(9.5).text(
+      doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(8.8).text(
         "For clarifications contact Radhika (Course Coordinator) on 9666677505.",
-        left, curY + 10, { width: contentWidth, align: "center" }
+        left, curY + 8, { width: contentWidth, align: "center" }
       );
 
       // Page 2 Footer
@@ -405,11 +437,11 @@ export async function generateOfferLetterPdf(data: OfferLetterData): Promise<Buf
       const contentWidth = 505;
       const { sefLogo, savLogo } = getLogoPaths();
 
-      const defaultInterviewDate = isRetinaSpecialty(data.specialization) ? "7th December 2026" : "8th December 2026";
+      const defaultInterviewDate = isRetinaSpecialty(data.specialization) ? "07.12.2026, Monday" : "08.12.2026, Tuesday";
       const interviewDate = data.interviewDate || defaultInterviewDate;
       const phaseDetails = formatPhaseDurations(data.specialization, data.durationMonths);
-      const effectiveDate = data.effectiveDate || "11th January 2027 (Monday)";
-      const unit = data.unitName || "Bangalore Main Hospital";
+      const effectiveDate = data.effectiveDate || "11.01.2027, Monday";
+      const unit = data.unitName || "Bengaluru Main Hospital";
       
       // Clean up CMO / Reporting doctor name
       let reportingDoctor = data.cmoName || "Dr. Kaushik Murali";
@@ -424,7 +456,7 @@ export async function generateOfferLetterPdf(data: OfferLetterData): Promise<Buf
       const issueDate = data.issuanceDate || new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
       const cleanName = cleanDoctorName(data.candidateName);
       const durationText = `${phaseDetails.totalMonths} Months`;
-      const inductionDates = data.inductionDate || "7th & 8th January 2027 (Thursday & Friday) at Bengaluru";
+      const inductionDates = data.inductionDate || "07.01.2027 & 08.01.2027 (Thursday & Friday) at Bengaluru";
 
       // ═══════════════════════════════════════════════════════════════════════
       // PAGE 1: Header, Recipient, Subject, Intro, Table & Section A
