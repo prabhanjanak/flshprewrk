@@ -16,7 +16,7 @@ import {
   LayoutGrid, Plus, Settings, Users, ArrowRight, CheckCircle2,
   Clock, DoorOpen, UserCheck, X, FileText, Loader2,
   GripVertical, ExternalLink, ShieldAlert,
-  AlertTriangle, HelpCircle, Grid3x3
+  AlertTriangle, HelpCircle, Grid3x3, Sparkles
 } from "lucide-react";
 import { useToast } from "../hooks/use-toast";
 import { getCleanObjectPath } from "../lib/utils";
@@ -54,6 +54,12 @@ interface DoctorAssignment {
   specialityId?: number | null;
   specialityName?: string;
   submissionId?: number | null;
+  photoUrl?: string | null;
+  email?: string;
+  phone?: string;
+  qualification?: string;
+  pgQualifications?: string;
+  collegeName?: string;
 }
 
 interface PanelEntry {
@@ -100,6 +106,7 @@ function DoctorView({ toast, qc }: { toast: ReturnType<typeof import("../hooks/u
   const [seatMatrixOpen, setSeatMatrixOpen] = useState(false);
   const [activeDossierTab, setActiveDossierTab] = useState<"profile" | "pdf" | "lors" | "docs">("profile");
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "completed">("all");
   const [score, setScore] = useState("");
   const [remarks, setRemarks] = useState("");
 
@@ -165,15 +172,25 @@ function DoctorView({ toast, qc }: { toast: ReturnType<typeof import("../hooks/u
 
   const isEngaged = myStatus?.isEngaged ?? false;
 
-  // Filter assignments by search term
-  const filteredAssignments = assignments.filter(a =>
-    a.candidateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.candidateCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (a.specialityName ?? "").toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const pendingCount = assignments.filter(a => !a.existingScore).length;
+  const completedCount = assignments.filter(a => !!a.existingScore).length;
+
+  // Filter assignments by search term and status
+  const filteredAssignments = assignments.filter(a => {
+    const matchesSearch =
+      a.candidateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.candidateCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (a.specialityName ?? "").toLowerCase().includes(searchTerm.toLowerCase());
+    
+    if (!matchesSearch) return false;
+    if (statusFilter === "pending") return !a.existingScore;
+    if (statusFilter === "completed") return !!a.existingScore;
+    return true;
+  });
 
   return (
     <div className="p-6 space-y-6">
+      {/* Active Panel Engagement Card */}
       <Card className={`border-2 ${isEngaged ? "border-red-400 bg-red-50/50 dark:bg-red-950/20" : "border-green-400 bg-green-50/50 dark:bg-green-950/20"}`}>
         <CardContent className="flex items-center justify-between py-4 flex-wrap gap-3">
           <div className="flex items-center gap-3">
@@ -211,31 +228,92 @@ function DoctorView({ toast, qc }: { toast: ReturnType<typeof import("../hooks/u
         </CardContent>
       </Card>
 
+      {/* Explanatory Panel Banner (Mind Matter Universal Roster vs Specialty Panel) */}
+      {isMindMatterDoctor ? (
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 flex items-start gap-3 shadow-xs">
+          <Sparkles className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+          <div>
+            <p className="font-bold text-amber-950 text-xs uppercase tracking-wider">
+              Mind Matter Station — Universal Cohort Roster
+            </p>
+            <p className="text-[11px] text-amber-800 font-medium mt-0.5 leading-relaxed">
+              All candidates across the cohort are displayed below without pre-assigned queue limits. As students finish other stations, the next available student is sent to Mind Matter. <strong>Only 1 doctor from the Mind Matter panel enters the single mark (Max 10).</strong>
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-start gap-3 shadow-xs">
+          <Stethoscope className="h-5 w-5 text-indigo-600 mt-0.5 shrink-0" />
+          <div>
+            <p className="font-bold text-indigo-950 text-xs uppercase tracking-wider">
+              Specialty Interview Panel — Consensus Score Entry
+            </p>
+            <p className="text-[11px] text-indigo-800 font-medium mt-0.5 leading-relaxed">
+              Doctors on this panel interview candidates together. <strong>One doctor enters the single consensus mark (Max 50)</strong> on behalf of the panel. No multi-doctor averaging is needed. Click &ldquo;Examine &amp; Score&rdquo; to view the candidate&rsquo;s prominent photograph and complete credentials.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Header and Filter Controls */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold font-mono">My Interview Assignments</h1>
-          {isMindMatterDoctor ? (
-            <Badge className={`mt-1.5 border text-[10px] font-black uppercase tracking-wider px-2 py-0.5 ${
-              myStatus?.marksEntryEnabled 
-                ? "bg-amber-100 text-amber-800 border-amber-300" 
-                : "bg-slate-100 text-slate-800 border-slate-350"
-            }`}>
-              {myStatus?.marksEntryEnabled 
-                ? "Mind Matter Panel — Score Entry Enabled (Max 10 Marks)" 
-                : "Mind Matter Panel — View Only"}
-            </Badge>
-          ) : (
-            <Badge className={`mt-1.5 border text-[10px] font-black uppercase tracking-wider px-2 py-0.5 ${
-              myStatus?.marksEntryEnabled 
-                ? "bg-emerald-100 text-emerald-800 border-emerald-300" 
-                : "bg-slate-100 text-slate-800 border-slate-350"
-            }`}>
-              {myStatus?.marksEntryEnabled 
-                ? "VIVA Panel — Score Entry Enabled (Max 50 Marks)" 
-                : "VIVA Panel — View Only"}
-            </Badge>
-          )}
-          <p className="text-muted-foreground text-sm mt-1">{assignments.length} candidates assigned · {filteredAssignments.length} shown</p>
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            {isMindMatterDoctor ? (
+              <Badge className={`border text-[10px] font-black uppercase tracking-wider px-2 py-0.5 ${
+                myStatus?.marksEntryEnabled 
+                  ? "bg-amber-100 text-amber-800 border-amber-300" 
+                  : "bg-slate-100 text-slate-800 border-slate-350"
+              }`}>
+                {myStatus?.marksEntryEnabled 
+                  ? "Mind Matter Panel — Score Entry Enabled (Max 10 Marks)" 
+                  : "Mind Matter Panel — View Only"}
+              </Badge>
+            ) : (
+              <Badge className={`border text-[10px] font-black uppercase tracking-wider px-2 py-0.5 ${
+                myStatus?.marksEntryEnabled 
+                  ? "bg-emerald-100 text-emerald-800 border-emerald-300" 
+                  : "bg-slate-100 text-slate-800 border-slate-350"
+              }`}>
+                {myStatus?.marksEntryEnabled 
+                  ? "VIVA Panel — Score Entry Enabled (Max 50 Marks)" 
+                  : "VIVA Panel — View Only"}
+              </Badge>
+            )}
+
+            {/* Filter Pills */}
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
+              <button
+                type="button"
+                onClick={() => setStatusFilter("all")}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                  statusFilter === "all" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                All ({assignments.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter("pending")}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                  statusFilter === "pending" ? "bg-white text-amber-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Pending ({pendingCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter("completed")}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
+                  statusFilter === "completed" ? "bg-white text-emerald-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Scored ({completedCount})
+              </button>
+            </div>
+          </div>
+          <p className="text-muted-foreground text-xs mt-1.5">{assignments.length} candidates in roster · {filteredAssignments.length} shown</p>
         </div>
         <div className="flex items-center gap-2">
           {/* Search Box */}
@@ -280,7 +358,7 @@ function DoctorView({ toast, qc }: { toast: ReturnType<typeof import("../hooks/u
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Candidate</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Code</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Scheduled</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Score Status</th>
                     <th className="text-right px-4 py-3 font-medium text-muted-foreground">Action</th>
                   </tr>
                 </thead>
@@ -288,23 +366,43 @@ function DoctorView({ toast, qc }: { toast: ReturnType<typeof import("../hooks/u
                   {filteredAssignments.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="text-center py-10 text-muted-foreground text-xs font-semibold">
-                        No candidates match your search.
+                        No candidates match your search or filter.
                       </td>
                     </tr>
                   ) : filteredAssignments.map((a) => (
                     <tr key={a.id} className="border-b last:border-0 hover:bg-muted/20">
-                      <td className="px-4 py-3 font-medium">
-                        <div>
-                          <button
-                            onClick={() => setExamCandidateId(a.candidateId)}
-                            className="font-bold text-indigo-600 hover:text-indigo-850 hover:underline text-left cursor-pointer transition-colors"
-                            title="Click to open Candidate Examination & Full Application Dossier"
-                          >
-                            {a.candidateName}
-                          </button>
-                          {a.specialityName && (
-                            <span className="block text-[10px] text-muted-foreground">{a.specialityName}</span>
-                          )}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          {/* Candidate Photo Thumbnail */}
+                          <div className="h-11 w-11 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0 flex items-center justify-center font-bold text-slate-500 shadow-2xs">
+                            {a.photoUrl ? (
+                              <img
+                                src={a.photoUrl.startsWith("http") || a.photoUrl.startsWith("data:") ? a.photoUrl : `/api/storage${getCleanObjectPath(a.photoUrl)}?token=${localStorage.getItem("fellowship_token")}`}
+                                alt={a.candidateName}
+                                className="h-full w-full object-cover"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                              />
+                            ) : (
+                              a.candidateName.charAt(0).toUpperCase()
+                            )}
+                          </div>
+                          <div>
+                            <button
+                              onClick={() => setExamCandidateId(a.candidateId)}
+                              className="font-bold text-slate-900 hover:text-indigo-600 hover:underline text-left cursor-pointer transition-colors"
+                              title="Click to view candidate application dossier & enter marks"
+                            >
+                              {a.candidateName}
+                            </button>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-[10px] text-muted-foreground font-mono">{a.candidateCode}</span>
+                              {a.specialityName && (
+                                <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-indigo-200 text-indigo-700 bg-indigo-50/50">
+                                  {a.specialityName}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </td>
                       <td className="px-4 py-3 font-mono text-xs">{a.candidateCode}</td>
@@ -312,21 +410,29 @@ function DoctorView({ toast, qc }: { toast: ReturnType<typeof import("../hooks/u
                         {a.scheduledAt ? new Date(a.scheduledAt).toLocaleString("en-IN") : "—"}
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant={a.status === "completed" ? "default" : "secondary"} className="text-[10px]">
-                          {a.existingScore 
-                            ? `Score: ${a.existingScore.score}/${isMindMatterDoctor ? 10 : 50}` 
-                            : a.status}
-                        </Badge>
+                        {a.existingScore ? (
+                          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[10px] font-black font-mono">
+                            Score: {a.existingScore.score} / {isMindMatterDoctor ? 10 : 50}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-800 border-amber-300 font-bold">
+                            Pending
+                          </Badge>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <Button
                             size="sm"
-                            className="bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs gap-1.5 rounded-xl h-9 px-3.5 shadow-sm"
+                            className={`font-bold text-xs gap-1.5 rounded-xl h-9 px-3.5 shadow-sm text-white ${
+                              a.existingScore
+                                ? "bg-indigo-600 hover:bg-indigo-700"
+                                : "bg-orange-600 hover:bg-orange-700"
+                            }`}
                             onClick={() => setExamCandidateId(a.candidateId)}
                           >
                             <Stethoscope className="h-3.5 w-3.5" />
-                            Examine & Score
+                            {a.existingScore ? "Review / Edit Score" : (isMindMatterDoctor ? "Score Mind Matter" : "Examine & Score")}
                           </Button>
                         </div>
                       </td>
@@ -344,6 +450,14 @@ function DoctorView({ toast, qc }: { toast: ReturnType<typeof import("../hooks/u
         candidateId={examCandidateId}
         open={!!examCandidateId}
         onClose={() => setExamCandidateId(null)}
+        panelSpecialityId={myStatus?.specialityId}
+        panelSpecialityName={myStatus?.specialityName}
+        isMindMatterPanel={isMindMatterDoctor}
+        marksEntryEnabled={myStatus?.marksEntryEnabled !== false}
+        onSaved={() => {
+          qc.invalidateQueries({ queryKey: ["doctor-assignments"] });
+          qc.invalidateQueries({ queryKey: ["interview-scores"] });
+        }}
       />
 
       {/* ─── Live Seat Matrix Modal ─── */}

@@ -40,14 +40,33 @@ interface CandidateExamDialogProps {
   open: boolean;
   onClose: () => void;
   onSaved?: () => void;
+  panelSpecialityId?: number | null;
+  panelSpecialityName?: string | null;
+  isMindMatterPanel?: boolean;
+  marksEntryEnabled?: boolean;
 }
 
-export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: CandidateExamDialogProps) {
+function cleanDoctorName(rawName: string | null | undefined): string {
+  if (!rawName) return "";
+  return rawName.replace(/^(?:\s*(?:dr\.?|doctor)\s*)+/gi, "").trim();
+}
+
+export function CandidateExamDialog({ 
+  candidateId, 
+  open, 
+  onClose, 
+  onSaved,
+  panelSpecialityId,
+  panelSpecialityName,
+  isMindMatterPanel = false,
+  marksEntryEnabled = true,
+}: CandidateExamDialogProps) {
   const { toast } = useToast();
   const qc = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<"profile" | "qualifications" | "clinical" | "lors" | "form">("profile");
   const [seatMatrixOpen, setSeatMatrixOpen] = useState(false);
+  const [photoLoadFailed, setPhotoLoadFailed] = useState(false);
   
   // Selection decision and notes
   const [decisionStatus, setDecisionStatus] = useState<string>("interview_completed");
@@ -70,6 +89,7 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
 
   // Populate decision & remarks when candidate details load
   useEffect(() => {
+    setPhotoLoadFailed(false);
     if (candidate) {
       setDecisionStatus(candidate.status || "interview_completed");
       setSelectedUnitId(candidate.unitId || null);
@@ -79,17 +99,27 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
       );
 
       const initialSpecMarks: Record<number, { score: string; remarks: string }> = {};
-      if (Array.isArray(candidate.appliedSpecialities)) {
-        for (const spec of candidate.appliedSpecialities) {
-          initialSpecMarks[spec.specialityId] = {
-            score: spec.score != null ? String(spec.score) : "",
-            remarks: spec.remarks || "",
-          };
+      const listToSeed = (candidate.appliedSpecialities && candidate.appliedSpecialities.length > 0)
+        ? candidate.appliedSpecialities
+        : (candidate.preferences || []);
+
+      if (Array.isArray(listToSeed)) {
+        for (const spec of listToSeed) {
+          const specId = spec.specialityId;
+          if (specId) {
+            initialSpecMarks[specId] = {
+              score: spec.score != null ? String(spec.score) : "",
+              remarks: spec.remarks || "",
+            };
+          }
         }
+      }
+      if (panelSpecialityId && !initialSpecMarks[panelSpecialityId]) {
+        initialSpecMarks[panelSpecialityId] = { score: "", remarks: "" };
       }
       setSpecialityMarks(initialSpecMarks);
     }
-  }, [candidate]);
+  }, [candidate, panelSpecialityId]);
 
   const saveDecisionMutation = useMutation({
     mutationFn: async () => {
@@ -103,15 +133,17 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
         }
       }
 
-      const specialityScores = Object.entries(specialityMarks).map(([specIdStr, data]) => {
-        const specId = Number(specIdStr);
-        const scoreVal = data.score.trim() !== "" ? parseFloat(data.score) : 0;
-        return {
-          specialityId: specId,
-          score: !isNaN(scoreVal) ? scoreVal : 0,
-          remarks: data.remarks.trim() || undefined,
-        };
-      });
+      const specialityScores = Object.entries(specialityMarks)
+        .filter(([_, data]) => data.score.trim() !== "" || (data.remarks && data.remarks.trim() !== ""))
+        .map(([specIdStr, data]) => {
+          const specId = Number(specIdStr);
+          const scoreVal = data.score.trim() !== "" ? parseFloat(data.score) : null;
+          return {
+            specialityId: specId,
+            score: scoreVal !== null && !isNaN(scoreVal) ? scoreVal : null,
+            remarks: data.remarks.trim() || undefined,
+          };
+        });
 
       return api.post(`/candidates/${candidateId}/doctor-marks`, {
         psychometricScore: psychoNum,
@@ -202,10 +234,12 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
   };
 
   const getPhotoSrc = () => {
-    if (candidate?.photoUrl || sub?.photoUrl) {
-      const p = candidate?.photoUrl || sub?.photoUrl;
-      const clean = getCleanObjectPath(p);
-      return clean ? `/api/storage${clean}?token=${token}` : p;
+    if (photoLoadFailed) return null;
+    const raw = candidate?.photoUrl || sub?.photoUrl || candidate?.submission?.photoUrl;
+    if (raw) {
+      if (raw.startsWith("data:") || raw.startsWith("blob:") || raw.startsWith("http")) return raw;
+      const clean = getCleanObjectPath(raw);
+      return clean ? `/api/storage${clean}?token=${token}` : raw;
     }
     const photoDoc = candidate?.documents?.find((d: any) =>
       d.docType?.toLowerCase().includes("photo") ||
@@ -219,7 +253,30 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
   };
 
   // Applied specialities list
-  const appliedList: AppliedSpeciality[] = candidate?.appliedSpecialities || [];
+  const rawAppliedList: AppliedSpeciality[] = (candidate?.appliedSpecialities && candidate.appliedSpecialities.length > 0)
+    ? candidate.appliedSpecialities
+    : (candidate?.preferences && candidate.preferences.length > 0
+        ? candidate.preferences.map((p: any, i: number) => ({
+            specialityId: p.specialityId,
+            specialityName: p.specialityName,
+            specialityCode: p.specialityCode || "",
+            preferenceOrder: p.preferenceOrder || i + 1,
+            score: null,
+            remarks: null,
+          }))
+        : []);
+
+  const appliedList = [...rawAppliedList];
+  if (panelSpecialityId && !appliedList.some(s => s.specialityId === panelSpecialityId)) {
+    appliedList.push({
+      specialityId: panelSpecialityId,
+      specialityName: panelSpecialityName || "Assigned Panel Specialty",
+      specialityCode: "",
+      preferenceOrder: appliedList.length + 1,
+      score: null,
+      remarks: null,
+    });
+  }
 
   const [uploadingLor, setUploadingLor] = useState<string | null>(null);
 
@@ -383,6 +440,115 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
             
             {/* LEFT COLUMN: VIEW-ONLY APPLICATION DETAILS (7 cols) */}
             <div className="lg:col-span-7 border-r border-slate-200 bg-slate-50/70 flex flex-col overflow-hidden">
+              
+              {/* CANDIDATE PHOTOGRAPH & IDENTITY HERO SECTION */}
+              <div className="p-4 bg-gradient-to-br from-white to-slate-50 border-b border-slate-200 shrink-0">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
+                  {/* Prominent Passport Photograph Frame */}
+                  <div className="relative group shrink-0">
+                    <div className="w-28 h-36 sm:w-32 sm:h-40 rounded-2xl bg-slate-100 border-2 border-indigo-200 overflow-hidden shadow-md flex items-center justify-center relative bg-gradient-to-b from-slate-50 to-slate-200">
+                      {getPhotoSrc() ? (
+                        <img
+                          src={getPhotoSrc()!}
+                          alt={candidate?.fullName || "Candidate"}
+                          className="w-full h-full object-cover"
+                          onError={() => setPhotoLoadFailed(true)}
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-slate-400 p-2 text-center">
+                          <User className="h-10 w-10 text-slate-300 mb-1" />
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">No Photo</span>
+                        </div>
+                      )}
+                    </div>
+                    {getPhotoSrc() && (
+                      <button
+                        type="button"
+                        onClick={() => window.open(getPhotoSrc()!, "_blank")}
+                        className="absolute bottom-1.5 right-1.5 bg-black/70 hover:bg-black text-white p-1 rounded-lg text-[9px] font-bold flex items-center gap-1 shadow-sm opacity-90 group-hover:opacity-100 transition-opacity"
+                        title="Open original photograph in new tab"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Primary Candidate Credentials & Status */}
+                  <div className="flex-1 min-w-0 space-y-2 text-center sm:text-left">
+                    <div className="flex items-center justify-center sm:justify-between flex-wrap gap-2">
+                      <div>
+                        <h2 className="text-lg font-black text-slate-900 tracking-tight">
+                          Dr. {cleanDoctorName(candidate?.fullName) || "Candidate"}
+                        </h2>
+                        <div className="flex items-center justify-center sm:justify-start gap-2 mt-0.5 flex-wrap">
+                          <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200 font-mono text-[11px] font-extrabold px-2 py-0.5">
+                            {candidate?.candidateCode || "APP-CODE"}
+                          </Badge>
+                          {candidate?.dateOfBirth && (
+                            <span className="text-[11px] text-slate-500 font-semibold">
+                              DOB: {candidate.dateOfBirth} {candidate.gender ? `(${candidate.gender})` : ""}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {candidate?.psychometricScore != null && candidate?.psychometricScore !== "" && (
+                          <Badge className="bg-amber-100 text-amber-900 border-amber-300 font-black text-[10px] px-2 py-0.5">
+                            Mind Matter: {candidate.psychometricScore}/10
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Applied Specialities Pills */}
+                    <div className="flex items-center justify-center sm:justify-start gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mr-1">Applied:</span>
+                      {appliedList.length > 0 ? (
+                        appliedList.map((sp, idx) => (
+                          <Badge
+                            key={sp.specialityId || idx}
+                            variant="outline"
+                            className={`text-[10px] font-bold py-0.5 px-2 ${
+                              panelSpecialityId && sp.specialityId === panelSpecialityId
+                                ? "bg-orange-50 border-orange-400 text-orange-800 font-black ring-1 ring-orange-300"
+                                : "bg-white border-slate-200 text-slate-700"
+                            }`}
+                          >
+                            #{sp.preferenceOrder || idx + 1}: {sp.specialityName}
+                          </Badge>
+                        ))
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] bg-white border-slate-200 text-slate-600">
+                          {sub?.specialization || "General Fellowship"}
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Quick Summary Grid (MCI, College, Degrees) */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-200/80 text-[11px]">
+                      <div>
+                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">PG Qualification</span>
+                        <p className="font-extrabold text-slate-800 truncate" title={candidate?.qualification || sub?.pgQualifications}>
+                          {candidate?.qualification || sub?.pgQualifications || "MS / MD / DNB Ophthalmology"}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">Medical College / Univ</span>
+                        <p className="font-extrabold text-slate-800 truncate" title={candidate?.collegeName || candidate?.university}>
+                          {candidate?.collegeName || candidate?.university || "—"}
+                        </p>
+                      </div>
+                      <div className="col-span-2 sm:col-span-1">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">MCI / SMC Reg. No.</span>
+                        <p className="font-extrabold text-indigo-700 truncate" title={candidate?.mciNumber || sub?.mciRegistrationNumber}>
+                          {candidate?.mciNumber || sub?.mciRegistrationNumber || "—"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Tab Navigation */}
               <div className="p-3 border-b border-slate-200 bg-white shrink-0">
                 <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
@@ -903,10 +1069,12 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
                 <div>
                   <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
                     <Stethoscope className="h-4 w-4 text-orange-600" />
-                    Interview Evaluation & Decision
+                    {isMindMatterPanel ? "Mind Matter Station Evaluation" : "Specialty Interview Evaluation"}
                   </h3>
                   <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
-                    Assess candidate dossier, record panel feedback & fellowship selection.
+                    {isMindMatterPanel 
+                      ? "Score out of 10 · 1 doctor enters consensus mark on behalf of Mind Matter panel" 
+                      : "Consensus score out of 50 · 1 doctor enters for panel (no averaging)"}
                   </p>
                 </div>
                 <Badge className={
@@ -924,213 +1092,449 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
 
               <div className="flex-1 overflow-y-auto p-5 space-y-5 fancy-scrollbar">
                 
-                {/* 1. SELECTION DECISION SELECTOR */}
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-                  <Label className="text-xs font-black uppercase text-slate-900 tracking-wider flex items-center gap-1.5">
-                    <Award className="h-3.5 w-3.5 text-orange-600" />
-                    Interview Selection Outcome
-                  </Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setDecisionStatus("allocated")}
-                      className={`p-3 rounded-xl border text-left transition-all ${
-                        decisionStatus === "allocated"
-                          ? "bg-emerald-50 border-emerald-500 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-400/20"
-                          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-bold"
-                      }`}
-                    >
+                {/* ════════════════════════════════════════════════════════════════
+                    MODE A: MIND MATTER PANEL (MAX 10 MARKS)
+                   ════════════════════════════════════════════════════════════════ */}
+                {isMindMatterPanel ? (
+                  <div className="space-y-4">
+                    {/* Mind Matter Scoring Box */}
+                    <div className="p-5 rounded-2xl bg-amber-50/70 border-2 border-amber-300 space-y-4 shadow-xs">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs">Selected (Allocate)</span>
-                        {decisionStatus === "allocated" && <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
-                      </div>
-                      <p className="text-[10px] text-emerald-700 font-medium mt-0.5">Offer Letter Ready</p>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setDecisionStatus("interview_completed")}
-                      className={`p-3 rounded-xl border text-left transition-all ${
-                        decisionStatus === "interview_completed"
-                          ? "bg-blue-50 border-blue-500 text-blue-950 font-black shadow-xs ring-2 ring-blue-400/20"
-                          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-bold"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs">Interview Completed</span>
-                        {decisionStatus === "interview_completed" && <CheckCircle2 className="h-4 w-4 text-blue-600" />}
-                      </div>
-                      <p className="text-[10px] text-blue-700 font-medium mt-0.5">Reviewed by Panel</p>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setDecisionStatus("waitlisted")}
-                      className={`p-3 rounded-xl border text-left transition-all ${
-                        decisionStatus === "waitlisted"
-                          ? "bg-amber-50 border-amber-500 text-amber-950 font-black shadow-xs ring-2 ring-amber-400/20"
-                          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-bold"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs">Waitlisted</span>
-                        {decisionStatus === "waitlisted" && <CheckCircle2 className="h-4 w-4 text-amber-600" />}
-                      </div>
-                      <p className="text-[10px] text-amber-700 font-medium mt-0.5">Under Consideration</p>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setDecisionStatus("rejected")}
-                      className={`p-3 rounded-xl border text-left transition-all ${
-                        decisionStatus === "rejected"
-                          ? "bg-rose-50 border-rose-500 text-rose-950 font-black shadow-xs ring-2 ring-rose-400/20"
-                          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-bold"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs">Not Selected</span>
-                        {decisionStatus === "rejected" && <X className="h-4 w-4 text-rose-600" />}
-                      </div>
-                      <p className="text-[10px] text-rose-700 font-medium mt-0.5">Not Recommended</p>
-                    </button>
-                  </div>
-
-                  {/* If Allocated / Selected: Hospital Location / Unit Picker */}
-                  {decisionStatus === "allocated" && (
-                    <div className="pt-2 border-t border-slate-200 space-y-2 animate-in fade-in duration-200">
-                      <Label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
-                        <span>Assigned Hospital Unit / Location:</span>
-                        <span className="text-emerald-700 text-[10px] font-extrabold uppercase">Required for Offer Letter</span>
-                      </Label>
-                      <Select
-                        value={selectedUnitId ? String(selectedUnitId) : ""}
-                        onValueChange={(val) => setSelectedUnitId(Number(val))}
-                      >
-                        <SelectTrigger className="h-10 rounded-xl border-slate-300 bg-white text-xs font-bold">
-                          <SelectValue placeholder="Select Hospital Unit..." />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-xl">
-                          {units.map((u: any) => (
-                            <SelectItem key={u.id} value={String(u.id)} className="text-xs font-semibold">
-                              {u.name} {u.code ? `(${u.code})` : ""}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      {/* Offer Letter Ready Card */}
-                      <div className="p-3 bg-purple-50 rounded-xl border border-purple-200 flex items-center justify-between mt-2">
-                        <div>
-                          <p className="text-xs font-extrabold text-purple-950 flex items-center gap-1.5">
-                            <Award className="h-4 w-4 text-purple-600" />
-                            Official Offer Letter Generated
-                          </p>
-                          <p className="text-[10px] text-purple-700">Official 2-page fellowship appointment letter</p>
+                        <div className="flex items-center gap-2.5">
+                          <span className="p-2 rounded-xl bg-amber-500 text-white shadow-xs">
+                            <Sparkles className="h-5 w-5" />
+                          </span>
+                          <div>
+                            <h4 className="text-sm font-black uppercase tracking-wider text-amber-950">
+                              Mind Matter Evaluation
+                            </h4>
+                            <span className="text-[11px] font-semibold text-amber-800">
+                              Consensus Mark out of 10 · Single score entered for panel
+                            </span>
+                          </div>
                         </div>
-                        <Button
-                          size="sm"
+                        {psychometricScore && (
+                          <Badge className="bg-amber-600 text-white font-black text-sm px-3 py-1 font-mono">
+                            {psychometricScore} / 10
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Score Input with quick chips */}
+                      <div className="space-y-2 pt-2 border-t border-amber-200">
+                        <Label className="text-[11px] font-black text-amber-900 uppercase tracking-wider block">
+                          Enter Station Mark (0.0 – 10.0 Marks)
+                        </Label>
+                        <div className="flex items-center gap-3">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="10"
+                            step="0.5"
+                            placeholder="e.g. 8.5"
+                            value={psychometricScore}
+                            onChange={(e) => setPsychometricScore(e.target.value)}
+                            className="h-12 w-36 rounded-xl text-xl font-black font-mono border-amber-400 bg-white text-amber-950 text-center shadow-inner focus:ring-amber-500"
+                            disabled={!marksEntryEnabled}
+                          />
+                          <span className="text-sm font-black text-amber-800">/ 10 Marks</span>
+                        </div>
+
+                        {/* Quick Preset Buttons */}
+                        {marksEntryEnabled && (
+                          <div className="pt-2">
+                            <span className="text-[10px] font-bold text-amber-850 uppercase block mb-1.5">Quick Score Presets:</span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {["5.0", "6.0", "6.5", "7.0", "7.5", "8.0", "8.5", "9.0", "9.5", "10.0"].map((preset) => (
+                                <button
+                                  key={preset}
+                                  type="button"
+                                  onClick={() => setPsychometricScore(preset)}
+                                  className={`px-3 py-1 rounded-xl text-xs font-mono font-black border transition-all ${
+                                    psychometricScore === preset
+                                      ? "bg-amber-600 text-white border-amber-700 shadow-xs"
+                                      : "bg-white text-amber-900 border-amber-200 hover:bg-amber-100"
+                                  }`}
+                                >
+                                  {preset}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Mind Matter Notes */}
+                      <div className="space-y-1.5 pt-2">
+                        <Label className="text-[11px] font-bold text-amber-900 uppercase">
+                          Psychological & Behavioral Observations:
+                        </Label>
+                        <Textarea
+                          placeholder="Observations on communication, empathy, stress response, problem solving, leadership..."
+                          value={overallRemarks}
+                          onChange={(e) => setOverallRemarks(e.target.value)}
+                          className="text-xs rounded-xl border-amber-200 bg-white min-h-[90px]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Completion Status */}
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                      <Label className="text-xs font-black uppercase text-slate-700 tracking-wider">
+                        Mind Matter Station Status
+                      </Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
                           type="button"
-                          onClick={handleDownloadOfferLetter}
-                          className="h-8 text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-lg gap-1.5 shadow-2xs"
+                          onClick={() => setDecisionStatus("interview_completed")}
+                          className={`p-3 rounded-xl border text-left transition-all ${
+                            decisionStatus === "interview_completed"
+                              ? "bg-blue-50 border-blue-500 text-blue-950 font-black shadow-xs"
+                              : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-bold"
+                          }`}
                         >
-                          <Download className="h-3 w-3" /> Download Offer Letter
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">Station Completed</span>
+                            {decisionStatus === "interview_completed" && <CheckCircle2 className="h-4 w-4 text-blue-600" />}
+                          </div>
+                          <p className="text-[10px] text-blue-700 font-medium mt-0.5">Scored & Dispatched</p>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDecisionStatus("approved")}
+                          className={`p-3 rounded-xl border text-left transition-all ${
+                            decisionStatus === "approved"
+                              ? "bg-slate-100 border-slate-500 text-slate-950 font-black shadow-xs"
+                              : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-bold"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">In Progress / Pending</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 font-medium mt-0.5">Under Assessment</p>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* ════════════════════════════════════════════════════════════════
+                      MODE B: SPECIALTY INTERVIEW PANEL (MAX 50 MARKS)
+                     ════════════════════════════════════════════════════════════════ */
+                  <div className="space-y-5">
+                    {/* 1. SELECTION DECISION SELECTOR */}
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                      <Label className="text-xs font-black uppercase text-slate-900 tracking-wider flex items-center gap-1.5">
+                        <Award className="h-3.5 w-3.5 text-orange-600" />
+                        Interview Selection Outcome
+                      </Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setDecisionStatus("allocated")}
+                          className={`p-3 rounded-xl border text-left transition-all ${
+                            decisionStatus === "allocated"
+                              ? "bg-emerald-50 border-emerald-500 text-emerald-950 font-black shadow-xs ring-2 ring-emerald-400/20"
+                              : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-bold"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">Selected (Allocate)</span>
+                            {decisionStatus === "allocated" && <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+                          </div>
+                          <p className="text-[10px] text-emerald-700 font-medium mt-0.5">Offer Letter Ready</p>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setDecisionStatus("interview_completed")}
+                          className={`p-3 rounded-xl border text-left transition-all ${
+                            decisionStatus === "interview_completed"
+                              ? "bg-blue-50 border-blue-500 text-blue-950 font-black shadow-xs ring-2 ring-blue-400/20"
+                              : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-bold"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">Interview Completed</span>
+                            {decisionStatus === "interview_completed" && <CheckCircle2 className="h-4 w-4 text-blue-600" />}
+                          </div>
+                          <p className="text-[10px] text-blue-700 font-medium mt-0.5">Reviewed by Panel</p>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setDecisionStatus("waitlisted")}
+                          className={`p-3 rounded-xl border text-left transition-all ${
+                            decisionStatus === "waitlisted"
+                              ? "bg-amber-50 border-amber-500 text-amber-950 font-black shadow-xs ring-2 ring-amber-400/20"
+                              : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-bold"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">Waitlisted</span>
+                            {decisionStatus === "waitlisted" && <CheckCircle2 className="h-4 w-4 text-amber-600" />}
+                          </div>
+                          <p className="text-[10px] text-amber-700 font-medium mt-0.5">Under Consideration</p>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setDecisionStatus("rejected")}
+                          className={`p-3 rounded-xl border text-left transition-all ${
+                            decisionStatus === "rejected"
+                              ? "bg-rose-50 border-rose-500 text-rose-950 font-black shadow-xs ring-2 ring-rose-400/20"
+                              : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-bold"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs">Not Selected</span>
+                            {decisionStatus === "rejected" && <X className="h-4 w-4 text-rose-600" />}
+                          </div>
+                          <p className="text-[10px] text-rose-700 font-medium mt-0.5">Not Recommended</p>
+                        </button>
+                      </div>
+
+                      {/* If Allocated / Selected: Hospital Location / Unit Picker */}
+                      {decisionStatus === "allocated" && (
+                        <div className="pt-2 border-t border-slate-200 space-y-2 animate-in fade-in duration-200">
+                          <Label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                            <span>Assigned Hospital Unit / Location:</span>
+                            <span className="text-emerald-700 text-[10px] font-extrabold uppercase">Required for Offer Letter</span>
+                          </Label>
+                          <Select
+                            value={selectedUnitId ? String(selectedUnitId) : ""}
+                            onValueChange={(val) => setSelectedUnitId(Number(val))}
+                          >
+                            <SelectTrigger className="h-10 rounded-xl border-slate-300 bg-white text-xs font-bold">
+                              <SelectValue placeholder="Select Hospital Unit..." />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl">
+                              {units.map((u: any) => (
+                                <SelectItem key={u.id} value={String(u.id)} className="text-xs font-semibold">
+                                  {u.name} {u.code ? `(${u.code})` : ""}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+
+                          {/* Offer Letter Ready Card */}
+                          <div className="p-3 bg-purple-50 rounded-xl border border-purple-200 flex items-center justify-between mt-2">
+                            <div>
+                              <p className="text-xs font-extrabold text-purple-950 flex items-center gap-1.5">
+                                <Award className="h-4 w-4 text-purple-600" />
+                                Official Offer Letter Generated
+                              </p>
+                              <p className="text-[10px] text-purple-700">Official 2-page fellowship appointment letter</p>
+                            </div>
+                            <Button
+                              size="sm"
+                              type="button"
+                              onClick={handleDownloadOfferLetter}
+                              className="h-8 text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-lg gap-1.5 shadow-2xs"
+                            >
+                              <Download className="h-3 w-3" /> Download Offer Letter
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 2. SPECIALIZATION INTERVIEW OBSERVATIONS & CONSENSUS MARKS ENTRY */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between border-b pb-2">
+                        <div>
+                          <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-1.5">
+                            <Stethoscope className="h-3.5 w-3.5 text-indigo-600" />
+                            Specialization Interview Assessment
+                          </h4>
+                          <span className="text-[10px] text-slate-500 font-semibold block mt-0.5">
+                            Consensus panel marks (Max 50) · 1 doctor enters for panel (no averaging)
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-400">
+                          {appliedList.length} Applied
+                        </span>
+                      </div>
+
+                      {appliedList.length === 0 ? (
+                        <div className="p-4 rounded-xl bg-slate-50 text-center text-slate-400 text-xs font-bold border border-slate-200">
+                          No specialization preferences attached to this candidate.
+                        </div>
+                      ) : (
+                        appliedList.map((spec, idx) => {
+                          const current = specialityMarks[spec.specialityId] || { score: "", remarks: "" };
+                          const isAssignedSpec = panelSpecialityId && spec.specialityId === panelSpecialityId;
+                          return (
+                            <div
+                              key={spec.specialityId || idx}
+                              className={`p-4 rounded-2xl border space-y-3 transition-all ${
+                                isAssignedSpec
+                                  ? "bg-indigo-50/70 border-indigo-400 ring-2 ring-indigo-200/50 shadow-xs"
+                                  : "bg-slate-50/80 border-slate-200"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className={`h-5 w-5 rounded-full font-black text-[10px] flex items-center justify-center ${
+                                    isAssignedSpec ? "bg-indigo-600 text-white" : "bg-slate-500 text-white"
+                                  }`}>
+                                    {idx + 1}
+                                  </span>
+                                  <span className="font-black text-xs text-slate-900">{spec.specialityName}</span>
+                                  {isAssignedSpec && (
+                                    <Badge className="bg-indigo-600 text-white text-[9px] font-black uppercase px-2 py-0.5">
+                                      Your Panel Speciality
+                                    </Badge>
+                                  )}
+                                </div>
+                                <Badge variant="outline" className="text-[10px] font-bold border-slate-300 text-slate-700 bg-white">
+                                  Preference {spec.preferenceOrder || idx + 1}
+                                </Badge>
+                              </div>
+
+                              {/* Specialty Interview Marks Input (Max 50) */}
+                              <div className="space-y-1.5 pt-1 border-t border-slate-200/80">
+                                <div className="flex items-center justify-between">
+                                  <Label className="text-[11px] font-black uppercase tracking-wider text-slate-700">
+                                    Specialty Viva Score (Max 50 Marks)
+                                  </Label>
+                                  <span className="text-[10px] font-semibold text-slate-500">
+                                    Consensus Mark
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max="50"
+                                    step="1"
+                                    placeholder="Marks / 50"
+                                    value={current.score}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setSpecialityMarks(prev => ({
+                                        ...prev,
+                                        [spec.specialityId]: { ...prev[spec.specialityId], score: val, remarks: prev[spec.specialityId]?.remarks || "" }
+                                      }));
+                                    }}
+                                    className="h-10 w-28 rounded-xl text-base font-black font-mono border-slate-300 bg-white text-slate-900 text-center shadow-inner focus:ring-indigo-500"
+                                    disabled={!marksEntryEnabled}
+                                  />
+                                  <span className="text-xs font-black text-slate-500">/ 50 Marks</span>
+
+                                  {/* Quick Score Chips */}
+                                  {marksEntryEnabled && (
+                                    <div className="flex items-center gap-1 flex-wrap pl-2 border-l border-slate-200">
+                                      {[30, 35, 38, 40, 42, 45, 48, 50].map((preset) => (
+                                        <button
+                                          key={preset}
+                                          type="button"
+                                          onClick={() => {
+                                            setSpecialityMarks(prev => ({
+                                              ...prev,
+                                              [spec.specialityId]: { ...prev[spec.specialityId], score: String(preset), remarks: prev[spec.specialityId]?.remarks || "" }
+                                            }));
+                                          }}
+                                          className={`px-2 py-0.5 rounded-lg text-[11px] font-mono font-bold border transition-all ${
+                                            current.score === String(preset)
+                                              ? "bg-indigo-600 text-white border-indigo-700 shadow-2xs"
+                                              : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                                          }`}
+                                        >
+                                          {preset}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              <Textarea
+                                placeholder="Doctor / Panel clinical & surgical remarks for this specialty..."
+                                value={current.remarks}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setSpecialityMarks(prev => ({
+                                    ...prev,
+                                    [spec.specialityId]: { ...prev[spec.specialityId], remarks: val, score: prev[spec.specialityId]?.score || "" }
+                                  }));
+                                }}
+                                className="text-xs rounded-xl border-slate-200 bg-white min-h-[55px]"
+                              />
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* 3. MIND MATTER STATUS SUMMARY CARD */}
+                    <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="p-1.5 rounded-lg bg-amber-500 text-white">
+                          <Sparkles className="h-3.5 w-3.5" />
+                        </span>
+                        <div>
+                          <span className="text-xs font-black uppercase tracking-wider text-slate-900 block">
+                            Mind Matter Station
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-semibold">
+                            Evaluated at independent Mind Matter station
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        {candidate?.psychometricScore != null && candidate?.psychometricScore !== "" ? (
+                          <Badge className="bg-amber-100 text-amber-900 border-amber-300 font-black text-xs px-2.5 py-0.5">
+                            Scored: {candidate.psychometricScore}/10
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-white text-slate-500 border-slate-300 text-[10px] font-bold">
+                            Station Pending
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 4. OVERALL INTERVIEW NOTES */}
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Overall Panel Decision Notes & Allocation Remarks
+                      </Label>
+                      <Textarea
+                        placeholder="Enter general candidate observations, panel agreement, or special instructions..."
+                        value={overallRemarks}
+                        onChange={(e) => setOverallRemarks(e.target.value)}
+                        className="text-xs rounded-xl border-slate-200 bg-white min-h-[70px]"
+                      />
+                    </div>
+
+                    {/* 5. CALL & OFFER LETTERS QUICK ACTIONS */}
+                    <div className="p-4 rounded-2xl bg-slate-100/80 border border-slate-200 space-y-2.5">
+                      <span className="text-[11px] font-black uppercase text-slate-600 tracking-wider block">
+                        Official Admission Letters
+                      </span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleDownloadCallLetter}
+                          className="h-9 text-xs font-bold rounded-xl bg-white border-slate-300 hover:bg-slate-50 text-slate-800 justify-start gap-2"
+                        >
+                          <Mail className="h-3.5 w-3.5 text-blue-600" /> Call Letter PDF
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleDownloadOfferLetter}
+                          className="h-9 text-xs font-bold rounded-xl bg-white border-purple-300 hover:bg-purple-50 text-purple-900 justify-start gap-2"
+                        >
+                          <Award className="h-3.5 w-3.5 text-purple-600" /> Offer Letter PDF
                         </Button>
                       </div>
                     </div>
-                  )}
-                </div>
-
-                {/* 2. SPECIALIZATION INTERVIEW OBSERVATIONS & FEEDBACK */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between border-b pb-2">
-                    <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-1.5">
-                      <Stethoscope className="h-3.5 w-3.5 text-indigo-600" />
-                      Specialization Interview Assessment
-                    </h4>
-                    <span className="text-[10px] font-bold text-slate-400">
-                      {appliedList.length} Applied
-                    </span>
                   </div>
-
-                  {appliedList.length === 0 ? (
-                    <div className="p-4 rounded-xl bg-slate-50 text-center text-slate-400 text-xs font-bold border border-slate-200">
-                      No specialization preferences attached to this candidate.
-                    </div>
-                  ) : (
-                    appliedList.map((spec, idx) => {
-                      const current = specialityMarks[spec.specialityId] || { score: "", remarks: "" };
-                      return (
-                        <div key={spec.specialityId} className="p-4 rounded-2xl bg-indigo-50/40 border border-indigo-200 space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="h-5 w-5 rounded-full bg-indigo-600 text-white font-black text-[10px] flex items-center justify-center">
-                                {idx + 1}
-                              </span>
-                              <span className="font-black text-xs text-indigo-950">{spec.specialityName}</span>
-                            </div>
-                            <Badge variant="outline" className="text-[10px] font-bold border-indigo-300 text-indigo-800 bg-white">
-                              Preference {spec.preferenceOrder || idx + 1}
-                            </Badge>
-                          </div>
-
-                          <Textarea
-                            placeholder="Doctor / Panel clinical & surgical remarks for this specialty..."
-                            value={current.remarks}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setSpecialityMarks(prev => ({
-                                ...prev,
-                                [spec.specialityId]: { ...prev[spec.specialityId], remarks: val, score: prev[spec.specialityId]?.score || "" }
-                              }));
-                            }}
-                            className="text-xs rounded-xl border-indigo-100 bg-white min-h-[60px]"
-                          />
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-
-                {/* 3. OVERALL INTERVIEW NOTES */}
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Overall Panel Decision Notes & Allocation Remarks
-                  </Label>
-                  <Textarea
-                    placeholder="Enter general candidate observations, panel agreement, or special instructions..."
-                    value={overallRemarks}
-                    onChange={(e) => setOverallRemarks(e.target.value)}
-                    className="text-xs rounded-xl border-slate-200 bg-white min-h-[70px]"
-                  />
-                </div>
-
-                {/* 4. CALL & OFFER LETTERS QUICK ACTIONS */}
-                <div className="p-4 rounded-2xl bg-slate-100/80 border border-slate-200 space-y-2.5">
-                  <span className="text-[11px] font-black uppercase text-slate-600 tracking-wider block">
-                    Official Admission Letters
-                  </span>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleDownloadCallLetter}
-                      className="h-9 text-xs font-bold rounded-xl bg-white border-slate-300 hover:bg-slate-50 text-slate-800 justify-start gap-2"
-                    >
-                      <Mail className="h-3.5 w-3.5 text-blue-600" /> Call Letter PDF
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleDownloadOfferLetter}
-                      className="h-9 text-xs font-bold rounded-xl bg-white border-purple-300 hover:bg-purple-50 text-purple-900 justify-start gap-2"
-                    >
-                      <Award className="h-3.5 w-3.5 text-purple-600" /> Offer Letter PDF
-                    </Button>
-                  </div>
-                </div>
+                )}
 
               </div>
 
@@ -1153,7 +1557,7 @@ export function CandidateExamDialog({ candidateId, open, onClose, onSaved }: Can
                   ) : (
                     <CheckCircle2 className="h-4 w-4" />
                   )}
-                  Save Interview Decision
+                  {isMindMatterPanel ? "Save Mind Matter Score" : "Save Interview Decision & Marks"}
                 </Button>
               </div>
             </div>

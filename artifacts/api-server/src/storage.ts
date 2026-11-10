@@ -99,7 +99,7 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
 });
 
 // Private object serving: requires authenticated staff + path must be a known uploaded document
-router.get("/storage/objects/*path", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "invigilator", "result_publisher"), async (req: Request, res: Response) => {
+router.get("/storage/objects/*path", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "invigilator", "result_publisher", "doctor"), async (req: Request, res: Response) => {
   try {
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;

@@ -159,13 +159,13 @@ export async function computeScoresForProgram(programId: number): Promise<Candid
     // Compute candidate-wide Mind Matter score based on direct psychometric score or doctor Mind Matter panel entries
     const candInterviews = interviewsByCandidate.get(c.id) || [];
     const mmInterviews = candInterviews.filter((i) => isMindMatterScore(i));
-    const avgMindMatter = mmInterviews.length > 0
-      ? mmInterviews.reduce((sum, i) => sum + i.score, 0) / mmInterviews.length
+    const singleMindMatter = mmInterviews.length > 0
+      ? mmInterviews[mmInterviews.length - 1]!.score // Take the single entered Mind Matter score (out of 10)
       : null;
 
-    const psychoScore = avgMindMatter !== null
-      ? avgMindMatter
-      : (psychos.length > 0 ? psychos.reduce((sum, a) => sum + (a.score ?? 0), 0) / psychos.length : (Number(c.psychometricScore) || 0));
+    const psychoScore = singleMindMatter !== null
+      ? singleMindMatter
+      : (psychos.length > 0 && psychos[0]!.score != null ? psychos[0]!.score : (Number(c.psychometricScore) || 0));
 
     // Handle multiple submissions by selecting the LATEST submission by submittedAt
     const sub = submissionsByCandidate.get(c.id) || (c.email ? submissionsByEmail.get(c.email.toLowerCase().trim()) : null);
@@ -242,25 +242,19 @@ export async function computeScoresForProgram(programId: number): Promise<Candid
         avgInterview = overrideEntry.overrideScore;
         vivaStatus = "override";
       } else {
-        // Average VIVA scores — only from marks_entry_enabled doctors (multi-doctor averaging).
+        // Single Specialty Panel Score — NO multi-doctor averaging required.
+        // One doctor from the panel enters a single score (max 50).
         const specInterviews = candInterviews.filter(
-          (i) => i.specialityId === p.specialityId && !isMindMatterScore(i) && enabledDocIds.has(i.doctorId)
+          (i) => i.specialityId === p.specialityId && !isMindMatterScore(i)
         );
-        const submittedCount = specInterviews.length;
 
-        if (expectedCount > 0 && submittedCount < expectedCount) {
-          // Some enabled doctors haven't submitted yet
-          vivaStatus = "pending";
-          avgInterview = 0;
-        } else {
-          // All enabled doctors submitted (or no enabled doctors configured, fallback to all VIVA scores)
-          const effectiveInterviews = expectedCount > 0
-            ? specInterviews
-            : candInterviews.filter((i) => i.specialityId === p.specialityId && !isMindMatterScore(i));
-          avgInterview = effectiveInterviews.length > 0
-            ? effectiveInterviews.reduce((sum, i) => sum + i.score, 0) / effectiveInterviews.length
-            : 0;
+        if (specInterviews.length > 0) {
+          // Take the single entered panel score (latest if multiple)
+          avgInterview = specInterviews[specInterviews.length - 1]!.score;
           vivaStatus = "complete";
+        } else {
+          avgInterview = 0;
+          vivaStatus = "pending";
         }
       }
 

@@ -1232,22 +1232,52 @@ router.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("s
     const userId = req.user!.userId;
     const now = new Date();
 
-    // 1. Optional Psychometry Score (if provided)
+    // 1. Optional Psychometry / Mind Matter Score (if provided, max 10)
     if (psychometricScore !== undefined) {
       if (psychometricScore !== null && (psychometricScore < 0 || psychometricScore > 10)) {
-        return res.status(400).json({ error: "Psychometry score must be between 0 and 10." });
+        return res.status(400).json({ error: "Psychometry / Mind Matter score must be between 0 and 10." });
       }
       await db.update(candidatesTable)
         .set({ psychometricScore: psychometricScore !== null ? String(psychometricScore) : null })
         .where(eq(candidatesTable.id, candidateId));
+
+      if (psychometricScore !== null) {
+        const existingMm = await db.select().from(interviewScoresTable).where(
+          and(
+            eq(interviewScoresTable.candidateId, candidateId),
+            sql`speciality_id IS NULL`
+          )
+        );
+        if (existingMm.length > 0) {
+          await db.update(interviewScoresTable).set({
+            score: psychometricScore,
+            doctorId: userId,
+            submittedAt: now,
+            lastModifiedBy: userId,
+            lastModifiedAt: now,
+          }).where(eq(interviewScoresTable.id, existingMm[0]!.id));
+        } else {
+          await db.insert(interviewScoresTable).values({
+            candidateId,
+            doctorId: userId,
+            specialityId: null,
+            score: psychometricScore,
+            remarks: "Mind Matter Station Evaluation",
+            enteredBy: userId,
+            enteredAt: now,
+            lastModifiedBy: userId,
+            lastModifiedAt: now,
+            submittedAt: now,
+          });
+        }
+      }
     }
 
     // 2. Speciality Assessment & Remarks (scores optional, max 50)
     if (Array.isArray(specialityScores) && specialityScores.length > 0) {
       for (const item of specialityScores) {
-        const scoreVal = typeof item.score === "number" && !isNaN(item.score) 
-          ? Math.max(0, Math.min(50, item.score)) 
-          : 0;
+        const hasScore = typeof item.score === "number" && !isNaN(item.score);
+        const scoreVal = hasScore ? Math.max(0, Math.min(50, item.score!)) : 0;
 
         const existing = await db.select().from(interviewScoresTable).where(
           and(
@@ -1258,8 +1288,9 @@ router.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("s
 
         if (existing.length > 0) {
           const oldScore = existing[0]!.score;
+          const finalScore = hasScore ? scoreVal : oldScore;
           await db.update(interviewScoresTable).set({
-            score: scoreVal,
+            score: finalScore,
             remarks: item.remarks !== undefined ? item.remarks : existing[0]!.remarks,
             doctorId: userId,
             submittedAt: now,
@@ -1271,7 +1302,7 @@ router.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("s
           try {
             await db.execute(sql`
               INSERT INTO interview_scores_audit (candidate_id, speciality_id, doctor_id, old_score, new_score, remarks, action, changed_by_user_id)
-              VALUES (${candidateId}, ${item.specialityId}, ${userId}, ${oldScore}, ${scoreVal}, ${item.remarks ?? null}, 'UPDATE', ${userId})
+              VALUES (${candidateId}, ${item.specialityId}, ${userId}, ${oldScore}, ${finalScore}, ${item.remarks ?? null}, 'UPDATE', ${userId})
             `);
           } catch (_) {}
         } else {

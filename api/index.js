@@ -1078636,13 +1078636,44 @@ var init_candidates2 = __esm({
         const now = /* @__PURE__ */ new Date();
         if (psychometricScore !== void 0) {
           if (psychometricScore !== null && (psychometricScore < 0 || psychometricScore > 10)) {
-            return res.status(400).json({ error: "Psychometry score must be between 0 and 10." });
+            return res.status(400).json({ error: "Psychometry / Mind Matter score must be between 0 and 10." });
           }
           await db.update(candidatesTable).set({ psychometricScore: psychometricScore !== null ? String(psychometricScore) : null }).where(eq(candidatesTable.id, candidateId));
+          if (psychometricScore !== null) {
+            const existingMm = await db.select().from(interviewScoresTable).where(
+              and(
+                eq(interviewScoresTable.candidateId, candidateId),
+                sql`speciality_id IS NULL`
+              )
+            );
+            if (existingMm.length > 0) {
+              await db.update(interviewScoresTable).set({
+                score: psychometricScore,
+                doctorId: userId,
+                submittedAt: now,
+                lastModifiedBy: userId,
+                lastModifiedAt: now
+              }).where(eq(interviewScoresTable.id, existingMm[0].id));
+            } else {
+              await db.insert(interviewScoresTable).values({
+                candidateId,
+                doctorId: userId,
+                specialityId: null,
+                score: psychometricScore,
+                remarks: "Mind Matter Station Evaluation",
+                enteredBy: userId,
+                enteredAt: now,
+                lastModifiedBy: userId,
+                lastModifiedAt: now,
+                submittedAt: now
+              });
+            }
+          }
         }
         if (Array.isArray(specialityScores) && specialityScores.length > 0) {
           for (const item of specialityScores) {
-            const scoreVal = typeof item.score === "number" && !isNaN(item.score) ? Math.max(0, Math.min(50, item.score)) : 0;
+            const hasScore = typeof item.score === "number" && !isNaN(item.score);
+            const scoreVal = hasScore ? Math.max(0, Math.min(50, item.score)) : 0;
             const existing = await db.select().from(interviewScoresTable).where(
               and(
                 eq(interviewScoresTable.candidateId, candidateId),
@@ -1078651,8 +1078682,9 @@ var init_candidates2 = __esm({
             );
             if (existing.length > 0) {
               const oldScore = existing[0].score;
+              const finalScore = hasScore ? scoreVal : oldScore;
               await db.update(interviewScoresTable).set({
-                score: scoreVal,
+                score: finalScore,
                 remarks: item.remarks !== void 0 ? item.remarks : existing[0].remarks,
                 doctorId: userId,
                 submittedAt: now,
@@ -1078662,7 +1078694,7 @@ var init_candidates2 = __esm({
               try {
                 await db.execute(sql`
               INSERT INTO interview_scores_audit (candidate_id, speciality_id, doctor_id, old_score, new_score, remarks, action, changed_by_user_id)
-              VALUES (${candidateId}, ${item.specialityId}, ${userId}, ${oldScore}, ${scoreVal}, ${item.remarks ?? null}, 'UPDATE', ${userId})
+              VALUES (${candidateId}, ${item.specialityId}, ${userId}, ${oldScore}, ${finalScore}, ${item.remarks ?? null}, 'UPDATE', ${userId})
             `);
               } catch (_) {
               }
@@ -1131606,49 +1131638,115 @@ router14.get("/interviews/assignments", requireAuth, requireRole("doctor", "supe
   const specialityId = activePanel?.speciality_id ?? null;
   const panelId = activePanel?.panel_id ?? null;
   let queueEntries = [];
-  if (panelId) {
+  if (activePanel?.is_mind_matter) {
     queueEntries = (await db.execute(sql`
-      SELECT pq.id as queue_id, pq.candidate_id, pq.status as queue_status,
+      SELECT c.id as candidate_id, c.id as queue_id,
+             CASE 
+               WHEN (c.psychometric_score IS NOT NULL AND c.psychometric_score != '') THEN 'completed'
+               ELSE 'pending'
+             END as queue_status,
              c.full_name, c.candidate_code, c.email, c.phone, c.qualification, c.college_name, c.status as candidate_status,
-             sub.id as submission_id, sub.pg_qualifications, sub.specialization
-      FROM panel_queue pq
-      JOIN candidates c ON c.id = pq.candidate_id
+             c.psychometric_score,
+             sub.id as submission_id, sub.pg_qualifications, sub.specialization, sub.photo_url
+      FROM candidates c
       LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
-      WHERE pq.panel_id = ${panelId}
-      ORDER BY pq.queue_position ASC, pq.created_at ASC
+      WHERE c.status != 'rejected'
+      ORDER BY c.full_name ASC
     `)).rows;
-  }
-  if (queueEntries.length === 0) {
-    if (specialityId) {
-      queueEntries = (await db.execute(sql`
-        SELECT DISTINCT c.id as candidate_id, c.id as queue_id, 'pending' as queue_status,
+  } else if (specialityId) {
+    let qRows = [];
+    if (panelId) {
+      qRows = (await db.execute(sql`
+        SELECT pq.id as queue_id, pq.candidate_id, pq.status as queue_status, pq.queue_position,
                c.full_name, c.candidate_code, c.email, c.phone, c.qualification, c.college_name, c.status as candidate_status,
-               sub.id as submission_id, sub.pg_qualifications, sub.specialization
-        FROM candidates c
-        JOIN candidate_preferences cp ON cp.candidate_id = c.id
+               c.psychometric_score,
+               sub.id as submission_id, sub.pg_qualifications, sub.specialization, sub.photo_url
+        FROM panel_queue pq
+        JOIN candidates c ON c.id = pq.candidate_id
         LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
-        WHERE cp.speciality_id = ${specialityId} AND c.status != 'rejected'
-        ORDER BY c.full_name ASC
-      `)).rows;
-    } else {
-      queueEntries = (await db.execute(sql`
-        SELECT DISTINCT c.id as candidate_id, c.id as queue_id, 'pending' as queue_status,
-               c.full_name, c.candidate_code, c.email, c.phone, c.qualification, c.college_name, c.status as candidate_status,
-               sub.id as submission_id, sub.pg_qualifications, sub.specialization, c.created_at
-        FROM candidates c
-        LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
-        WHERE c.status IN ('approved', 'interview_completed', 'allocated', 'pending')
-        ORDER BY c.created_at DESC
-        LIMIT 100
+        WHERE pq.panel_id = ${panelId} AND c.status != 'rejected'
+        ORDER BY pq.queue_position ASC, pq.created_at ASC
       `)).rows;
     }
+    const prefRows = (await db.execute(sql`
+      SELECT DISTINCT c.id as candidate_id, c.id as queue_id, 'pending' as queue_status, 9999 as queue_position,
+             c.full_name, c.candidate_code, c.email, c.phone, c.qualification, c.college_name, c.status as candidate_status,
+             c.psychometric_score,
+             sub.id as submission_id, sub.pg_qualifications, sub.specialization, sub.photo_url
+      FROM candidates c
+      JOIN candidate_preferences cp ON cp.candidate_id = c.id
+      LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
+      WHERE cp.speciality_id = ${specialityId} AND c.status != 'rejected'
+      ORDER BY c.full_name ASC
+    `)).rows;
+    const seenCands = /* @__PURE__ */ new Set();
+    queueEntries = [];
+    for (const row of [...qRows, ...prefRows]) {
+      const cid = Number(row["candidate_id"]);
+      if (!seenCands.has(cid)) {
+        seenCands.add(cid);
+        queueEntries.push(row);
+      }
+    }
+  } else {
+    queueEntries = (await db.execute(sql`
+      SELECT DISTINCT c.id as candidate_id, c.id as queue_id, 'pending' as queue_status,
+             c.full_name, c.candidate_code, c.email, c.phone, c.qualification, c.college_name, c.status as candidate_status,
+             c.psychometric_score,
+             sub.id as submission_id, sub.pg_qualifications, sub.specialization, sub.photo_url, c.created_at
+      FROM candidates c
+      LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
+      WHERE c.status IN ('approved', 'interview_completed', 'allocated', 'pending')
+      ORDER BY c.created_at DESC
+      LIMIT 100
+    `)).rows;
   }
-  const scores = await db.select().from(interviewScoresTable).where(
-    specialityId ? eq(interviewScoresTable.specialityId, specialityId) : eq(interviewScoresTable.doctorId, userId)
-  );
+  const allScores = await db.select().from(interviewScoresTable);
   res.json(queueEntries.map((q) => {
     const candidateId = Number(q["candidate_id"]);
-    const sc = scores.find((s2) => s2.candidateId === candidateId);
+    let sc = null;
+    if (activePanel?.is_mind_matter) {
+      const psychVal = q["psychometric_score"] != null && q["psychometric_score"] !== "" ? parseFloat(String(q["psychometric_score"])) : null;
+      const mmScore = allScores.find((s2) => s2.candidateId === candidateId && s2.specialityId === null);
+      if (psychVal !== null && !isNaN(psychVal)) {
+        sc = {
+          id: mmScore?.id ?? candidateId,
+          score: psychVal,
+          remarks: mmScore?.remarks ?? "",
+          submittedAt: mmScore?.submittedAt?.toISOString() ?? (/* @__PURE__ */ new Date()).toISOString()
+        };
+      } else if (mmScore) {
+        sc = {
+          id: mmScore.id,
+          score: mmScore.score,
+          remarks: mmScore.remarks,
+          submittedAt: mmScore.submittedAt.toISOString()
+        };
+      }
+    } else if (specialityId) {
+      const specScore = allScores.find((s2) => s2.candidateId === candidateId && s2.specialityId === specialityId);
+      if (specScore) {
+        sc = {
+          id: specScore.id,
+          score: specScore.score,
+          remarks: specScore.remarks,
+          doctorId: specScore.doctorId,
+          submittedAt: specScore.submittedAt.toISOString()
+        };
+      }
+    } else {
+      const docScore = allScores.find((s2) => s2.candidateId === candidateId && s2.doctorId === userId);
+      if (docScore) {
+        sc = {
+          id: docScore.id,
+          score: docScore.score,
+          remarks: docScore.remarks,
+          doctorId: docScore.doctorId,
+          submittedAt: docScore.submittedAt.toISOString()
+        };
+      }
+    }
+    const isCompleted = sc !== null;
     return {
       id: Number(q["queue_id"] ?? candidateId),
       candidateId,
@@ -1131662,10 +1131760,11 @@ router14.get("/interviews/assignments", requireAuth, requireRole("doctor", "supe
       pgQualifications: String(q["pg_qualifications"] ?? "N/A"),
       collegeName: String(q["college_name"] ?? "N/A"),
       submissionId: q["submission_id"] ? Number(q["submission_id"]) : null,
+      photoUrl: q["photo_url"] ? String(q["photo_url"]) : null,
       unitName: null,
       scheduledAt: null,
-      status: sc ? "completed" : q["queue_status"] === "completed" ? "completed" : "pending",
-      existingScore: sc ? { id: sc.id, score: sc.score, remarks: sc.remarks, submittedAt: sc.submittedAt.toISOString() } : null
+      status: isCompleted ? "completed" : "pending",
+      existingScore: sc
     };
   }));
 });
@@ -1131868,10 +1131967,7 @@ router14.post("/interviews/scores", requireAuth, requireRole("doctor"), async (r
   const existing = await db.select().from(interviewScoresTable).where(
     and(
       eq(interviewScoresTable.candidateId, candidateId),
-      specialityId ? and(
-        eq(interviewScoresTable.doctorId, userId),
-        eq(interviewScoresTable.specialityId, specialityId)
-      ) : sql`speciality_id IS NULL`
+      specialityId ? eq(interviewScoresTable.specialityId, specialityId) : sql`speciality_id IS NULL`
     )
   );
   let row;
@@ -1131895,7 +1131991,8 @@ router14.post("/interviews/scores", requireAuth, requireRole("doctor"), async (r
       enteredBy: userId,
       enteredAt: now,
       lastModifiedBy: userId,
-      lastModifiedAt: now
+      lastModifiedAt: now,
+      submittedAt: now
     }).returning();
   }
   if (activePanel.is_mind_matter) {
@@ -1133590,8 +1133687,8 @@ async function computeScoresForProgram(programId) {
     const mcqScore = mcqs.length > 0 ? mcqs.reduce((sum2, a) => sum2 + (a.score ?? 0), 0) / mcqs.length : Number(c.mcqScore) || 0;
     const candInterviews = interviewsByCandidate.get(c.id) || [];
     const mmInterviews = candInterviews.filter((i2) => isMindMatterScore(i2));
-    const avgMindMatter = mmInterviews.length > 0 ? mmInterviews.reduce((sum2, i2) => sum2 + i2.score, 0) / mmInterviews.length : null;
-    const psychoScore = avgMindMatter !== null ? avgMindMatter : psychos.length > 0 ? psychos.reduce((sum2, a) => sum2 + (a.score ?? 0), 0) / psychos.length : Number(c.psychometricScore) || 0;
+    const singleMindMatter = mmInterviews.length > 0 ? mmInterviews[mmInterviews.length - 1].score : null;
+    const psychoScore = singleMindMatter !== null ? singleMindMatter : psychos.length > 0 && psychos[0].score != null ? psychos[0].score : Number(c.psychometricScore) || 0;
     const sub = submissionsByCandidate.get(c.id) || (c.email ? submissionsByEmail.get(c.email.toLowerCase().trim()) : null);
     const appliedAt = sub?.submittedAt ? sub.submittedAt.toISOString() : c.createdAt ? new Date(c.createdAt).toISOString() : (/* @__PURE__ */ new Date()).toISOString();
     const preferredLocations = {};
@@ -1133651,16 +1133748,14 @@ async function computeScoresForProgram(programId) {
         vivaStatus = "override";
       } else {
         const specInterviews = candInterviews.filter(
-          (i2) => i2.specialityId === p.specialityId && !isMindMatterScore(i2) && enabledDocIds.has(i2.doctorId)
+          (i2) => i2.specialityId === p.specialityId && !isMindMatterScore(i2)
         );
-        const submittedCount = specInterviews.length;
-        if (expectedCount > 0 && submittedCount < expectedCount) {
-          vivaStatus = "pending";
-          avgInterview = 0;
-        } else {
-          const effectiveInterviews = expectedCount > 0 ? specInterviews : candInterviews.filter((i2) => i2.specialityId === p.specialityId && !isMindMatterScore(i2));
-          avgInterview = effectiveInterviews.length > 0 ? effectiveInterviews.reduce((sum2, i2) => sum2 + i2.score, 0) / effectiveInterviews.length : 0;
+        if (specInterviews.length > 0) {
+          avgInterview = specInterviews[specInterviews.length - 1].score;
           vivaStatus = "complete";
+        } else {
+          avgInterview = 0;
+          vivaStatus = "pending";
         }
       }
       const specTotalScore = mcqScore + psychoScore + avgInterview;

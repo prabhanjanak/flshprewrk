@@ -37,58 +37,132 @@ router.get("/interviews/assignments", requireAuth, requireRole("doctor", "super_
   const specialityId = activePanel?.speciality_id ?? null;
   const panelId = activePanel?.panel_id ?? null;
 
-  // 2. Try fetching candidates from panel queue
+  // 2. Fetch candidates based on panel type:
   let queueEntries: Array<Record<string, unknown>> = [];
-  if (panelId) {
+
+  if (activePanel?.is_mind_matter) {
+    // 🧠 Mind Matter Panel: Return ALL registered/approved candidates across the entire cohort.
+    // There is no pre-filtered list because candidates arrive randomly as they finish other stations.
     queueEntries = (await db.execute(sql`
-      SELECT pq.id as queue_id, pq.candidate_id, pq.status as queue_status,
+      SELECT c.id as candidate_id, c.id as queue_id,
+             CASE 
+               WHEN (c.psychometric_score IS NOT NULL AND c.psychometric_score != '') THEN 'completed'
+               ELSE 'pending'
+             END as queue_status,
              c.full_name, c.candidate_code, c.email, c.phone, c.qualification, c.college_name, c.status as candidate_status,
-             sub.id as submission_id, sub.pg_qualifications, sub.specialization
-      FROM panel_queue pq
-      JOIN candidates c ON c.id = pq.candidate_id
+             c.psychometric_score,
+             sub.id as submission_id, sub.pg_qualifications, sub.specialization, sub.photo_url
+      FROM candidates c
       LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
-      WHERE pq.panel_id = ${panelId}
-      ORDER BY pq.queue_position ASC, pq.created_at ASC
+      WHERE c.status != 'rejected'
+      ORDER BY c.full_name ASC
+    `)).rows as Array<Record<string, unknown>>;
+  } else if (specialityId) {
+    // 🔬 Specialty Panel: Merge queue entries with all candidates who selected this speciality
+    let qRows: Array<Record<string, unknown>> = [];
+    if (panelId) {
+      qRows = (await db.execute(sql`
+        SELECT pq.id as queue_id, pq.candidate_id, pq.status as queue_status, pq.queue_position,
+               c.full_name, c.candidate_code, c.email, c.phone, c.qualification, c.college_name, c.status as candidate_status,
+               c.psychometric_score,
+               sub.id as submission_id, sub.pg_qualifications, sub.specialization, sub.photo_url
+        FROM panel_queue pq
+        JOIN candidates c ON c.id = pq.candidate_id
+        LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
+        WHERE pq.panel_id = ${panelId} AND c.status != 'rejected'
+        ORDER BY pq.queue_position ASC, pq.created_at ASC
+      `)).rows as Array<Record<string, unknown>>;
+    }
+
+    const prefRows = (await db.execute(sql`
+      SELECT DISTINCT c.id as candidate_id, c.id as queue_id, 'pending' as queue_status, 9999 as queue_position,
+             c.full_name, c.candidate_code, c.email, c.phone, c.qualification, c.college_name, c.status as candidate_status,
+             c.psychometric_score,
+             sub.id as submission_id, sub.pg_qualifications, sub.specialization, sub.photo_url
+      FROM candidates c
+      JOIN candidate_preferences cp ON cp.candidate_id = c.id
+      LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
+      WHERE cp.speciality_id = ${specialityId} AND c.status != 'rejected'
+      ORDER BY c.full_name ASC
+    `)).rows as Array<Record<string, unknown>>;
+
+    const seenCands = new Set<number>();
+    queueEntries = [];
+    for (const row of [...qRows, ...prefRows]) {
+      const cid = Number(row["candidate_id"]);
+      if (!seenCands.has(cid)) {
+        seenCands.add(cid);
+        queueEntries.push(row);
+      }
+    }
+  } else {
+    // General list of approved/active candidates
+    queueEntries = (await db.execute(sql`
+      SELECT DISTINCT c.id as candidate_id, c.id as queue_id, 'pending' as queue_status,
+             c.full_name, c.candidate_code, c.email, c.phone, c.qualification, c.college_name, c.status as candidate_status,
+             c.psychometric_score,
+             sub.id as submission_id, sub.pg_qualifications, sub.specialization, sub.photo_url, c.created_at
+      FROM candidates c
+      LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
+      WHERE c.status IN ('approved', 'interview_completed', 'allocated', 'pending')
+      ORDER BY c.created_at DESC
+      LIMIT 100
     `)).rows as Array<Record<string, unknown>>;
   }
 
-  // 3. Fallback: If no panel queue items or no active panel, load candidates by speciality preference or doctor assignments
-  if (queueEntries.length === 0) {
-    if (specialityId) {
-      queueEntries = (await db.execute(sql`
-        SELECT DISTINCT c.id as candidate_id, c.id as queue_id, 'pending' as queue_status,
-               c.full_name, c.candidate_code, c.email, c.phone, c.qualification, c.college_name, c.status as candidate_status,
-               sub.id as submission_id, sub.pg_qualifications, sub.specialization
-        FROM candidates c
-        JOIN candidate_preferences cp ON cp.candidate_id = c.id
-        LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
-        WHERE cp.speciality_id = ${specialityId} AND c.status != 'rejected'
-        ORDER BY c.full_name ASC
-      `)).rows as Array<Record<string, unknown>>;
-    } else {
-      // General list of approved/active candidates
-      queueEntries = (await db.execute(sql`
-        SELECT DISTINCT c.id as candidate_id, c.id as queue_id, 'pending' as queue_status,
-               c.full_name, c.candidate_code, c.email, c.phone, c.qualification, c.college_name, c.status as candidate_status,
-               sub.id as submission_id, sub.pg_qualifications, sub.specialization, c.created_at
-        FROM candidates c
-        LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
-        WHERE c.status IN ('approved', 'interview_completed', 'allocated', 'pending')
-        ORDER BY c.created_at DESC
-        LIMIT 100
-      `)).rows as Array<Record<string, unknown>>;
-    }
-  }
-
-  const scores = await db.select().from(interviewScoresTable).where(
-    specialityId
-      ? eq(interviewScoresTable.specialityId, specialityId)
-      : eq(interviewScoresTable.doctorId, userId)
-  );
+  // Load all scores once to accurately link single panel scores
+  const allScores = await db.select().from(interviewScoresTable);
 
   res.json(queueEntries.map((q) => {
     const candidateId = Number(q["candidate_id"]);
-    const sc = scores.find((s) => s.candidateId === candidateId);
+    let sc: any = null;
+
+    if (activePanel?.is_mind_matter) {
+      // Mind Matter: check psychometric_score or score entered on Mind Matter panel
+      const psychVal = q["psychometric_score"] != null && q["psychometric_score"] !== "" ? parseFloat(String(q["psychometric_score"])) : null;
+      const mmScore = allScores.find((s) => s.candidateId === candidateId && s.specialityId === null);
+      if (psychVal !== null && !isNaN(psychVal)) {
+        sc = { 
+          id: mmScore?.id ?? candidateId, 
+          score: psychVal, 
+          remarks: mmScore?.remarks ?? "", 
+          submittedAt: mmScore?.submittedAt?.toISOString() ?? new Date().toISOString() 
+        };
+      } else if (mmScore) {
+        sc = { 
+          id: mmScore.id, 
+          score: mmScore.score, 
+          remarks: mmScore.remarks, 
+          submittedAt: mmScore.submittedAt.toISOString() 
+        };
+      }
+    } else if (specialityId) {
+      // Speciality Interview: single panel score entered by ANY doctor on this panel
+      const specScore = allScores.find((s) => s.candidateId === candidateId && s.specialityId === specialityId);
+      if (specScore) {
+        sc = { 
+          id: specScore.id, 
+          score: specScore.score, 
+          remarks: specScore.remarks, 
+          doctorId: specScore.doctorId, 
+          submittedAt: specScore.submittedAt.toISOString() 
+        };
+      }
+    } else {
+      const docScore = allScores.find((s) => s.candidateId === candidateId && s.doctorId === userId);
+      if (docScore) {
+        sc = { 
+          id: docScore.id, 
+          score: docScore.score, 
+          remarks: docScore.remarks, 
+          doctorId: docScore.doctorId, 
+          submittedAt: docScore.submittedAt.toISOString() 
+        };
+      }
+    }
+
+    const isCompleted = sc !== null;
+
     return {
       id: Number(q["queue_id"] ?? candidateId),
       candidateId,
@@ -102,10 +176,11 @@ router.get("/interviews/assignments", requireAuth, requireRole("doctor", "super_
       pgQualifications: String(q["pg_qualifications"] ?? "N/A"),
       collegeName: String(q["college_name"] ?? "N/A"),
       submissionId: q["submission_id"] ? Number(q["submission_id"]) : null,
+      photoUrl: q["photo_url"] ? String(q["photo_url"]) : null,
       unitName: null,
       scheduledAt: null,
-      status: sc ? "completed" : (q["queue_status"] === "completed" ? "completed" : "pending"),
-      existingScore: sc ? { id: sc.id, score: sc.score, remarks: sc.remarks, submittedAt: sc.submittedAt.toISOString() } : null,
+      status: isCompleted ? "completed" : "pending",
+      existingScore: sc,
     };
   }));
 });
@@ -340,14 +415,12 @@ router.post("/interviews/scores", requireAuth, requireRole("doctor"), async (req
     return res.status(400).json({ error: `Score must be between 0 and ${maxScore} marks.` });
   }
 
+  // Look for any existing panel score for this candidate + speciality (or Mind Matter)
   const existing = await db.select().from(interviewScoresTable).where(
     and(
       eq(interviewScoresTable.candidateId, candidateId),
       specialityId
-        ? and(
-            eq(interviewScoresTable.doctorId, userId),
-            eq(interviewScoresTable.specialityId, specialityId)
-          )
+        ? eq(interviewScoresTable.specialityId, specialityId)
         : sql`speciality_id IS NULL`
     ),
   );
@@ -373,7 +446,8 @@ router.post("/interviews/scores", requireAuth, requireRole("doctor"), async (req
       enteredBy: userId,
       enteredAt: now,
       lastModifiedBy: userId,
-      lastModifiedAt: now
+      lastModifiedAt: now,
+      submittedAt: now,
     }).returning();
   }
 
