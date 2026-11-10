@@ -23,7 +23,7 @@ import {
   Edit3 as Edit, Save, AlertCircle, FileJson, CheckCircle2, LayoutDashboard, CalendarDays,
   FileSignature, ExternalLink as ExtLink, FileType, CheckCircle, UserPlus, GitMerge,
   Mail, Send, Search, Phone, IndianRupee, ShieldCheck, Zap,
-  Share2
+  Share2, User, Stethoscope, GraduationCap, MapPin
 } from "lucide-react";
 import { ShareApplicationDialog } from "../components/ShareApplicationDialog";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
@@ -1753,26 +1753,163 @@ export default function ApplicationFormsPage() {
     return val;
   };
 
-  // Extract all standard and dynamic fields into a compact list of key-value pairs
-  const getCompactPrintFields = () => {
+  // Synchronous and robust photo URL for print and view
+  const getPrintPhotoUrl = (): string | null => {
+    if (photoBlobUrl) return photoBlobUrl;
+    let rawUrl: string | null = viewedSub?.photoUrl || null;
+    if (!rawUrl && viewedSub?.formData) {
+      for (const [k, v] of Object.entries(viewedSub.formData)) {
+        if (typeof v === "string" && (k.toLowerCase().includes("photo") || k.toLowerCase().includes("photograph") || k.toLowerCase().includes("passport"))) {
+          rawUrl = v;
+          break;
+        }
+      }
+    }
+    if (!rawUrl) return null;
+    if (rawUrl.startsWith("data:") || rawUrl.startsWith("blob:")) return rawUrl;
+    const cleanPath = getCleanObjectPath(rawUrl);
+    if (cleanPath) {
+      const token = typeof window !== "undefined" ? (localStorage.getItem("fellowship_token") || "") : "";
+      return `/api/storage${cleanPath}?token=${encodeURIComponent(token)}`;
+    }
+    return rawUrl;
+  };
+
+  interface ParsedSurgery {
+    procedure: string;
+    independent: number;
+    supervision: number;
+    total: number;
+  }
+
+  const getParsedSurgicalExperience = (): ParsedSurgery[] => {
+    if (!viewedSub) return [];
+    const raw = viewedSub.surgicalExperience || viewedSub.formData?.surgicalExperience || viewedSub.formData?.["Surgical Experience"] || viewedSub.formData?.surgical_experience;
+    if (!raw) return [];
+
+    const results: ParsedSurgery[] = [];
+
+    if (typeof raw === "object" && raw !== null) {
+      for (const [key, val] of Object.entries(raw)) {
+        if (typeof val === "object" && val !== null) {
+          const ind = Number((val as any).independent ?? (val as any).ind ?? 0);
+          const sup = Number((val as any).supervision ?? (val as any).sup ?? 0);
+          results.push({ procedure: key.toUpperCase(), independent: ind, supervision: sup, total: ind + sup });
+        } else if (typeof val === "number" || typeof val === "string") {
+          const num = Number(val) || 0;
+          results.push({ procedure: key.toUpperCase(), independent: num, supervision: 0, total: num });
+        }
+      }
+      return results;
+    }
+
+    const str = String(raw).trim();
+    try {
+      const parsed = JSON.parse(str);
+      if (typeof parsed === "object" && parsed !== null) {
+        for (const [key, val] of Object.entries(parsed)) {
+          if (typeof val === "object" && val !== null) {
+            const ind = Number((val as any).independent ?? (val as any).ind ?? 0);
+            const sup = Number((val as any).supervision ?? (val as any).sup ?? 0);
+            results.push({ procedure: key.toUpperCase(), independent: ind, supervision: sup, total: ind + sup });
+          }
+        }
+        if (results.length > 0) return results;
+      }
+    } catch { }
+
+    const regex = /([A-Za-z0-9\s/+-]+):\s*\{([^}]+)\}/g;
+    let match;
+    while ((match = regex.exec(str)) !== null) {
+      const proc = match[1].trim().toUpperCase();
+      const inner = match[2];
+      const indMatch = inner.match(/independent\s*:\s*(\d+)/i) || inner.match(/ind\s*:\s*(\d+)/i);
+      const supMatch = inner.match(/supervision\s*:\s*(\d+)/i) || inner.match(/sup\s*:\s*(\d+)/i);
+      const ind = indMatch ? Number(indMatch[1]) : 0;
+      const sup = supMatch ? Number(supMatch[1]) : 0;
+      results.push({ procedure: proc, independent: ind, supervision: sup, total: ind + sup });
+    }
+    if (results.length > 0) return results;
+
+    const parts = str.split(",").map(p => p.trim()).filter(Boolean);
+    for (const p of parts) {
+      const [k, v] = p.split(":").map(s => s.trim());
+      if (k && v) {
+        const num = Number(v) || 0;
+        results.push({ procedure: k.toUpperCase(), independent: num, supervision: 0, total: num });
+      }
+    }
+    return results;
+  };
+
+  interface ParsedSkill {
+    name: string;
+    level: "Expert" | "Proficient" | "Intermittent" | "Beginner";
+  }
+
+  const getParsedDiagnosticSkills = (): ParsedSkill[] => {
+    if (!viewedSub) return [];
+    const raw = viewedSub.diagnosticSkills || viewedSub.formData?.diagnosticSkills || viewedSub.formData?.["Diagnostic Skills"] || viewedSub.formData?.diagnostic_skills;
+    if (!raw) return [];
+
+    const results: ParsedSkill[] = [];
+    const str = String(raw).trim();
+
+    try {
+      const parsed = JSON.parse(str);
+      if (typeof parsed === "object" && parsed !== null) {
+        for (const [k, v] of Object.entries(parsed)) {
+          const valStr = String(v);
+          let level: ParsedSkill["level"] = "Proficient";
+          if (/expert/i.test(valStr)) level = "Expert";
+          else if (/intermittent/i.test(valStr)) level = "Intermittent";
+          else if (/beginner|basic/i.test(valStr)) level = "Beginner";
+          results.push({ name: k, level });
+        }
+        if (results.length > 0) return results;
+      }
+    } catch { }
+
+    const items = str.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
+    for (const item of items) {
+      const colonIdx = item.lastIndexOf(":");
+      if (colonIdx !== -1) {
+        const name = item.slice(0, colonIdx).trim();
+        const valStr = item.slice(colonIdx + 1).trim();
+        let level: ParsedSkill["level"] = "Proficient";
+        if (/expert/i.test(valStr)) level = "Expert";
+        else if (/intermittent/i.test(valStr)) level = "Intermittent";
+        else if (/beginner|basic/i.test(valStr)) level = "Beginner";
+        if (name) results.push({ name, level });
+      } else {
+        results.push({ name: item, level: "Proficient" });
+      }
+    }
+    return results;
+  };
+
+  const getAdditionalPrintFields = () => {
     if (!viewedSub || !viewedForm) return [];
     const fields: { label: string; value: string }[] = [];
-    
-    // Core demographic details
-    if (viewedSub.dateOfBirth) fields.push({ label: "Date of Birth", value: new Date(viewedSub.dateOfBirth).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) });
-    if (viewedSub.maritalStatus) fields.push({ label: "Marital Status", value: viewedSub.maritalStatus });
-    if (viewedSub.phone) fields.push({ label: "Contact Number", value: viewedSub.phone });
-    if (viewedSub.centerPreference) fields.push({ label: "Center Preference", value: formatCenterPreferences() });
-    
-    // Read dynamic non-file fields
+    const excludedKeywords = [
+      "name", "email", "phone", "contact", "address", "photo", "photograph",
+      "specialization", "center", "preference", "qualification", "degree", "college",
+      "university", "council", "surgical", "surgery", "diagnostic", "publication",
+      "presentation", "lor", "recommendation", "declare", "declaration", "spouse", "dob", "birth",
+      "gender", "marital", "health", "medical condition"
+    ];
+
     for (const s of viewedForm.sectionsConfig || []) {
       for (const f of s.fields) {
         if (f.type !== "file" && f.type !== "info" && f.type !== "heading" && f.type !== "static_text") {
-          const val = f.isStandard && f.mapping ? viewedSub[f.mapping] : viewedSub.formData?.[f.id];
-          if (val && typeof val !== "object" && String(val).trim() !== "") {
-            const cleanedVal = cleanArrayValue(String(val));
-            if (!fields.some(item => item.label.toLowerCase() === f.label.toLowerCase())) {
-              fields.push({ label: f.label, value: cleanedVal });
+          const isExcluded = excludedKeywords.some(kw => f.label.toLowerCase().includes(kw) || f.id.toLowerCase().includes(kw));
+          if (!isExcluded) {
+            const val = f.isStandard && f.mapping ? viewedSub[f.mapping] : viewedSub.formData?.[f.id];
+            if (val && typeof val !== "object" && String(val).trim() !== "" && String(val).toLowerCase() !== "null" && String(val).toLowerCase() !== "nil") {
+              const cleanedVal = cleanArrayValue(String(val));
+              if (!fields.some(item => item.label.toLowerCase() === f.label.toLowerCase())) {
+                fields.push({ label: f.label, value: cleanedVal });
+              }
             }
           }
         }
@@ -1812,10 +1949,9 @@ export default function ApplicationFormsPage() {
       >
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
-            /* Standard Letter portrait dimensions with crisp, compact margins */
             @page { 
-              size: letter portrait; 
-              margin: 8mm 10mm; 
+              size: A4 portrait; 
+              margin: 7mm 9mm; 
             }
 
             body, html, #root { 
@@ -1830,12 +1966,13 @@ export default function ApplicationFormsPage() {
                print-color-adjust: exact !important; 
             }
             
-            /* Remove all overflow restrictions that truncate pages */
             * {
                overflow: visible !important;
+               -webkit-print-color-adjust: exact !important; 
+               print-color-adjust: exact !important; 
             }
             
-            aside, .md\\:hidden, .main-sidebar, .main-header, .no-print, header, nav { 
+            aside, .md\\:hidden, .main-sidebar, .main-header, .no-print, header, nav, .glass-header { 
                display: none !important; 
             }
 
@@ -1846,7 +1983,6 @@ export default function ApplicationFormsPage() {
                position: static !important;
             }
             
-            /* Make the overlay flow naturally on letter pages without clipping */
             .detail-overlay { 
                position: static !important; 
                background: white !important; 
@@ -1863,8 +1999,6 @@ export default function ApplicationFormsPage() {
                width: 100% !important;
                max-width: 100% !important;
                word-wrap: break-word !important;
-               page-break-inside: avoid !important;
-               break-inside: avoid !important;
             }
 
             td, th {
@@ -1872,16 +2006,16 @@ export default function ApplicationFormsPage() {
                white-space: normal !important;
             }
             
-            /* Compact Letter Fit Components */
-            .print-card, .border-slate-350, .print-avoid-break {
+            .print-page-break {
+               page-break-before: always !important;
+               break-before: page !important;
+               height: 0 !important;
+               display: block !important;
+            }
+
+            .print-avoid-break {
                break-inside: avoid !important;
                page-break-inside: avoid !important;
-               box-shadow: none !important;
-            }
-            
-            * { 
-               -webkit-print-color-adjust: exact !important; 
-               print-color-adjust: exact !important; 
             }
           }
         `}} />
@@ -1933,75 +2067,6 @@ export default function ApplicationFormsPage() {
           </div>
 
           <div className="flex-1 overflow-auto p-8 fancy-scrollbar print:overflow-visible print:h-auto print:p-0">
-             {/* Formal Print Header Title */}
-             <div className="hidden print:flex items-start justify-between border-b-2 border-[#0b4a8f] pb-4 mb-6">
-                <div className="space-y-0.5">
-                   <h1 className="text-3xl font-black uppercase tracking-tight text-[#0b4a8f]">Sankara Academy of Vision</h1>
-                   <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Fellowship Application Record</p>
-                </div>
-                <div className="text-right">
-                   <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 text-right">Date Printed</p>
-                   <p className="text-xs font-bold text-slate-950 text-right">{new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                </div>
-             </div>
-
-             {/* Candidate Details & Photo Placement (Below Header, Photo on the Right) */}
-             <div className="hidden print:grid grid-cols-12 gap-6 items-start pb-6 mb-6 border-b border-slate-200">
-                <div className="col-span-8 space-y-4">
-                    {viewedSub.candidateCode && viewedSub.candidateCode !== "PENDING" && (
-                       <div>
-                          <p className="text-[9px] font-black uppercase tracking-widest text-[#0b4a8f] leading-none mb-1">Applicant Registration Number</p>
-                          <p className="text-xl font-black text-slate-900 font-mono tracking-wider">{viewedSub.candidateCode}</p>
-                       </div>
-                    )}
-                   <div className="grid grid-cols-2 gap-4">
-                      <div>
-                         <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-none mb-1">Full Name of Applicant</p>
-                         <p className="text-sm font-black text-slate-900">{viewedSub.fullName}</p>
-                      </div>
-                      <div>
-                         <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-none mb-1">E-Mail Address</p>
-                         <p className="text-sm font-semibold text-slate-700 break-all">{viewedSub.email}</p>
-                      </div>
-                   </div>
-                   <div>
-                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-none mb-1.5">Specialization Applied For</p>
-                      <div className="flex flex-wrap gap-1.5">
-                         {(() => {
-                            const centerPrefs = parseCenterPreferences(viewedSub.centerPreference, viewedSub.formData, viewedForm?.sectionsConfig);
-                            return parseSpecializations(viewedSub.specialization).map((spec, idx) => {
-                               const matchKey = Object.keys(centerPrefs).find(k => 
-                                  k.toLowerCase().trim() === spec.toLowerCase().trim() ||
-                                  spec.toLowerCase().trim().includes(k.toLowerCase().trim()) ||
-                                  k.toLowerCase().trim().includes(spec.toLowerCase().trim())
-                               );
-                               const loc = matchKey ? centerPrefs[matchKey] : "";
-                               const displayName = loc ? `${spec} (${loc})` : spec;
-                               return (
-                            <span key={idx} className="text-[10px] font-black text-[#0b4a8f] bg-[#0b4a8f]/5 border border-[#0b4a8f]/10 px-2.5 py-0.5 rounded-lg shadow-sm">
-                               {displayName}
-                            </span>
-                               );
-                            });
-                         })()}
-                      </div>
-                   </div>
-                </div>
-                
-                <div className="col-span-4 flex justify-end">
-                   <div className="w-28 h-32 border-2 border-slate-300 bg-white p-1 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden shadow-sm">
-                      {photoBlobUrl ? (
-                         <img src={photoBlobUrl} alt="Candidate Photo" className="w-full h-full object-cover rounded" />
-                      ) : (
-                         <div className="w-full h-full bg-slate-50 flex flex-col items-center justify-center text-center p-2 rounded">
-                            <span className="text-[9px] text-slate-400 font-black uppercase tracking-wider">Passport size</span>
-                            <span className="text-[9px] text-slate-400 font-black uppercase tracking-wider">Photograph</span>
-                         </div>
-                      )}
-                   </div>
-                </div>
-             </div>
-
              <div className="no-print">
              <AnimatePresence mode="wait">
               <motion.div
@@ -2272,66 +2337,538 @@ export default function ApplicationFormsPage() {
             </AnimatePresence>
             </div>
 
-            {/* Dedicated 1-Page A4 Print View (Hidden on Screen, Visible on Print) */}
-            <div className="hidden print:block space-y-4 print:text-slate-900 mt-2">
-               {/* Academic & Personal Grid */}
-               <div className="border border-slate-350 rounded-xl overflow-hidden bg-white shadow-sm">
-                  <div className="bg-[#0b4a8f]/5 px-4 py-1.5 border-b border-slate-350">
-                     <p className="text-[10px] font-black text-[#0b4a8f] uppercase tracking-wider">I. Candidate Profile & Academic Overview</p>
+            {/* ═══════════════════════════════════════════════════════════════════════ */}
+            {/* DEDICATED OFFICIAL 2-PAGE INSTITUTIONAL APPLICATION DOCUMENT (PRINT ONLY) */}
+            {/* ═══════════════════════════════════════════════════════════════════════ */}
+            <div className="hidden print:block font-sans text-slate-900 leading-tight">
+               {/* ────────────────── PAGE 1: DEMOGRAPHICS, CREDENTIALS & FITNESS ────────────────── */}
+               <div className="space-y-3">
+                  {/* Header */}
+                  <div className="flex items-start justify-between border-b-2 border-[#0b4a8f] pb-3">
+                     <div className="space-y-0.5">
+                        <h1 className="text-2xl font-black uppercase tracking-tight text-[#0b4a8f] leading-none">
+                           Sankara Academy of Vision
+                        </h1>
+                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                           Educational Unit of Sankara Eye Foundation, India · Sri Kanchi Kamakoti Medical Trust
+                        </p>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-700 pt-0.5">
+                           Official Fellowship Application Record — Academic Session 2027
+                        </p>
+                     </div>
+                     <div className="text-right space-y-0.5">
+                        <p className="text-[8.5px] font-black uppercase tracking-widest text-[#0b4a8f]">
+                           Application Ref: <span className="font-mono text-slate-900">#APP-{viewedSub.id}</span>
+                        </p>
+                        <p className="text-[8px] font-bold text-slate-500">
+                           Submitted: {viewedSub.submittedAt ? new Date(viewedSub.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                        </p>
+                        <p className="text-[8px] font-bold text-slate-500">
+                           Printed: {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </p>
+                     </div>
                   </div>
-                  <div className="grid grid-cols-2 divide-x divide-y divide-slate-200 text-xs">
-                     {getCompactPrintFields().map((field, idx) => (
-                        <div key={idx} className="p-2 flex items-center justify-between min-h-[36px]">
-                           <span className="font-bold text-slate-500 uppercase text-[9px] tracking-wider">{field.label}</span>
-                           <span className="font-black text-slate-800 break-all pl-2 text-right">{field.value}</span>
+
+                  {/* Top Candidate Profile Strip & Passport Photograph */}
+                  <div className="grid grid-cols-12 gap-4 items-start pb-2 border-b border-slate-200">
+                     <div className="col-span-9 space-y-2">
+                        <div className="flex items-center gap-3">
+                           {viewedSub.candidateCode && viewedSub.candidateCode !== "PENDING" && (
+                              <div className="bg-[#0b4a8f]/10 border border-[#0b4a8f]/20 px-2 py-0.5 rounded">
+                                 <span className="text-[8px] font-black uppercase tracking-wider text-[#0b4a8f]">Roll No: </span>
+                                 <span className="text-xs font-black font-mono text-[#0b4a8f]">{viewedSub.candidateCode}</span>
+                              </div>
+                           )}
+                           <h2 className="text-lg font-black text-slate-900 tracking-tight">
+                              Dr. {viewedSub.fullName}
+                           </h2>
                         </div>
-                     ))}
+
+                        {/* Specializations & Preferred Centers */}
+                        <div>
+                           <p className="text-[8.5px] font-black uppercase tracking-wider text-slate-400 mb-1">
+                              Applied Specialization & Preferred Study Centers
+                           </p>
+                           <div className="flex flex-wrap gap-1.5">
+                              {(() => {
+                                 const centerPrefs = parseCenterPreferences(viewedSub.centerPreference, viewedSub.formData, viewedForm?.sectionsConfig);
+                                 const specs = parseSpecializations(viewedSub.specialization);
+                                 if (specs.length === 0) return <span className="text-xs font-semibold text-slate-500">Ophthalmology Fellowship</span>;
+                                 return specs.map((spec, idx) => {
+                                    const matchKey = Object.keys(centerPrefs).find(k => 
+                                       k.toLowerCase().trim() === spec.toLowerCase().trim() ||
+                                       spec.toLowerCase().trim().includes(k.toLowerCase().trim()) ||
+                                       k.toLowerCase().trim().includes(spec.toLowerCase().trim())
+                                    );
+                                    const loc = matchKey ? centerPrefs[matchKey] : "";
+                                    return (
+                                       <span key={idx} className="text-[9.5px] font-black text-[#0b4a8f] bg-[#0b4a8f]/5 border border-[#0b4a8f]/20 px-2 py-0.5 rounded">
+                                          {spec} {loc ? `— Preferred Center: ${loc}` : ""}
+                                       </span>
+                                    );
+                                 });
+                              })()}
+                           </div>
+                        </div>
+
+                        {/* Core Demographics Grid */}
+                        <div className="grid grid-cols-3 gap-2 pt-1 text-[10px]">
+                           <div>
+                              <span className="font-bold text-slate-400 uppercase text-[8px] block">Date of Birth & Gender</span>
+                              <span className="font-black text-slate-800">
+                                 {viewedSub.dateOfBirth ? new Date(viewedSub.dateOfBirth).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                                 {viewedSub.gender ? ` (${viewedSub.gender})` : ''}
+                              </span>
+                           </div>
+                           <div>
+                              <span className="font-bold text-slate-400 uppercase text-[8px] block">Contact Number</span>
+                              <span className="font-black text-slate-800 font-mono">{viewedSub.phone || '—'}</span>
+                           </div>
+                           <div>
+                              <span className="font-bold text-slate-400 uppercase text-[8px] block">Email Address</span>
+                              <span className="font-black text-slate-800 break-all">{viewedSub.email}</span>
+                           </div>
+                        </div>
+                     </div>
+
+                     {/* Passport Photo */}
+                     <div className="col-span-3 flex justify-end">
+                        <div className="w-[105px] h-[130px] border border-slate-300 bg-white p-0.5 rounded shadow-xs flex items-center justify-center overflow-hidden">
+                           {(() => {
+                              const photoUrl = getPrintPhotoUrl();
+                              return photoUrl ? (
+                                 <img 
+                                    src={photoUrl} 
+                                    alt="Applicant Passport Photo" 
+                                    className="w-full h-full object-cover rounded" 
+                                    crossOrigin="anonymous" 
+                                 />
+                              ) : (
+                                 <div className="w-full h-full bg-slate-50 flex flex-col items-center justify-center text-center p-2 rounded">
+                                    <User className="w-8 h-8 text-slate-300 mb-1" />
+                                    <span className="text-[8px] text-slate-400 font-black uppercase tracking-wider">PASSPORT SIZE</span>
+                                    <span className="text-[8px] text-slate-400 font-black uppercase tracking-wider">PHOTOGRAPH</span>
+                                 </div>
+                              );
+                           })()}
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* Section I: Residential & Correspondence Addresses */}
+                  <div className="border border-slate-300 rounded-lg overflow-hidden bg-white">
+                     <div className="bg-[#0b4a8f]/5 px-3 py-1 border-b border-slate-300 flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-[#0b4a8f]" />
+                        <p className="text-[9.5px] font-black text-[#0b4a8f] uppercase tracking-wider">
+                           I. Candidate Contact & Address Details
+                        </p>
+                     </div>
+                     <div className="grid grid-cols-2 divide-x divide-slate-200 p-2.5 text-[9.5px]">
+                        <div className="pr-3">
+                           <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Permanent Residential Address</p>
+                           <p className="font-semibold text-slate-800 leading-snug">
+                              {viewedSub.permanentAddress || viewedSub.formData?.["Permanent Address"] || viewedSub.formData?.permanent_address || "—"}
+                           </p>
+                        </div>
+                        <div className="pl-3">
+                           <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Mailing / Correspondence Address</p>
+                           <p className="font-semibold text-slate-800 leading-snug">
+                              {viewedSub.mailingAddress || viewedSub.formData?.["Mailing Address"] || viewedSub.formData?.mailing_address || viewedSub.permanentAddress || "Same as permanent address"}
+                           </p>
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* Section II: Academic Qualifications & Medical Council Registration */}
+                  <div className="border border-slate-300 rounded-lg overflow-hidden bg-white">
+                     <div className="bg-[#0b4a8f]/5 px-3 py-1 border-b border-slate-300 flex items-center gap-1.5">
+                        <GraduationCap className="w-3.5 h-3.5 text-[#0b4a8f]" />
+                        <p className="text-[9.5px] font-black text-[#0b4a8f] uppercase tracking-wider">
+                           II. Academic Qualifications & Medical Council Registration
+                        </p>
+                     </div>
+                     <table className="w-full text-left text-[9.5px] divide-y divide-slate-200">
+                        <tbody className="divide-y divide-slate-200">
+                           <tr className="bg-slate-50/50">
+                              <td className="py-1.5 px-3 font-bold text-slate-500 uppercase text-[8.5px] w-1/4">Basic Medical Degree</td>
+                              <td className="py-1.5 px-3 font-black text-slate-800 w-1/4">
+                                 {viewedSub.degree || viewedSub.formData?.["Degree"] || "MBBS"}
+                              </td>
+                              <td className="py-1.5 px-3 font-bold text-slate-500 uppercase text-[8.5px] w-1/4">Medical Council Reg No</td>
+                              <td className="py-1.5 px-3 font-black text-slate-800 font-mono w-1/4">
+                                 {viewedSub.medicalCouncilNumber || viewedSub.formData?.["Medical Council Registration Number"] || viewedSub.formData?.["Registration Number"] || "—"}
+                              </td>
+                           </tr>
+                           <tr>
+                              <td className="py-1.5 px-3 font-bold text-slate-500 uppercase text-[8.5px]">MBBS College & University</td>
+                              <td className="py-1.5 px-3 font-semibold text-slate-800" colSpan={3}>
+                                 {[viewedSub.medicalCollege || viewedSub.formData?.["MBBS Medical College"] || viewedSub.formData?.medical_college, viewedSub.university || viewedSub.formData?.["MBBS University"] || viewedSub.formData?.university].filter(Boolean).join(" · ") || "—"}
+                              </td>
+                           </tr>
+                           <tr className="bg-slate-50/50">
+                              <td className="py-1.5 px-3 font-bold text-slate-500 uppercase text-[8.5px]">PG Qualification (MS / MD / DNB / DO)</td>
+                              <td className="py-1.5 px-3 font-black text-slate-800">
+                                 {viewedSub.pgQualifications || viewedSub.formData?.["Post Graduate Qualifications"] || viewedSub.formData?.pg_qualifications || (viewedSub.msMdQualification ? "MS / MD" : (viewedSub.dnbQualification ? "DNB" : (viewedSub.doQualification ? "DO" : "—")))}
+                              </td>
+                              <td className="py-1.5 px-3 font-bold text-slate-500 uppercase text-[8.5px]">State Medical Council</td>
+                              <td className="py-1.5 px-3 font-semibold text-slate-800">
+                                 {viewedSub.formData?.["Medical Council State"] || viewedSub.formData?.["State Medical Council"] || viewedSub.formData?.state_medical_council || "—"}
+                              </td>
+                           </tr>
+                           <tr>
+                              <td className="py-1.5 px-3 font-bold text-slate-500 uppercase text-[8.5px]">PG College & University</td>
+                              <td className="py-1.5 px-3 font-semibold text-slate-800" colSpan={3}>
+                                 {[viewedSub.formData?.["Post Graduate Medical College"] || viewedSub.formData?.["PG Medical College"] || viewedSub.msMdDetails || viewedSub.dnbDetails || viewedSub.doDetails, viewedSub.formData?.["Post Graduate University"] || viewedSub.formData?.["PG University"]].filter(Boolean).join(" · ") || "—"}
+                              </td>
+                           </tr>
+                           {(viewedSub.otherTraining || viewedSub.formData?.["Other Training"] || viewedSub.formData?.other_training) && (
+                              <tr className="bg-slate-50/50">
+                                 <td className="py-1.5 px-3 font-bold text-slate-500 uppercase text-[8.5px]">Other Training / Experience</td>
+                                 <td className="py-1.5 px-3 font-semibold text-slate-800" colSpan={3}>
+                                    {viewedSub.otherTraining || viewedSub.formData?.["Other Training"] || viewedSub.formData?.other_training}
+                                 </td>
+                              </tr>
+                           )}
+                        </tbody>
+                     </table>
+                  </div>
+
+                  {/* Section III: Personal Declarations & Administrative Information */}
+                  <div className="border border-slate-300 rounded-lg overflow-hidden bg-white">
+                     <div className="bg-[#0b4a8f]/5 px-3 py-1 border-b border-slate-300 flex items-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5 text-[#0b4a8f]" />
+                        <p className="text-[9.5px] font-black text-[#0b4a8f] uppercase tracking-wider">
+                           III. Personal Declarations & Medical Fitness
+                        </p>
+                     </div>
+                     <div className="grid grid-cols-3 divide-x divide-slate-200 p-2.5 text-[9.5px]">
+                        <div className="pr-2">
+                           <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Marital Status</p>
+                           <p className="font-semibold text-slate-800">
+                              {viewedSub.maritalStatus || viewedSub.formData?.["Marital Status"] || "—"}
+                              {(() => {
+                                 const sp = viewedSub.spouseDetails || viewedSub.formData?.["Spouse Details"] || viewedSub.formData?.spouse_details;
+                                 if (sp && String(sp).trim() !== "" && String(sp) !== "0" && String(sp).toLowerCase() !== "nil" && String(sp).toLowerCase() !== "none") {
+                                    return ` (Spouse: ${sp})`;
+                                 }
+                                 return "";
+                              })()}
+                           </p>
+                        </div>
+                        <div className="px-2">
+                           <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Medical Fitness / Conditions</p>
+                           <p className="font-semibold text-slate-800">
+                              {viewedSub.medicalConditions || viewedSub.healthDeclaration || viewedSub.formData?.["Health Declaration"] || viewedSub.formData?.["Medical Conditions"] || "Fit / No pre-existing illness"}
+                           </p>
+                        </div>
+                        <div className="pl-2">
+                           <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Information / Referral Source</p>
+                           <p className="font-semibold text-slate-800">
+                              {viewedSub.referralSource || viewedSub.formData?.["Referral Source"] || viewedSub.formData?.["How did you hear about us?"] || viewedSub.referredByName || "Direct / Website"}
+                           </p>
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* Additional Dynamic Answers (if any extra custom questions exist) */}
+                  {getAdditionalPrintFields().length > 0 && (
+                     <div className="border border-slate-300 rounded-lg overflow-hidden bg-white">
+                        <div className="bg-[#0b4a8f]/5 px-3 py-1 border-b border-slate-300">
+                           <p className="text-[9.5px] font-black text-[#0b4a8f] uppercase tracking-wider">Additional Applicant Disclosures</p>
+                        </div>
+                        <div className="grid grid-cols-2 divide-x divide-y divide-slate-200 text-[9px]">
+                           {getAdditionalPrintFields().map((f, idx) => (
+                              <div key={idx} className="p-1.5 flex items-center justify-between">
+                                 <span className="font-bold text-slate-500 uppercase text-[8px]">{f.label}</span>
+                                 <span className="font-black text-slate-800 break-all pl-2 text-right">{f.value}</span>
+                              </div>
+                           ))}
+                        </div>
+                     </div>
+                  )}
+
+                  {/* Page 1 Running Footer */}
+                  <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[8px] text-slate-400 font-bold uppercase tracking-wider">
+                     <span>Sankara Academy of Vision &bull; Fellowship Program 2027</span>
+                     <span>Page 1 of 2</span>
+                     <span>App Ref: {viewedSub.candidateCode || `#APP-${viewedSub.id}`}</span>
                   </div>
                </div>
 
-               {/* Secure Letters of Recommendation Verification (LORs side-by-side) */}
-               {getPrintLorFields().length > 0 && (
-                  <div className="grid grid-cols-2 gap-4">
-                     {getPrintLorFields().map((lor, idx) => {
-                        const verifyUrl = typeof window !== 'undefined' ? (window.location.origin + "/verify-lor?path=" + encodeURIComponent(lor.value)) : "";
+               {/* ────────────────── FORCED CLEAN PAGE BREAK ────────────────── */}
+               <div className="print-page-break" />
+
+               {/* ────────────────── PAGE 2: SURGICAL, DIAGNOSTICS, LORS & SIGN-OFF ────────────────── */}
+               <div className="space-y-3 pt-2">
+                  {/* Page 2 Running Header */}
+                  <div className="flex items-center justify-between border-b-2 border-[#0b4a8f] pb-2">
+                     <div>
+                        <h3 className="text-xs font-black uppercase text-[#0b4a8f] tracking-tight leading-none">
+                           Sankara Academy of Vision — Fellowship Application Record
+                        </h3>
+                        <p className="text-[8.5px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">
+                           Clinical Log, Referees & Verification Endorsement
+                        </p>
+                     </div>
+                     <div className="text-right">
+                        <p className="text-[9px] font-black text-slate-900 font-mono">
+                           Dr. {viewedSub.fullName} ({viewedSub.candidateCode || `#APP-${viewedSub.id}`})
+                        </p>
+                        <p className="text-[7.5px] font-bold uppercase tracking-widest text-[#0b4a8f]">
+                           CONFIDENTIAL APPLICANT DOSSIER
+                        </p>
+                     </div>
+                  </div>
+
+                  {/* Section IV: Surgical Experience & Operative Log */}
+                  <div className="border border-slate-300 rounded-lg overflow-hidden bg-white">
+                     <div className="bg-[#0b4a8f]/5 px-3 py-1 border-b border-slate-300 flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                           <Award className="w-3.5 h-3.5 text-[#0b4a8f]" />
+                           <p className="text-[9.5px] font-black text-[#0b4a8f] uppercase tracking-wider">
+                              IV. Surgical Log & Operative Competency Summary
+                           </p>
+                        </div>
+                        {viewedSub.totalSurgeries && (
+                           <span className="text-[8.5px] font-black text-[#0b4a8f] bg-white border border-[#0b4a8f]/20 px-2 py-0.5 rounded">
+                              Total Cases Reported: {viewedSub.totalSurgeries}
+                           </span>
+                        )}
+                     </div>
+
+                     {(() => {
+                        const parsedSurgeries = getParsedSurgicalExperience();
+                        if (parsedSurgeries.length > 0) {
+                           const totalInd = parsedSurgeries.reduce((acc, s) => acc + s.independent, 0);
+                           const totalSup = parsedSurgeries.reduce((acc, s) => acc + s.supervision, 0);
+                           const grandTotal = totalInd + totalSup;
+
+                           return (
+                              <table className="w-full text-left text-[9.5px]">
+                                 <thead>
+                                    <tr className="bg-slate-100 text-[8.5px] font-black uppercase text-slate-600 border-b border-slate-200">
+                                       <th className="py-1 px-3">Surgical Procedure</th>
+                                       <th className="py-1 px-3 text-center">Independent Surgeries</th>
+                                       <th className="py-1 px-3 text-center">Under Supervision</th>
+                                       <th className="py-1 px-3 text-right">Total Cases</th>
+                                    </tr>
+                                 </thead>
+                                 <tbody className="divide-y divide-slate-200">
+                                    {parsedSurgeries.map((s, idx) => (
+                                       <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
+                                          <td className="py-1 px-3 font-bold text-slate-800">{s.procedure}</td>
+                                          <td className="py-1 px-3 text-center font-mono font-bold text-slate-700">{s.independent}</td>
+                                          <td className="py-1 px-3 text-center font-mono font-bold text-slate-700">{s.supervision}</td>
+                                          <td className="py-1 px-3 text-right font-mono font-black text-[#0b4a8f]">{s.total}</td>
+                                       </tr>
+                                    ))}
+                                    <tr className="bg-[#0b4a8f]/5 font-black text-[#0b4a8f] border-t-2 border-[#0b4a8f]/30">
+                                       <td className="py-1.5 px-3 uppercase text-[9px]">Cumulative Surgical Volume</td>
+                                       <td className="py-1.5 px-3 text-center font-mono">{totalInd}</td>
+                                       <td className="py-1.5 px-3 text-center font-mono">{totalSup}</td>
+                                       <td className="py-1.5 px-3 text-right font-mono text-[10.5px]">{grandTotal}</td>
+                                    </tr>
+                                 </tbody>
+                              </table>
+                           );
+                        }
+
                         return (
-                           <div key={idx} className="border border-slate-350 rounded-xl p-3.5 bg-white flex items-center justify-between gap-4 shadow-sm min-h-[110px]">
-                              <div className="space-y-1">
-                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Verified Reference</p>
-                                 <p className="text-xs font-black text-slate-900 leading-snug">{lor.label}</p>
-                                 <div className="pt-1.5 flex items-center gap-1 text-[8px] font-black text-[#0b4a8f] uppercase tracking-wider">
-                                    <span>🔒 Secure Verification QR</span>
-                                 </div>
-                                 <p className="text-[7.5px] text-slate-455 font-medium leading-tight max-w-[130px]">
-                                    Administrative review required. Scanning validates credential authenticity.
-                                 </p>
-                              </div>
-                              <div className="p-1 bg-white border border-slate-200 rounded-lg flex-shrink-0">
-                                 {verifyUrl && <QRCode value={verifyUrl} size={65} className="w-[65px] h-[65px]" />}
-                              </div>
+                           <div className="p-3 text-[9.5px] text-slate-700">
+                              <p className="font-semibold">{viewedSub.surgicalExperience || viewedSub.formData?.surgicalExperience || "No individual procedure log provided."}</p>
+                              {viewedSub.totalSurgeries && (
+                                 <p className="font-bold text-[#0b4a8f] mt-1">Total Reported Cases: {viewedSub.totalSurgeries}</p>
+                              )}
                            </div>
                         );
-                     })}
+                     })()}
                   </div>
-               )}
 
-               {/* Print Verification Sign-off Box */}
-               <div className="border border-slate-350 rounded-xl p-4 bg-white/50 grid grid-cols-3 gap-6 items-end pt-12 mt-4">
-                  <div className="space-y-1">
-                     <div className="border-t border-slate-400 w-full pt-1.5">
-                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Signature of Reviewer</p>
+                  {/* Section V: Diagnostic & Clinical Competencies */}
+                  <div className="border border-slate-300 rounded-lg overflow-hidden bg-white">
+                     <div className="bg-[#0b4a8f]/5 px-3 py-1 border-b border-slate-300 flex items-center gap-1.5">
+                        <Stethoscope className="w-3.5 h-3.5 text-[#0b4a8f]" />
+                        <p className="text-[9.5px] font-black text-[#0b4a8f] uppercase tracking-wider">
+                           V. Diagnostic & Clinical Examination Skills
+                        </p>
+                     </div>
+                     <div className="p-2.5">
+                        {(() => {
+                           const skills = getParsedDiagnosticSkills();
+                           if (skills.length > 0) {
+                              return (
+                                 <div className="flex flex-wrap gap-1.5">
+                                    {skills.map((s, idx) => {
+                                       const isExpert = s.level === "Expert";
+                                       const isIntermittent = s.level === "Intermittent";
+                                       return (
+                                          <span 
+                                             key={idx} 
+                                             className={`text-[8.5px] font-bold px-2 py-0.5 rounded border ${
+                                                isExpert 
+                                                   ? "bg-blue-50 text-[#0b4a8f] border-blue-200" 
+                                                   : isIntermittent 
+                                                      ? "bg-amber-50 text-amber-800 border-amber-200" 
+                                                      : "bg-slate-50 text-slate-700 border-slate-200"
+                                             }`}
+                                          >
+                                             {s.name}: <span className="font-black uppercase text-[7.5px]">{s.level}</span>
+                                          </span>
+                                       );
+                                    })}
+                                 </div>
+                              );
+                           }
+
+                           return (
+                              <p className="text-[9px] font-semibold text-slate-700">
+                                 {viewedSub.diagnosticSkills || "Standard ophthalmic clinical examination proficiencies reported."}
+                              </p>
+                           );
+                        })()}
                      </div>
                   </div>
-                  <div className="space-y-1 text-center">
-                     <div className="border-t border-slate-400 w-full pt-1.5">
-                        <p className="text-[9px] font-black text-[#0b4a8f] uppercase tracking-wider font-mono opacity-20">SAV OFFICIAL SEAL</p>
-                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Authorized Seal / Stamp</p>
+
+                  {/* Section VI: Research, Publications & Presentations */}
+                  {(viewedSub.publications || viewedSub.presentations || viewedSub.formData?.["Publications"] || viewedSub.formData?.["Presentations"]) && (
+                     <div className="border border-slate-300 rounded-lg overflow-hidden bg-white">
+                        <div className="bg-[#0b4a8f]/5 px-3 py-1 border-b border-slate-300 flex items-center gap-1.5">
+                           <BookOpen className="w-3.5 h-3.5 text-[#0b4a8f]" />
+                           <p className="text-[9.5px] font-black text-[#0b4a8f] uppercase tracking-wider">
+                              VI. Research Publications & Conference Presentations
+                           </p>
+                        </div>
+                        <div className="p-2.5 space-y-1.5 text-[9px]">
+                           {(viewedSub.publications || viewedSub.formData?.["Publications"]) && (
+                              <div>
+                                 <span className="font-black uppercase text-[8px] text-slate-400 block">Indexed Publications</span>
+                                 <p className="font-semibold text-slate-800 leading-snug">
+                                    {viewedSub.publications || viewedSub.formData?.["Publications"]}
+                                 </p>
+                              </div>
+                           )}
+                           {(viewedSub.presentations || viewedSub.formData?.["Presentations"]) && (
+                              <div>
+                                 <span className="font-black uppercase text-[8px] text-slate-400 block">Scientific Presentations</span>
+                                 <p className="font-semibold text-slate-800 leading-snug">
+                                    {viewedSub.presentations || viewedSub.formData?.["Presentations"]}
+                                 </p>
+                              </div>
+                           )}
+                        </div>
+                     </div>
+                  )}
+
+                  {/* Section VII: Verified Academic Referees (LOR Verification) */}
+                  <div className="border border-slate-300 rounded-lg overflow-hidden bg-white">
+                     <div className="bg-[#0b4a8f]/5 px-3 py-1 border-b border-slate-300 flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-[#0b4a8f]" />
+                        <p className="text-[9.5px] font-black text-[#0b4a8f] uppercase tracking-wider">
+                           VII. Academic References & Secure Recommendation Letters (LOR)
+                        </p>
+                     </div>
+                     <div className="grid grid-cols-2 divide-x divide-slate-200 p-2.5 gap-2">
+                        {/* Referee 1 */}
+                        <div className="flex items-start justify-between gap-2 pr-2">
+                           <div className="space-y-0.5 text-[9px]">
+                              <p className="text-[7.5px] font-black text-slate-400 uppercase tracking-wider">Referee 1 (Professional Reference)</p>
+                              <p className="text-[10px] font-black text-slate-900 leading-tight">
+                                 {viewedSub.lor1RefName || viewedSub.formData?.["Referee 1 Name"] || viewedSub.formData?.lor1_ref_name || "Referee 1"}
+                              </p>
+                              <p className="text-[8.5px] font-medium text-slate-600">
+                                 {viewedSub.lor1RefContact || viewedSub.formData?.["Referee 1 Designation / Institution"] || viewedSub.formData?.lor1_ref_contact || "Institution / Hospital"}
+                              </p>
+                              {viewedSub.lor1RefEmail && (
+                                 <p className="text-[8px] font-mono text-slate-500">{viewedSub.lor1RefEmail}</p>
+                              )}
+                              <p className="text-[7px] text-[#0b4a8f] font-bold pt-0.5">🔒 Scan QR to verify uploaded LOR</p>
+                           </div>
+                           {(() => {
+                              const lorUrl = viewedSub.lor1Url || viewedSub.formData?.["Upload Letter of Recommendation (LOR 1)"] || viewedSub.formData?.lor1_url;
+                              const cleanPath = lorUrl ? getCleanObjectPath(lorUrl) : null;
+                              const verifyUrl = typeof window !== 'undefined' && cleanPath ? (window.location.origin + "/verify-lor?path=" + encodeURIComponent(cleanPath)) : "";
+                              return verifyUrl ? (
+                                 <div className="p-1 bg-white border border-slate-200 rounded shrink-0">
+                                    <QRCode value={verifyUrl} size={50} className="w-[50px] h-[50px]" />
+                                 </div>
+                              ) : null;
+                           })()}
+                        </div>
+
+                        {/* Referee 2 */}
+                        <div className="flex items-start justify-between gap-2 pl-2">
+                           <div className="space-y-0.5 text-[9px]">
+                              <p className="text-[7.5px] font-black text-slate-400 uppercase tracking-wider">Referee 2 (Professional Reference)</p>
+                              <p className="text-[10px] font-black text-slate-900 leading-tight">
+                                 {viewedSub.lor2RefName || viewedSub.formData?.["Referee 2 Name"] || viewedSub.formData?.lor2_ref_name || "Referee 2"}
+                              </p>
+                              <p className="text-[8.5px] font-medium text-slate-600">
+                                 {viewedSub.lor2RefContact || viewedSub.formData?.["Referee 2 Designation / Institution"] || viewedSub.formData?.lor2_ref_contact || "Institution / Hospital"}
+                              </p>
+                              {viewedSub.lor2RefEmail && (
+                                 <p className="text-[8px] font-mono text-slate-500">{viewedSub.lor2RefEmail}</p>
+                              )}
+                              <p className="text-[7px] text-[#0b4a8f] font-bold pt-0.5">🔒 Scan QR to verify uploaded LOR</p>
+                           </div>
+                           {(() => {
+                              const lorUrl = viewedSub.lor2Url || viewedSub.formData?.["Upload Letter of Recommendation (LOR 2)"] || viewedSub.formData?.lor2_url;
+                              const cleanPath = lorUrl ? getCleanObjectPath(lorUrl) : null;
+                              const verifyUrl = typeof window !== 'undefined' && cleanPath ? (window.location.origin + "/verify-lor?path=" + encodeURIComponent(cleanPath)) : "";
+                              return verifyUrl ? (
+                                 <div className="p-1 bg-white border border-slate-200 rounded shrink-0">
+                                    <QRCode value={verifyUrl} size={50} className="w-[50px] h-[50px]" />
+                                 </div>
+                              ) : null;
+                           })()}
+                        </div>
                      </div>
                   </div>
-                  <div className="space-y-1 text-right">
-                     <div className="border-t border-slate-400 w-full pt-1.5">
-                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Date of Verification</p>
+
+                  {/* Section VIII: Solemn Candidate Declaration */}
+                  <div className="border border-slate-300 rounded-lg p-2.5 bg-slate-50/60 print-avoid-break">
+                     <p className="text-[8px] font-black uppercase tracking-wider text-slate-500 mb-0.5">
+                        VIII. Solemn Applicant Undertaking & Verification
+                     </p>
+                     <p className="text-[8.5px] font-medium text-slate-700 leading-snug">
+                        "I hereby declare that all particulars furnished by me in this application are true, complete and correct to the best of my knowledge and belief. I agree to abide by the rules and decisions of Sankara Eye Foundation regarding fellowship selection and training."
+                     </p>
+                     <div className="mt-1 flex items-center justify-between text-[8px] font-bold text-[#0b4a8f]">
+                        <span className="flex items-center gap-1">
+                           <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Digitally Verified & Accepted at Submission
+                        </span>
+                        <span className="text-slate-500 font-mono">
+                           {viewedSub.submittedAt ? new Date(viewedSub.submittedAt).toLocaleString('en-IN') : 'Verified'}
+                        </span>
                      </div>
+                  </div>
+
+                  {/* Section IX: Official Institutional Scrutiny & Stamp Sign-off */}
+                  <div className="border border-slate-300 rounded-lg p-3 bg-white grid grid-cols-3 gap-6 items-end pt-8 print-avoid-break">
+                     <div className="space-y-1">
+                        <div className="border-t border-slate-400 w-full pt-1">
+                           <p className="text-[8.5px] font-black text-slate-700 uppercase tracking-wider">Scrutiny Officer / Faculty</p>
+                           <p className="text-[7px] text-slate-400">Signature of Reviewer</p>
+                        </div>
+                     </div>
+                     <div className="space-y-1 text-center">
+                        <div className="border-t border-slate-400 w-full pt-1">
+                           <p className="text-[8.5px] font-black text-[#0b4a8f] uppercase tracking-wider font-mono">SAV OFFICIAL SEAL</p>
+                           <p className="text-[7px] text-slate-400">Authorized Stamp</p>
+                        </div>
+                     </div>
+                     <div className="space-y-1 text-right">
+                        <div className="border-t border-slate-400 w-full pt-1">
+                           <p className="text-[8.5px] font-black text-slate-700 uppercase tracking-wider">Date of Verification</p>
+                           <p className="text-[7px] text-slate-400">Official Decision Endorsement</p>
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* Page 2 Running Footer */}
+                  <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[8px] text-slate-400 font-bold uppercase tracking-wider">
+                     <span>Sankara Academy of Vision &bull; Fellowship Program 2027</span>
+                     <span>Page 2 of 2</span>
+                     <span>Official Scrutinized Institutional Record</span>
                   </div>
                </div>
             </div>

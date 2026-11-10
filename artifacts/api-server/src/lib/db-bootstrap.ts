@@ -1064,6 +1064,22 @@ async function seedAndHealBaselineData(): Promise<void> {
       ? janForm.sectionsConfig
       : DEFAULT_SECTIONS;
 
+    // Ensure Cornea Preferred Center includes Jaipur
+    if (Array.isArray(existingSections)) {
+      for (const sec of existingSections) {
+        if (sec.fields) {
+          for (const field of sec.fields) {
+            if (field.id === "unit_cornea" && Array.isArray(field.options)) {
+              if (!field.options.includes("Jaipur")) {
+                field.options.push("Jaipur");
+                field.options.sort();
+              }
+            }
+          }
+        }
+      }
+    }
+
     await db.update(applicationFormsTable)
       .set({
         token: "JAN2027",

@@ -1138878,6 +1138878,8 @@ router24.get("/storage/public-objects/*filePath", async (req, res) => {
 });
 router24.get("/storage/objects/*path", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "invigilator", "result_publisher", "doctor"), async (req, res) => {
   try {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     const raw = req.params.path;
     const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
     const objectPath = `/objects/${wildcardPath}`;
@@ -1142346,6 +1142348,20 @@ async function seedAndHealBaselineData() {
   );
   if (janForm) {
     const existingSections = Array.isArray(janForm.sectionsConfig) && janForm.sectionsConfig.length > 0 ? janForm.sectionsConfig : DEFAULT_SECTIONS;
+    if (Array.isArray(existingSections)) {
+      for (const sec of existingSections) {
+        if (sec.fields) {
+          for (const field of sec.fields) {
+            if (field.id === "unit_cornea" && Array.isArray(field.options)) {
+              if (!field.options.includes("Jaipur")) {
+                field.options.push("Jaipur");
+                field.options.sort();
+              }
+            }
+          }
+        }
+      }
+    }
     await db.update(applicationFormsTable).set({
       token: "JAN2027",
       programId: jan27Prog.id,
