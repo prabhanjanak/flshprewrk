@@ -53,7 +53,7 @@ import {
   TrendingUp,
   Percent,
 } from "lucide-react";
-import { getCleanObjectPath } from "../lib/utils";
+import { getCleanObjectPath, parseSurgicalExperience, parseDiagnosticSkills } from "../lib/utils";
 
 
 interface CustomField {
@@ -1782,110 +1782,16 @@ export default function ApplicationFormsPage() {
     total: number;
   }
 
-  const getParsedSurgicalExperience = (): ParsedSurgery[] => {
+  const getParsedSurgicalExperience = () => {
     if (!viewedSub) return [];
     const raw = viewedSub.surgicalExperience || viewedSub.formData?.surgicalExperience || viewedSub.formData?.["Surgical Experience"] || viewedSub.formData?.surgical_experience;
-    if (!raw) return [];
-
-    const results: ParsedSurgery[] = [];
-
-    if (typeof raw === "object" && raw !== null) {
-      for (const [key, val] of Object.entries(raw)) {
-        if (typeof val === "object" && val !== null) {
-          const ind = Number((val as any).independent ?? (val as any).ind ?? 0);
-          const sup = Number((val as any).supervision ?? (val as any).sup ?? 0);
-          results.push({ procedure: key.toUpperCase(), independent: ind, supervision: sup, total: ind + sup });
-        } else if (typeof val === "number" || typeof val === "string") {
-          const num = Number(val) || 0;
-          results.push({ procedure: key.toUpperCase(), independent: num, supervision: 0, total: num });
-        }
-      }
-      return results;
-    }
-
-    const str = String(raw).trim();
-    try {
-      const parsed = JSON.parse(str);
-      if (typeof parsed === "object" && parsed !== null) {
-        for (const [key, val] of Object.entries(parsed)) {
-          if (typeof val === "object" && val !== null) {
-            const ind = Number((val as any).independent ?? (val as any).ind ?? 0);
-            const sup = Number((val as any).supervision ?? (val as any).sup ?? 0);
-            results.push({ procedure: key.toUpperCase(), independent: ind, supervision: sup, total: ind + sup });
-          }
-        }
-        if (results.length > 0) return results;
-      }
-    } catch { }
-
-    const regex = /([A-Za-z0-9\s/+-]+):\s*\{([^}]+)\}/g;
-    let match;
-    while ((match = regex.exec(str)) !== null) {
-      const proc = match[1].trim().toUpperCase();
-      const inner = match[2];
-      const indMatch = inner.match(/independent\s*:\s*(\d+)/i) || inner.match(/ind\s*:\s*(\d+)/i);
-      const supMatch = inner.match(/supervision\s*:\s*(\d+)/i) || inner.match(/sup\s*:\s*(\d+)/i);
-      const ind = indMatch ? Number(indMatch[1]) : 0;
-      const sup = supMatch ? Number(supMatch[1]) : 0;
-      results.push({ procedure: proc, independent: ind, supervision: sup, total: ind + sup });
-    }
-    if (results.length > 0) return results;
-
-    const parts = str.split(",").map(p => p.trim()).filter(Boolean);
-    for (const p of parts) {
-      const [k, v] = p.split(":").map(s => s.trim());
-      if (k && v) {
-        const num = Number(v) || 0;
-        results.push({ procedure: k.toUpperCase(), independent: num, supervision: 0, total: num });
-      }
-    }
-    return results;
+    return parseSurgicalExperience(raw);
   };
 
-  interface ParsedSkill {
-    name: string;
-    level: "Expert" | "Proficient" | "Intermittent" | "Beginner";
-  }
-
-  const getParsedDiagnosticSkills = (): ParsedSkill[] => {
+  const getParsedDiagnosticSkills = () => {
     if (!viewedSub) return [];
     const raw = viewedSub.diagnosticSkills || viewedSub.formData?.diagnosticSkills || viewedSub.formData?.["Diagnostic Skills"] || viewedSub.formData?.diagnostic_skills;
-    if (!raw) return [];
-
-    const results: ParsedSkill[] = [];
-    const str = String(raw).trim();
-
-    try {
-      const parsed = JSON.parse(str);
-      if (typeof parsed === "object" && parsed !== null) {
-        for (const [k, v] of Object.entries(parsed)) {
-          const valStr = String(v);
-          let level: ParsedSkill["level"] = "Proficient";
-          if (/expert/i.test(valStr)) level = "Expert";
-          else if (/intermittent/i.test(valStr)) level = "Intermittent";
-          else if (/beginner|basic/i.test(valStr)) level = "Beginner";
-          results.push({ name: k, level });
-        }
-        if (results.length > 0) return results;
-      }
-    } catch { }
-
-    const items = str.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
-    for (const item of items) {
-      const colonIdx = item.lastIndexOf(":");
-      if (colonIdx !== -1) {
-        const name = item.slice(0, colonIdx).trim();
-        const valStr = item.slice(colonIdx + 1).trim();
-        let level: ParsedSkill["level"] = "Proficient";
-        if (/expert/i.test(valStr)) level = "Expert";
-        else if (/intermittent/i.test(valStr)) level = "Intermittent";
-        else if (/beginner|basic/i.test(valStr)) level = "Beginner";
-        if (name) results.push({ name, level });
-      } else {
-        results.push({ name: item, level: "Proficient" });
-      }
-    }
-    return results;
+    return parseDiagnosticSkills(raw);
   };
 
   const getAdditionalPrintFields = () => {
@@ -2294,14 +2200,57 @@ export default function ApplicationFormsPage() {
                                                       </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-100 text-slate-700 bg-white">
-                                                      {entries.map(([k, v]) => (
-                                                        <tr key={k} className="hover:bg-slate-50/50">
-                                                          <td className="px-4 py-2.5 font-semibold text-slate-600">{k}</td>
-                                                          <td className="px-4 py-2.5 font-bold text-slate-900">
-                                                            {typeof v === 'object' ? JSON.stringify(v) : String(v)}
-                                                          </td>
-                                                        </tr>
-                                                      ))}
+                                                      {entries.map(([k, v]: any) => {
+                                                        const isObj = typeof v === 'object' && v !== null;
+                                                        const isSurgery = isObj && (v.independent !== undefined || v.supervision !== undefined);
+                                                        const strV = String(v);
+                                                        const isExpert = /expert/i.test(strV);
+                                                        const isInterm = /intermittent/i.test(strV);
+                                                        const isBegin = /beginner|basic/i.test(strV);
+
+                                                        return (
+                                                          <tr key={k} className="hover:bg-slate-50/50">
+                                                            <td className="px-4 py-2.5 font-semibold text-slate-600">{k}</td>
+                                                            <td className="px-4 py-2.5 font-bold text-slate-900">
+                                                              {isSurgery ? (
+                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                  <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-200">
+                                                                    Ind: {v.independent ?? 0}
+                                                                  </span>
+                                                                  <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-bold border border-slate-200">
+                                                                    Sup: {v.supervision ?? 0}
+                                                                  </span>
+                                                                  <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 text-[10px] font-black border border-emerald-200">
+                                                                    Total: {(Number(v.independent) || 0) + (Number(v.supervision) || 0)}
+                                                                  </span>
+                                                                </div>
+                                                              ) : isObj ? (
+                                                                <div className="flex flex-wrap gap-1">
+                                                                  {Object.entries(v).map(([subK, subV]) => (
+                                                                    <span key={subK} className="px-2 py-0.5 bg-slate-100 rounded text-[10px] text-slate-700 border border-slate-200">
+                                                                      {subK}: <b className="text-slate-900">{String(subV)}</b>
+                                                                    </span>
+                                                                  ))}
+                                                                </div>
+                                                              ) : isExpert ? (
+                                                                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-black text-[10px] uppercase border border-emerald-200">
+                                                                  Expert
+                                                                </span>
+                                                              ) : isInterm ? (
+                                                                <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-black text-[10px] uppercase border border-amber-200">
+                                                                  Intermittent
+                                                                </span>
+                                                              ) : isBegin ? (
+                                                                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-black text-[10px] uppercase border border-slate-200">
+                                                                  Beginner
+                                                                </span>
+                                                              ) : (
+                                                                strV
+                                                              )}
+                                                            </td>
+                                                          </tr>
+                                                        );
+                                                      })}
                                                     </tbody>
                                                   </table>
                                                 </div>
@@ -3050,6 +2999,19 @@ export default function ApplicationFormsPage() {
             <Button variant="outline" size="sm" className="rounded-xl border-slate-200 font-bold px-4" onClick={() => exportExcel(viewFormId)} disabled={exporting || submissions.length === 0}>
               {exporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
               Excel Export
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="rounded-xl border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-900 font-bold px-4 shadow-2xs" 
+              onClick={() => {
+                const token = localStorage.getItem("fellowship_token");
+                window.open(`/api/application-forms/${viewFormId}/export-applications-zip?token=${token}`, "_blank");
+              }} 
+              disabled={submissions.length === 0}
+            >
+              <Download className="w-4 h-4 mr-2 text-indigo-600" />
+              Download Applications (ZIP)
             </Button>
             <Button 
               size="sm" 

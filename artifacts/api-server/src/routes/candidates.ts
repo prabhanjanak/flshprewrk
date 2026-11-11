@@ -32,6 +32,7 @@ import { parseSpecializationString, formatDOBToStandard, formatToLocalDateTime }
 import { generateCallLetterPdf, generateOfferLetterPdf, isRetinaSpecialty } from "../lib/letters";
 import * as XLSX from "xlsx";
 import * as archiverPkg from "archiver";
+import { generateSubmissionPdfBuffer } from "./application-forms";
 
 const archiver: any = (archiverPkg as any)?.default || archiverPkg;
 
@@ -1449,15 +1450,15 @@ async function createCandidateDossierPdfBuffer(c: any): Promise<Buffer> {
   });
 }
 
-// GET /candidates/export-zip — Download ZIP package containing all candidate application dossiers
+// GET /candidates/export-zip — Download ZIP package containing all candidate application dossiers organized by speciality
 router.get("/candidates/export-zip", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   try {
     const candidates = await db.select().from(candidatesTable)
       .where(eq(candidatesTable.isMock, (req as any).isMockMode))
       .orderBy(desc(candidatesTable.createdAt));
 
-    const archive = new archiverPkg.ZipArchive({ zlib: { level: 6 } });
-    const filename = `Candidate_Dossiers_${Date.now()}.zip`;
+    const archive = archiver("zip", { zlib: { level: 6 } });
+    const filename = `Candidate_Applications_By_Speciality_${Date.now()}.zip`;
 
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -1465,9 +1466,39 @@ router.get("/candidates/export-zip", requireAuth, requireRole("super_admin", "pr
 
     for (const c of candidates) {
       try {
-        const buffer = await createCandidateDossierPdfBuffer(c);
-        const safeName = `${c.candidateCode}_${c.fullName.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
-        archive.append(buffer, { name: safeName });
+        const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
+        let buffer: Buffer;
+        let specs: string[] = [];
+
+        if (sub) {
+          const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
+          const [program] = form ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
+          buffer = await generateSubmissionPdfBuffer(sub, form, program, c);
+          specs = parseSpecializationString(sub.specialization);
+        } else {
+          buffer = await createCandidateDossierPdfBuffer(c);
+          const full = await fullCandidate(c);
+          if (full.preferences && full.preferences.length > 0) {
+            specs = full.preferences.map((p: any) => p.specialityName).filter(Boolean);
+          }
+        }
+
+        if (specs.length === 0) {
+          specs = ["General_Fellowship"];
+        }
+
+        const rawFullName = c.fullName || sub?.fullName || "Candidate";
+        const cleanFullName = rawFullName.trim().replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+        const rawMobile = c.phone || sub?.phone || "NoMobile";
+        const cleanMobile = rawMobile.replace(/[^a-zA-Z0-9]/g, "");
+
+        for (const spec of specs) {
+          const cleanSpec = spec.trim().replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+          const folderName = cleanSpec || "General";
+          const fileName = `${cleanFullName}_${cleanSpec}_${cleanMobile}.pdf`;
+          const entryPath = `${folderName}/${fileName}`;
+          archive.append(buffer, { name: entryPath });
+        }
       } catch (err) {
         console.error(`Failed to add PDF for candidate ${c.id}:`, err);
       }

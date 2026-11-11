@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { useToast } from "../hooks/use-toast";
-import { getCleanObjectPath } from "../lib/utils";
+import { getCleanObjectPath, parseSurgicalExperience, parseDiagnosticSkills } from "../lib/utils";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "./ui/dialog";
@@ -822,57 +822,215 @@ export function CandidateExamDialog({
 
                 {/* 3. CLINICAL SKILLS & SURGICAL EXPERIENCE */}
                 {activeTab === "clinical" && (
-                  <div className="space-y-4 animate-in fade-in duration-200">
-                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-                      <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-1.5 border-b pb-2">
-                        <Stethoscope className="h-3.5 w-3.5 text-rose-500" />
-                        Diagnostic & Clinical Skills
-                      </h4>
-                      <p className="text-xs font-semibold text-slate-800 whitespace-pre-wrap leading-relaxed">
-                        {sub?.diagnosticSkills || "No diagnostic skills provided."}
-                      </p>
-                    </div>
-
-                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-                      <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-1.5 border-b pb-2">
-                        <Award className="h-3.5 w-3.5 text-orange-500" />
-                        Surgical Experience & Surgeries Done
-                      </h4>
-                      <div className="space-y-3 text-xs">
-                        {sub?.totalSurgeries && (
-                          <div className="bg-orange-50 p-3 rounded-xl border border-orange-100">
-                            <span className="text-[10px] font-black text-orange-800 uppercase">Total Surgeries Performed</span>
-                            <p className="font-black text-lg text-orange-950 mt-0.5">{sub.totalSurgeries}</p>
-                          </div>
-                        )}
-                        <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase">Surgical Details</span>
-                          <p className="font-semibold text-slate-800 mt-0.5 whitespace-pre-wrap leading-relaxed">
-                            {sub?.surgicalExperience || "No surgical details provided."}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {(sub?.publications || sub?.presentations) && (
-                      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-                        <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-1.5 border-b pb-2">
-                          <BookOpen className="h-3.5 w-3.5 text-purple-500" />
-                          Research & Publications
+                  <div className="space-y-5 animate-in fade-in duration-200">
+                    {/* Diagnostic & Clinical Skills */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3.5">
+                      <div className="flex items-center justify-between border-b pb-2.5">
+                        <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
+                          <Stethoscope className="h-4 w-4 text-rose-500" />
+                          Diagnostic & Clinical Skills
                         </h4>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          Candidate Assessment
+                        </span>
+                      </div>
+
+                      {(() => {
+                        const skills = parseDiagnosticSkills(sub?.diagnosticSkills);
+                        if (skills.length === 0) {
+                          return (
+                            <p className="text-xs font-semibold text-slate-500 italic py-2">
+                              {sub?.diagnosticSkills || "No diagnostic skills provided."}
+                            </p>
+                          );
+                        }
+
+                        const expertCount = skills.filter(s => s.level === "Expert").length;
+                        const interCount = skills.filter(s => s.level === "Intermittent" || s.level === "Proficient").length;
+                        const beginCount = skills.filter(s => s.level === "Beginner").length;
+
+                        return (
+                          <div className="space-y-3">
+                            {/* Summary Category Badges */}
+                            <div className="flex items-center gap-2 flex-wrap text-[11px] font-bold">
+                              <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1 shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                {expertCount} Expert / Independent
+                              </span>
+                              <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1 shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                {interCount} Intermittent / Familiar
+                              </span>
+                              {beginCount > 0 && (
+                                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1 shadow-2xs">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                  {beginCount} Beginner / Basic
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Aligned Responsive Grid of Skill Cards */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
+                              {skills.map((s, idx) => {
+                                const isExp = s.level === "Expert";
+                                const isInt = s.level === "Intermittent" || s.level === "Proficient";
+                                return (
+                                  <div 
+                                    key={idx} 
+                                    className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 shadow-2xs transition-all ${
+                                      isExp 
+                                        ? "bg-emerald-50/40 border-emerald-200/80 hover:bg-emerald-50/70" 
+                                        : isInt 
+                                          ? "bg-amber-50/40 border-amber-200/80 hover:bg-amber-50/70" 
+                                          : "bg-slate-50/60 border-slate-200 hover:bg-slate-50"
+                                    }`}
+                                  >
+                                    <span className="text-xs font-bold text-slate-800 leading-tight">
+                                      {s.name}
+                                    </span>
+                                    <span 
+                                      className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md tracking-wider shrink-0 ${
+                                        isExp 
+                                          ? "bg-emerald-600 text-white shadow-2xs" 
+                                          : isInt 
+                                            ? "bg-amber-500 text-white shadow-2xs" 
+                                            : "bg-slate-200 text-slate-700"
+                                      }`}
+                                    >
+                                      {s.level}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Surgical Experience & Surgeries Done */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                      <div className="flex items-center justify-between border-b pb-2.5">
+                        <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
+                          <Award className="h-4 w-4 text-orange-500" />
+                          Surgical Experience & Surgeries Done
+                        </h4>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          Operative Log
+                        </span>
+                      </div>
+
+                      {(() => {
+                        const surgeries = parseSurgicalExperience(sub?.surgicalExperience);
+                        const totalInd = surgeries.reduce((acc, s) => acc + s.independent, 0);
+                        const totalSup = surgeries.reduce((acc, s) => acc + s.supervision, 0);
+                        const grandTotal = totalInd + totalSup;
+                        const reportedTotal = sub?.totalSurgeries ? Number(sub.totalSurgeries) || grandTotal : grandTotal;
+
+                        return (
+                          <div className="space-y-4">
+                            {/* Summary Metric Counters */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div className="bg-gradient-to-br from-orange-50 to-amber-50/60 p-3.5 rounded-2xl border border-orange-200/80 shadow-2xs">
+                                <span className="text-[10px] font-black text-orange-800 uppercase tracking-wider block">Total Surgeries</span>
+                                <p className="font-black text-2xl text-orange-950 mt-0.5">{reportedTotal > 0 ? reportedTotal : (grandTotal || "—")}</p>
+                                <span className="text-[10px] text-orange-700/80 font-semibold">Cumulative Cases</span>
+                              </div>
+                              <div className="bg-gradient-to-br from-emerald-50 to-teal-50/60 p-3.5 rounded-2xl border border-emerald-200/80 shadow-2xs">
+                                <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider block">Independent Surgeries</span>
+                                <p className="font-black text-2xl text-emerald-950 mt-0.5">{totalInd}</p>
+                                <span className="text-[10px] text-emerald-700/80 font-semibold">Solo Operating Surgeon</span>
+                              </div>
+                              <div className="bg-gradient-to-br from-blue-50 to-indigo-50/60 p-3.5 rounded-2xl border border-blue-200/80 shadow-2xs">
+                                <span className="text-[10px] font-black text-blue-800 uppercase tracking-wider block">Under Supervision</span>
+                                <p className="font-black text-2xl text-blue-950 mt-0.5">{totalSup}</p>
+                                <span className="text-[10px] text-blue-700/80 font-semibold">Senior Faculty Guided</span>
+                              </div>
+                            </div>
+
+                            {/* Clean 4-Column Structured Table */}
+                            {surgeries.length > 0 ? (
+                              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs bg-white">
+                                <table className="w-full text-left text-xs">
+                                  <thead>
+                                    <tr className="bg-slate-50 text-[10px] font-black uppercase text-slate-500 border-b border-slate-200 tracking-wider">
+                                      <th className="py-2.5 px-4">Surgical Procedure</th>
+                                      <th className="py-2.5 px-4 text-center">Independent</th>
+                                      <th className="py-2.5 px-4 text-center">Under Supervision</th>
+                                      <th className="py-2.5 px-4 text-right">Total Cases</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100 font-medium">
+                                    {surgeries.map((s, idx) => (
+                                      <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                                        <td className="py-2.5 px-4 font-black text-slate-800">{s.procedure}</td>
+                                        <td className="py-2.5 px-4 text-center font-mono font-bold text-slate-700">{s.independent}</td>
+                                        <td className="py-2.5 px-4 text-center font-mono font-bold text-slate-700">{s.supervision}</td>
+                                        <td className="py-2.5 px-4 text-right font-mono font-black text-orange-600 text-sm">{s.total}</td>
+                                      </tr>
+                                    ))}
+                                    <tr className="bg-orange-50/60 font-black text-orange-950 border-t-2 border-orange-200">
+                                      <td className="py-3 px-4 uppercase text-[11px] tracking-wider">Total Surgeries Performed</td>
+                                      <td className="py-3 px-4 text-center font-mono text-sm">{totalInd}</td>
+                                      <td className="py-3 px-4 text-center font-mono text-sm">{totalSup}</td>
+                                      <td className="py-3 px-4 text-right font-mono text-base text-orange-700">{grandTotal}</td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600">
+                                {sub?.surgicalExperience || "No itemized procedure log reported."}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Research & Publications */}
+                    {(sub?.publications || sub?.presentations) && (
+                      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3.5">
+                        <div className="flex items-center justify-between border-b pb-2.5">
+                          <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
+                            <BookOpen className="h-4 w-4 text-purple-500" />
+                            Research & Publications
+                          </h4>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                            Scholarly Output
+                          </span>
+                        </div>
                         <div className="space-y-3 text-xs">
-                          {sub?.publications && (
-                            <div>
-                              <span className="text-[10px] font-bold text-slate-400 uppercase">Publications</span>
-                              <p className="font-semibold text-slate-800 mt-0.5 whitespace-pre-wrap">{sub.publications}</p>
-                            </div>
-                          )}
-                          {sub?.presentations && (
-                            <div>
-                              <span className="text-[10px] font-bold text-slate-400 uppercase">Presentations</span>
-                              <p className="font-semibold text-slate-800 mt-0.5 whitespace-pre-wrap">{sub.presentations}</p>
-                            </div>
-                          )}
+                          <div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1">Publications</span>
+                            {(() => {
+                              const pub = sub?.publications?.trim();
+                              const isNA = !pub || /^(na|none|nil|n\/a)$/i.test(pub);
+                              if (isNA) {
+                                return <p className="text-xs text-slate-400 italic">No indexed publications reported.</p>;
+                              }
+                              return (
+                                <div className="p-3 rounded-xl bg-purple-50/40 border border-purple-100 text-slate-800 font-semibold leading-relaxed">
+                                  {pub}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1">Presentations</span>
+                            {(() => {
+                              const pres = sub?.presentations?.trim();
+                              const isNA = !pres || /^(na|none|nil|n\/a)$/i.test(pres);
+                              if (isNA) {
+                                return <p className="text-xs text-slate-400 italic">No scientific presentations reported.</p>;
+                              }
+                              return (
+                                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">
+                                  {pres}
+                                </div>
+                              );
+                            })()}
+                          </div>
                         </div>
                       </div>
                     )}

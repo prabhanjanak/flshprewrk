@@ -28,7 +28,16 @@ import { createWriteStream } from "fs";
 import path from "path";
 import os from "os";
 import PDFDocument from "pdfkit";
-import { parseSpecializationString, formatDOBToStandard, formatToDDMMYYYY, formatToLocalDateTime } from "../lib/utils";
+import * as archiverPkg from "archiver";
+const archiver: any = (archiverPkg as any)?.default || archiverPkg;
+import { 
+  parseSpecializationString, 
+  formatDOBToStandard, 
+  formatToDDMMYYYY, 
+  formatToLocalDateTime,
+  parseSurgicalExperience,
+  parseDiagnosticSkills
+} from "../lib/utils";
 
 const router: Router = Router();
 
@@ -96,62 +105,79 @@ async function syncSubmissionToCandidateAndDocuments(candidateId: number, sub: a
   }
 }
 
-// Admin: generate application PDF
-router.get(
-  "/application-forms/submissions/:id/pdf",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
-  async (req, res) => {
+// ── Application Dossier PDF Generator (SAV Official Admissions Record Standard) ──
+export async function generateSubmissionPdfBuffer(
+  sub: any,
+  form?: any,
+  program?: any,
+  candidate?: any
+): Promise<Buffer> {
+  // Pre-fetch candidate photo if remote URL or local file
+  let photoBuffer: Buffer | null = null;
+  const photoUrl = sub.photoUrl;
+  if (photoUrl) {
+    if (photoUrl.startsWith("/objects/")) {
+      const localPath = path.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
+      try {
+        photoBuffer = await fs.readFile(localPath);
+      } catch {}
+    } else if (photoUrl.startsWith("http://") || photoUrl.startsWith("https://")) {
+      try {
+        const resp = await fetch(photoUrl, { signal: AbortSignal.timeout(3000) });
+        if (resp.ok) {
+          photoBuffer = Buffer.from(await resp.arrayBuffer());
+        }
+      } catch {}
+    }
+  }
+
+  return new Promise((resolve, reject) => {
     try {
-      const id = Number(req.params.id);
-      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, id));
-      if (!sub) return res.status(404).json({ error: "Submission not found" });
-
-      const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
-      const [program] = form ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
-
-      let candidateCode = "PENDING";
-      if (sub.email) {
-        const [candidate] = await db.select().from(candidatesTable).where(eq(candidatesTable.email, sub.email));
-        if (candidate) candidateCode = candidate.candidateCode;
-      }
-
+      const candidateCode = candidate?.candidateCode || `APP-${sub.id}`;
       const doc = new PDFDocument({ 
         margin: 36, 
         size: 'LETTER',
         bufferPages: true,
         info: { Title: `Application - ${sub.fullName}`, Author: 'Sankara Academy of Vision' }
       });
-      const filename = `Application_${sub.fullName.replace(/\s+/g, '_')}_${id}.pdf`;
+      const buffers: Buffer[] = [];
+      doc.on("data", (chunk) => buffers.push(chunk));
+      doc.on("end", () => resolve(Buffer.concat(buffers)));
+      doc.on("error", reject);
 
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `inline; filename=${filename}`);
-      doc.pipe(res);
-
-      // --- PDF THEME & HELPERS (Letter Scaled) ---
-      const colors = { primary: '#0f172a', secondary: '#475569', accent: '#0b4a8f', muted: '#94a3b8', border: '#e2e8f0', bgSection: '#f8fafc' };
+      const colors = { 
+        primary: '#0f172a', 
+        secondary: '#475569', 
+        accent: '#0b4a8f', 
+        muted: '#94a3b8', 
+        border: '#e2e8f0', 
+        bgSection: '#f8fafc',
+        expertGreen: '#059669',
+        intermOrange: '#d97706',
+        basicSlate: '#64748b'
+      };
 
       const drawSectionHeader = (title: string) => {
         if (doc.y > 680) {
           doc.addPage();
           doc.y = 36;
         }
-        doc.moveDown(0.6);
+        doc.moveDown(0.5);
         const y = doc.y;
         doc.rect(36, y, 540, 18).fill(colors.bgSection);
-        doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(10).text(title.toUpperCase(), 44, y + 4, { width: 520 });
+        doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(9.5).text(title.toUpperCase(), 44, y + 4, { width: 520 });
         doc.strokeColor(colors.border).lineWidth(0.5).moveTo(36, y + 18).lineTo(576, y + 18).stroke();
-        doc.y = y + 24;
+        doc.y = y + 23;
       };
 
       const renderApplicationRecordRow = (label: string, value: any) => {
         const valText = (value === null || value === undefined || value === "null" || value === "") ? "—" : String(value);
         const startY = doc.y;
-        doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(9).text(label.toUpperCase(), 36, startY, { width: 115, lineGap: 1 });
+        doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(8.5).text(label.toUpperCase(), 36, startY, { width: 115, lineGap: 1 });
         const labelEndY = doc.y;
-        doc.fillColor(colors.primary).font('Helvetica').fontSize(9.5).text(`: ${valText}`, 155, startY, { width: 310, lineGap: 1 });
+        doc.fillColor(colors.primary).font('Helvetica').fontSize(9).text(`: ${valText}`, 155, startY, { width: 310, lineGap: 1 });
         const valueEndY = doc.y;
-        doc.y = Math.max(labelEndY, valueEndY) + 3;
+        doc.y = Math.max(labelEndY, valueEndY) + 2.5;
       };
 
       const renderGeneralRow = (label: string, value: any) => {
@@ -165,11 +191,7 @@ router.get(
         const labelEndY = doc.y;
         doc.fillColor(colors.primary).font('Helvetica').fontSize(9).text(`: ${valText}`, 185, currentY, { width: 390, lineGap: 1 });
         const valueEndY = doc.y;
-        doc.y = Math.max(labelEndY, valueEndY) + 4;
-      };
-
-      const parseSpecializations = (spec: string | null | undefined): string[] => {
-        return parseSpecializationString(spec);
+        doc.y = Math.max(labelEndY, valueEndY) + 3.5;
       };
 
       const parseCenterPreferences = (cp: string | null | undefined, customAnswers?: any, sections?: any[]): Record<string, string> => {
@@ -201,25 +223,23 @@ router.get(
 
       // Header (Letter Scaled)
       doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(18).text('SANKARA ACADEMY OF VISION', 36, 36, { width: 440, align: 'left' });
-      doc.fillColor(colors.primary).font('Helvetica').fontSize(9).text('Educational unit of Sankara Eye Foundation, India', 36, 57, { width: 440, align: 'left' });
+      doc.fillColor(colors.primary).font('Helvetica').fontSize(9).text('Educational unit of Sankara Eye Foundation, India · Sri Kanchi Kamakoti Medical Trust', 36, 57, { width: 440, align: 'left' });
       doc.fillColor(colors.muted).font('Helvetica-Bold').fontSize(8.5).text('FELLOWSHIP PROGRAM ADMISSIONS RECORD', 36, 70, { width: 440, align: 'left' });
       doc.strokeColor(colors.accent).lineWidth(1.5).moveTo(36, 84).lineTo(576, 84).stroke();
 
-      // Photo on the right
-      const photoUrl = sub.photoUrl;
+      // Photo on top-right
       const photoX = 491;
       const photoY = 94;
       const photoW = 85;
       const photoH = 105;
 
-      if (photoUrl && photoUrl.startsWith("/objects/")) {
-        const localPath = path.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
+      if (photoBuffer) {
         try {
-          doc.image(localPath, photoX, photoY, { width: photoW, height: photoH });
+          doc.image(photoBuffer, photoX, photoY, { width: photoW, height: photoH, fit: [photoW, photoH] });
           doc.rect(photoX, photoY, photoW, photoH).strokeColor(colors.border).lineWidth(1).stroke();
-        } catch (e) {
+        } catch {
           doc.rect(photoX, photoY, photoW, photoH).fill('#f1f5f9');
-          doc.fillColor(colors.muted).font('Helvetica').fontSize(7.5).text('PHOTO NOT AVAILABLE', photoX, photoY + 45, { width: photoW, align: 'center' });
+          doc.fillColor(colors.muted).font('Helvetica').fontSize(7.5).text('PHOTO LOAD ERROR', photoX, photoY + 45, { width: photoW, align: 'center' });
         }
       } else {
         doc.rect(photoX, photoY, photoW, photoH).fill('#f1f5f9');
@@ -230,112 +250,182 @@ router.get(
       doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(11).text('APPLICATION SUMMARY', 36, 94, { width: 350 });
       doc.y = 112;
 
-      renderApplicationRecordRow('Application ID', `#APP-${id}`);
-      renderApplicationRecordRow('Program', program?.name || 'Fellowship Program');
+      renderApplicationRecordRow('Application ID', `#APP-${sub.id}`);
+      renderApplicationRecordRow('Candidate Protocol', candidateCode);
+      renderApplicationRecordRow('Program Stream', program?.name || 'Fellowship Program');
       renderApplicationRecordRow('Submission Date', sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
-      renderApplicationRecordRow('Status', sub.status.toUpperCase());
-      
-      // Ensure cursor is below the photo height before continuing
+      renderApplicationRecordRow('Application Status', sub.status.toUpperCase());
+
       if (doc.y < 210) {
         doc.y = 210;
       }
 
+      // 1. Personal & Communication Details
       drawSectionHeader('Personal & Communication Details');
       renderGeneralRow('Full Name', sub.fullName);
       renderGeneralRow('Email Address', sub.email);
       renderGeneralRow('Phone Number', sub.phone);
       renderGeneralRow('Date of Birth', formatDOBToStandard(sub.dateOfBirth));
       renderGeneralRow('Gender / Marital', [sub.gender, sub.maritalStatus].filter(Boolean).join(" · ") || "—");
+      if (sub.spouseDetails) renderGeneralRow('Spouse Details', sub.spouseDetails);
       renderGeneralRow('Permanent Address', sub.permanentAddress);
+      if (sub.mailingAddress) renderGeneralRow('Mailing Address', sub.mailingAddress);
+      if (sub.healthDeclaration || sub.medicalConditions || sub.healthDetails) {
+        renderGeneralRow('Health Declaration / Ailments', [sub.healthDeclaration, sub.medicalConditions, sub.healthDetails].filter(Boolean).join(" · ") || "Medically Fit");
+      }
 
+      // 2. Academic & Professional Qualifications
       drawSectionHeader('Academic & Professional Qualifications');
-      renderGeneralRow('Basic Degree', sub.degree);
+      renderGeneralRow('Basic Degree (UG)', sub.degree || 'MBBS');
       renderGeneralRow('Medical College / University', [sub.medicalCollege, sub.university].filter(Boolean).join(" · ") || "—");
       renderGeneralRow('Medical Council Reg No', sub.medicalCouncilNumber);
       if (sub.pgQualifications) renderGeneralRow('PG Qualifications', sub.pgQualifications);
+      if (sub.msMdQualification) renderGeneralRow('MS / MD Details', sub.msMdDetails || 'Yes');
+      if (sub.dnbQualification) renderGeneralRow('DNB Details', sub.dnbDetails || 'Yes');
+      if (sub.doQualification) renderGeneralRow('DO Details', sub.doDetails || 'Yes');
+      if (sub.otherTraining) renderGeneralRow('Other Training / Exp', sub.otherTraining);
 
+      // 3. Specialization & Center Preferences
       drawSectionHeader('Specialization & Center Preferences');
-      const specs = parseSpecializations(sub.specialization);
+      const specs = parseSpecializationString(sub.specialization);
       const centerPrefs = parseCenterPreferences(sub.centerPreference, sub.customAnswers, form?.sectionsConfig ?? undefined);
-      
+
       if (specs.length === 0) {
-        if (doc.y > 700) {
-          doc.addPage();
-          doc.y = 36;
-        }
-        doc.fillColor(colors.secondary).font('Helvetica').fontSize(9).text('No specializations selected.', 36, doc.y);
+        if (doc.y > 700) { doc.addPage(); doc.y = 36; }
+        doc.fillColor(colors.secondary).font('Helvetica').fontSize(9).text('General Fellowship / No specific preference', 36, doc.y);
       } else {
         specs.forEach((sp, idx) => {
-          if (doc.y > 700) {
-            doc.addPage();
-            doc.y = 36;
-          }
+          if (doc.y > 700) { doc.addPage(); doc.y = 36; }
           const currentY = doc.y;
-          doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(9.5).text(`${idx + 1}. ${sp}`, 36, currentY, { width: 220, lineGap: 1 });
+          doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(9).text(`${idx + 1}. ${sp}`, 36, currentY, { width: 220, lineGap: 1 });
           const spEndY = doc.y;
           doc.fillColor(colors.secondary).font('Helvetica').fontSize(9).text(`Preferred Center: ${centerPrefs[sp] || 'Any Center'}`, 260, currentY, { width: 315, lineGap: 1 });
           const centerEndY = doc.y;
-          doc.y = Math.max(spEndY, centerEndY) + 4;
+          doc.y = Math.max(spEndY, centerEndY) + 3;
         });
       }
 
-      if (sub.diagnosticSkills) {
-        drawSectionHeader('Clinical Profile & Skills');
-        try {
-          const skills = typeof sub.diagnosticSkills === 'string' ? JSON.parse(sub.diagnosticSkills) : sub.diagnosticSkills;
-          Object.entries(skills).forEach(([skill, val]: any) => {
-            renderGeneralRow(skill, val);
-          });
-        } catch {
-          if (doc.y > 700) {
+      // 4. Clinical Profile & Diagnostic Skills (Formatted 2-Column Grid)
+      const parsedSkills = parseDiagnosticSkills(sub.diagnosticSkills);
+      if (parsedSkills.length > 0) {
+        drawSectionHeader('Clinical Profile & Diagnostic Skills');
+        const colWidth = 265;
+        const colGap = 10;
+        let colIdx = 0;
+        let rowStartY = doc.y;
+
+        parsedSkills.forEach((skill) => {
+          if (rowStartY > 700) {
             doc.addPage();
             doc.y = 36;
+            rowStartY = doc.y;
+            colIdx = 0;
           }
-          doc.fillColor(colors.primary).font('Helvetica').fontSize(9).text(String(sub.diagnosticSkills), 36, doc.y, { width: 540 });
+
+          const curX = colIdx === 0 ? 36 : 36 + colWidth + colGap;
+          const levelColor = skill.level === 'Expert' 
+            ? colors.expertGreen 
+            : (skill.level === 'Intermittent' ? colors.intermOrange : colors.basicSlate);
+
+          doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(8.5).text(skill.name, curX, rowStartY, { width: 180, lineGap: 1 });
+          doc.fillColor(levelColor).font('Helvetica-Bold').fontSize(7.5).text(`[ ${skill.level.toUpperCase()} ]`, curX + 185, rowStartY, { width: 80, align: 'right' });
+
+          if (colIdx === 0) {
+            colIdx = 1;
+          } else {
+            colIdx = 0;
+            rowStartY += 14;
+            doc.y = rowStartY;
+          }
+        });
+
+        if (colIdx === 1) {
+          rowStartY += 14;
+          doc.y = rowStartY;
         }
       }
 
-      if (sub.surgicalExperience) {
-        drawSectionHeader('Surgical Experience');
-        try {
-          const exp = typeof sub.surgicalExperience === 'string' ? JSON.parse(sub.surgicalExperience) : sub.surgicalExperience;
-          Object.entries(exp).forEach(([cat, val]: any) => {
-            if (doc.y > 700) {
+      // 5. Surgical Experience & Operative Log (Formatted Table)
+      const parsedSurgeries = parseSurgicalExperience(sub.surgicalExperience);
+      if (parsedSurgeries.length > 0 || sub.totalSurgeries) {
+        drawSectionHeader('Surgical Experience & Operative Log');
+
+        if (parsedSurgeries.length > 0) {
+          // Table Header
+          if (doc.y > 670) { doc.addPage(); doc.y = 36; }
+          const thY = doc.y;
+          doc.rect(36, thY, 540, 16).fill('#f1f5f9');
+          doc.strokeColor(colors.border).lineWidth(0.5).rect(36, thY, 540, 16).stroke();
+          doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(8).text('SURGICAL PROCEDURE', 42, thY + 4, { width: 220 });
+          doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(8).text('INDEPENDENT (SOLO)', 270, thY + 4, { width: 95, align: 'center' });
+          doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(8).text('UNDER SUPERVISION', 375, thY + 4, { width: 95, align: 'center' });
+          doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(8).text('TOTAL CASES', 475, thY + 4, { width: 95, align: 'right' });
+
+          let rowY = thY + 16;
+          let sumInd = 0;
+          let sumSup = 0;
+
+          parsedSurgeries.forEach((s, idx) => {
+            if (rowY > 700) {
               doc.addPage();
               doc.y = 36;
+              rowY = doc.y;
             }
-            const currentY = doc.y;
-            doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(8.5).text(cat.toUpperCase(), 36, currentY, { width: 180, lineGap: 1 });
-            const catEndY = doc.y;
-            doc.fillColor(colors.secondary).font('Helvetica').fontSize(8.5).text(`Supervision: ${val.supervision || 0} | Independent: ${val.independent || 0}`, 220, currentY, { width: 350, lineGap: 1 });
-            const valEndY = doc.y;
-            doc.y = Math.max(catEndY, valEndY) + 4;
+            sumInd += s.independent;
+            sumSup += s.supervision;
+
+            const bg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+            doc.rect(36, rowY, 540, 15).fill(bg);
+            doc.strokeColor(colors.border).lineWidth(0.3).rect(36, rowY, 540, 15).stroke();
+
+            doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(8).text(s.procedure, 42, rowY + 3.5, { width: 220 });
+            doc.fillColor(colors.secondary).font('Helvetica').fontSize(8).text(String(s.independent), 270, rowY + 3.5, { width: 95, align: 'center' });
+            doc.fillColor(colors.secondary).font('Helvetica').fontSize(8).text(String(s.supervision), 375, rowY + 3.5, { width: 95, align: 'center' });
+            doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(8).text(String(s.total), 475, rowY + 3.5, { width: 95, align: 'right' });
+            rowY += 15;
           });
-        } catch {
-          if (doc.y > 700) {
-            doc.addPage();
-            doc.y = 36;
-          }
-          doc.fillColor(colors.primary).font('Helvetica').fontSize(9).text(String(sub.surgicalExperience), 36, doc.y, { width: 540 });
+
+          // Summary Footer Row
+          const grandTotal = sumInd + sumSup;
+          doc.rect(36, rowY, 540, 17).fill('#e0f2fe');
+          doc.strokeColor(colors.accent).lineWidth(0.8).rect(36, rowY, 540, 17).stroke();
+          doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(8.5).text('CUMULATIVE SURGICAL VOLUME', 42, rowY + 4, { width: 220 });
+          doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(8.5).text(String(sumInd), 270, rowY + 4, { width: 95, align: 'center' });
+          doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(8.5).text(String(sumSup), 375, rowY + 4, { width: 95, align: 'center' });
+          doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(8.5).text(String(grandTotal), 475, rowY + 4, { width: 95, align: 'right' });
+          doc.y = rowY + 22;
+        }
+
+        if (sub.totalSurgeries) {
+          renderGeneralRow('Declared Total Surgeries', sub.totalSurgeries);
         }
       }
 
+      // 6. Research, Publications & Presentations
+      if (sub.publications || sub.presentations) {
+        drawSectionHeader('Research, Publications & Presentations');
+        if (sub.publications) renderGeneralRow('Indexed Publications', sub.publications);
+        if (sub.presentations) renderGeneralRow('Conference Presentations', sub.presentations);
+      }
+
+      // 7. References & Documents
       drawSectionHeader('References & Documents');
-      renderGeneralRow('Reference 1 (LOR)', `${sub.lor1RefName || '—'} (${sub.lor1RefContact || 'No contact'})`);
-      renderGeneralRow('Reference 2 (LOR)', `${sub.lor2RefName || '—'} (${sub.lor2RefContact || 'No contact'})`);
-      
+      renderGeneralRow('Reference 1 (LOR)', `${sub.lor1RefName || '—'} (${sub.lor1RefContact || 'No contact'}${sub.lor1RefEmail ? ` · ${sub.lor1RefEmail}` : ''})`);
+      renderGeneralRow('Reference 2 (LOR)', `${sub.lor2RefName || '—'} (${sub.lor2RefContact || 'No contact'}${sub.lor2RefEmail ? ` · ${sub.lor2RefEmail}` : ''})`);
+
       const docList = [];
       if (sub.lor1Url) docList.push('LOR 1');
       if (sub.lor2Url) docList.push('LOR 2');
       if (sub.photoUrl) docList.push('Photo');
       if (sub.paymentUrl) docList.push('Payment Receipt');
-      renderGeneralRow('Uploaded Files', docList.length > 0 ? docList.join(', ') : 'No documents uploaded');
+      renderGeneralRow('Uploaded Dossier Files', docList.length > 0 ? docList.join(', ') : 'No documents uploaded');
 
-      drawSectionHeader('Declaration & Fee Submission');
+      // 8. Declaration & Fee Verification
+      drawSectionHeader('Declaration & Fee Verification');
       renderGeneralRow('Payment Reference ID', sub.paymentId || '—');
-      renderGeneralRow('Payment Mode', sub.paymentMode?.toUpperCase() || '—');
+      renderGeneralRow('Payment Mode / Source', [sub.paymentMode?.toUpperCase(), sub.source?.toUpperCase()].filter(Boolean).join(" · ") || '—');
       renderGeneralRow('Fee Status', sub.paymentId ? 'Verified & Paid' : 'Pending');
-      
+
       if (doc.y > 670) {
         doc.addPage();
         doc.y = 36;
@@ -360,20 +450,123 @@ router.get(
         doc.fillColor(colors.secondary).font('Helvetica').fontSize(7.5).text('Date of Verification', 432, signY + 34, { width: 144, align: 'center' });
       }
 
-      // --- PAGE NUMBERS ---
+      // Page Numbers on all pages
       const range = doc.bufferedPageRange();
       for (let i = range.start; i < range.start + range.count; i++) {
         doc.switchToPage(i);
         doc.fillColor(colors.muted).fontSize(7.5).text(
-          `Page ${i + 1} of ${range.count} | Letter Format | Sankara Academy of Vision Admissions Portal`,
+          `Page ${i + 1} of ${range.count} | Sankara Academy of Vision Admissions Record`,
           36, doc.page.height - 24, { width: 540, align: 'center' }
         );
       }
 
       doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Admin: generate individual application PDF
+router.get(
+  "/application-forms/submissions/:id/pdf",
+  requireAuth,
+  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+  async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, id));
+      if (!sub) return res.status(404).json({ error: "Submission not found" });
+
+      const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
+      const [program] = form ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
+
+      let candidate = null;
+      if (sub.email) {
+        const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.email, sub.email));
+        candidate = c || null;
+      }
+
+      const pdfBuffer = await generateSubmissionPdfBuffer(sub, form, program, candidate);
+      const cleanName = (sub.fullName || "Candidate").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const filename = `Application_${cleanName}_${id}.pdf`;
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+      res.send(pdfBuffer);
     } catch (e: any) {
       console.error("[pdf-gen] error:", e);
       if (!res.headersSent) res.status(500).json({ error: "Failed to generate PDF" });
+    }
+  }
+);
+
+// GET /application-forms/:id/export-applications-zip (Download all applications organized in speciality subfolders)
+router.get(
+  "/application-forms/:id/export-applications-zip",
+  requireAuth,
+  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+  async (req, res) => {
+    try {
+      const formId = Number(req.params.id);
+      const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, formId));
+      if (!form) return res.status(404).json({ error: "Application form not found" });
+
+      const [program] = await db.select().from(programsTable).where(eq(programsTable.id, form.programId));
+
+      const subs = await db
+        .select()
+        .from(applicationSubmissionsTable)
+        .where(and(eq(applicationSubmissionsTable.formId, formId), ne(applicationSubmissionsTable.saveAsDraft, true)))
+        .orderBy(desc(applicationSubmissionsTable.submittedAt));
+
+      if (subs.length === 0) {
+        return res.status(400).json({ error: "No finalized submissions found to export" });
+      }
+
+      const emails = subs.map(s => s.email).filter(Boolean) as string[];
+      const candidates = emails.length > 0
+        ? await db.select().from(candidatesTable).where(inArray(candidatesTable.email, emails))
+        : [];
+      const candidateByEmail = new Map(candidates.map(c => [c.email.toLowerCase(), c]));
+
+      const archive = archiver("zip", { zlib: { level: 6 } });
+      const safeTitle = form.title.replace(/[^a-zA-Z0-9_-]/g, "_");
+      const zipFileName = `Applications_${safeTitle}_${Date.now()}.zip`;
+
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", `attachment; filename="${zipFileName}"`);
+      archive.pipe(res);
+
+      for (const sub of subs) {
+        try {
+          const candidate = sub.email ? candidateByEmail.get(sub.email.toLowerCase()) : null;
+          const pdfBuffer = await generateSubmissionPdfBuffer(sub, form, program, candidate);
+
+          const rawFullName = sub.fullName || candidate?.fullName || "Candidate";
+          const cleanFullName = rawFullName.trim().replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+          const rawMobile = sub.phone || candidate?.phone || "NoMobile";
+          const cleanMobile = rawMobile.replace(/[^a-zA-Z0-9]/g, "");
+
+          const specs = parseSpecializationString(sub.specialization);
+          const targetSpecs = specs.length > 0 ? specs : ["General_Fellowship"];
+
+          for (const spec of targetSpecs) {
+            const cleanSpec = spec.trim().replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+            const folderName = cleanSpec || "General";
+            const fileName = `${cleanFullName}_${cleanSpec}_${cleanMobile}.pdf`;
+            const entryPath = `${folderName}/${fileName}`;
+            archive.append(pdfBuffer, { name: entryPath });
+          }
+        } catch (subErr) {
+          console.error(`[export-applications-zip] Failed to add PDF for sub ${sub.id}:`, subErr);
+        }
+      }
+
+      await archive.finalize();
+    } catch (err: any) {
+      console.error("[export-applications-zip] error:", err);
+      if (!res.headersSent) res.status(500).json({ error: err.message || "Failed to generate applications ZIP" });
     }
   }
 );

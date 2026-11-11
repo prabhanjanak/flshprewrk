@@ -1026010,6 +1026010,106 @@ function formatToLocalDateTime(date6) {
   hours = hours % 12 || 12;
   return `${day}-${month}-${year} ${String(hours).padStart(2, "0")}:${minutes} ${ampm}`;
 }
+function parseSurgicalExperience(raw) {
+  if (!raw) return [];
+  const results = [];
+  if (typeof raw === "object" && raw !== null) {
+    for (const [key, val] of Object.entries(raw)) {
+      if (typeof val === "object" && val !== null) {
+        const ind = Number(val.independent ?? val.ind ?? 0);
+        const sup = Number(val.supervision ?? val.sup ?? 0);
+        results.push({ procedure: key.toUpperCase(), independent: ind, supervision: sup, total: ind + sup });
+      } else if (typeof val === "number" || typeof val === "string") {
+        const num = Number(val) || 0;
+        results.push({ procedure: key.toUpperCase(), independent: num, supervision: 0, total: num });
+      }
+    }
+    return results;
+  }
+  const str = String(raw).trim();
+  try {
+    const parsed = JSON.parse(str);
+    if (typeof parsed === "object" && parsed !== null) {
+      for (const [key, val] of Object.entries(parsed)) {
+        if (typeof val === "object" && val !== null) {
+          const ind = Number(val.independent ?? val.ind ?? 0);
+          const sup = Number(val.supervision ?? val.sup ?? 0);
+          results.push({ procedure: key.toUpperCase(), independent: ind, supervision: sup, total: ind + sup });
+        }
+      }
+      if (results.length > 0) return results;
+    }
+  } catch {
+  }
+  const regex = /([A-Za-z0-9\s/+-]+):\s*\{([^}]+)\}/g;
+  let match2;
+  while ((match2 = regex.exec(str)) !== null) {
+    const proc = match2[1].trim().toUpperCase();
+    const inner = match2[2];
+    const indMatch = inner.match(/independent\s*:\s*(\d+)/i) || inner.match(/ind\s*:\s*(\d+)/i);
+    const supMatch = inner.match(/supervision\s*:\s*(\d+)/i) || inner.match(/sup\s*:\s*(\d+)/i);
+    const ind = indMatch ? Number(indMatch[1]) : 0;
+    const sup = supMatch ? Number(supMatch[1]) : 0;
+    results.push({ procedure: proc, independent: ind, supervision: sup, total: ind + sup });
+  }
+  if (results.length > 0) return results;
+  const parts = str.split(",").map((p) => p.trim()).filter(Boolean);
+  for (const p of parts) {
+    const [k, v] = p.split(":").map((s2) => s2.trim());
+    if (k && v) {
+      const num = Number(v) || 0;
+      results.push({ procedure: k.toUpperCase(), independent: num, supervision: 0, total: num });
+    }
+  }
+  return results;
+}
+function parseDiagnosticSkills(raw) {
+  if (!raw) return [];
+  const results = [];
+  if (typeof raw === "object" && raw !== null) {
+    for (const [k, v] of Object.entries(raw)) {
+      const valStr = String(v);
+      let level = "Proficient";
+      if (/expert/i.test(valStr)) level = "Expert";
+      else if (/intermittent/i.test(valStr)) level = "Intermittent";
+      else if (/beginner|basic/i.test(valStr)) level = "Beginner";
+      results.push({ name: k, level });
+    }
+    return results;
+  }
+  const str = String(raw).trim();
+  try {
+    const parsed = JSON.parse(str);
+    if (typeof parsed === "object" && parsed !== null) {
+      for (const [k, v] of Object.entries(parsed)) {
+        const valStr = String(v);
+        let level = "Proficient";
+        if (/expert/i.test(valStr)) level = "Expert";
+        else if (/intermittent/i.test(valStr)) level = "Intermittent";
+        else if (/beginner|basic/i.test(valStr)) level = "Beginner";
+        results.push({ name: k, level });
+      }
+      if (results.length > 0) return results;
+    }
+  } catch {
+  }
+  const items = str.split(/[,;\n]+/).map((s2) => s2.trim()).filter(Boolean);
+  for (const item of items) {
+    const colonIdx = item.lastIndexOf(":");
+    if (colonIdx !== -1) {
+      const name2 = item.slice(0, colonIdx).trim();
+      const valStr = item.slice(colonIdx + 1).trim();
+      let level = "Proficient";
+      if (/expert/i.test(valStr)) level = "Expert";
+      else if (/intermittent/i.test(valStr)) level = "Intermittent";
+      else if (/beginner|basic/i.test(valStr)) level = "Beginner";
+      if (name2) results.push({ name: name2, level });
+    } else {
+      results.push({ name: item, level: "Proficient" });
+    }
+  }
+  return results;
+}
 var init_utils5 = __esm({
   "src/lib/utils.ts"() {
     "use strict";
@@ -1077478,4561 +1077578,171 @@ var init_archiver = __esm({
   }
 });
 
-// src/routes/candidates.ts
-var candidates_exports = {};
-__export(candidates_exports, {
-  default: () => candidates_default,
-  recalculateCandidateStatus: () => recalculateCandidateStatus
-});
-import path4 from "path";
-async function fullCandidate(c) {
-  const units = await db.select().from(unitsTable);
-  const unit = c.unitId ? units.find((u) => u.id === c.unitId) : null;
-  const prefs = await db.select().from(candidatePreferencesTable).where(eq(candidatePreferencesTable.candidateId, c.id));
-  const specs = await db.select().from(specialitiesTable);
-  const programs = await db.select().from(programsTable);
-  const docs = await db.select().from(documentsTable).where(eq(documentsTable.candidateId, c.id));
-  const attempts = await db.select().from(examAttemptsTable).where(eq(examAttemptsTable.candidateId, c.id));
-  const exams = await db.select().from(examsTable);
-  const interviews = await db.select().from(interviewScoresTable).where(eq(interviewScoresTable.candidateId, c.id));
-  const apps = await db.select().from(applicationsTable).where(eq(applicationsTable.candidateId, c.id));
-  const [sub] = await db.select().from(applicationSubmissionsTable).where(
-    or(
-      eq(applicationSubmissionsTable.candidateId, c.id),
-      eq(applicationSubmissionsTable.email, c.email)
-    )
-  );
-  const mcqAttempts = attempts.filter((a) => {
-    const e2 = exams.find((x2) => x2.id === a.examId);
-    return e2?.kind === "mcq";
-  });
-  const psychoAttempts = attempts.filter((a) => {
-    const e2 = exams.find((x2) => x2.id === a.examId);
-    return e2?.kind?.startsWith("psychometric");
-  });
-  const mcqScore = mcqAttempts.length > 0 ? mcqAttempts.reduce((s2, a) => s2 + (a.score ?? 0), 0) / mcqAttempts.length : c.mcqScore ? parseFloat(c.mcqScore) : null;
-  const psychometricScore = psychoAttempts.length > 0 ? psychoAttempts.reduce((s2, a) => s2 + (a.score ?? 0), 0) / psychoAttempts.length : c.psychometricScore ? parseFloat(c.psychometricScore) : null;
-  const interviewScore = interviews.length > 0 ? interviews.reduce((s2, i2) => s2 + i2.score, 0) / interviews.length : null;
-  const totalScore = mcqScore != null || psychometricScore != null || interviewScore != null ? (mcqScore ?? 0) + (psychometricScore ?? 0) + (interviewScore ?? 0) : null;
-  let resolvedPrefs = prefs.sort((a, b) => a.preferenceOrder - b.preferenceOrder).map((p) => {
-    const sp = specs.find((s2) => s2.id === p.specialityId);
-    const pg2 = sp ? programs.find((g) => g.id === sp.programId) : null;
-    return {
-      id: p.id,
-      specialityId: p.specialityId,
-      specialityName: sp?.name ?? "",
-      specialityCode: sp?.code ?? "",
-      programName: pg2?.name ?? "",
-      preferenceOrder: p.preferenceOrder
-    };
-  });
-  if (resolvedPrefs.length === 0 && sub?.specialization) {
-    const parsedSpecs = parseSpecializationString(sub.specialization);
-    resolvedPrefs = parsedSpecs.map((specName, index3) => {
-      const sp = specs.find((s2) => s2.name.toLowerCase() === specName.toLowerCase());
-      const pg2 = sp ? programs.find((g) => g.id === sp.programId) : null;
-      return {
-        id: -(index3 + 1),
-        // virtual ID
-        specialityId: sp?.id ?? 0,
-        specialityName: sp?.name ?? specName,
-        specialityCode: sp?.code ?? "",
-        programName: pg2?.name ?? "",
-        preferenceOrder: index3 + 1
-      };
-    });
-  }
-  const specializations = resolvedPrefs.map((p) => p.specialityName).filter(Boolean);
-  const appSpecIds = new Set(apps.map((a) => a.specialityId));
-  for (const pref of resolvedPrefs) {
-    if (pref.specialityId && pref.specialityId > 0 && !appSpecIds.has(pref.specialityId)) {
-      const sp = specs.find((s2) => s2.id === pref.specialityId);
-      const prefix = sp?.code ? sp.code.toUpperCase() : "GEN";
-      const year = 2026;
-      try {
-        const countResult = await db.execute(sql`
-          SELECT COUNT(*)::int as count FROM applications WHERE speciality_id = ${pref.specialityId} AND hall_ticket_number IS NOT NULL
-        `);
-        const seq = Number(countResult.rows[0]?.count ?? 0) + 1;
-        const hallTicketNumber = `${prefix}-${year}-${String(seq).padStart(3, "0")}`;
-        const [newApp] = await db.insert(applicationsTable).values({
-          candidateId: c.id,
-          specialityId: pref.specialityId,
-          hallTicketNumber,
-          status: "approved"
-        }).returning();
-        if (newApp) {
-          apps.push(newApp);
-          appSpecIds.add(pref.specialityId);
-        }
-      } catch {
-        apps.push({
-          id: -pref.specialityId,
-          candidateId: c.id,
-          specialityId: pref.specialityId,
-          hallTicketNumber: `${prefix}-${year}-001`,
-          status: "approved",
-          batchId: null,
-          interviewSlot: null,
-          createdAt: /* @__PURE__ */ new Date(),
-          updatedAt: /* @__PURE__ */ new Date()
-        });
-      }
-    }
-  }
-  const appliedSpecialities = resolvedPrefs.map((p) => {
-    const scoreEntry = interviews.find((i2) => i2.specialityId === p.specialityId);
-    return {
-      specialityId: p.specialityId,
-      specialityName: p.specialityName,
-      specialityCode: p.specialityCode,
-      preferenceOrder: p.preferenceOrder,
-      score: scoreEntry ? scoreEntry.score : null,
-      remarks: scoreEntry ? scoreEntry.remarks : null,
-      submittedAt: scoreEntry?.submittedAt ? scoreEntry.submittedAt.toISOString() : null,
-      doctorId: scoreEntry ? scoreEntry.doctorId : null
-    };
-  });
-  return {
-    id: c.id,
-    candidateCode: c.candidateCode,
-    fullName: c.fullName,
-    email: c.email,
-    phone: c.phone,
-    unitId: c.unitId,
-    unitName: unit?.name ?? null,
-    status: c.status,
-    mcqScore,
-    psychometricScore,
-    interviewScore,
-    totalScore,
-    rank: null,
-    createdAt: c.createdAt.toISOString(),
-    dateOfBirth: formatDOBToStandard(c.dateOfBirth),
-    gender: c.gender || sub?.gender || null,
-    qualification: c.qualification || sub?.degree || null,
-    collegeName: c.collegeName || sub?.medicalCollege || null,
-    address: c.address || sub?.permanentAddress || null,
-    specializations,
-    preferences: resolvedPrefs,
-    appliedSpecialities,
-    interviewScores: interviews.map((i2) => ({
-      id: i2.id,
-      specialityId: i2.specialityId,
-      doctorId: i2.doctorId,
-      score: i2.score,
-      remarks: i2.remarks,
-      submittedAt: i2.submittedAt.toISOString()
-    })),
-    documents: docs.map((d) => ({
-      id: d.id,
-      docType: d.docType,
-      fileName: d.fileName,
-      fileUrl: d.fileUrl ?? null,
-      uploadedAt: d.uploadedAt.toISOString()
-    })),
-    attempts: attempts.map((a) => {
-      const e2 = exams.find((x2) => x2.id === a.examId);
-      return {
-        id: a.id,
-        examId: a.examId,
-        examTitle: e2?.title ?? "",
-        examKind: e2?.kind ?? "",
-        score: a.score,
-        maxScore: a.maxScore,
-        submittedAt: a.submittedAt?.toISOString() ?? null,
-        startedAt: a.startedAt.toISOString()
-      };
-    }),
-    paymentInfo: sub ? {
-      amount: sub.paidAmount ? sub.paidAmount > 1e5 ? sub.paidAmount / 100 : sub.paidAmount : null,
-      id: sub.paymentId,
-      mode: sub.paymentMode
-    } : null,
-    centerPreference: sub?.centerPreference ?? null,
-    submissionId: sub?.id ?? null,
-    reviewNotes: sub?.reviewNotes ?? null,
-    pgQualifications: sub?.pgQualifications ?? null,
-    applications: apps.map((a) => ({
-      id: a.id,
-      specialityId: a.specialityId,
-      hallTicketNumber: a.hallTicketNumber,
-      status: a.status,
-      batchId: a.batchId,
-      interviewSlot: a.interviewSlot
-    })),
-    // Detailed application submission fields for doctor view
-    submission: sub ? {
-      id: sub.id,
-      applicationId: sub.applicationId,
-      fullName: sub.fullName,
-      email: sub.email,
-      phone: sub.phone,
-      dateOfBirth: formatDOBToStandard(sub.dateOfBirth),
-      gender: sub.gender,
-      maritalStatus: sub.maritalStatus,
-      spouseDetails: sub.spouseDetails,
-      permanentAddress: sub.permanentAddress,
-      mailingAddress: sub.mailingAddress,
-      degree: sub.degree,
-      medicalCollege: sub.medicalCollege,
-      university: sub.university,
-      medicalCouncilNumber: sub.medicalCouncilNumber,
-      pgQualifications: sub.pgQualifications,
-      doQualification: sub.doQualification,
-      doDetails: sub.doDetails,
-      msMdQualification: sub.msMdQualification,
-      msMdDetails: sub.msMdDetails,
-      dnbQualification: sub.dnbQualification,
-      dnbDetails: sub.dnbDetails,
-      otherTraining: sub.otherTraining,
-      diagnosticSkills: sub.diagnosticSkills,
-      surgicalExperience: sub.surgicalExperience,
-      totalSurgeries: sub.totalSurgeries,
-      publications: sub.publications,
-      presentations: sub.presentations,
-      healthDeclaration: sub.healthDeclaration,
-      healthDetails: sub.healthDetails,
-      medicalConditions: sub.medicalConditions,
-      previousApplicationMonthYear: sub.previousApplicationMonthYear,
-      referralSource: sub.referralSource,
-      referredByName: sub.referredByName,
-      mediaSource: sub.mediaSource,
-      lor1Url: sub.lor1Url,
-      lor1RefName: sub.lor1RefName,
-      lor1RefContact: sub.lor1RefContact,
-      lor1RefEmail: sub.lor1RefEmail,
-      lor2Url: sub.lor2Url,
-      lor2RefName: sub.lor2RefName,
-      lor2RefContact: sub.lor2RefContact,
-      lor2RefEmail: sub.lor2RefEmail,
-      photoUrl: sub.photoUrl,
-      paymentUrl: sub.paymentUrl,
-      otherInformation: sub.otherInformation,
-      customAnswers: sub.customAnswers ?? null,
-      formData: sub.formData ?? null,
-      declarationAccepted: sub.declarationAccepted ?? null,
-      submittedAt: sub.submittedAt ? sub.submittedAt.toISOString() : null
-    } : null
-  };
-}
-function buildStyledSheet(rows, sheetName) {
-  if (rows.length === 0) {
-    const ws2 = XLSX.utils.json_to_sheet([]);
-    return ws2;
-  }
-  const headers = Object.keys(rows[0]);
-  const numCols = headers.length;
-  const numRows = rows.length;
-  const headerColor = SHEET_HEADER_COLORS[sheetName] ?? "0B4A8F";
-  const wsData = [headers, ...rows.map((r2) => headers.map((h2) => r2[h2] ?? ""))];
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
-  for (let R = 0; R <= numRows; R++) {
-    for (let C = 0; C < numCols; C++) {
-      const addr = XLSX.utils.encode_cell({ r: R, c: C });
-      if (!ws[addr]) continue;
-      const cell2 = ws[addr];
-      if (R === 0) {
-        cell2.s = {
-          fill: { patternType: "solid", fgColor: { rgb: headerColor } },
-          font: HEADER_FONT,
-          alignment: HEADER_ALIGN,
-          border: THIN_BORDER
-        };
-      } else {
-        const colHeader = headers[C];
-        const cellVal = String(cell2.v ?? "");
-        const isRetina = colHeader === "Retina/Anterior" && cellVal === "Retina";
-        cell2.s = {
-          fill: isRetina ? RETINA_FILL : R % 2 === 0 ? ROW_ODD : ROW_EVEN,
-          font: isRetina ? RETINA_FONT : BODY_FONT,
-          alignment: BODY_ALIGN,
-          border: THIN_BORDER
-        };
-      }
-    }
-  }
-  ws["!cols"] = headers.map((h2) => {
-    let maxLen = h2.length;
-    for (const row of rows) {
-      const v = row[h2];
-      if (v != null) maxLen = Math.max(maxLen, String(v).length);
-    }
-    return { wch: Math.min(maxLen + 4, 50) };
-  });
-  ws["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft", state: "frozen" };
-  ws["!autofilter"] = {
-    ref: XLSX.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: numCols - 1, r: numRows } })
-  };
-  ws["!rows"] = [{ hpt: 22 }, ...Array(numRows).fill({ hpt: 18 })];
-  return ws;
-}
-async function recalculateCandidateStatus(candidateId) {
-  const [cand] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, candidateId));
-  if (!cand) return;
-  if (cand.status === "allocated" || cand.status === "waitlisted" || cand.status === "rejected") return;
-  const apps = await db.select().from(applicationsTable).where(eq(applicationsTable.candidateId, candidateId));
-  if (apps.length === 0) return;
-  const scores = await db.select().from(interviewScoresTable).where(eq(interviewScoresTable.candidateId, candidateId));
-  let allSpecialtiesCompleted = true;
-  for (const app2 of apps) {
-    const hasScore = scores.some((s2) => s2.specialityId === app2.specialityId);
-    if (!hasScore) {
-      allSpecialtiesCompleted = false;
-      if (app2.status === "completed") {
-        await db.update(applicationsTable).set({ status: "approved" }).where(eq(applicationsTable.id, app2.id));
-      }
-    } else {
-      if (app2.status !== "completed") {
-        await db.update(applicationsTable).set({ status: "completed" }).where(eq(applicationsTable.id, app2.id));
-      }
-    }
-  }
-  const overallCompleted = allSpecialtiesCompleted || scores.length > 0;
-  if (overallCompleted) {
-    await db.update(candidatesTable).set({ status: "interview_completed" }).where(eq(candidatesTable.id, candidateId));
-  } else {
-    if (cand.status === "interview_completed") {
-      await db.update(candidatesTable).set({ status: "approved" }).where(eq(candidatesTable.id, candidateId));
-    }
-  }
-}
-async function createCandidateDossierPdfBuffer(c) {
-  return new Promise(async (resolve4, reject) => {
-    try {
-      const full = await fullCandidate(c);
-      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
-      const doc = new import_pdfkit2.default({ margin: 50, size: "A4" });
-      const buffers = [];
-      doc.on("data", (chunk) => buffers.push(chunk));
-      doc.on("end", () => resolve4(Buffer.concat(buffers)));
-      doc.on("error", reject);
-      const colors = {
-        primary: "#0f172a",
-        secondary: "#475569",
-        accent: "#f97316",
-        muted: "#94a3b8",
-        border: "#e2e8f0",
-        bgOrange: "#fff7ed"
-      };
-      const logoPath = path4.join(process.cwd(), "artifacts", "fellowship-exam", "src", "assets", "seh_sav_logo_1777703794142.jpg");
-      try {
-        doc.image(logoPath, 50, 40, { width: 130, height: 65 });
-      } catch (e2) {
-        doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(14).text("SANKARA ACADEMY OF VISION", 50, 50);
-      }
-      doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(16).text("CANDIDATE DOSSIER", 0, 45, { align: "right", width: 545 });
-      doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text("Sankara Academy of Vision \u2014 Fellowship Admissions", 0, 65, { align: "right", width: 545 });
-      doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text(`Protocol ID: ${c.candidateCode}`, 0, 78, { align: "right", width: 545 });
-      doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, 112).lineTo(550, 112).stroke();
-      const photoUrl = sub?.photoUrl;
-      if (photoUrl && photoUrl.startsWith("/objects/")) {
-        const localPath = path4.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
-        try {
-          doc.image(localPath, 460, 120, { width: 85, height: 105 });
-          doc.rect(460, 120, 85, 105).strokeColor(colors.border).lineWidth(1).stroke();
-        } catch (_) {
-        }
-      }
-      doc.y = 122;
-      doc.moveDown(2);
-      doc.rect(50, doc.y, 500, 30).fill(colors.bgOrange);
-      doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(12).text("ACADEMIC IDENTITY & PROFILE", 65, doc.y - 22);
-      doc.moveDown(0.5);
-      const leftCol = 70;
-      const rightCol = 320;
-      let currY = doc.y;
-      const renderField = (label, value, x2, y) => {
-        doc.fillColor(colors.muted).font("Helvetica-Bold").fontSize(8).text(label.toUpperCase(), x2, y);
-        doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(11).text(String(value || "\u2014"), x2, y + 12);
-      };
-      renderField("Full Name", full.fullName, leftCol, currY);
-      renderField("Contact Identity", full.email, rightCol, currY);
-      currY += 40;
-      renderField("Contact Phone", full.phone || "\u2014", leftCol, currY);
-      renderField("Date of Birth", formatDOBToStandard(full.dateOfBirth), rightCol, currY);
-      currY += 40;
-      renderField("MBBS Institution", full.collegeName || "\u2014", leftCol, currY);
-      renderField("Qualifying MBBS", full.qualification || "\u2014", rightCol, currY);
-      currY += 40;
-      if (sub?.pgQualifications) {
-        doc.rect(50, currY, 500, 24).fill("#f8fafc");
-        doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(10).text("POST-GRADUATE QUALIFICATIONS", 65, currY + 6);
-        currY += 32;
-        doc.fillColor(colors.secondary).font("Helvetica").fontSize(10).text(sub.pgQualifications, 65, currY, { width: 470 });
-        currY = doc.y + 16;
-      }
-      const bottom = 750;
-      doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, bottom).lineTo(550, bottom).stroke();
-      doc.fillColor(colors.muted).font("Helvetica").fontSize(8).text("CONFIDENTIAL DOCUMENT - FOR INTERNAL USE ONLY", 50, bottom + 10);
-      doc.text("SANKARA ACADEMY OF VISION - FELLOWSHIP ADMISSIONS HUB", 50, bottom + 22);
-      doc.text(`Generated on ${formatToLocalDateTime(/* @__PURE__ */ new Date())}`, 350, bottom + 10, { align: "right" });
-      doc.end();
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-async function cascadeDeleteCandidates(ids) {
-  const { inArray: inArray4, sql: sql2 } = await Promise.resolve().then(() => (init_drizzle_orm(), drizzle_orm_exports));
-  if (!ids || ids.length === 0) return;
-  await db.delete(interviewScoresTable).where(inArray4(interviewScoresTable.candidateId, ids)).catch(() => {
-  });
-  await db.delete(doctorAssignmentsTable).where(inArray4(doctorAssignmentsTable.candidateId, ids)).catch(() => {
-  });
-  await db.delete(documentsTable).where(inArray4(documentsTable.candidateId, ids)).catch(() => {
-  });
-  await db.delete(candidateExamAssignmentsTable).where(inArray4(candidateExamAssignmentsTable.candidateId, ids)).catch(() => {
-  });
-  await db.delete(examAttemptsTable).where(inArray4(examAttemptsTable.candidateId, ids)).catch(() => {
-  });
-  await db.delete(candidatePreferencesTable).where(inArray4(candidatePreferencesTable.candidateId, ids)).catch(() => {
-  });
-  await db.delete(applicationsTable).where(inArray4(applicationsTable.candidateId, ids)).catch(() => {
-  });
-  await db.delete(batchCandidatesTable).where(inArray4(batchCandidatesTable.candidateId, ids)).catch(() => {
-  });
-  await db.execute(sql2`DELETE FROM panel_queue WHERE candidate_id = ANY(${ids})`).catch(() => {
-  });
-  await db.execute(sql2`DELETE FROM interview_panel_member_scores WHERE candidate_id = ANY(${ids})`).catch(() => {
-  });
-  await db.execute(sql2`DELETE FROM interview_panel_member_scoring_audit WHERE candidate_id = ANY(${ids})`).catch(() => {
-  });
-  await db.delete(candidatesTable).where(inArray4(candidatesTable.id, ids));
-}
-var import_express7, import_pdfkit2, XLSX, archiver, router7, HEADER_FONT, HEADER_ALIGN, ROW_EVEN, ROW_ODD, BODY_FONT, BODY_ALIGN, THIN_BORDER, RETINA_FILL, RETINA_FONT, SHEET_HEADER_COLORS, candidates_default;
-var init_candidates2 = __esm({
-  "src/routes/candidates.ts"() {
+// src/lib/default-sections.ts
+var DEFAULT_SECTIONS;
+var init_default_sections = __esm({
+  "src/lib/default-sections.ts"() {
     "use strict";
-    import_express7 = __toESM(require_express2(), 1);
-    init_drizzle_orm();
-    init_drizzle_orm();
-    init_src();
-    init_auth2();
-    init_email();
-    init_google_docs();
-    init_src();
-    import_pdfkit2 = __toESM(require_pdfkit(), 1);
-    init_utils5();
-    init_letters();
-    XLSX = __toESM(require_xlsx(), 1);
-    init_archiver();
-    archiver = archiver_exports?.default || archiver_exports;
-    router7 = (0, import_express7.Router)();
-    router7.get("/candidates", requireAuth, async (req, res) => {
-      const programId = req.query["programId"] ? Number(req.query["programId"]) : null;
-      const unitIdRaw = req.query["unitId"] ? Number(req.query["unitId"]) : void 0;
-      const status = req.query["status"];
-      let effectiveUnit = unitIdRaw;
-      if (req.user.role === "unit_coordinator") {
-        const [u] = await readDb.select().from(usersTable).where(eq(usersTable.id, req.user.userId));
-        effectiveUnit = u?.unitId ?? -1;
-      }
-      let candidates = await readDb.select().from(candidatesTable).where(eq(candidatesTable.isMock, req.isMockMode)).orderBy(desc(candidatesTable.createdAt));
-      if (effectiveUnit !== void 0) candidates = candidates.filter((c) => c.unitId === effectiveUnit);
-      if (status) candidates = candidates.filter((c) => c.status === status);
-      if (programId) {
-        const specs = await readDb.select().from(specialitiesTable).where(eq(specialitiesTable.programId, programId));
-        const forms = await readDb.select().from(applicationFormsTable).where(eq(applicationFormsTable.programId, programId));
-        const specIds = new Set(specs.map((s2) => s2.id));
-        const formIds = new Set(forms.map((f3) => f3.id));
-        const candIdsFromPrefs = specIds.size > 0 ? (await readDb.select({ candidateId: candidatePreferencesTable.candidateId }).from(candidatePreferencesTable).where(inArray(candidatePreferencesTable.specialityId, [...specIds]))).map((p) => p.candidateId) : [];
-        const candIdsFromApps = specIds.size > 0 ? (await readDb.select({ candidateId: applicationsTable.candidateId }).from(applicationsTable).where(inArray(applicationsTable.specialityId, [...specIds]))).map((a) => a.candidateId) : [];
-        const candIdsFromSubs = formIds.size > 0 ? (await readDb.select({ candidateId: applicationSubmissionsTable.candidateId }).from(applicationSubmissionsTable).where(inArray(applicationSubmissionsTable.formId, [...formIds]))).map((s2) => s2.candidateId).filter((id) => typeof id === "number" && id > 0) : [];
-        const allowedCandIds = /* @__PURE__ */ new Set([...candIdsFromPrefs, ...candIdsFromApps, ...candIdsFromSubs]);
-        candidates = candidates.filter((c) => allowedCandIds.has(c.id));
-      }
-      let units = [];
-      let allPrefs = [];
-      let allSpecs = [];
-      let allDocs = [];
-      let allSubmissions = [];
-      let allApplications = [];
-      let allScores = [];
-      if (candidates.length > 0) {
-        const candidateIds = candidates.map((c) => c.id);
-        const emails = candidates.map((c) => c.email.toLowerCase().trim()).filter(Boolean);
-        units = await readDb.select().from(unitsTable);
-        allPrefs = await readDb.select().from(candidatePreferencesTable).where(inArray(candidatePreferencesTable.candidateId, candidateIds));
-        allSpecs = await readDb.select().from(specialitiesTable);
-        allDocs = await readDb.select().from(documentsTable).where(inArray(documentsTable.candidateId, candidateIds));
-        allSubmissions = emails.length > 0 ? await readDb.select().from(applicationSubmissionsTable).where(
-          or(
-            inArray(applicationSubmissionsTable.candidateId, candidateIds),
-            inArray(sql`LOWER(email)`, emails)
-          )
-        ) : await readDb.select().from(applicationSubmissionsTable).where(inArray(applicationSubmissionsTable.candidateId, candidateIds));
-        allApplications = await readDb.select().from(applicationsTable).where(inArray(applicationsTable.candidateId, candidateIds));
-        allScores = await readDb.select().from(interviewScoresTable).where(inArray(interviewScoresTable.candidateId, candidateIds));
-      }
-      const unitsMap = new Map(units.map((u) => [u.id, u]));
-      const specsMap = new Map(allSpecs.map((s2) => [s2.id, s2]));
-      const prefsByCandidate = /* @__PURE__ */ new Map();
-      for (const p of allPrefs) {
-        if (!prefsByCandidate.has(p.candidateId)) prefsByCandidate.set(p.candidateId, []);
-        prefsByCandidate.get(p.candidateId).push(p);
-      }
-      const docsByCandidate = /* @__PURE__ */ new Map();
-      for (const d of allDocs) {
-        if (!docsByCandidate.has(d.candidateId)) docsByCandidate.set(d.candidateId, []);
-        docsByCandidate.get(d.candidateId).push(d);
-      }
-      const submissionsByCandidate = /* @__PURE__ */ new Map();
-      const submissionsByEmail = /* @__PURE__ */ new Map();
-      for (const s2 of allSubmissions) {
-        if (s2.candidateId) submissionsByCandidate.set(s2.candidateId, s2);
-        if (s2.email) submissionsByEmail.set(s2.email.toLowerCase().trim(), s2);
-      }
-      const scoresByCandidate = /* @__PURE__ */ new Map();
-      for (const s2 of allScores) {
-        if (!scoresByCandidate.has(s2.candidateId)) scoresByCandidate.set(s2.candidateId, []);
-        scoresByCandidate.get(s2.candidateId).push(s2);
-      }
-      const out = candidates.map((c) => {
-        const unit = c.unitId ? unitsMap.get(c.unitId) : null;
-        const prefs = (prefsByCandidate.get(c.id) || []).sort((a, b) => a.preferenceOrder - b.preferenceOrder);
-        let specializations = prefs.map((p) => specsMap.get(p.specialityId)?.name ?? "").filter(Boolean);
-        if (specializations.length === 0) {
-          const sub2 = submissionsByCandidate.get(c.id) || (c.email ? submissionsByEmail.get(c.email.toLowerCase().trim()) : null);
-          if (sub2 && sub2.specialization) {
-            specializations = parseSpecializationString(sub2.specialization);
+    DEFAULT_SECTIONS = [
+      {
+        id: "instructions",
+        title: "Key Instructions & Schedule (January Intake)",
+        description: "Please read the following instructions and schedule carefully before proceeding.",
+        enabled: true,
+        fields: [
+          {
+            id: "intro_text",
+            type: "info",
+            label: "Entrance & Induction Schedule \u2014 January Intake",
+            defaultValue: "<b>1. Important Examination & Induction Dates:</b><br/>\u2022 <b>07.12.2026, Monday:</b> Retina Fellowship Entrance & Selection (Bengaluru)<br/>\u2022 <b>08.12.2026, Tuesday:</b> Anterior Segment Fellowship Entrance & Selection (Bengaluru)<br/>\u2022 <b>07.01.2027 & 08.01.2027 (Thursday & Friday):</b> Mandatory Induction for New Fellows (Bengaluru)<br/>\u2022 <b>11.01.2027, Monday:</b> New Fellows Reporting at respective Hospital Units<br/><br/><b>2. Multiple Sub-specialties:</b> Candidates can apply for multiple Sub-specialties in a single application form. Separate fees apply for each specialization (Rs. 2750/- per specialization).<br/><br/><b>3. Selection Process:</b> Selection involves an objective assessment of theoretical knowledge (MCQ pattern), OSCE, and skills evaluation with an interview by a panel of faculty.<br/><br/><b>4. Eligibility & Age Limit:</b> The age limit is 35 years. Applicants appearing for interviews must have cleared the results of PG (MS/MD) and DNB (Theory & Practical). Candidates awaiting PG results are not eligible.<br/><br/><b>5. Government Bond / Rural Service:</b> Applicants under Government bond or Compulsory Rural Service must submit a 'No Objection Certificate' during the examination.<br/><br/><b>6. State Medical Council NOC:</b> Selected fellows must submit NOC from their State Medical Council within 3 days of accepting the Fellowship Offer.<br/><br/><b>7. Required Documents:</b> Basic & post-graduate educational certificates, current valid medical registration license, complete CV, passport-size photograph, and two Letters of Recommendation."
           }
-        }
-        const documents = (docsByCandidate.get(c.id) || []).map((d) => ({ id: d.id, docType: d.docType, fileName: d.fileName, fileUrl: d.fileUrl }));
-        const candScores = scoresByCandidate.get(c.id) || [];
-        const sub = submissionsByCandidate.get(c.id) || (c.email ? submissionsByEmail.get(c.email.toLowerCase().trim()) : null);
-        return {
-          id: c.id,
-          candidateCode: c.candidateCode,
-          fullName: c.fullName,
-          email: c.email,
-          phone: c.phone,
-          unitId: c.unitId,
-          unitName: unit?.name ?? null,
-          status: c.status,
-          specializations,
-          preferences: prefs.map((p) => ({
-            id: p.id,
-            specialityId: p.specialityId,
-            preferenceOrder: p.preferenceOrder
-          })),
-          documents,
-          mcqScore: c.mcqScore ? parseFloat(c.mcqScore) : null,
-          psychometricScore: c.psychometricScore ? parseFloat(c.psychometricScore) : null,
-          interviewScore: candScores.length > 0 ? candScores.reduce((acc, s2) => acc + s2.score, 0) / candScores.length : null,
-          totalScore: (() => {
-            const mcq = c.mcqScore ? parseFloat(c.mcqScore) : null;
-            const psy = c.psychometricScore ? parseFloat(c.psychometricScore) : null;
-            const intv = candScores.length > 0 ? candScores.reduce((acc, s2) => acc + s2.score, 0) / candScores.length : null;
-            return mcq !== null || psy !== null || intv !== null ? (mcq ?? 0) + (psy ?? 0) + (intv ?? 0) : null;
-          })(),
-          rank: null,
-          createdAt: c.createdAt.toISOString(),
-          dateOfBirth: formatDOBToStandard(c.dateOfBirth),
-          gender: c.gender,
-          qualification: c.qualification,
-          collegeName: c.collegeName,
-          address: c.address,
-          photoUrl: sub?.photoUrl || documents.find((d) => d.docType?.toLowerCase().includes("photo"))?.fileUrl || null,
-          lor1Url: sub?.lor1Url || documents.find((d) => d.docType?.includes("LOR1"))?.fileUrl || null,
-          lor2Url: sub?.lor2Url || documents.find((d) => d.docType?.includes("LOR2"))?.fileUrl || null,
-          lor1RefName: sub?.lor1RefName || null,
-          lor2RefName: sub?.lor2RefName || null,
-          paymentInfo: (() => {
-            const s2 = sub || allSubmissions.find((s3) => s3.email?.toLowerCase() === c.email?.toLowerCase());
-            if (!s2) return null;
-            return {
-              amount: s2.paidAmount ? s2.paidAmount > 1e5 ? s2.paidAmount / 100 : s2.paidAmount : null,
-              id: s2.paymentId,
-              mode: s2.paymentMode
-            };
-          })(),
-          centerPreference: sub?.centerPreference ?? null,
-          submissionId: sub?.id ?? null,
-          reviewNotes: sub?.reviewNotes ?? null,
-          pgQualifications: sub?.pgQualifications ?? null,
-          applications: allApplications.filter((a) => a.candidateId === c.id).map((a) => ({
-            id: a.id,
-            specialityId: a.specialityId,
-            hallTicketNumber: a.hallTicketNumber,
-            status: a.status,
-            batchId: a.batchId,
-            interviewSlot: a.interviewSlot
-          }))
-        };
-      });
-      res.json(out);
-    });
-    HEADER_FONT = { bold: true, color: { rgb: "FFFFFF" }, sz: 11, name: "Calibri" };
-    HEADER_ALIGN = { horizontal: "center", vertical: "center", wrapText: false };
-    ROW_EVEN = { patternType: "solid", fgColor: { rgb: "E8F0FE" } };
-    ROW_ODD = { patternType: "solid", fgColor: { rgb: "FFFFFF" } };
-    BODY_FONT = { sz: 10, name: "Calibri" };
-    BODY_ALIGN = { horizontal: "left", vertical: "center", wrapText: false };
-    THIN_BORDER = {
-      top: { style: "thin", color: { rgb: "C5D3E8" } },
-      bottom: { style: "thin", color: { rgb: "C5D3E8" } },
-      left: { style: "thin", color: { rgb: "C5D3E8" } },
-      right: { style: "thin", color: { rgb: "C5D3E8" } }
-    };
-    RETINA_FILL = { patternType: "solid", fgColor: { rgb: "FFF3CD" } };
-    RETINA_FONT = { sz: 10, name: "Calibri", color: { rgb: "7B3F00" }, bold: true };
-    SHEET_HEADER_COLORS = {
-      "General": "0B4A8F",
-      // deep navy
-      "Cornea": "006064",
-      // teal
-      "Glaucoma": "311B92",
-      // deep purple
-      "IOL Fellowship": "1A237E",
-      // indigo
-      "Medical Retina": "880E4F",
-      // deep pink
-      "Oculoplasty": "BF360C",
-      // deep orange
-      "Pediatric Ophthalmology": "1B5E20",
-      // deep green
-      "Phaco Refractive": "4A148C",
-      // purple
-      "Vitreo Retina": "B71C1C"
-      // deep red
-    };
-    router7.get("/candidates/export", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
-      try {
-        const candidates = await db.select().from(candidatesTable).where(eq(candidatesTable.isMock, req.isMockMode)).orderBy(desc(candidatesTable.createdAt));
-        const units = await db.select().from(unitsTable);
-        const allPrefs = await db.select().from(candidatePreferencesTable);
-        const allSpecs = await db.select().from(specialitiesTable);
-        const allSubmissions = await db.select().from(applicationSubmissionsTable);
-        const allForms = await db.select().from(applicationFormsTable);
-        const resolvedCandidates = candidates.map((c) => {
-          const unit = c.unitId ? units.find((u) => u.id === c.unitId) : null;
-          const prefs = allPrefs.filter((p) => p.candidateId === c.id).sort((a, b) => a.preferenceOrder - b.preferenceOrder);
-          let specializations = prefs.map((p) => allSpecs.find((s2) => s2.id === p.specialityId)?.name ?? "").filter(Boolean);
-          const submission = allSubmissions.find((s2) => s2.email?.toLowerCase() === c.email?.toLowerCase());
-          let activeSpecializations = specializations;
-          if (submission?.specialization) {
-            activeSpecializations = parseSpecializationString(submission.specialization);
-          }
-          const getFormattedSpecialityPrefs = (specs, centerPreferenceStr, formData, customAnswers, sectionsConfig) => {
-            if (specs.length === 0) return [];
-            const prefs2 = {};
-            if (centerPreferenceStr) {
-              try {
-                const parsed = JSON.parse(centerPreferenceStr);
-                if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-                  Object.entries(parsed).forEach(([k, v]) => {
-                    prefs2[k] = Array.isArray(v) ? v.join(", ") : String(v);
-                  });
-                }
-              } catch {
-              }
-            }
-            const extractUnitFields = (obj) => {
-              if (obj && typeof obj === "object") {
-                Object.entries(obj).forEach(([key, val]) => {
-                  if (key.startsWith("unit_") && val) {
-                    let label = key.replace("unit_", "").replace(/_/g, " ").toUpperCase();
-                    if (sectionsConfig) {
-                      sectionsConfig.forEach((sec) => {
-                        sec.fields?.forEach((f3) => {
-                          if (f3.id === key && f3.label) {
-                            label = f3.label.replace(" Preferred Center", "");
-                          }
-                        });
-                      });
-                    }
-                    prefs2[label] = Array.isArray(val) ? val.join(", ") : String(val);
-                  }
-                });
-              }
-            };
-            extractUnitFields(formData);
-            extractUnitFields(customAnswers);
-            if (formData && formData.formData) {
-              extractUnitFields(formData.formData);
-            }
-            const normalize2 = (str) => {
-              return str.toLowerCase().replace(/[^a-z0-9]/g, "");
-            };
-            const normalizedPrefs = {};
-            Object.entries(prefs2).forEach(([k, v]) => {
-              normalizedPrefs[normalize2(k)] = v;
-              if (k.startsWith("unit_")) {
-                normalizedPrefs[normalize2(k.substring(5))] = v;
-              }
-            });
-            const result = [];
-            specs.forEach((spec) => {
-              const normSpec = normalize2(spec);
-              let loc = normalizedPrefs[normSpec];
-              if (!loc) {
-                const key = Object.keys(normalizedPrefs).find((k) => k.includes(normSpec) || normSpec.includes(k));
-                if (key) {
-                  loc = normalizedPrefs[key];
-                }
-              }
-              if (!loc && centerPreferenceStr) {
-                const trimmedCp = centerPreferenceStr.trim();
-                if (!trimmedCp.startsWith("{") && !trimmedCp.startsWith("[") && trimmedCp !== "0" && trimmedCp.toLowerCase() !== "not applicable") {
-                  loc = trimmedCp;
-                }
-              }
-              if (loc && (loc.toLowerCase().trim() === "not applicable" || loc.toLowerCase().trim() === "not_applicable")) {
-                loc = "";
-              }
-              result.push({
-                spec,
-                location: loc ? loc.trim() : null
-              });
-            });
-            return result;
-          };
-          const form = submission ? allForms.find((f3) => f3.id === submission.formId) : null;
-          const caParsed = {
-            ...submission?.formData || {},
-            ...submission?.customAnswers || {}
-          };
-          const specPrefs = getFormattedSpecialityPrefs(
-            activeSpecializations,
-            submission?.centerPreference,
-            caParsed,
-            submission?.customAnswers,
-            form?.sectionsConfig ?? void 0
-          );
-          const specWithCentersList = specPrefs.map(({ spec, location }) => location ? `${spec}: ${location}` : spec);
-          const specWithCentersString = specWithCentersList.length > 0 ? specWithCentersList.join("; ") : activeSpecializations.join(", ");
-          const centerPrefsString = specPrefs.filter((p) => p.location).map(({ spec, location }) => `${spec}: ${location}`).join("; ") || "N/A";
-          const finalSpecializations = specPrefs.map((p) => p.spec);
-          return {
-            id: c.id,
-            candidateCode: c.candidateCode,
-            fullName: c.fullName,
-            email: c.email,
-            phone: c.phone || "N/A",
-            dateOfBirth: formatDOBToStandard(c.dateOfBirth),
-            gender: c.gender || "N/A",
-            qualification: c.qualification || "N/A",
-            pgQualifications: submission?.pgQualifications || "N/A",
-            collegeName: c.collegeName || "N/A",
-            address: c.address || "N/A",
-            centerPreference: centerPrefsString,
-            specializations: finalSpecializations,
-            specialitiesStringFormatted: specWithCentersString,
-            status: c.status,
-            unitName: unit?.name || "N/A",
-            paymentAmount: (() => {
-              if (!submission?.paidAmount) return "N/A";
-              const amt = submission.paidAmount > 1e5 ? submission.paidAmount / 100 : submission.paidAmount;
-              return `Rs. ${amt.toLocaleString("en-IN")}`;
-            })(),
-            paymentMode: submission?.paymentMode || "N/A",
-            createdAt: c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-IN") : "N/A"
-          };
-        });
-        const specOrder = [
-          "Cornea",
-          "Glaucoma",
-          "IOL Fellowship",
-          "Medical Retina",
-          "Oculoplasty",
-          "Pediatric Ophthalmology",
-          "Phaco Refractive",
-          "Vitreo Retina"
-        ];
-        const STATUS_LABELS = {
-          pending: "Pending",
-          approved: "Approved",
-          rejected: "Rejected",
-          interview_completed: "Interview Completed",
-          waitlisted: "Waitlisted",
-          allocated: "Allocated"
-        };
-        const mapToExcelRow = (rc) => {
-          const specsString = rc.specialitiesStringFormatted;
-          const hasRetina = rc.specializations.some((s2) => s2.toLowerCase().includes("retina"));
-          const hasBoth = hasRetina && rc.specializations.some((s2) => !s2.toLowerCase().includes("retina"));
-          const segment = hasBoth ? "Anterior, Retina" : hasRetina ? "Retina" : "Anterior";
-          return {
-            "Candidate ID": rc.candidateCode,
-            "Name": rc.fullName,
-            "Email": rc.email,
-            "Phone": rc.phone,
-            "Date of Birth": rc.dateOfBirth,
-            "Gender": rc.gender,
-            "Qualification": rc.qualification,
-            "PG Qualification": rc.pgQualifications,
-            "College": rc.collegeName,
-            "Mailing Address": rc.address,
-            "Specialities": specsString,
-            "Retina/Anterior": segment,
-            "Preferred Center": rc.centerPreference,
-            "Allotted Unit": rc.unitName,
-            "Status": STATUS_LABELS[rc.status] ?? rc.status,
-            "Payment Amount": rc.paymentAmount,
-            "Payment Mode": rc.paymentMode,
-            "Registration Date": rc.createdAt
-          };
-        };
-        const wb = XLSX.utils.book_new();
-        const generalRows = resolvedCandidates.map(mapToExcelRow);
-        const generalWs = buildStyledSheet(generalRows, "General");
-        XLSX.utils.book_append_sheet(wb, generalWs, "General");
-        const approvedResolved = resolvedCandidates.filter((c) => c.status === "approved");
-        for (const spec of specOrder) {
-          const specCandidates = approvedResolved.filter(
-            (rc) => rc.specializations.some((s2) => {
-              const sN = s2.toLowerCase(), spN = spec.toLowerCase();
-              return spN === "iol fellowship" ? sN === "iol" || sN === "iol fellowship" : sN === spN;
-            })
-          );
-          const specRows = specCandidates.map(mapToExcelRow);
-          const specWs = buildStyledSheet(specRows, spec);
-          XLSX.utils.book_append_sheet(wb, specWs, spec);
-        }
-        const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx", cellStyles: true });
-        const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-        res.setHeader("Content-Disposition", `attachment; filename="SAV_Candidates_${today}.xlsx"`);
-        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-        res.send(buffer);
-      } catch (error40) {
-        res.status(500).json({ error: error40.message || "Failed to export candidates" });
-      }
-    });
-    router7.get("/candidates/me", requireAuth, requireRole("student"), async (req, res) => {
-      const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.userId, req.user.userId));
-      if (!c) {
-        res.status(404).json({ error: "Candidate not found" });
-        return;
-      }
-      res.json(await fullCandidate(c));
-    });
-    router7.patch("/candidates/me", requireAuth, requireRole("student"), async (req, res) => {
-      const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.userId, req.user.userId));
-      if (!c) {
-        res.status(404).json({ error: "Candidate not found" });
-        return;
-      }
-      const body = req.body;
-      const update = {};
-      for (const k of ["fullName", "phone", "dateOfBirth", "gender", "qualification", "collegeName", "address"]) {
-        if (body[k] !== void 0) update[k] = body[k];
-      }
-      const [updated] = await db.update(candidatesTable).set(update).where(eq(candidatesTable.id, c.id)).returning();
-      if (!updated) {
-        res.status(500).json({ error: "Failed" });
-        return;
-      }
-      res.json(await fullCandidate(updated));
-    });
-    router7.patch("/candidates/:candidateId", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "doctor"), async (req, res) => {
-      const id = Number(req.params["candidateId"]);
-      const body = req.body;
-      const allowed = ["status", "fullName", "email", "candidateCode", "phone", "dateOfBirth", "gender", "qualification", "collegeName", "address", "unitId", "mcqScore", "psychometricScore"];
-      const update = {};
-      for (const k of allowed) {
-        if (body[k] !== void 0) update[k] = body[k];
-      }
-      const [before] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
-      if (!before) {
-        res.status(404).json({ error: "Not found" });
-        return;
-      }
-      const [updated] = await db.update(candidatesTable).set(update).where(eq(candidatesTable.id, id)).returning();
-      if (!updated) {
-        res.status(404).json({ error: "Not found" });
-        return;
-      }
-      if (body.email && body.email !== before.email) {
-        await db.update(applicationSubmissionsTable).set({ email: String(body.email) }).where(eq(applicationSubmissionsTable.email, before.email)).catch(() => {
-        });
-      }
-      if (body.reviewNotes !== void 0) {
-        await db.update(applicationSubmissionsTable).set({ reviewNotes: String(body.reviewNotes) }).where(eq(applicationSubmissionsTable.email, updated.email));
-      }
-      const oldStatus = before.status;
-      const newStatus = updated.status;
-      if (newStatus !== oldStatus && (newStatus === "allocated" || oldStatus === "allocated")) {
-        const delta = newStatus === "allocated" ? 1 : -1;
-        const allUnits2 = await db.select().from(unitsTable);
-        const unitObj = updated.unitId ? allUnits2.find((u) => u.id === updated.unitId) : null;
-        const unitName = unitObj?.name ?? null;
-        let specialityName = null;
-        if (body.reviewNotes && typeof body.reviewNotes === "string" && body.reviewNotes.startsWith("Allocated to ")) {
-          specialityName = body.reviewNotes.replace("Allocated to ", "").trim();
-        } else {
-          const prefs = await db.select().from(candidatePreferencesTable).where(eq(candidatePreferencesTable.candidateId, id));
-          const firstPref = prefs.sort((a, b) => a.preferenceOrder - b.preferenceOrder)[0];
-          if (firstPref) {
-            const [spec] = await db.select().from(specialitiesTable).where(eq(specialitiesTable.id, firstPref.specialityId));
-            specialityName = spec?.name ?? null;
-          }
-        }
-        if (unitName && specialityName) {
-          await db.execute(sql`
-        INSERT INTO seat_matrix_entries (speciality, unit_name, total_seats, allocated_seats)
-        VALUES (${specialityName}, ${unitName}, 0, ${delta > 0 ? 1 : 0})
-        ON CONFLICT (speciality, unit_name) DO UPDATE
-          SET allocated_seats = GREATEST(0, seat_matrix_entries.allocated_seats + ${delta}), updated_at = NOW()
-      `);
-        }
-      }
-      const allUnits = await db.select().from(unitsTable);
-      const unit = updated.unitId ? allUnits.find((u) => u.id === updated.unitId) : null;
-      res.json({ id: updated.id, candidateCode: updated.candidateCode, fullName: updated.fullName, email: updated.email, phone: updated.phone, unitId: updated.unitId, unitName: unit?.name ?? null, status: updated.status });
-    });
-    router7.post("/candidates", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
-      const { fullName, email: email3, phone, gender, qualification, collegeName, address, unitId, pgQualifications, centerPreference, specialityIds } = req.body;
-      if (!fullName || !email3) {
-        res.status(400).json({ error: "fullName and email required" });
-        return;
-      }
-      const cleanEmail = email3.toLowerCase().trim();
-      const existing = await db.select().from(candidatesTable).where(eq(candidatesTable.email, cleanEmail));
-      if (existing.length > 0) {
-        res.status(400).json({ error: "Candidate with this email already exists" });
-        return;
-      }
-      const count2 = await db.select().from(candidatesTable);
-      const candidateCode = `CAND-2026-${String(count2.length + 1).padStart(3, "0")}`;
-      const [c] = await db.insert(candidatesTable).values({
-        candidateCode,
-        fullName,
-        email: cleanEmail,
-        phone: phone ?? null,
-        gender: gender ?? null,
-        qualification: qualification ?? null,
-        collegeName: collegeName ?? null,
-        address: address ?? null,
-        unitId: unitId ?? null,
-        status: "pending"
-      }).returning();
-      if (!c) {
-        res.status(500).json({ error: "Failed" });
-        return;
-      }
-      const specialityNames = [];
-      if (Array.isArray(specialityIds) && specialityIds.length > 0) {
-        const specs = await db.select().from(specialitiesTable);
-        let order = 1;
-        for (const specId of specialityIds) {
-          const spec = specs.find((s2) => s2.id === specId);
-          if (spec) {
-            specialityNames.push(spec.name);
-            await db.insert(candidatePreferencesTable).values({
-              candidateId: c.id,
-              specialityId: spec.id,
-              preferenceOrder: order++
-            });
-            const prefix = spec.code ? spec.code.toUpperCase() : "GEN";
-            const year = 2026;
-            const countResult = await db.execute(sql`
-          SELECT COUNT(*)::int as count FROM applications WHERE speciality_id = ${spec.id} AND hall_ticket_number IS NOT NULL
-        `);
-            const seq = Number(countResult.rows[0]?.count ?? 0) + 1;
-            const hallTicketNumber = `${prefix}-${year}-${String(seq).padStart(3, "0")}`;
-            await db.insert(applicationsTable).values({
-              candidateId: c.id,
-              specialityId: spec.id,
-              hallTicketNumber,
-              status: "approved"
-            });
-          }
-        }
-      }
-      const activeForms = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.isActive, true));
-      const formId = activeForms[0]?.id ?? 1;
-      await db.insert(applicationSubmissionsTable).values({
-        candidateId: c.id,
-        formId,
-        fullName: c.fullName,
-        email: cleanEmail,
-        phone: c.phone,
-        permanentAddress: c.address,
-        degree: c.qualification,
-        medicalCollege: c.collegeName,
-        pgQualifications: pgQualifications || null,
-        centerPreference: centerPreference || null,
-        specialization: specialityNames.length > 0 ? JSON.stringify(specialityNames) : null,
-        status: "approved",
-        readyForReview: true,
-        source: "manual"
-      });
-      res.json({ id: c.id, candidateCode: c.candidateCode, fullName: c.fullName, email: c.email, phone: c.phone, unitId: c.unitId, unitName: null, status: c.status });
-    });
-    router7.patch("/candidates/:candidateId/marks", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
-      try {
-        const id = Number(req.params["candidateId"]);
-        const { mcqScore, psychometricScore, vivaScore, specialityId, panelId, targetDoctorId } = req.body;
-        if (vivaScore !== void 0 && vivaScore !== null) {
-          if (vivaScore < 0 || vivaScore > 50) {
-            res.status(400).json({ error: "VIVA score must be between 0 and 50." });
-            return;
-          }
-        }
-        if (mcqScore !== void 0 && mcqScore !== null) {
-          if (mcqScore < 0 || mcqScore > 50) {
-            res.status(400).json({ error: "MCQ score must be between 0 and 50." });
-            return;
-          }
-        }
-        if (psychometricScore !== void 0 && psychometricScore !== null) {
-          if (psychometricScore < 0 || psychometricScore > 10) {
-            res.status(400).json({ error: "Mind Mapping score must be between 0 and 10." });
-            return;
-          }
-        }
-        const [candBefore] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
-        if (!candBefore) {
-          res.status(404).json({ error: "Candidate not found." });
-          return;
-        }
-        const update = {};
-        if (mcqScore !== void 0) update["mcqScore"] = mcqScore !== null ? String(mcqScore) : null;
-        if (psychometricScore !== void 0) update["psychometricScore"] = psychometricScore !== null ? String(psychometricScore) : null;
-        const [updated] = await db.update(candidatesTable).set(update).where(eq(candidatesTable.id, id)).returning();
-        if (!updated) {
-          res.status(404).json({ error: "Not found" });
-          return;
-        }
-        const ipAddress = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "127.0.0.1").split(",")[0].trim();
-        if (mcqScore !== void 0 && String(mcqScore) !== String(candBefore.mcqScore)) {
-          await db.insert(auditLogsTable).values({
-            userId: req.user.userId,
-            userEmail: req.user.email,
-            userName: req.user.email,
-            action: "MARK_MODIFY",
-            details: `Updated MCQ Score for candidate ${candBefore.fullName} (${candBefore.candidateCode}) from ${candBefore.mcqScore ?? "N/A"} to ${mcqScore ?? "N/A"}`,
-            ipAddress
-          });
-        }
-        if (psychometricScore !== void 0 && String(psychometricScore) !== String(candBefore.psychometricScore)) {
-          await db.insert(auditLogsTable).values({
-            userId: req.user.userId,
-            userEmail: req.user.email,
-            userName: req.user.email,
-            action: "MARK_MODIFY",
-            details: `Updated Mind Mapping Score for candidate ${candBefore.fullName} (${candBefore.candidateCode}) from ${candBefore.psychometricScore ?? "N/A"} to ${psychometricScore ?? "N/A"}`,
-            ipAddress
-          });
-        }
-        if (vivaScore !== void 0) {
-          let docId = req.user.userId;
-          if (targetDoctorId && (req.user.role === "super_admin" || req.user.role === "program_admin" || req.user.role === "central_exam_coordinator")) {
-            docId = Number(targetDoctorId);
-          }
-          let targetSpecId = specialityId;
-          if (!targetSpecId) {
-            const [firstPref] = await db.select().from(candidatePreferencesTable).where(eq(candidatePreferencesTable.candidateId, id)).orderBy(candidatePreferencesTable.preferenceOrder);
-            if (firstPref) {
-              targetSpecId = firstPref.specialityId;
-            }
-          }
-          if (targetSpecId) {
-            let finalDocId = docId;
-            if (!targetDoctorId) {
-              const specPanelDoctor = await db.execute(sql`
-            SELECT doctor_id FROM interview_panel_members ipm
-            JOIN interview_panels ip ON ip.id = ipm.panel_id
-            WHERE ip.speciality_id = ${targetSpecId} AND ip.is_active = TRUE
-            LIMIT 1
-          `);
-              if (specPanelDoctor.rows[0]) {
-                finalDocId = Number(specPanelDoctor.rows[0].doctor_id);
-              }
-            }
-            const [doc] = await db.select().from(usersTable).where(eq(usersTable.id, finalDocId));
-            const doctorName = doc?.fullName ?? `Doctor ID ${finalDocId}`;
-            const [spec] = await db.select().from(specialitiesTable).where(eq(specialitiesTable.id, targetSpecId));
-            const specName = spec?.name ?? `Specialty ID ${targetSpecId}`;
-            const existingScores = await db.select().from(interviewScoresTable).where(and(
-              eq(interviewScoresTable.candidateId, id),
-              eq(interviewScoresTable.specialityId, targetSpecId),
-              sql`doctor_id NOT IN (SELECT doctor_id FROM interview_panel_members WHERE panel_id IN (SELECT id FROM interview_panels WHERE is_mind_matter = TRUE))`
-            ));
-            const existing = existingScores[0];
-            const now = /* @__PURE__ */ new Date();
-            if (vivaScore === null) {
-              if (existing) {
-                await db.delete(interviewScoresTable).where(eq(interviewScoresTable.id, existing.id));
-                await db.insert(auditLogsTable).values({
-                  userId: req.user.userId,
-                  userEmail: req.user.email,
-                  action: "MARK_MODIFY",
-                  details: `Deleted Specialty ${specName} Viva score entered by Doctor ${doctorName} for candidate ${candBefore.fullName} (${candBefore.candidateCode})`,
-                  ipAddress
-                });
-              }
-            } else {
-              if (existing) {
-                await db.update(interviewScoresTable).set({
-                  score: vivaScore,
-                  submittedAt: now,
-                  lastModifiedBy: req.user.userId,
-                  lastModifiedAt: now
-                }).where(eq(interviewScoresTable.id, existing.id));
-                await db.insert(auditLogsTable).values({
-                  userId: req.user.userId,
-                  userEmail: req.user.email,
-                  action: "MARK_MODIFY",
-                  details: `Updated Specialty ${specName} Viva score for candidate ${candBefore.fullName} (${candBefore.candidateCode}) entered by Doctor ${doctorName} from ${existing.score} to ${vivaScore}`,
-                  ipAddress
-                });
-              } else {
-                await db.insert(interviewScoresTable).values({
-                  candidateId: id,
-                  doctorId: finalDocId,
-                  specialityId: targetSpecId,
-                  score: vivaScore,
-                  remarks: "Coordinator Direct Entry",
-                  enteredBy: req.user.userId,
-                  enteredAt: now,
-                  lastModifiedBy: req.user.userId,
-                  lastModifiedAt: now
-                });
-                await db.insert(auditLogsTable).values({
-                  userId: req.user.userId,
-                  userEmail: req.user.email,
-                  action: "MARK_ENTRY",
-                  details: `Directly entered Specialty ${specName} Viva score (${vivaScore}) for candidate ${candBefore.fullName} (${candBefore.candidateCode}) attributed to Doctor ${doctorName}`,
-                  ipAddress
-                });
-              }
-            }
-          }
-        }
-        await recalculateCandidateStatus(id);
-        if (panelId) {
-          const [maxRow] = (await db.execute(sql`
-        SELECT COALESCE(MAX(queue_position), -1) as max_pos FROM panel_queue WHERE panel_id = ${panelId}
-      `)).rows;
-          const nextPos = Number(maxRow["max_pos"]) + 1;
-          await db.execute(sql`
-        INSERT INTO panel_queue (panel_id, candidate_id, queue_position, status)
-        VALUES (${panelId}, ${id}, ${nextPos}, 'waiting')
-        ON CONFLICT (panel_id, candidate_id) DO NOTHING
-      `);
-        }
-        const updatedAny = updated;
-        res.json({
-          id: updated.id,
-          mcqScore: updatedAny.mcqScore != null ? Number(updatedAny.mcqScore) : null,
-          psychometricScore: updatedAny.psychometricScore != null ? Number(updatedAny.psychometricScore) : null
-        });
-      } catch (err) {
-        console.error("[candidates-marks-patch] error:", err);
-        res.status(500).json({ error: err.message || "An unexpected database error occurred while updating marks." });
-      }
-    });
-    router7.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "doctor"), async (req, res) => {
-      try {
-        const candidateId = Number(req.params["candidateId"]);
-        const { psychometricScore, specialityScores, status, unitId, reviewNotes } = req.body;
-        const [cand] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, candidateId));
-        if (!cand) {
-          return res.status(404).json({ error: "Candidate not found." });
-        }
-        const userId = req.user.userId;
-        const now = /* @__PURE__ */ new Date();
-        if (psychometricScore !== void 0) {
-          if (psychometricScore !== null && (psychometricScore < 0 || psychometricScore > 10)) {
-            return res.status(400).json({ error: "Psychometry / Mind Matter score must be between 0 and 10." });
-          }
-          await db.update(candidatesTable).set({ psychometricScore: psychometricScore !== null ? String(psychometricScore) : null }).where(eq(candidatesTable.id, candidateId));
-          if (psychometricScore !== null) {
-            const existingMm = await db.select().from(interviewScoresTable).where(
-              and(
-                eq(interviewScoresTable.candidateId, candidateId),
-                sql`speciality_id IS NULL`
-              )
-            );
-            if (existingMm.length > 0) {
-              await db.update(interviewScoresTable).set({
-                score: psychometricScore,
-                doctorId: userId,
-                submittedAt: now,
-                lastModifiedBy: userId,
-                lastModifiedAt: now
-              }).where(eq(interviewScoresTable.id, existingMm[0].id));
-            } else {
-              await db.insert(interviewScoresTable).values({
-                candidateId,
-                doctorId: userId,
-                specialityId: null,
-                score: psychometricScore,
-                remarks: "Mind Matter Station Evaluation",
-                enteredBy: userId,
-                enteredAt: now,
-                lastModifiedBy: userId,
-                lastModifiedAt: now,
-                submittedAt: now
-              });
-            }
-          }
-        }
-        if (Array.isArray(specialityScores) && specialityScores.length > 0) {
-          for (const item of specialityScores) {
-            const hasScore = typeof item.score === "number" && !isNaN(item.score);
-            const scoreVal = hasScore ? Math.max(0, Math.min(50, item.score)) : 0;
-            const existing = await db.select().from(interviewScoresTable).where(
-              and(
-                eq(interviewScoresTable.candidateId, candidateId),
-                eq(interviewScoresTable.specialityId, item.specialityId)
-              )
-            );
-            if (existing.length > 0) {
-              const oldScore = existing[0].score;
-              const finalScore = hasScore ? scoreVal : oldScore;
-              await db.update(interviewScoresTable).set({
-                score: finalScore,
-                remarks: item.remarks !== void 0 ? item.remarks : existing[0].remarks,
-                doctorId: userId,
-                submittedAt: now,
-                lastModifiedBy: userId,
-                lastModifiedAt: now
-              }).where(eq(interviewScoresTable.id, existing[0].id));
-              try {
-                await db.execute(sql`
-              INSERT INTO interview_scores_audit (candidate_id, speciality_id, doctor_id, old_score, new_score, remarks, action, changed_by_user_id)
-              VALUES (${candidateId}, ${item.specialityId}, ${userId}, ${oldScore}, ${finalScore}, ${item.remarks ?? null}, 'UPDATE', ${userId})
-            `);
-              } catch (_) {
-              }
-            } else {
-              await db.insert(interviewScoresTable).values({
-                candidateId,
-                doctorId: userId,
-                specialityId: item.specialityId,
-                score: scoreVal,
-                remarks: item.remarks ?? null,
-                submittedAt: now,
-                enteredBy: userId,
-                enteredAt: now,
-                lastModifiedBy: userId,
-                lastModifiedAt: now
-              });
-              try {
-                await db.execute(sql`
-              INSERT INTO interview_scores_audit (candidate_id, speciality_id, doctor_id, old_score, new_score, remarks, action, changed_by_user_id)
-              VALUES (${candidateId}, ${item.specialityId}, ${userId}, NULL, ${scoreVal}, ${item.remarks ?? null}, 'INSERT', ${userId})
-            `);
-              } catch (_) {
-              }
-            }
-          }
-        }
-        if (status) {
-          const allowedStatuses = ["approved", "interview_completed", "waitlisted", "allocated", "rejected"];
-          if (allowedStatuses.includes(status)) {
-            const candUpdate = { status };
-            if (unitId !== void 0) candUpdate.unitId = unitId;
-            await db.update(candidatesTable).set(candUpdate).where(eq(candidatesTable.id, candidateId));
-          }
-        } else if (unitId !== void 0) {
-          await db.update(candidatesTable).set({ unitId }).where(eq(candidatesTable.id, candidateId));
-        }
-        if (reviewNotes !== void 0) {
-          await db.update(applicationSubmissionsTable).set({ reviewNotes: String(reviewNotes) }).where(eq(applicationSubmissionsTable.email, cand.email));
-        }
-        if (!status) {
-          await recalculateCandidateStatus(candidateId);
-        }
-        const [updatedCandidate] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, candidateId));
-        res.json(await fullCandidate(updatedCandidate));
-      } catch (err) {
-        console.error("[doctor-marks-post] error:", err);
-        res.status(500).json({ error: err.message || "Failed to save marks." });
-      }
-    });
-    router7.get("/candidates/export-zip", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
-      try {
-        const candidates = await db.select().from(candidatesTable).where(eq(candidatesTable.isMock, req.isMockMode)).orderBy(desc(candidatesTable.createdAt));
-        const archive = new ZipArchive({ zlib: { level: 6 } });
-        const filename = `Candidate_Dossiers_${Date.now()}.zip`;
-        res.setHeader("Content-Type", "application/zip");
-        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-        archive.pipe(res);
-        for (const c of candidates) {
-          try {
-            const buffer = await createCandidateDossierPdfBuffer(c);
-            const safeName = `${c.candidateCode}_${c.fullName.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
-            archive.append(buffer, { name: safeName });
-          } catch (err) {
-            console.error(`Failed to add PDF for candidate ${c.id}:`, err);
-          }
-        }
-        await archive.finalize();
-      } catch (err) {
-        console.error("[candidates-export-zip] error:", err);
-        if (!res.headersSent) res.status(500).json({ error: err.message || "Failed to generate ZIP archive." });
-      }
-    });
-    router7.get("/candidates/bulk-dossier-pdf", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
-      try {
-        const candidates = await db.select().from(candidatesTable).where(eq(candidatesTable.isMock, req.isMockMode)).orderBy(desc(candidatesTable.createdAt));
-        const doc = new import_pdfkit2.default({ margin: 50, size: "A4", autoFirstPage: false });
-        const filename = `Cohort_Dossier_Compilation_${Date.now()}.pdf`;
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
-        doc.pipe(res);
-        const colors = {
-          primary: "#0f172a",
-          secondary: "#475569",
-          accent: "#f97316",
-          muted: "#94a3b8",
-          border: "#e2e8f0",
-          bgOrange: "#fff7ed"
-        };
-        const logoPath = path4.join(process.cwd(), "artifacts", "fellowship-exam", "src", "assets", "seh_sav_logo_1777703794142.jpg");
-        for (let i2 = 0; i2 < candidates.length; i2++) {
-          const c = candidates[i2];
-          const full = await fullCandidate(c);
-          const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
-          doc.addPage();
-          doc.save();
-          doc.fillColor(colors.bgOrange).opacity(0.1);
-          doc.circle(550, 50, 150).fill();
-          doc.circle(50, 750, 100).fill();
-          doc.restore();
-          try {
-            doc.image(logoPath, 50, 40, { width: 130, height: 65 });
-          } catch (e2) {
-            doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(14).text("SANKARA ACADEMY OF VISION", 50, 50);
-          }
-          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(16).text("CANDIDATE DOSSIER", 0, 45, { align: "right", width: 545 });
-          doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text("Sankara Academy of Vision \u2014 Fellowship Admissions", 0, 65, { align: "right", width: 545 });
-          doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text(`Protocol ID: ${c.candidateCode} (Page ${i2 + 1}/${candidates.length})`, 0, 78, { align: "right", width: 545 });
-          doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, 112).lineTo(550, 112).stroke();
-          const photoUrl = sub?.photoUrl;
-          if (photoUrl && photoUrl.startsWith("/objects/")) {
-            const localPath = path4.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
-            try {
-              doc.image(localPath, 460, 120, { width: 85, height: 105 });
-              doc.rect(460, 120, 85, 105).strokeColor(colors.border).lineWidth(1).stroke();
-            } catch (_) {
-            }
-          }
-          doc.y = 122;
-          doc.moveDown(2);
-          doc.rect(50, doc.y, 500, 30).fill(colors.bgOrange);
-          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(12).text("ACADEMIC IDENTITY & PROFILE", 65, doc.y - 22);
-          doc.moveDown(0.5);
-          const leftCol = 70;
-          const rightCol = 320;
-          let currY = doc.y;
-          const renderField = (label, value, x2, y) => {
-            doc.fillColor(colors.muted).font("Helvetica-Bold").fontSize(8).text(label.toUpperCase(), x2, y);
-            doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(11).text(String(value || "\u2014"), x2, y + 12);
-          };
-          renderField("Full Name", full.fullName, leftCol, currY);
-          renderField("Contact Identity", full.email, rightCol, currY);
-          currY += 40;
-          renderField("Contact Phone", full.phone || "\u2014", leftCol, currY);
-          renderField("Date of Birth", formatDOBToStandard(full.dateOfBirth), rightCol, currY);
-          currY += 40;
-          renderField("MBBS Institution", full.collegeName || "\u2014", leftCol, currY);
-          renderField("Qualifying MBBS", full.qualification || "\u2014", rightCol, currY);
-          currY += 40;
-          if (sub?.pgQualifications) {
-            doc.rect(50, currY, 500, 24).fill("#f8fafc");
-            doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(10).text("POST-GRADUATE QUALIFICATIONS", 65, currY + 6);
-            currY += 32;
-            doc.fillColor(colors.secondary).font("Helvetica").fontSize(10).text(sub.pgQualifications, 65, currY, { width: 470 });
-            currY = doc.y + 16;
-          }
-          const bottom = 750;
-          doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, bottom).lineTo(550, bottom).stroke();
-          doc.fillColor(colors.muted).font("Helvetica").fontSize(8).text("CONFIDENTIAL DOCUMENT - FOR INTERNAL USE ONLY", 50, bottom + 10);
-          doc.text("SANKARA ACADEMY OF VISION - FELLOWSHIP ADMISSIONS HUB", 50, bottom + 22);
-          doc.text(`Candidate ${i2 + 1} of ${candidates.length} \xB7 Generated on ${formatToLocalDateTime(/* @__PURE__ */ new Date())}`, 350, bottom + 10, { align: "right" });
-        }
-        doc.end();
-      } catch (err) {
-        console.error("[bulk-dossier-pdf] error:", err);
-        if (!res.headersSent) res.status(500).json({ error: err.message || "Failed to generate bulk PDF compilation." });
-      }
-    });
-    router7.get("/candidates/:candidateId", requireAuth, async (req, res, next) => {
-      const id = Number(req.params["candidateId"]);
-      if (isNaN(id)) return next();
-      const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
-      if (!c) {
-        res.status(404).json({ error: "Not found" });
-        return;
-      }
-      res.json(await fullCandidate(c));
-    });
-    router7.post(
-      "/candidates/:candidateId/documents",
-      requireAuth,
-      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "doctor"),
-      async (req, res) => {
-        try {
-          const candidateId = Number(req.params["candidateId"]);
-          const { docType, fileName, fileUrl } = req.body;
-          if (!docType || !fileUrl) {
-            return res.status(400).json({ error: "docType and fileUrl are required" });
-          }
-          const existing = await db.select().from(documentsTable).where(
-            and(eq(documentsTable.candidateId, candidateId), eq(documentsTable.docType, docType))
-          );
-          let doc;
-          if (existing.length > 0) {
-            [doc] = await db.update(documentsTable).set({
-              fileUrl,
-              fileName: fileName || `${docType}.pdf`,
-              uploadedAt: /* @__PURE__ */ new Date()
-            }).where(eq(documentsTable.id, existing[0].id)).returning();
-          } else {
-            [doc] = await db.insert(documentsTable).values({
-              candidateId,
-              docType,
-              fileName: fileName || `${docType}.pdf`,
-              fileUrl,
-              uploadedAt: /* @__PURE__ */ new Date()
-            }).returning();
-          }
-          if (docType === "LOR1" || docType === "LOR2" || docType === "PHOTO") {
-            const field = docType === "LOR1" ? "lor1Url" : docType === "LOR2" ? "lor2Url" : "photoUrl";
-            await db.update(applicationSubmissionsTable).set({ [field]: fileUrl }).where(eq(applicationSubmissionsTable.candidateId, candidateId));
-          }
-          res.status(201).json(doc);
-        } catch (err) {
-          console.error("[candidate-document-attach] error:", err);
-          res.status(500).json({ error: err.message || "Failed to attach document" });
-        }
-      }
-    );
-    router7.post("/candidates/:candidateId/assign-unit", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
-      const id = Number(req.params["candidateId"]);
-      const { unitId } = req.body;
-      const [c] = await db.update(candidatesTable).set({ unitId }).where(eq(candidatesTable.id, id)).returning();
-      if (!c) {
-        res.status(404).json({ error: "Not found" });
-        return;
-      }
-      const units = await db.select().from(unitsTable);
-      const unit = c.unitId ? units.find((u) => u.id === c.unitId) : null;
-      res.json({
-        id: c.id,
-        candidateCode: c.candidateCode,
-        fullName: c.fullName,
-        email: c.email,
-        phone: c.phone,
-        unitId: c.unitId,
-        unitName: unit?.name ?? null,
-        status: c.status,
-        mcqScore: null,
-        psychometricScore: null,
-        interviewScore: null,
-        totalScore: null,
-        rank: null,
-        createdAt: c.createdAt.toISOString()
-      });
-    });
-    router7.delete("/candidates/:id", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
-      const id = Number(req.params.id);
-      if (!id) {
-        res.status(400).json({ error: "Invalid id" });
-        return;
-      }
-      await cascadeDeleteCandidates([id]);
-      res.json({ success: true });
-    });
-    router7.post("/candidates/bulk-delete", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"), async (req, res) => {
-      const { ids } = req.body;
-      if (!Array.isArray(ids) || ids.length === 0) {
-        res.status(400).json({ error: "ids array required" });
-        return;
-      }
-      await cascadeDeleteCandidates(ids);
-      res.json({ success: true, deleted: ids.length });
-    });
-    router7.post("/candidates/bulk-status", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"), async (req, res) => {
-      const { ids, status } = req.body;
-      if (!Array.isArray(ids) || ids.length === 0 || !status) {
-        res.status(400).json({ error: "ids array and status string required" });
-        return;
-      }
-      await db.update(candidatesTable).set({ status }).where(inArray(candidatesTable.id, ids));
-      await db.update(applicationsTable).set({ status }).where(inArray(applicationsTable.candidateId, ids));
-      res.json({ success: true, updated: ids.length, status });
-    });
-    router7.post("/candidates/bulk-assign-batch", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"), async (req, res) => {
-      const { candidateIds, batchId } = req.body;
-      if (!Array.isArray(candidateIds) || candidateIds.length === 0 || !batchId) {
-        res.status(400).json({ error: "candidateIds array and batchId required" });
-        return;
-      }
-      await db.update(applicationsTable).set({ batchId }).where(inArray(applicationsTable.candidateId, candidateIds));
-      for (const cid of candidateIds) {
-        await db.insert(batchCandidatesTable).values({ batchId, candidateId: cid }).onConflictDoNothing();
-      }
-      res.json({ success: true, assigned: candidateIds.length, batchId });
-    });
-    router7.post("/candidates/:id/send-offer", requireAuth, requireRole("super_admin", "program_admin"), async (req, res) => {
-      const id = Number(req.params.id);
-      const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
-      if (!c) {
-        res.status(404).json({ error: "Candidate not found" });
-        return;
-      }
-      if (c.status !== "allocated") {
-        res.status(400).json({ error: "Candidate must be allocated before sending an offer letter" });
-        return;
-      }
-      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
-      const reviewNotes = sub?.reviewNotes || "";
-      let specialization = "Fellowship";
-      if (reviewNotes.startsWith("Allocated to ")) {
-        specialization = reviewNotes.replace("Allocated to ", "");
-      }
-      const units = await db.select().from(unitsTable);
-      const unit = c.unitId ? units.find((u) => u.id === c.unitId) : null;
-      const unitName = unit?.name || "Sankara Eye Hospital";
-      try {
-        const [settings] = await db.select().from(emailSettingsTable).limit(1);
-        let templateId = req.body.templateId;
-        if (!templateId) {
-          templateId = settings?.googleDocsTemplateId;
-          const [submission] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
-          if (submission?.formId) {
-            const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, submission.formId));
-            if (form?.programId) {
-              const [prog] = await db.select().from(programsTable).where(eq(programsTable.id, form.programId));
-              const progAny = prog;
-              if (progAny?.offerLetterTemplateId) {
-                templateId = String(progAny.offerLetterTemplateId);
-              }
-            }
-          }
-        } else {
-          const [tpl] = await db.select().from(documentTemplatesTable).where(eq(documentTemplatesTable.id, Number(templateId)));
-          if (tpl) templateId = tpl.googleDocId;
-        }
-        if (templateId && settings?.googleServiceAccountJson) {
-          const replacements = {
-            letter_date: (/* @__PURE__ */ new Date()).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" }),
-            name: c.fullName,
-            address: c.address || "",
-            interview_date: req.body.interview_date || "\u2014",
-            specialization,
-            unit: unitName,
-            duration: req.body.duration || "24 Months",
-            start_date: req.body.start_date || "\u2014",
-            reporting_date: req.body.reporting_date || "\u2014",
-            induction_dates: req.body.induction_dates || "\u2014",
-            stipend: String(req.body.stipend || "0"),
-            stipend_words: req.body.stipend_words || "Zero",
-            reporting_doctor: req.body.reporting_doctor || "the Chief Medical Officer",
-            signing_authority: req.body.signing_authority || "Director",
-            ...req.body.custom_fields || {}
-          };
-          const pdfBuffer = await processGoogleDocTemplate({
-            templateId,
-            serviceAccountJson: settings.googleServiceAccountJson,
-            replacements
-          });
-          await sendOfferLetterWithAttachment({
-            toEmail: c.email,
-            toName: c.fullName,
-            pdfBuffer,
-            fileName: `Offer_Letter_${c.candidateCode}.pdf`
-          });
-        } else {
-          await sendOfferLetterEmail({
-            toEmail: c.email,
-            toName: c.fullName,
-            candidateCode: c.candidateCode,
-            specialization,
-            unitName
-          });
-        }
-        const newNotes = reviewNotes + " [OFFER SENT]";
-        await db.update(applicationSubmissionsTable).set({ reviewNotes: newNotes }).where(eq(applicationSubmissionsTable.email, c.email));
-        res.json({ success: true, method: settings?.googleDocsTemplateId ? "google_docs" : "html" });
-      } catch (e2) {
-        console.error("[email] Failed to send offer letter", e2);
-        res.status(500).json({ error: e2.message || "Failed to send email." });
-      }
-    });
-    router7.post("/candidates/:id/generate-document", requireAuth, requireRole("super_admin", "program_admin"), async (req, res) => {
-      const id = Number(req.params.id);
-      const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
-      if (!c) {
-        res.status(404).json({ error: "Candidate not found" });
-        return;
-      }
-      const [subForNotes] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
-      const cReviewNotes = subForNotes?.reviewNotes ?? "";
-      const specialization = cReviewNotes.includes("Allocated to ") ? cReviewNotes.replace("Allocated to ", "").split(" [")[0] : "Fellowship";
-      const units = await db.select().from(unitsTable);
-      const unit = c.unitId ? units.find((u) => u.id === c.unitId) : null;
-      const unitName = unit?.name || "Sankara Eye Hospital";
-      try {
-        const [settings] = await db.select().from(emailSettingsTable).limit(1);
-        let googleDocId = req.body.templateId;
-        if (googleDocId && !isNaN(Number(googleDocId))) {
-          const [tpl] = await db.select().from(documentTemplatesTable).where(eq(documentTemplatesTable.id, Number(googleDocId)));
-          if (tpl) googleDocId = tpl.googleDocId;
-        }
-        if (!googleDocId) googleDocId = settings?.googleDocsTemplateId;
-        if (!googleDocId || !settings?.googleServiceAccountJson) {
-          return res.status(400).json({ error: "No document template configured." });
-        }
-        const replacements = {
-          letter_date: (/* @__PURE__ */ new Date()).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" }),
-          name: c.fullName,
-          address: c.address || "",
-          interview_date: req.body.interview_date || "\u2014",
-          specialization,
-          unit: unitName,
-          duration: req.body.duration || "24 Months",
-          start_date: req.body.start_date || "\u2014",
-          reporting_date: req.body.reporting_date || "\u2014",
-          induction_dates: req.body.induction_dates || "\u2014",
-          stipend: String(req.body.stipend || "0"),
-          stipend_words: req.body.stipend_words || "Zero",
-          reporting_doctor: req.body.reporting_doctor || "the Chief Medical Officer",
-          signing_authority: req.body.signing_authority || "Director",
-          ...req.body.custom_fields || {}
-        };
-        const pdfBuffer = await processGoogleDocTemplate({
-          templateId: googleDocId,
-          serviceAccountJson: settings.googleServiceAccountJson,
-          replacements
-        });
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `attachment; filename=Offer_${c.candidateCode}.pdf`);
-        res.send(pdfBuffer);
-      } catch (e2) {
-        console.error("[doc-gen] failed", e2);
-        res.status(500).json({ error: e2.message || "Failed to generate document." });
-      }
-    });
-    router7.get("/candidates/:id/call-letter-pdf", requireAuth, async (req, res) => {
-      try {
-        const id = Number(req.params.id);
-        let c = null;
-        let sub = null;
-        if (id > 0) {
-          const [found] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
-          c = found;
-          if (c) {
-            const [foundSub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
-            sub = foundSub;
-          }
-        }
-        const candidateName = req.query.candidateName || c?.fullName || "Dr. Candidate";
-        const candidateCode = req.query.candidateCode || c?.candidateCode || "SAV-2027-001";
-        let spec = req.query.specialization || "";
-        if (!spec && sub?.specialization) {
-          try {
-            const parsed = typeof sub.specialization === "string" && sub.specialization.startsWith("[") ? JSON.parse(sub.specialization) : [sub.specialization];
-            spec = Array.isArray(parsed) ? parsed.join(", ") : String(sub.specialization);
-          } catch (e2) {
-            spec = String(sub.specialization);
-          }
-        }
-        if (!spec) spec = "Vitreo Retina";
-        const pdfBuffer = await generateCallLetterPdf({
-          candidateName,
-          candidateCode,
-          specialization: spec,
-          email: req.query.email || c?.email || "candidate@sankaraeye.com",
-          phone: req.query.phone || c?.phone || "",
-          address: req.query.address || c?.address || "",
-          applicationId: sub?.id || (c?.id || 1),
-          interviewDate: req.query.interviewDate || (isRetinaSpecialty(spec) ? "07.12.2026, Monday" : "08.12.2026, Tuesday"),
-          reportingTime: req.query.reportingTime || "8:00 AM Sharp",
-          venue: req.query.venue || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bengaluru \u2013 560037"
-        });
-        const isRetina = isRetinaSpecialty(spec);
-        const filename = `Interview_Call_Letter_${isRetina ? "Retina" : "Anterior"}_${candidateCode}.pdf`;
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
-        res.send(pdfBuffer);
-      } catch (err) {
-        console.error("[call-letter-pdf] Error:", err);
-        res.status(500).json({ error: err.message || "Failed to generate call letter" });
-      }
-    });
-    router7.get("/candidates/:id/offer-letter-pdf", requireAuth, async (req, res) => {
-      try {
-        const id = Number(req.params.id);
-        let c = null;
-        let sub = null;
-        if (id > 0) {
-          const [found] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
-          c = found;
-          if (c) {
-            const [foundSub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
-            sub = foundSub;
-          }
-        }
-        const units = await db.select().from(unitsTable);
-        let unitName = req.query.unitName || "";
-        if (!unitName && req.query.unitId) {
-          const u = units.find((x2) => x2.id === Number(req.query.unitId));
-          if (u) unitName = u.name;
-        }
-        if (!unitName) {
-          const unit = c?.unitId ? units.find((u) => u.id === c.unitId) : null;
-          unitName = unit?.name || "Bangalore";
-        }
-        const cReviewNotes = sub?.reviewNotes ?? "";
-        let specialization = req.query.specialization || "";
-        if (!specialization) {
-          specialization = cReviewNotes.includes("Allocated to ") ? cReviewNotes.replace("Allocated to ", "").split(" [")[0] : sub?.specialization ? parseSpecializationString(sub.specialization)[0] : "Vitreo Retina";
-        }
-        const stipendQuery = req.query.stipend;
-        let stipendFormatted = "Rs 40,000 (Rupees Forty Thousand Only)";
-        if (stipendQuery) {
-          const num = Number(stipendQuery.replace(/[^0-9]/g, ""));
-          if (num > 0) {
-            stipendFormatted = `Rs ${num.toLocaleString("en-IN")}`;
-          } else {
-            stipendFormatted = stipendQuery;
-          }
-        }
-        const duration3 = req.query.duration ? Number(req.query.duration) : isRetinaSpecialty(specialization) ? 24 : 18;
-        const effectiveDate = req.query.effectiveDate || "11.01.2027, Monday";
-        const candidateName = req.query.candidateName || c?.fullName || "Dr. Tejaswini";
-        const candidateCode = req.query.candidateCode || c?.candidateCode || "SAV-2027-001";
-        const pdfBuffer = await generateOfferLetterPdf({
-          candidateName,
-          candidateCode,
-          specialization: specialization || "Vitreo Retina",
-          unitName,
-          cmoName: req.query.cmoName || "Dr. Kaushik Murali - Chief Medical Officer",
-          address: req.query.address || c?.address || "Sankara Eye Hospital Campus",
-          durationMonths: duration3,
-          effectiveDate,
-          stipendAmount: stipendFormatted,
-          interviewDate: req.query.interviewDate,
-          inductionDate: req.query.inductionDate || "07.01.2027 & 08.01.2027 (Thursday & Friday) at Bengaluru"
-        });
-        const filename = `Fellowship_Offer_Letter_${candidateCode}.pdf`;
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
-        res.send(pdfBuffer);
-      } catch (err) {
-        console.error("[offer-letter-pdf] Error:", err);
-        res.status(500).json({ error: err.message || "Failed to generate offer letter" });
-      }
-    });
-    router7.post("/candidates/:id/send-call-letter", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
-      try {
-        const id = Number(req.params.id);
-        const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
-        if (!c) {
-          res.status(404).json({ error: "Candidate not found" });
-          return;
-        }
-        const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
-        let spec = req.body.specialization || "";
-        if (!spec && sub?.specialization) {
-          try {
-            const parsed = typeof sub.specialization === "string" && sub.specialization.startsWith("[") ? JSON.parse(sub.specialization) : [sub.specialization];
-            spec = Array.isArray(parsed) ? parsed.join(", ") : String(sub.specialization);
-          } catch (e2) {
-            spec = String(sub.specialization);
-          }
-        }
-        if (!spec) spec = "Ophthalmology Fellowship";
-        const pdfBuffer = await generateCallLetterPdf({
-          candidateName: req.body.candidateName || c.fullName,
-          candidateCode: c.candidateCode,
-          specialization: spec,
-          email: c.email,
-          phone: c.phone,
-          address: req.body.address || c.address,
-          applicationId: sub?.id || c.id,
-          interviewDate: req.body.interviewDate,
-          reportingTime: req.body.reportingTime,
-          venue: req.body.venue
-        });
-        const isRetina = isRetinaSpecialty(spec);
-        const fileName = `Interview_Call_Letter_${isRetina ? "Retina" : "Anterior"}_${c.candidateCode}.pdf`;
-        const emailResult = await sendCallLetterWithAttachment({
-          toEmail: c.email,
-          toName: c.fullName,
-          pdfBuffer,
-          fileName,
-          interviewDate: req.body.interviewDate,
-          reportingTime: req.body.reportingTime,
-          venue: req.body.venue,
-          specialization: spec
-        });
-        res.json({
-          success: true,
-          isRetina,
-          fileName,
-          emailSent: emailResult.sent,
-          message: emailResult.sent ? "Call letter dispatched by email and ready for download." : "Call letter PDF generated successfully. (Note: Email was not sent because SMTP is not configured. Download PDF directly)."
-        });
-      } catch (err) {
-        console.error("[send-call-letter] Error:", err);
-        res.status(500).json({ error: err.message || "Failed to generate call letter" });
-      }
-    });
-    router7.post("/candidates/:id/send-offer-letter", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
-      try {
-        const id = Number(req.params.id);
-        const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
-        if (!c) {
-          res.status(404).json({ error: "Candidate not found" });
-          return;
-        }
-        const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
-        const units = await db.select().from(unitsTable);
-        let unitName = req.body.unitName || "";
-        if (!unitName && req.body.unitId) {
-          const u = units.find((x2) => x2.id === Number(req.body.unitId));
-          if (u) unitName = u.name;
-        }
-        if (!unitName) {
-          const unit = c.unitId ? units.find((u) => u.id === c.unitId) : null;
-          unitName = unit?.name || "Jaipur";
-        }
-        const cReviewNotes = sub?.reviewNotes ?? "";
-        let specialization = req.body.specialization || "";
-        if (!specialization) {
-          specialization = cReviewNotes.includes("Allocated to ") ? cReviewNotes.replace("Allocated to ", "").split(" [")[0] : sub?.specialization ? parseSpecializationString(sub.specialization)[0] : "Cataract & IOL";
-        }
-        const stipendBody = req.body.stipend;
-        let stipendFormatted = "Rs 40,000 (Rupees Forty Thousand Only)";
-        if (stipendBody) {
-          const num = typeof stipendBody === "number" ? stipendBody : Number(String(stipendBody).replace(/[^0-9]/g, ""));
-          if (num > 0) {
-            stipendFormatted = `Rs ${num.toLocaleString("en-IN")}`;
-          } else {
-            stipendFormatted = String(stipendBody);
-          }
-        }
-        const duration3 = req.body.duration ? Number(String(req.body.duration).replace(/[^0-9]/g, "")) : isRetinaSpecialty(specialization) ? 24 : 18;
-        const effectiveDate = req.body.effectiveDate || req.body.start_date || "11.01.2027, Monday";
-        const interviewDate = req.body.interviewDate || req.body.interview_date || (isRetinaSpecialty(specialization) ? "07.12.2026, Monday" : "08.12.2026, Tuesday");
-        const pdfBuffer = await generateOfferLetterPdf({
-          candidateName: req.body.candidateName || c.fullName,
-          candidateCode: c.candidateCode,
-          specialization: specialization || "Cataract & IOL",
-          unitName,
-          cmoName: req.body.cmoName,
-          address: req.body.address || c.address,
-          durationMonths: duration3,
-          effectiveDate,
-          stipendAmount: stipendFormatted,
-          interviewDate,
-          inductionDate: req.body.inductionDate || "07.01.2027 & 08.01.2027 (Thursday & Friday) at Bengaluru"
-        });
-        const fileName = `Fellowship_Offer_Letter_${c.candidateCode}.pdf`;
-        const emailResult = await sendOfferLetterWithAttachment({
-          toEmail: c.email,
-          toName: c.fullName,
-          pdfBuffer,
-          fileName,
-          specialization,
-          unitName
-        });
-        res.json({
-          success: true,
-          fileName,
-          emailSent: emailResult.sent,
-          message: emailResult.sent ? "Offer letter dispatched by email and ready for download." : "Offer letter PDF generated successfully. (Note: Email was not sent because SMTP is not configured. Download PDF directly)."
-        });
-      } catch (err) {
-        console.error("[send-offer-letter] Error:", err);
-        res.status(500).json({ error: err.message || "Failed to generate offer letter" });
-      }
-    });
-    router7.get(["/candidates/:id/summary-pdf", "/candidates/:id/application-pdf", "/candidates/:id/pdf"], requireAuth, async (req, res) => {
-      try {
-        const id = Number(req.params.id);
-        const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
-        if (!c) {
-          res.status(404).json({ error: "Candidate not found" });
-          return;
-        }
-        const full = await fullCandidate(c);
-        const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
-        const [bc] = await db.select().from(batchCandidatesTable).where(eq(batchCandidatesTable.candidateId, c.id));
-        let batch = null;
-        if (bc) {
-          [batch] = await db.select().from(batchesTable).where(eq(batchesTable.id, bc.batchId));
-        }
-        const doc = new import_pdfkit2.default({ margin: 50, size: "A4" });
-        const filename = `Dossier_${c.fullName.replace(/\s+/g, "_")}.pdf`;
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `inline; filename=${filename}`);
-        doc.pipe(res);
-        const colors = {
-          primary: "#0f172a",
-          secondary: "#475569",
-          accent: "#f97316",
-          // Orange
-          muted: "#94a3b8",
-          border: "#e2e8f0",
-          bgOrange: "#fff7ed"
-        };
-        doc.save();
-        doc.fillColor(colors.bgOrange).opacity(0.1);
-        doc.circle(550, 50, 150).fill();
-        doc.circle(50, 750, 100).fill();
-        doc.restore();
-        const logoPath = path4.join(process.cwd(), "artifacts", "fellowship-exam", "src", "assets", "seh_sav_logo_1777703794142.jpg");
-        let logoLoaded = false;
-        try {
-          doc.image(logoPath, 50, 40, { width: 130, height: 65 });
-          logoLoaded = true;
-        } catch (e2) {
-          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(14).text("SANKARA ACADEMY OF VISION", 50, 50);
-        }
-        doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(16).text("CANDIDATE DOSSIER", 0, 45, { align: "right", width: 545 });
-        doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text("Sankara Academy of Vision \u2014 Fellowship Admissions", 0, 65, { align: "right", width: 545 });
-        doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text(`Protocol ID: ${c.candidateCode}`, 0, 78, { align: "right", width: 545 });
-        doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, 112).lineTo(550, 112).stroke();
-        const photoUrl = sub?.photoUrl;
-        if (photoUrl && photoUrl.startsWith("/objects/")) {
-          const localPath = path4.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
-          try {
-            doc.image(localPath, 460, 120, { width: 85, height: 105 });
-            doc.rect(460, 120, 85, 105).strokeColor(colors.border).lineWidth(1).stroke();
-          } catch (e2) {
-          }
-        }
-        doc.y = 122;
-        doc.moveDown(2);
-        doc.rect(50, doc.y, 500, 30).fill(colors.bgOrange);
-        doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(12).text("ACADEMIC IDENTITY & PROFILE", 65, doc.y - 22);
-        doc.moveDown(0.5);
-        const leftCol = 70;
-        const rightCol = 320;
-        let currY = doc.y;
-        const renderField = (label, value, x2, y) => {
-          doc.fillColor(colors.muted).font("Helvetica-Bold").fontSize(8).text(label.toUpperCase(), x2, y);
-          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(11).text(String(value || "\u2014"), x2, y + 12);
-        };
-        renderField("Full Name", full.fullName, leftCol, currY);
-        renderField("Contact Identity", full.email, rightCol, currY);
-        currY += 40;
-        renderField("Mobile Registry", full.phone, leftCol, currY);
-        renderField("Academic Year", batch?.name || "DECEMBER 2026 CYCLE", rightCol, currY);
-        currY += 40;
-        renderField("Clinical Segment", (sub?.reviewNotes ?? "").replace("Allocated to ", "") || "Fellowship Track", leftCol, currY);
-        renderField("Reporting Unit", full.unitName || "Pending Allocation", rightCol, currY);
-        doc.moveDown(4);
-        doc.rect(50, doc.y, 500, 20).fill(colors.bgOrange);
-        doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(10).text("CLINICAL & SURGICAL PEDIGREE", 65, doc.y - 15);
-        doc.moveDown(0.5);
-        currY = doc.y;
-        renderField("Degree / Qualification", sub?.degree || c.qualification, leftCol, currY);
-        renderField("Medical College", sub?.medicalCollege || c.collegeName, rightCol, currY);
-        currY += 40;
-        renderField("Medical Council No.", sub?.medicalCouncilNumber, leftCol, currY);
-        renderField("Surgical Experience", sub?.surgicalExperience || "Standard Residency", rightCol, currY);
-        currY += 40;
-        renderField("Total Surgeries", sub?.totalSurgeries, leftCol, currY);
-        renderField("Research / Publications", sub?.publications ? "PRESENT" : "NONE LISTED", rightCol, currY);
-        doc.moveDown(5);
-        doc.rect(50, doc.y, 500, 25).fill(colors.primary);
-        doc.fillColor("white").font("Helvetica-Bold").fontSize(10).text("MERIT PERFORMANCE MATRIX", 65, doc.y - 18);
-        doc.moveDown(1);
-        const marksTableY = doc.y;
-        doc.fillColor(colors.muted).font("Helvetica-Bold").fontSize(9);
-        doc.text("EVALUATION STAGE", 70, marksTableY);
-        doc.text("MAXIMUM", 350, marksTableY);
-        doc.text("OBTAINED", 450, marksTableY);
-        doc.moveDown(0.5);
-        doc.strokeColor(colors.border).lineWidth(1).moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-        doc.moveDown(0.5);
-        const renderMarkRow = (label, max2, obtained) => {
-          const y = doc.y;
-          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(10).text(label, 70, y);
-          doc.fillColor(colors.secondary).font("Helvetica").fontSize(10).text(String(max2), 350, y);
-          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(11).text(obtained != null ? Number(obtained).toFixed(2) : "\u2014", 450, y);
-          doc.moveDown(0.8);
-          doc.strokeColor(colors.border).lineWidth(0.5).moveTo(70, doc.y).lineTo(530, doc.y).stroke();
-          doc.moveDown(0.5);
-        };
-        renderMarkRow("MCQ Assessment", batch?.mcqTotalMarks || 50, full.mcqScore);
-        renderMarkRow("Psychometry Profile", batch?.psychometricTotalMarks || 50, full.psychometricScore);
-        renderMarkRow("Clinical Interview", batch?.interviewTotalMarks || 100, full.interviewScore);
-        doc.moveDown(1);
-        doc.rect(400, doc.y, 130, 30).fill(colors.bgOrange);
-        doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(10).text("AGGREGATE", 410, doc.y - 20);
-        doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(14).text(full.totalScore != null ? full.totalScore.toFixed(2) : "\u2014", 480, doc.y - 23);
-        doc.moveDown(4);
-        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(11).text("STRATEGIC PREFERENCES", 50, doc.y);
-        doc.moveDown(0.5);
-        if (full.preferences.length > 0) {
-          full.preferences.forEach((p, i2) => {
-            doc.fillColor(colors.primary).font("Helvetica").fontSize(10).text(`${i2 + 1}. ${p.specialityName}`, { indent: 20 });
-          });
-        } else {
-          doc.fillColor(colors.muted).font("Helvetica").fontSize(10).text("Institutional Choice", { indent: 20 });
-        }
-        doc.moveDown(2);
-        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(11).text("PROFESSIONAL REFERENCES (LOR)", 50, doc.y);
-        doc.moveDown(0.5);
-        const renderLOR = (num, name2, contact, email3, status) => {
-          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(9).text(`LOR ${num}: ${name2 || "\u2014"}`, { indent: 20 });
-          doc.fillColor(colors.secondary).font("Helvetica").fontSize(8).text(`Contact: ${contact || "\u2014"} | Email: ${email3 || "\u2014"}`, { indent: 35 });
-          doc.fillColor(status ? "#10b981" : colors.muted).font("Helvetica-Bold").fontSize(8).text(`STATUS: ${status ? "PROCESSED & VERIFIED" : "PENDING"}`, { indent: 35 });
-          doc.moveDown(0.5);
-        };
-        renderLOR(1, sub?.lor1RefName || "", sub?.lor1RefContact || "", sub?.lor1RefEmail || "", !!sub?.lor1Url);
-        renderLOR(2, sub?.lor2RefName || "", sub?.lor2RefContact || "", sub?.lor2RefEmail || "", !!sub?.lor2Url);
-        const bottom = 750;
-        doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, bottom).lineTo(550, bottom).stroke();
-        doc.fillColor(colors.muted).font("Helvetica").fontSize(8).text("CONFIDENTIAL DOCUMENT - FOR INTERNAL USE ONLY", 50, bottom + 10);
-        doc.text("SANKARA ACADEMY OF VISION - FELLOWSHIP ADMISSIONS HUB", 50, bottom + 22);
-        doc.text(`Generated on ${formatToLocalDateTime(/* @__PURE__ */ new Date())}`, 350, bottom + 10, { align: "right" });
-        doc.end();
-      } catch (e2) {
-        console.error("[summary-pdf] failed", e2);
-        res.status(500).json({ error: e2.message || "Failed to generate summary PDF." });
-      }
-    });
-    router7.post("/candidates/:id/batches", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
-      const candidateId = Number(req.params.id);
-      const { schedules } = req.body;
-      try {
-        for (const s2 of schedules) {
-          let appId = s2.applicationId;
-          if (appId <= 0) {
-            const specId = Math.abs(appId);
-            const [existingApp] = await db.select().from(applicationsTable).where(
-              and(eq(applicationsTable.candidateId, candidateId), eq(applicationsTable.specialityId, specId))
-            );
-            if (existingApp) {
-              appId = existingApp.id;
-            } else {
-              const sp = (await db.select().from(specialitiesTable).where(eq(specialitiesTable.id, specId)))[0];
-              const prefix = sp?.code ? sp.code.toUpperCase() : "GEN";
-              const countResult = await db.execute(sql`
-            SELECT COUNT(*)::int as count FROM applications WHERE speciality_id = ${specId} AND hall_ticket_number IS NOT NULL
-          `);
-              const seq = Number(countResult.rows[0]?.count ?? 0) + 1;
-              const hallTicketNumber = `${prefix}-2026-${String(seq).padStart(3, "0")}`;
-              const [newApp] = await db.insert(applicationsTable).values({
-                candidateId,
-                specialityId: specId,
-                hallTicketNumber,
-                status: "approved"
-              }).returning();
-              if (newApp) appId = newApp.id;
-            }
-          }
-          if (s2.batchId) {
-            await db.update(applicationsTable).set({ batchId: s2.batchId, status: "scheduled" }).where(and(eq(applicationsTable.id, appId), eq(applicationsTable.candidateId, candidateId)));
-            const existing = await db.select().from(batchCandidatesTable).where(
-              and(
-                eq(batchCandidatesTable.batchId, s2.batchId),
-                eq(batchCandidatesTable.candidateId, candidateId)
-              )
-            );
-            if (existing.length === 0) {
-              await db.insert(batchCandidatesTable).values({
-                batchId: s2.batchId,
-                candidateId,
-                status: "assigned"
-              });
-            }
-          } else {
-            const [appRow] = await db.select().from(applicationsTable).where(eq(applicationsTable.id, appId));
-            if (appRow && appRow.batchId) {
-              await db.delete(batchCandidatesTable).where(
-                and(
-                  eq(batchCandidatesTable.batchId, appRow.batchId),
-                  eq(batchCandidatesTable.candidateId, candidateId)
-                )
-              );
-            }
-            await db.update(applicationsTable).set({ batchId: null, status: "approved" }).where(and(eq(applicationsTable.id, appId), eq(applicationsTable.candidateId, candidateId)));
-          }
-        }
-        res.json({ success: true });
-      } catch (e2) {
-        res.status(500).json({ error: e2.message || "Failed to update schedules" });
-      }
-    });
-    router7.post(
-      "/candidates/merge",
-      requireAuth,
-      requireRole("super_admin", "program_admin", "central_exam_coordinator"),
-      async (req, res) => {
-        try {
-          const { primaryId, secondaryId, deleteSecondary } = req.body;
-          const primIdNum = Number(primaryId);
-          const secIdNum = Number(secondaryId);
-          if (!primIdNum || !secIdNum || primIdNum === secIdNum) {
-            return res.status(400).json({ error: "Please select two distinct candidates to merge." });
-          }
-          const [prim] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, primIdNum));
-          const [sec] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, secIdNum));
-          if (!prim || !sec) {
-            return res.status(404).json({ error: "One or both candidates could not be found." });
-          }
-          await db.update(applicationsTable).set({ candidateId: prim.id }).where(eq(applicationsTable.candidateId, sec.id));
-          const existingPrefs = await db.select().from(candidatePreferencesTable).where(eq(candidatePreferencesTable.candidateId, prim.id));
-          const secPrefs = await db.select().from(candidatePreferencesTable).where(eq(candidatePreferencesTable.candidateId, sec.id));
-          let nextOrder = existingPrefs.length > 0 ? Math.max(...existingPrefs.map((p) => p.preferenceOrder)) + 1 : 1;
-          for (const sp of secPrefs) {
-            const alreadyHas = existingPrefs.some((ep) => ep.specialityId === sp.specialityId);
-            if (!alreadyHas) {
-              await db.insert(candidatePreferencesTable).values({
-                candidateId: prim.id,
-                specialityId: sp.specialityId,
-                preferenceOrder: nextOrder++
-              }).onConflictDoNothing().catch(() => {
-              });
-            }
-          }
-          await db.delete(candidatePreferencesTable).where(eq(candidatePreferencesTable.candidateId, sec.id)).catch(() => {
-          });
-          await db.update(interviewScoresTable).set({ candidateId: prim.id }).where(eq(interviewScoresTable.candidateId, sec.id)).catch(() => {
-          });
-          await db.update(documentsTable).set({ candidateId: prim.id }).where(eq(documentsTable.candidateId, sec.id)).catch(() => {
-          });
-          await db.update(examAttemptsTable).set({ candidateId: prim.id }).where(eq(examAttemptsTable.candidateId, sec.id)).catch(() => {
-          });
-          await db.update(doctorAssignmentsTable).set({ candidateId: prim.id }).where(eq(doctorAssignmentsTable.candidateId, sec.id)).catch(() => {
-          });
-          await db.update(candidateExamAssignmentsTable).set({ candidateId: prim.id }).where(eq(candidateExamAssignmentsTable.candidateId, sec.id)).catch(() => {
-          });
-          await db.update(batchCandidatesTable).set({ candidateId: prim.id }).where(eq(batchCandidatesTable.candidateId, sec.id)).catch(() => {
-          });
-          await db.update(applicationSubmissionsTable).set({ candidateId: prim.id }).where(eq(applicationSubmissionsTable.candidateId, sec.id)).catch(() => {
-          });
-          const highestMcq = Math.max(parseFloat(prim.mcqScore || "0"), parseFloat(sec.mcqScore || "0"));
-          const highestPsycho = Math.max(parseFloat(prim.psychometricScore || "0"), parseFloat(sec.psychometricScore || "0"));
-          await db.update(candidatesTable).set({
-            phone: prim.phone || sec.phone,
-            dateOfBirth: prim.dateOfBirth || sec.dateOfBirth,
-            gender: prim.gender || sec.gender,
-            qualification: prim.qualification || sec.qualification,
-            collegeName: prim.collegeName || sec.collegeName,
-            address: prim.address || sec.address,
-            unitId: prim.unitId || sec.unitId,
-            mcqScore: highestMcq > 0 ? String(highestMcq) : prim.mcqScore || sec.mcqScore,
-            psychometricScore: highestPsycho > 0 ? String(highestPsycho) : prim.psychometricScore || sec.psychometricScore
-          }).where(eq(candidatesTable.id, prim.id));
-          await db.delete(candidatesTable).where(eq(candidatesTable.id, sec.id));
-          const mergedCand = await fullCandidate(prim);
-          return res.json({
-            success: true,
-            message: `Successfully merged Candidate ${sec.candidateCode} (${sec.fullName}) into ${prim.candidateCode} (${prim.fullName})`,
-            primaryCandidate: mergedCand
-          });
-        } catch (err) {
-          console.error("[merge-candidates] error:", err);
-          return res.status(500).json({ error: "Failed to merge candidates", details: err.message });
-        }
-      }
-    );
-    candidates_default = router7;
-  }
-});
-
-// ../../node_modules/.pnpm/colorette@2.0.20/node_modules/colorette/index.cjs
-var require_colorette = __commonJS({
-  "../../node_modules/.pnpm/colorette@2.0.20/node_modules/colorette/index.cjs"(exports) {
-    "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
-    var tty = __require("tty");
-    function _interopNamespace(e2) {
-      if (e2 && e2.__esModule) return e2;
-      var n = /* @__PURE__ */ Object.create(null);
-      if (e2) {
-        Object.keys(e2).forEach(function(k) {
-          if (k !== "default") {
-            var d = Object.getOwnPropertyDescriptor(e2, k);
-            Object.defineProperty(n, k, d.get ? d : {
-              enumerable: true,
-              get: function() {
-                return e2[k];
-              }
-            });
-          }
-        });
-      }
-      n["default"] = e2;
-      return Object.freeze(n);
-    }
-    var tty__namespace = /* @__PURE__ */ _interopNamespace(tty);
-    var {
-      env = {},
-      argv = [],
-      platform = ""
-    } = typeof process === "undefined" ? {} : process;
-    var isDisabled = "NO_COLOR" in env || argv.includes("--no-color");
-    var isForced = "FORCE_COLOR" in env || argv.includes("--color");
-    var isWindows = platform === "win32";
-    var isDumbTerminal = env.TERM === "dumb";
-    var isCompatibleTerminal = tty__namespace && tty__namespace.isatty && tty__namespace.isatty(1) && env.TERM && !isDumbTerminal;
-    var isCI = "CI" in env && ("GITHUB_ACTIONS" in env || "GITLAB_CI" in env || "CIRCLECI" in env);
-    var isColorSupported = !isDisabled && (isForced || isWindows && !isDumbTerminal || isCompatibleTerminal || isCI);
-    var replaceClose = (index3, string4, close, replace, head = string4.substring(0, index3) + replace, tail = string4.substring(index3 + close.length), next = tail.indexOf(close)) => head + (next < 0 ? tail : replaceClose(next, tail, close, replace));
-    var clearBleed = (index3, string4, open, close, replace) => index3 < 0 ? open + string4 + close : open + replaceClose(index3, string4, close, replace) + close;
-    var filterEmpty = (open, close, replace = open, at = open.length + 1) => (string4) => string4 || !(string4 === "" || string4 === void 0) ? clearBleed(
-      ("" + string4).indexOf(close, at),
-      string4,
-      open,
-      close,
-      replace
-    ) : "";
-    var init = (open, close, replace) => filterEmpty(`\x1B[${open}m`, `\x1B[${close}m`, replace);
-    var colors = {
-      reset: init(0, 0),
-      bold: init(1, 22, "\x1B[22m\x1B[1m"),
-      dim: init(2, 22, "\x1B[22m\x1B[2m"),
-      italic: init(3, 23),
-      underline: init(4, 24),
-      inverse: init(7, 27),
-      hidden: init(8, 28),
-      strikethrough: init(9, 29),
-      black: init(30, 39),
-      red: init(31, 39),
-      green: init(32, 39),
-      yellow: init(33, 39),
-      blue: init(34, 39),
-      magenta: init(35, 39),
-      cyan: init(36, 39),
-      white: init(37, 39),
-      gray: init(90, 39),
-      bgBlack: init(40, 49),
-      bgRed: init(41, 49),
-      bgGreen: init(42, 49),
-      bgYellow: init(43, 49),
-      bgBlue: init(44, 49),
-      bgMagenta: init(45, 49),
-      bgCyan: init(46, 49),
-      bgWhite: init(47, 49),
-      blackBright: init(90, 39),
-      redBright: init(91, 39),
-      greenBright: init(92, 39),
-      yellowBright: init(93, 39),
-      blueBright: init(94, 39),
-      magentaBright: init(95, 39),
-      cyanBright: init(96, 39),
-      whiteBright: init(97, 39),
-      bgBlackBright: init(100, 49),
-      bgRedBright: init(101, 49),
-      bgGreenBright: init(102, 49),
-      bgYellowBright: init(103, 49),
-      bgBlueBright: init(104, 49),
-      bgMagentaBright: init(105, 49),
-      bgCyanBright: init(106, 49),
-      bgWhiteBright: init(107, 49)
-    };
-    var createColors = ({ useColor = isColorSupported } = {}) => useColor ? colors : Object.keys(colors).reduce(
-      (colors2, key) => ({ ...colors2, [key]: String }),
-      {}
-    );
-    var {
-      reset,
-      bold,
-      dim,
-      italic,
-      underline,
-      inverse,
-      hidden,
-      strikethrough,
-      black,
-      red,
-      green,
-      yellow,
-      blue,
-      magenta,
-      cyan,
-      white,
-      gray,
-      bgBlack,
-      bgRed,
-      bgGreen,
-      bgYellow,
-      bgBlue,
-      bgMagenta,
-      bgCyan,
-      bgWhite,
-      blackBright,
-      redBright,
-      greenBright,
-      yellowBright,
-      blueBright,
-      magentaBright,
-      cyanBright,
-      whiteBright,
-      bgBlackBright,
-      bgRedBright,
-      bgGreenBright,
-      bgYellowBright,
-      bgBlueBright,
-      bgMagentaBright,
-      bgCyanBright,
-      bgWhiteBright
-    } = createColors();
-    exports.bgBlack = bgBlack;
-    exports.bgBlackBright = bgBlackBright;
-    exports.bgBlue = bgBlue;
-    exports.bgBlueBright = bgBlueBright;
-    exports.bgCyan = bgCyan;
-    exports.bgCyanBright = bgCyanBright;
-    exports.bgGreen = bgGreen;
-    exports.bgGreenBright = bgGreenBright;
-    exports.bgMagenta = bgMagenta;
-    exports.bgMagentaBright = bgMagentaBright;
-    exports.bgRed = bgRed;
-    exports.bgRedBright = bgRedBright;
-    exports.bgWhite = bgWhite;
-    exports.bgWhiteBright = bgWhiteBright;
-    exports.bgYellow = bgYellow;
-    exports.bgYellowBright = bgYellowBright;
-    exports.black = black;
-    exports.blackBright = blackBright;
-    exports.blue = blue;
-    exports.blueBright = blueBright;
-    exports.bold = bold;
-    exports.createColors = createColors;
-    exports.cyan = cyan;
-    exports.cyanBright = cyanBright;
-    exports.dim = dim;
-    exports.gray = gray;
-    exports.green = green;
-    exports.greenBright = greenBright;
-    exports.hidden = hidden;
-    exports.inverse = inverse;
-    exports.isColorSupported = isColorSupported;
-    exports.italic = italic;
-    exports.magenta = magenta;
-    exports.magentaBright = magentaBright;
-    exports.red = red;
-    exports.redBright = redBright;
-    exports.reset = reset;
-    exports.strikethrough = strikethrough;
-    exports.underline = underline;
-    exports.white = white;
-    exports.whiteBright = whiteBright;
-    exports.yellow = yellow;
-    exports.yellowBright = yellowBright;
-  }
-});
-
-// ../../node_modules/.pnpm/end-of-stream@1.4.5/node_modules/end-of-stream/index.js
-var require_end_of_stream2 = __commonJS({
-  "../../node_modules/.pnpm/end-of-stream@1.4.5/node_modules/end-of-stream/index.js"(exports, module) {
-    var once = require_once();
-    var noop2 = function() {
-    };
-    var qnt = global.Bare ? queueMicrotask : process.nextTick.bind(process);
-    var isRequest2 = function(stream2) {
-      return stream2.setHeader && typeof stream2.abort === "function";
-    };
-    var isChildProcess = function(stream2) {
-      return stream2.stdio && Array.isArray(stream2.stdio) && stream2.stdio.length === 3;
-    };
-    var eos = function(stream2, opts, callback) {
-      if (typeof opts === "function") return eos(stream2, null, opts);
-      if (!opts) opts = {};
-      callback = once(callback || noop2);
-      var ws = stream2._writableState;
-      var rs = stream2._readableState;
-      var readable = opts.readable || opts.readable !== false && stream2.readable;
-      var writable = opts.writable || opts.writable !== false && stream2.writable;
-      var cancelled = false;
-      var onlegacyfinish = function() {
-        if (!stream2.writable) onfinish();
-      };
-      var onfinish = function() {
-        writable = false;
-        if (!readable) callback.call(stream2);
-      };
-      var onend = function() {
-        readable = false;
-        if (!writable) callback.call(stream2);
-      };
-      var onexit = function(exitCode) {
-        callback.call(stream2, exitCode ? new Error("exited with error code: " + exitCode) : null);
-      };
-      var onerror = function(err) {
-        callback.call(stream2, err);
-      };
-      var onclose = function() {
-        qnt(onclosenexttick);
-      };
-      var onclosenexttick = function() {
-        if (cancelled) return;
-        if (readable && !(rs && (rs.ended && !rs.destroyed))) return callback.call(stream2, new Error("premature close"));
-        if (writable && !(ws && (ws.ended && !ws.destroyed))) return callback.call(stream2, new Error("premature close"));
-      };
-      var onrequest = function() {
-        stream2.req.on("finish", onfinish);
-      };
-      if (isRequest2(stream2)) {
-        stream2.on("complete", onfinish);
-        stream2.on("abort", onclose);
-        if (stream2.req) onrequest();
-        else stream2.on("request", onrequest);
-      } else if (writable && !ws) {
-        stream2.on("end", onlegacyfinish);
-        stream2.on("close", onlegacyfinish);
-      }
-      if (isChildProcess(stream2)) stream2.on("exit", onexit);
-      stream2.on("end", onend);
-      stream2.on("finish", onfinish);
-      if (opts.error !== false) stream2.on("error", onerror);
-      stream2.on("close", onclose);
-      return function() {
-        cancelled = true;
-        stream2.removeListener("complete", onfinish);
-        stream2.removeListener("abort", onclose);
-        stream2.removeListener("request", onrequest);
-        if (stream2.req) stream2.req.removeListener("finish", onfinish);
-        stream2.removeListener("end", onlegacyfinish);
-        stream2.removeListener("close", onlegacyfinish);
-        stream2.removeListener("finish", onfinish);
-        stream2.removeListener("exit", onexit);
-        stream2.removeListener("end", onend);
-        stream2.removeListener("error", onerror);
-        stream2.removeListener("close", onclose);
-      };
-    };
-    module.exports = eos;
-  }
-});
-
-// ../../node_modules/.pnpm/pump@3.0.4/node_modules/pump/index.js
-var require_pump = __commonJS({
-  "../../node_modules/.pnpm/pump@3.0.4/node_modules/pump/index.js"(exports, module) {
-    var once = require_once();
-    var eos = require_end_of_stream2();
-    var fs16;
-    try {
-      fs16 = __require("fs");
-    } catch (e2) {
-    }
-    var noop2 = function() {
-    };
-    var ancient = typeof process === "undefined" ? false : /^v?\.0/.test(process.version);
-    var isFn = function(fn) {
-      return typeof fn === "function";
-    };
-    var isFS = function(stream2) {
-      if (!ancient) return false;
-      if (!fs16) return false;
-      return (stream2 instanceof (fs16.ReadStream || noop2) || stream2 instanceof (fs16.WriteStream || noop2)) && isFn(stream2.close);
-    };
-    var isRequest2 = function(stream2) {
-      return stream2.setHeader && isFn(stream2.abort);
-    };
-    var destroyer = function(stream2, reading, writing, callback) {
-      callback = once(callback);
-      var closed = false;
-      stream2.on("close", function() {
-        closed = true;
-      });
-      eos(stream2, { readable: reading, writable: writing }, function(err) {
-        if (err) return callback(err);
-        closed = true;
-        callback();
-      });
-      var destroyed = false;
-      return function(err) {
-        if (closed) return;
-        if (destroyed) return;
-        destroyed = true;
-        if (isFS(stream2)) return stream2.close(noop2);
-        if (isRequest2(stream2)) return stream2.abort();
-        if (isFn(stream2.destroy)) return stream2.destroy();
-        callback(err || new Error("stream was destroyed"));
-      };
-    };
-    var call = function(fn) {
-      fn();
-    };
-    var pipe2 = function(from, to) {
-      return from.pipe(to);
-    };
-    var pump2 = function() {
-      var streams = Array.prototype.slice.call(arguments);
-      var callback = isFn(streams[streams.length - 1] || noop2) && streams.pop() || noop2;
-      if (Array.isArray(streams[0])) streams = streams[0];
-      if (streams.length < 2) throw new Error("pump requires two streams per minimum");
-      var error40;
-      var destroys = streams.map(function(stream2, i2) {
-        var reading = i2 < streams.length - 1;
-        var writing = i2 > 0;
-        return destroyer(stream2, reading, writing, function(err) {
-          if (!error40) error40 = err;
-          if (err) destroys.forEach(call);
-          if (reading) return;
-          destroys.forEach(call);
-          callback(error40);
-        });
-      });
-      return streams.reduce(pipe2);
-    };
-    module.exports = pump2;
-  }
-});
-
-// ../../node_modules/.pnpm/pino-abstract-transport@3.0.0/node_modules/pino-abstract-transport/index.js
-var require_pino_abstract_transport = __commonJS({
-  "../../node_modules/.pnpm/pino-abstract-transport@3.0.0/node_modules/pino-abstract-transport/index.js"(exports, module) {
-    "use strict";
-    var metadata = /* @__PURE__ */ Symbol.for("pino.metadata");
-    var split = require_split2();
-    var { Duplex } = __require("stream");
-    var { parentPort, workerData } = __require("worker_threads");
-    function createDeferred() {
-      let resolve4;
-      let reject;
-      const promise2 = new Promise((_resolve, _reject) => {
-        resolve4 = _resolve;
-        reject = _reject;
-      });
-      promise2.resolve = resolve4;
-      promise2.reject = reject;
-      return promise2;
-    }
-    module.exports = function build(fn, opts = {}) {
-      const waitForConfig = opts.expectPinoConfig === true && workerData?.workerData?.pinoWillSendConfig === true;
-      const parseLines = opts.parse === "lines";
-      const parseLine = typeof opts.parseLine === "function" ? opts.parseLine : JSON.parse;
-      const close = opts.close || defaultClose;
-      const stream2 = split(function(line2) {
-        let value;
-        try {
-          value = parseLine(line2);
-        } catch (error40) {
-          this.emit("unknown", line2, error40);
-          return;
-        }
-        if (value === null) {
-          this.emit("unknown", line2, "Null value ignored");
-          return;
-        }
-        if (typeof value !== "object") {
-          value = {
-            data: value,
-            time: Date.now()
-          };
-        }
-        if (stream2[metadata]) {
-          stream2.lastTime = value.time;
-          stream2.lastLevel = value.level;
-          stream2.lastObj = value;
-        }
-        if (parseLines) {
-          return line2;
-        }
-        return value;
-      }, { autoDestroy: true });
-      stream2._destroy = function(err, cb) {
-        const promise2 = close(err, cb);
-        if (promise2 && typeof promise2.then === "function") {
-          promise2.then(cb, cb);
-        }
-      };
-      if (opts.expectPinoConfig === true && workerData?.workerData?.pinoWillSendConfig !== true) {
-        setImmediate(() => {
-          stream2.emit("error", new Error("This transport is not compatible with the current version of pino. Please upgrade pino to the latest version."));
-        });
-      }
-      if (opts.metadata !== false) {
-        stream2[metadata] = true;
-        stream2.lastTime = 0;
-        stream2.lastLevel = 0;
-        stream2.lastObj = null;
-      }
-      if (waitForConfig) {
-        let pinoConfig = {};
-        const configReceived = createDeferred();
-        parentPort.on("message", function handleMessage(message) {
-          if (message.code === "PINO_CONFIG") {
-            pinoConfig = message.config;
-            configReceived.resolve();
-            parentPort.off("message", handleMessage);
-          }
-        });
-        Object.defineProperties(stream2, {
-          levels: {
-            get() {
-              return pinoConfig.levels;
-            }
-          },
-          messageKey: {
-            get() {
-              return pinoConfig.messageKey;
-            }
-          },
-          errorKey: {
-            get() {
-              return pinoConfig.errorKey;
-            }
-          }
-        });
-        return configReceived.then(finish);
-      }
-      return finish();
-      function finish() {
-        let res = fn(stream2);
-        if (res && typeof res.catch === "function") {
-          res.catch((err) => {
-            stream2.destroy(err);
-          });
-          res = null;
-        } else if (opts.enablePipelining && res) {
-          return Duplex.from({ writable: stream2, readable: res });
-        }
-        return stream2;
-      }
-    };
-    function defaultClose(err, cb) {
-      process.nextTick(cb, err);
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/constants.js
-var require_constants4 = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/constants.js"(exports, module) {
-    "use strict";
-    module.exports = {
-      DATE_FORMAT: "yyyy-mm-dd HH:MM:ss.l o",
-      DATE_FORMAT_SIMPLE: "HH:MM:ss.l",
-      /**
-       * @type {K_ERROR_LIKE_KEYS}
-       */
-      ERROR_LIKE_KEYS: ["err", "error"],
-      MESSAGE_KEY: "msg",
-      LEVEL_KEY: "level",
-      LEVEL_LABEL: "levelLabel",
-      TIMESTAMP_KEY: "time",
-      LEVELS: {
-        default: "USERLVL",
-        60: "FATAL",
-        50: "ERROR",
-        40: "WARN",
-        30: "INFO",
-        20: "DEBUG",
-        10: "TRACE"
+        ]
       },
-      LEVEL_NAMES: {
-        fatal: 60,
-        error: 50,
-        warn: 40,
-        info: 30,
-        debug: 20,
-        trace: 10
+      {
+        id: "subspecialty",
+        title: "Subspecialty Selection",
+        description: "Select the option(s) for which you are applying. You can select more than one.",
+        enabled: true,
+        fields: [
+          { id: "specialization", type: "checkbox_group", label: "Subspecialties", required: true, options: ["Cornea", "Glaucoma", "IOL", "Oculoplasty", "Pediatric Ophthalmology", "Phaco Refractive", "Medical Retina", "Vitreo Retina"], isStandard: true, mapping: "specialization" }
+        ]
       },
-      // Object keys that probably came from a logger like Pino or Bunyan.
-      LOGGER_KEYS: [
-        "pid",
-        "hostname",
-        "name",
-        "level",
-        "time",
-        "timestamp",
-        "caller"
-      ]
-    };
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/get-level-label-data.js
-var require_get_level_label_data = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/get-level-label-data.js"(exports, module) {
-    "use strict";
-    module.exports = getLevelLabelData;
-    var { LEVELS, LEVEL_NAMES } = require_constants4();
-    function getLevelLabelData(useOnlyCustomProps, customLevels, customLevelNames) {
-      const levels = useOnlyCustomProps ? customLevels || LEVELS : Object.assign({}, LEVELS, customLevels);
-      const levelNames = useOnlyCustomProps ? customLevelNames || LEVEL_NAMES : Object.assign({}, LEVEL_NAMES, customLevelNames);
-      return function(level) {
-        let levelNum = "default";
-        if (Number.isInteger(+level)) {
-          levelNum = Object.prototype.hasOwnProperty.call(levels, level) ? level : levelNum;
-        } else {
-          levelNum = Object.prototype.hasOwnProperty.call(levelNames, level.toLowerCase()) ? levelNames[level.toLowerCase()] : levelNum;
-        }
-        return [levels[levelNum], levelNum];
-      };
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/colors.js
-var require_colors = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/colors.js"(exports, module) {
-    "use strict";
-    var nocolor = (input) => input;
-    var plain = {
-      default: nocolor,
-      60: nocolor,
-      50: nocolor,
-      40: nocolor,
-      30: nocolor,
-      20: nocolor,
-      10: nocolor,
-      message: nocolor,
-      greyMessage: nocolor,
-      property: nocolor
-    };
-    var { createColors } = require_colorette();
-    var getLevelLabelData = require_get_level_label_data();
-    var availableColors = createColors({ useColor: true });
-    var { white, bgRed, red, yellow, green, blue, gray, cyan, magenta } = availableColors;
-    var colored = {
-      default: white,
-      60: bgRed,
-      50: red,
-      40: yellow,
-      30: green,
-      20: blue,
-      10: gray,
-      message: cyan,
-      greyMessage: gray,
-      property: magenta
-    };
-    function resolveCustomColoredColorizer(customColors) {
-      return customColors.reduce(
-        function(agg, [level, color]) {
-          agg[level] = typeof availableColors[color] === "function" ? availableColors[color] : white;
-          return agg;
-        },
-        { default: white, message: cyan, greyMessage: gray, property: magenta }
-      );
-    }
-    function colorizeLevel(useOnlyCustomProps) {
-      return function(level, colorizer, { customLevels, customLevelNames } = {}) {
-        const [levelStr, levelNum] = getLevelLabelData(useOnlyCustomProps, customLevels, customLevelNames)(level);
-        return Object.prototype.hasOwnProperty.call(colorizer, levelNum) ? colorizer[levelNum](levelStr) : colorizer.default(levelStr);
-      };
-    }
-    function plainColorizer(useOnlyCustomProps) {
-      const newPlainColorizer = colorizeLevel(useOnlyCustomProps);
-      const customColoredColorizer = function(level, opts) {
-        return newPlainColorizer(level, plain, opts);
-      };
-      customColoredColorizer.message = plain.message;
-      customColoredColorizer.greyMessage = plain.greyMessage;
-      customColoredColorizer.property = plain.property;
-      customColoredColorizer.colors = createColors({ useColor: false });
-      return customColoredColorizer;
-    }
-    function coloredColorizer(useOnlyCustomProps) {
-      const newColoredColorizer = colorizeLevel(useOnlyCustomProps);
-      const customColoredColorizer = function(level, opts) {
-        return newColoredColorizer(level, colored, opts);
-      };
-      customColoredColorizer.message = colored.message;
-      customColoredColorizer.property = colored.property;
-      customColoredColorizer.greyMessage = colored.greyMessage;
-      customColoredColorizer.colors = availableColors;
-      return customColoredColorizer;
-    }
-    function customColoredColorizerFactory(customColors, useOnlyCustomProps) {
-      const onlyCustomColored = resolveCustomColoredColorizer(customColors);
-      const customColored = useOnlyCustomProps ? onlyCustomColored : Object.assign({}, colored, onlyCustomColored);
-      const colorizeLevelCustom = colorizeLevel(useOnlyCustomProps);
-      const customColoredColorizer = function(level, opts) {
-        return colorizeLevelCustom(level, customColored, opts);
-      };
-      customColoredColorizer.colors = availableColors;
-      customColoredColorizer.message = customColoredColorizer.message || customColored.message;
-      customColoredColorizer.property = customColoredColorizer.property || customColored.property;
-      customColoredColorizer.greyMessage = customColoredColorizer.greyMessage || customColored.greyMessage;
-      return customColoredColorizer;
-    }
-    module.exports = function getColorizer(useColors = false, customColors, useOnlyCustomProps) {
-      if (useColors && customColors !== void 0) {
-        return customColoredColorizerFactory(customColors, useOnlyCustomProps);
-      } else if (useColors) {
-        return coloredColorizer(useOnlyCustomProps);
-      }
-      return plainColorizer(useOnlyCustomProps);
-    };
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/noop.js
-var require_noop = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/noop.js"(exports, module) {
-    "use strict";
-    module.exports = function noop2() {
-    };
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/build-safe-sonic-boom.js
-var require_build_safe_sonic_boom = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/build-safe-sonic-boom.js"(exports, module) {
-    "use strict";
-    module.exports = buildSafeSonicBoom;
-    var { isMainThread } = __require("node:worker_threads");
-    var SonicBoom = require_sonic_boom();
-    var noop2 = require_noop();
-    function buildSafeSonicBoom(opts) {
-      const stream2 = new SonicBoom(opts);
-      stream2.on("error", filterBrokenPipe);
-      if (!opts.sync && isMainThread) {
-        setupOnExit(stream2);
-      }
-      return stream2;
-      function filterBrokenPipe(err) {
-        if (err.code === "EPIPE") {
-          stream2.write = noop2;
-          stream2.end = noop2;
-          stream2.flushSync = noop2;
-          stream2.destroy = noop2;
-          return;
-        }
-        stream2.removeListener("error", filterBrokenPipe);
-      }
-    }
-    function setupOnExit(stream2) {
-      if (global.WeakRef && global.WeakMap && global.FinalizationRegistry) {
-        const onExit = require_on_exit_leak_free();
-        onExit.register(stream2, autoEnd);
-        stream2.on("close", function() {
-          onExit.unregister(stream2);
-        });
-      }
-    }
-    function autoEnd(stream2, eventName) {
-      if (stream2.destroyed) {
-        return;
-      }
-      if (eventName === "beforeExit") {
-        stream2.flush();
-        stream2.on("drain", function() {
-          stream2.end();
-        });
-      } else {
-        stream2.flushSync();
-      }
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/is-valid-date.js
-var require_is_valid_date = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/is-valid-date.js"(exports, module) {
-    "use strict";
-    module.exports = isValidDate;
-    function isValidDate(date6) {
-      return date6 instanceof Date && !Number.isNaN(date6.getTime());
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/create-date.js
-var require_create_date = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/create-date.js"(exports, module) {
-    "use strict";
-    module.exports = createDate;
-    var isValidDate = require_is_valid_date();
-    function createDate(epoch) {
-      let date6 = new Date(epoch);
-      if (isValidDate(date6)) {
-        return date6;
-      }
-      date6 = /* @__PURE__ */ new Date(+epoch);
-      return date6;
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/split-property-key.js
-var require_split_property_key = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/split-property-key.js"(exports, module) {
-    "use strict";
-    module.exports = splitPropertyKey;
-    function splitPropertyKey(key) {
-      const result = [];
-      let backslash = false;
-      let segment = "";
-      for (let i2 = 0; i2 < key.length; i2++) {
-        const c = key.charAt(i2);
-        if (c === "\\") {
-          backslash = true;
-          continue;
-        }
-        if (backslash) {
-          backslash = false;
-          segment += c;
-          continue;
-        }
-        if (c === ".") {
-          result.push(segment);
-          segment = "";
-          continue;
-        }
-        segment += c;
-      }
-      if (segment.length) {
-        result.push(segment);
-      }
-      return result;
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/get-property-value.js
-var require_get_property_value = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/get-property-value.js"(exports, module) {
-    "use strict";
-    module.exports = getPropertyValue;
-    var splitPropertyKey = require_split_property_key();
-    function getPropertyValue(obj, property) {
-      const props = Array.isArray(property) ? property : splitPropertyKey(property);
-      for (const prop of props) {
-        if (!Object.prototype.hasOwnProperty.call(obj, prop)) {
-          return;
-        }
-        obj = obj[prop];
-      }
-      return obj;
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/delete-log-property.js
-var require_delete_log_property = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/delete-log-property.js"(exports, module) {
-    "use strict";
-    module.exports = deleteLogProperty;
-    var getPropertyValue = require_get_property_value();
-    var splitPropertyKey = require_split_property_key();
-    function deleteLogProperty(log, property) {
-      const props = splitPropertyKey(property);
-      const propToDelete = props.pop();
-      log = getPropertyValue(log, props);
-      if (log !== null && typeof log === "object" && Object.prototype.hasOwnProperty.call(log, propToDelete)) {
-        delete log[propToDelete];
-      }
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/fast-copy@4.0.2/node_modules/fast-copy/dist/cjs/index.cjs
-var require_cjs = __commonJS({
-  "../../node_modules/.pnpm/fast-copy@4.0.2/node_modules/fast-copy/dist/cjs/index.cjs"(exports) {
-    "use strict";
-    var toStringFunction = Function.prototype.toString;
-    var toStringObject = Object.prototype.toString;
-    function getCleanClone(prototype) {
-      if (!prototype) {
-        return /* @__PURE__ */ Object.create(null);
-      }
-      const Constructor = prototype.constructor;
-      if (Constructor === Object) {
-        return prototype === Object.prototype ? {} : Object.create(prototype);
-      }
-      if (Constructor && ~toStringFunction.call(Constructor).indexOf("[native code]")) {
-        try {
-          return new Constructor();
-        } catch (_a2) {
-        }
-      }
-      return Object.create(prototype);
-    }
-    function getTag(value) {
-      const stringTag = value[Symbol.toStringTag];
-      if (stringTag) {
-        return stringTag;
-      }
-      const type = toStringObject.call(value);
-      return type.substring(8, type.length - 1);
-    }
-    var { hasOwnProperty, propertyIsEnumerable } = Object.prototype;
-    function copyOwnDescriptor(original, clone3, property, state) {
-      const ownDescriptor = Object.getOwnPropertyDescriptor(original, property) || {
-        configurable: true,
-        enumerable: true,
-        value: original[property],
-        writable: true
-      };
-      const descriptor = ownDescriptor.get || ownDescriptor.set ? ownDescriptor : {
-        configurable: ownDescriptor.configurable,
-        enumerable: ownDescriptor.enumerable,
-        value: state.copier(ownDescriptor.value, state),
-        writable: ownDescriptor.writable
-      };
-      try {
-        Object.defineProperty(clone3, property, descriptor);
-      } catch (_a2) {
-        clone3[property] = descriptor.get ? descriptor.get() : descriptor.value;
-      }
-    }
-    function copyOwnPropertiesStrict(value, clone3, state) {
-      const names = Object.getOwnPropertyNames(value);
-      for (let index3 = 0; index3 < names.length; ++index3) {
-        copyOwnDescriptor(value, clone3, names[index3], state);
-      }
-      const symbols = Object.getOwnPropertySymbols(value);
-      for (let index3 = 0; index3 < symbols.length; ++index3) {
-        copyOwnDescriptor(value, clone3, symbols[index3], state);
-      }
-      return clone3;
-    }
-    function copyArrayLoose(array2, state) {
-      const clone3 = new state.Constructor();
-      state.cache.set(array2, clone3);
-      for (let index3 = 0; index3 < array2.length; ++index3) {
-        clone3[index3] = state.copier(array2[index3], state);
-      }
-      return clone3;
-    }
-    function copyArrayStrict(array2, state) {
-      const clone3 = new state.Constructor();
-      state.cache.set(array2, clone3);
-      return copyOwnPropertiesStrict(array2, clone3, state);
-    }
-    function copyArrayBuffer(arrayBuffer, _state) {
-      return arrayBuffer.slice(0);
-    }
-    function copyBlob(blob, _state) {
-      return blob.slice(0, blob.size, blob.type);
-    }
-    function copyDataView(dataView, state) {
-      return new state.Constructor(copyArrayBuffer(dataView.buffer));
-    }
-    function copyDate(date6, state) {
-      return new state.Constructor(date6.getTime());
-    }
-    function copyMapLoose(map2, state) {
-      const clone3 = new state.Constructor();
-      state.cache.set(map2, clone3);
-      map2.forEach((value, key) => {
-        clone3.set(key, state.copier(value, state));
-      });
-      return clone3;
-    }
-    function copyMapStrict(map2, state) {
-      return copyOwnPropertiesStrict(map2, copyMapLoose(map2, state), state);
-    }
-    function copyObjectLoose(object2, state) {
-      const clone3 = getCleanClone(state.prototype);
-      state.cache.set(object2, clone3);
-      for (const key in object2) {
-        if (hasOwnProperty.call(object2, key)) {
-          clone3[key] = state.copier(object2[key], state);
-        }
-      }
-      const symbols = Object.getOwnPropertySymbols(object2);
-      for (let index3 = 0; index3 < symbols.length; ++index3) {
-        const symbol2 = symbols[index3];
-        if (propertyIsEnumerable.call(object2, symbol2)) {
-          clone3[symbol2] = state.copier(object2[symbol2], state);
-        }
-      }
-      return clone3;
-    }
-    function copyObjectStrict(object2, state) {
-      const clone3 = getCleanClone(state.prototype);
-      state.cache.set(object2, clone3);
-      return copyOwnPropertiesStrict(object2, clone3, state);
-    }
-    function copyPrimitiveWrapper(primitiveObject, state) {
-      return new state.Constructor(primitiveObject.valueOf());
-    }
-    function copyRegExp(regExp, state) {
-      const clone3 = new state.Constructor(regExp.source, regExp.flags);
-      clone3.lastIndex = regExp.lastIndex;
-      return clone3;
-    }
-    function copySelf(value, _state) {
-      return value;
-    }
-    function copySetLoose(set2, state) {
-      const clone3 = new state.Constructor();
-      state.cache.set(set2, clone3);
-      set2.forEach((value) => {
-        clone3.add(state.copier(value, state));
-      });
-      return clone3;
-    }
-    function copySetStrict(set2, state) {
-      return copyOwnPropertiesStrict(set2, copySetLoose(set2, state), state);
-    }
-    function createDefaultCache() {
-      return /* @__PURE__ */ new WeakMap();
-    }
-    function getOptions({ createCache: createCacheOverride, methods: methodsOverride, strict: strict2 }) {
-      const defaultMethods = {
-        array: strict2 ? copyArrayStrict : copyArrayLoose,
-        arrayBuffer: copyArrayBuffer,
-        asyncGenerator: copySelf,
-        blob: copyBlob,
-        dataView: copyDataView,
-        date: copyDate,
-        error: copySelf,
-        generator: copySelf,
-        map: strict2 ? copyMapStrict : copyMapLoose,
-        object: strict2 ? copyObjectStrict : copyObjectLoose,
-        regExp: copyRegExp,
-        set: strict2 ? copySetStrict : copySetLoose
-      };
-      const methods = methodsOverride ? Object.assign(defaultMethods, methodsOverride) : defaultMethods;
-      const copiers = getTagSpecificCopiers(methods);
-      const createCache = createCacheOverride || createDefaultCache;
-      if (!copiers.Object || !copiers.Array) {
-        throw new Error("An object and array copier must be provided.");
-      }
-      return { createCache, copiers, methods, strict: Boolean(strict2) };
-    }
-    function getTagSpecificCopiers(methods) {
-      return {
-        Arguments: methods.object,
-        Array: methods.array,
-        ArrayBuffer: methods.arrayBuffer,
-        AsyncGenerator: methods.asyncGenerator,
-        Blob: methods.blob,
-        Boolean: copyPrimitiveWrapper,
-        DataView: methods.dataView,
-        Date: methods.date,
-        Error: methods.error,
-        Float32Array: methods.arrayBuffer,
-        Float64Array: methods.arrayBuffer,
-        Generator: methods.generator,
-        Int8Array: methods.arrayBuffer,
-        Int16Array: methods.arrayBuffer,
-        Int32Array: methods.arrayBuffer,
-        Map: methods.map,
-        Number: copyPrimitiveWrapper,
-        Object: methods.object,
-        Promise: copySelf,
-        RegExp: methods.regExp,
-        Set: methods.set,
-        String: copyPrimitiveWrapper,
-        WeakMap: copySelf,
-        WeakSet: copySelf,
-        Uint8Array: methods.arrayBuffer,
-        Uint8ClampedArray: methods.arrayBuffer,
-        Uint16Array: methods.arrayBuffer,
-        Uint32Array: methods.arrayBuffer,
-        Uint64Array: methods.arrayBuffer
-      };
-    }
-    function createCopier(options = {}) {
-      const { createCache, copiers } = getOptions(options);
-      const { Array: copyArray, Object: copyObject } = copiers;
-      function copier(value, state) {
-        state.prototype = state.Constructor = void 0;
-        if (!value || typeof value !== "object") {
-          return value;
-        }
-        if (state.cache.has(value)) {
-          return state.cache.get(value);
-        }
-        state.prototype = Object.getPrototypeOf(value);
-        state.Constructor = state.prototype && state.prototype.constructor;
-        if (!state.Constructor || state.Constructor === Object) {
-          return copyObject(value, state);
-        }
-        if (Array.isArray(value)) {
-          return copyArray(value, state);
-        }
-        const tagSpecificCopier = copiers[getTag(value)];
-        if (tagSpecificCopier) {
-          return tagSpecificCopier(value, state);
-        }
-        return typeof value.then === "function" ? value : copyObject(value, state);
-      }
-      return function copy2(value) {
-        return copier(value, {
-          Constructor: void 0,
-          cache: createCache(),
-          copier,
-          prototype: void 0
-        });
-      };
-    }
-    var copyStrict = createCopier({ strict: true });
-    var copy = createCopier();
-    exports.copy = copy;
-    exports.copyStrict = copyStrict;
-    exports.createCopier = createCopier;
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/filter-log.js
-var require_filter_log = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/filter-log.js"(exports, module) {
-    "use strict";
-    module.exports = filterLog;
-    var { createCopier } = require_cjs();
-    var fastCopy = createCopier({});
-    var deleteLogProperty = require_delete_log_property();
-    function filterLog({ log, context }) {
-      const { ignoreKeys, includeKeys } = context;
-      const logCopy = fastCopy(log);
-      if (includeKeys) {
-        const logIncluded = {};
-        includeKeys.forEach((key) => {
-          logIncluded[key] = logCopy[key];
-        });
-        return logIncluded;
-      }
-      ignoreKeys.forEach((ignoreKey) => {
-        deleteLogProperty(logCopy, ignoreKey);
-      });
-      return logCopy;
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/dateformat@4.6.3/node_modules/dateformat/lib/dateformat.js
-var require_dateformat = __commonJS({
-  "../../node_modules/.pnpm/dateformat@4.6.3/node_modules/dateformat/lib/dateformat.js"(exports, module) {
-    "use strict";
-    function _typeof(obj) {
-      "@babel/helpers - typeof";
-      if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
-        _typeof = function _typeof2(obj2) {
-          return typeof obj2;
-        };
-      } else {
-        _typeof = function _typeof2(obj2) {
-          return obj2 && typeof Symbol === "function" && obj2.constructor === Symbol && obj2 !== Symbol.prototype ? "symbol" : typeof obj2;
-        };
-      }
-      return _typeof(obj);
-    }
-    (function(global2) {
-      var _arguments = arguments;
-      var dateFormat = /* @__PURE__ */ (function() {
-        var token = /d{1,4}|D{3,4}|m{1,4}|yy(?:yy)?|([HhMsTt])\1?|W{1,2}|[LlopSZN]|"[^"]*"|'[^']*'/g;
-        var timezone = /\b(?:[PMCEA][SDP]T|(?:Pacific|Mountain|Central|Eastern|Atlantic) (?:Standard|Daylight|Prevailing) Time|(?:GMT|UTC)(?:[-+]\d{4})?)\b/g;
-        var timezoneClip = /[^-+\dA-Z]/g;
-        return function(date6, mask, utc, gmt) {
-          if (_arguments.length === 1 && kindOf(date6) === "string" && !/\d/.test(date6)) {
-            mask = date6;
-            date6 = void 0;
-          }
-          date6 = date6 || date6 === 0 ? date6 : /* @__PURE__ */ new Date();
-          if (!(date6 instanceof Date)) {
-            date6 = new Date(date6);
-          }
-          if (isNaN(date6)) {
-            throw TypeError("Invalid date");
-          }
-          mask = String(dateFormat.masks[mask] || mask || dateFormat.masks["default"]);
-          var maskSlice = mask.slice(0, 4);
-          if (maskSlice === "UTC:" || maskSlice === "GMT:") {
-            mask = mask.slice(4);
-            utc = true;
-            if (maskSlice === "GMT:") {
-              gmt = true;
-            }
-          }
-          var _ = function _2() {
-            return utc ? "getUTC" : "get";
-          };
-          var _d = function d() {
-            return date6[_() + "Date"]();
-          };
-          var D = function D2() {
-            return date6[_() + "Day"]();
-          };
-          var _m = function m2() {
-            return date6[_() + "Month"]();
-          };
-          var y = function y2() {
-            return date6[_() + "FullYear"]();
-          };
-          var _H = function H() {
-            return date6[_() + "Hours"]();
-          };
-          var _M = function M() {
-            return date6[_() + "Minutes"]();
-          };
-          var _s = function s2() {
-            return date6[_() + "Seconds"]();
-          };
-          var _L = function L() {
-            return date6[_() + "Milliseconds"]();
-          };
-          var _o = function o() {
-            return utc ? 0 : date6.getTimezoneOffset();
-          };
-          var _W = function W() {
-            return getWeek(date6);
-          };
-          var _N = function N() {
-            return getDayOfWeek(date6);
-          };
-          var flags = { d: function d() {
-            return _d();
-          }, dd: function dd() {
-            return pad(_d());
-          }, ddd: function ddd() {
-            return dateFormat.i18n.dayNames[D()];
-          }, DDD: function DDD() {
-            return getDayName({ y: y(), m: _m(), d: _d(), _: _(), dayName: dateFormat.i18n.dayNames[D()], short: true });
-          }, dddd: function dddd() {
-            return dateFormat.i18n.dayNames[D() + 7];
-          }, DDDD: function DDDD() {
-            return getDayName({ y: y(), m: _m(), d: _d(), _: _(), dayName: dateFormat.i18n.dayNames[D() + 7] });
-          }, m: function m2() {
-            return _m() + 1;
-          }, mm: function mm() {
-            return pad(_m() + 1);
-          }, mmm: function mmm() {
-            return dateFormat.i18n.monthNames[_m()];
-          }, mmmm: function mmmm() {
-            return dateFormat.i18n.monthNames[_m() + 12];
-          }, yy: function yy() {
-            return String(y()).slice(2);
-          }, yyyy: function yyyy() {
-            return pad(y(), 4);
-          }, h: function h2() {
-            return _H() % 12 || 12;
-          }, hh: function hh() {
-            return pad(_H() % 12 || 12);
-          }, H: function H() {
-            return _H();
-          }, HH: function HH() {
-            return pad(_H());
-          }, M: function M() {
-            return _M();
-          }, MM: function MM() {
-            return pad(_M());
-          }, s: function s2() {
-            return _s();
-          }, ss: function ss() {
-            return pad(_s());
-          }, l: function l() {
-            return pad(_L(), 3);
-          }, L: function L() {
-            return pad(Math.floor(_L() / 10));
-          }, t: function t2() {
-            return _H() < 12 ? dateFormat.i18n.timeNames[0] : dateFormat.i18n.timeNames[1];
-          }, tt: function tt() {
-            return _H() < 12 ? dateFormat.i18n.timeNames[2] : dateFormat.i18n.timeNames[3];
-          }, T: function T() {
-            return _H() < 12 ? dateFormat.i18n.timeNames[4] : dateFormat.i18n.timeNames[5];
-          }, TT: function TT() {
-            return _H() < 12 ? dateFormat.i18n.timeNames[6] : dateFormat.i18n.timeNames[7];
-          }, Z: function Z2() {
-            return gmt ? "GMT" : utc ? "UTC" : (String(date6).match(timezone) || [""]).pop().replace(timezoneClip, "").replace(/GMT\+0000/g, "UTC");
-          }, o: function o() {
-            return (_o() > 0 ? "-" : "+") + pad(Math.floor(Math.abs(_o()) / 60) * 100 + Math.abs(_o()) % 60, 4);
-          }, p: function p() {
-            return (_o() > 0 ? "-" : "+") + pad(Math.floor(Math.abs(_o()) / 60), 2) + ":" + pad(Math.floor(Math.abs(_o()) % 60), 2);
-          }, S: function S2() {
-            return ["th", "st", "nd", "rd"][_d() % 10 > 3 ? 0 : (_d() % 100 - _d() % 10 != 10) * _d() % 10];
-          }, W: function W() {
-            return _W();
-          }, WW: function WW() {
-            return pad(_W());
-          }, N: function N() {
-            return _N();
-          } };
-          return mask.replace(token, function(match2) {
-            if (match2 in flags) {
-              return flags[match2]();
-            }
-            return match2.slice(1, match2.length - 1);
-          });
-        };
-      })();
-      dateFormat.masks = { default: "ddd mmm dd yyyy HH:MM:ss", shortDate: "m/d/yy", paddedShortDate: "mm/dd/yyyy", mediumDate: "mmm d, yyyy", longDate: "mmmm d, yyyy", fullDate: "dddd, mmmm d, yyyy", shortTime: "h:MM TT", mediumTime: "h:MM:ss TT", longTime: "h:MM:ss TT Z", isoDate: "yyyy-mm-dd", isoTime: "HH:MM:ss", isoDateTime: "yyyy-mm-dd'T'HH:MM:sso", isoUtcDateTime: "UTC:yyyy-mm-dd'T'HH:MM:ss'Z'", expiresHeaderFormat: "ddd, dd mmm yyyy HH:MM:ss Z" };
-      dateFormat.i18n = { dayNames: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"], monthNames: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"], timeNames: ["a", "p", "am", "pm", "A", "P", "AM", "PM"] };
-      var pad = function pad2(val, len) {
-        val = String(val);
-        len = len || 2;
-        while (val.length < len) {
-          val = "0" + val;
-        }
-        return val;
-      };
-      var getDayName = function getDayName2(_ref) {
-        var y = _ref.y, m2 = _ref.m, d = _ref.d, _ = _ref._, dayName = _ref.dayName, _ref$short = _ref["short"], _short = _ref$short === void 0 ? false : _ref$short;
-        var today = /* @__PURE__ */ new Date();
-        var yesterday = /* @__PURE__ */ new Date();
-        yesterday.setDate(yesterday[_ + "Date"]() - 1);
-        var tomorrow = /* @__PURE__ */ new Date();
-        tomorrow.setDate(tomorrow[_ + "Date"]() + 1);
-        var today_d = function today_d2() {
-          return today[_ + "Date"]();
-        };
-        var today_m = function today_m2() {
-          return today[_ + "Month"]();
-        };
-        var today_y = function today_y2() {
-          return today[_ + "FullYear"]();
-        };
-        var yesterday_d = function yesterday_d2() {
-          return yesterday[_ + "Date"]();
-        };
-        var yesterday_m = function yesterday_m2() {
-          return yesterday[_ + "Month"]();
-        };
-        var yesterday_y = function yesterday_y2() {
-          return yesterday[_ + "FullYear"]();
-        };
-        var tomorrow_d = function tomorrow_d2() {
-          return tomorrow[_ + "Date"]();
-        };
-        var tomorrow_m = function tomorrow_m2() {
-          return tomorrow[_ + "Month"]();
-        };
-        var tomorrow_y = function tomorrow_y2() {
-          return tomorrow[_ + "FullYear"]();
-        };
-        if (today_y() === y && today_m() === m2 && today_d() === d) {
-          return _short ? "Tdy" : "Today";
-        } else if (yesterday_y() === y && yesterday_m() === m2 && yesterday_d() === d) {
-          return _short ? "Ysd" : "Yesterday";
-        } else if (tomorrow_y() === y && tomorrow_m() === m2 && tomorrow_d() === d) {
-          return _short ? "Tmw" : "Tomorrow";
-        }
-        return dayName;
-      };
-      var getWeek = function getWeek2(date6) {
-        var targetThursday = new Date(date6.getFullYear(), date6.getMonth(), date6.getDate());
-        targetThursday.setDate(targetThursday.getDate() - (targetThursday.getDay() + 6) % 7 + 3);
-        var firstThursday = new Date(targetThursday.getFullYear(), 0, 4);
-        firstThursday.setDate(firstThursday.getDate() - (firstThursday.getDay() + 6) % 7 + 3);
-        var ds = targetThursday.getTimezoneOffset() - firstThursday.getTimezoneOffset();
-        targetThursday.setHours(targetThursday.getHours() - ds);
-        var weekDiff = (targetThursday - firstThursday) / (864e5 * 7);
-        return 1 + Math.floor(weekDiff);
-      };
-      var getDayOfWeek = function getDayOfWeek2(date6) {
-        var dow = date6.getDay();
-        if (dow === 0) {
-          dow = 7;
-        }
-        return dow;
-      };
-      var kindOf = function kindOf2(val) {
-        if (val === null) {
-          return "null";
-        }
-        if (val === void 0) {
-          return "undefined";
-        }
-        if (_typeof(val) !== "object") {
-          return _typeof(val);
-        }
-        if (Array.isArray(val)) {
-          return "array";
-        }
-        return {}.toString.call(val).slice(8, -1).toLowerCase();
-      };
-      if (typeof define === "function" && define.amd) {
-        define(function() {
-          return dateFormat;
-        });
-      } else if ((typeof exports === "undefined" ? "undefined" : _typeof(exports)) === "object") {
-        module.exports = dateFormat;
-      } else {
-        global2.dateFormat = dateFormat;
-      }
-    })(void 0);
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/format-time.js
-var require_format_time = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/format-time.js"(exports, module) {
-    "use strict";
-    module.exports = formatTime;
-    var {
-      DATE_FORMAT,
-      DATE_FORMAT_SIMPLE
-    } = require_constants4();
-    var dateformat = require_dateformat();
-    var createDate = require_create_date();
-    var isValidDate = require_is_valid_date();
-    function formatTime(epoch, translateTime = false) {
-      if (translateTime === false) {
-        return epoch;
-      }
-      const instant = createDate(epoch);
-      if (!isValidDate(instant)) {
-        return epoch;
-      }
-      if (translateTime === true) {
-        return dateformat(instant, DATE_FORMAT_SIMPLE);
-      }
-      const upperFormat = translateTime.toUpperCase();
-      if (upperFormat === "SYS:STANDARD") {
-        return dateformat(instant, DATE_FORMAT);
-      }
-      const prefix = upperFormat.substr(0, 4);
-      if (prefix === "SYS:" || prefix === "UTC:") {
-        if (prefix === "UTC:") {
-          return dateformat(instant, translateTime);
-        }
-        return dateformat(instant, translateTime.slice(4));
-      }
-      return dateformat(instant, `UTC:${translateTime}`);
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/handle-custom-levels-names-opts.js
-var require_handle_custom_levels_names_opts = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/handle-custom-levels-names-opts.js"(exports, module) {
-    "use strict";
-    module.exports = handleCustomLevelsNamesOpts;
-    function handleCustomLevelsNamesOpts(cLevels) {
-      if (!cLevels) return {};
-      if (typeof cLevels === "string") {
-        return cLevels.split(",").reduce((agg, value, idx) => {
-          const [levelName, levelNum = idx] = value.split(":");
-          agg[levelName.toLowerCase()] = levelNum;
-          return agg;
-        }, {});
-      } else if (Object.prototype.toString.call(cLevels) === "[object Object]") {
-        return Object.keys(cLevels).reduce((agg, levelName) => {
-          agg[levelName.toLowerCase()] = cLevels[levelName];
-          return agg;
-        }, {});
-      } else {
-        return {};
-      }
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/handle-custom-levels-opts.js
-var require_handle_custom_levels_opts = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/handle-custom-levels-opts.js"(exports, module) {
-    "use strict";
-    module.exports = handleCustomLevelsOpts;
-    function handleCustomLevelsOpts(cLevels) {
-      if (!cLevels) return {};
-      if (typeof cLevels === "string") {
-        return cLevels.split(",").reduce(
-          (agg, value, idx) => {
-            const [levelName, levelNum = idx] = value.split(":");
-            agg[levelNum] = levelName.toUpperCase();
-            return agg;
-          },
-          { default: "USERLVL" }
-        );
-      } else if (Object.prototype.toString.call(cLevels) === "[object Object]") {
-        return Object.keys(cLevels).reduce((agg, levelName) => {
-          agg[cLevels[levelName]] = levelName.toUpperCase();
-          return agg;
-        }, { default: "USERLVL" });
-      } else {
-        return {};
-      }
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/interpret-conditionals.js
-var require_interpret_conditionals = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/interpret-conditionals.js"(exports, module) {
-    "use strict";
-    module.exports = interpretConditionals;
-    var getPropertyValue = require_get_property_value();
-    function interpretConditionals(messageFormat, log) {
-      messageFormat = messageFormat.replace(/{if (.*?)}(.*?){end}/g, replacer);
-      messageFormat = messageFormat.replace(/{if (.*?)}/g, "");
-      messageFormat = messageFormat.replace(/{end}/g, "");
-      return messageFormat.replace(/\s+/g, " ").trim();
-      function replacer(_, key, value) {
-        const propertyValue = getPropertyValue(log, key);
-        if (propertyValue && value.includes(key)) {
-          return value.replace(new RegExp("{" + key + "}", "g"), propertyValue);
-        } else {
-          return "";
-        }
-      }
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/is-object.js
-var require_is_object = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/is-object.js"(exports, module) {
-    "use strict";
-    module.exports = isObject2;
-    function isObject2(input) {
-      return Object.prototype.toString.apply(input) === "[object Object]";
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/join-lines-with-indentation.js
-var require_join_lines_with_indentation = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/join-lines-with-indentation.js"(exports, module) {
-    "use strict";
-    module.exports = joinLinesWithIndentation;
-    function joinLinesWithIndentation({ input, ident = "    ", eol = "\n" }) {
-      const lines = input.split(/\r?\n/);
-      for (let i2 = 1; i2 < lines.length; i2 += 1) {
-        lines[i2] = ident + lines[i2];
-      }
-      return lines.join(eol);
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/parse-factory-options.js
-var require_parse_factory_options = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/parse-factory-options.js"(exports, module) {
-    "use strict";
-    module.exports = parseFactoryOptions;
-    var {
-      LEVEL_NAMES
-    } = require_constants4();
-    var colors = require_colors();
-    var handleCustomLevelsOpts = require_handle_custom_levels_opts();
-    var handleCustomLevelsNamesOpts = require_handle_custom_levels_names_opts();
-    var handleLevelLabelData = require_get_level_label_data();
-    function parseFactoryOptions(options) {
-      const EOL = options.crlf ? "\r\n" : "\n";
-      const IDENT = "    ";
-      const {
-        customPrettifiers,
-        errorLikeObjectKeys,
-        hideObject,
-        levelFirst,
-        levelKey,
-        levelLabel,
-        messageFormat,
-        messageKey,
-        minimumLevel,
-        singleLine,
-        timestampKey,
-        translateTime
-      } = options;
-      const errorProps = options.errorProps.split(",");
-      const useOnlyCustomProps = typeof options.useOnlyCustomProps === "boolean" ? options.useOnlyCustomProps : options.useOnlyCustomProps === "true";
-      const customLevels = handleCustomLevelsOpts(options.customLevels);
-      const customLevelNames = handleCustomLevelsNamesOpts(options.customLevels);
-      const getLevelLabelData = handleLevelLabelData(useOnlyCustomProps, customLevels, customLevelNames);
-      let customColors;
-      if (options.customColors) {
-        if (typeof options.customColors === "string") {
-          customColors = options.customColors.split(",").reduce((agg, value) => {
-            const [level, color] = value.split(":");
-            const condition = useOnlyCustomProps ? options.customLevels : customLevelNames[level] !== void 0;
-            const levelNum = condition ? customLevelNames[level] : LEVEL_NAMES[level];
-            const colorIdx = levelNum !== void 0 ? levelNum : level;
-            agg.push([colorIdx, color]);
-            return agg;
-          }, []);
-        } else if (typeof options.customColors === "object") {
-          customColors = Object.keys(options.customColors).reduce((agg, value) => {
-            const [level, color] = [value, options.customColors[value]];
-            const condition = useOnlyCustomProps ? options.customLevels : customLevelNames[level] !== void 0;
-            const levelNum = condition ? customLevelNames[level] : LEVEL_NAMES[level];
-            const colorIdx = levelNum !== void 0 ? levelNum : level;
-            agg.push([colorIdx, color]);
-            return agg;
-          }, []);
-        } else {
-          throw new Error("options.customColors must be of type string or object.");
-        }
-      }
-      const customProperties = { customLevels, customLevelNames };
-      if (useOnlyCustomProps === true && !options.customLevels) {
-        customProperties.customLevels = void 0;
-        customProperties.customLevelNames = void 0;
-      }
-      const includeKeys = options.include !== void 0 ? new Set(options.include.split(",")) : void 0;
-      const ignoreKeys = !includeKeys && options.ignore ? new Set(options.ignore.split(",")) : void 0;
-      const colorizer = colors(options.colorize, customColors, useOnlyCustomProps);
-      const objectColorizer = options.colorizeObjects ? colorizer : colors(false, [], false);
-      return {
-        EOL,
-        IDENT,
-        colorizer,
-        customColors,
-        customLevelNames,
-        customLevels,
-        customPrettifiers,
-        customProperties,
-        errorLikeObjectKeys,
-        errorProps,
-        getLevelLabelData,
-        hideObject,
-        ignoreKeys,
-        includeKeys,
-        levelFirst,
-        levelKey,
-        levelLabel,
-        messageFormat,
-        messageKey,
-        minimumLevel,
-        objectColorizer,
-        singleLine,
-        timestampKey,
-        translateTime,
-        useOnlyCustomProps
-      };
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/fast-safe-stringify@2.1.1/node_modules/fast-safe-stringify/index.js
-var require_fast_safe_stringify = __commonJS({
-  "../../node_modules/.pnpm/fast-safe-stringify@2.1.1/node_modules/fast-safe-stringify/index.js"(exports, module) {
-    module.exports = stringify4;
-    stringify4.default = stringify4;
-    stringify4.stable = deterministicStringify;
-    stringify4.stableStringify = deterministicStringify;
-    var LIMIT_REPLACE_NODE = "[...]";
-    var CIRCULAR_REPLACE_NODE = "[Circular]";
-    var arr = [];
-    var replacerStack = [];
-    function defaultOptions() {
-      return {
-        depthLimit: Number.MAX_SAFE_INTEGER,
-        edgesLimit: Number.MAX_SAFE_INTEGER
-      };
-    }
-    function stringify4(obj, replacer, spacer, options) {
-      if (typeof options === "undefined") {
-        options = defaultOptions();
-      }
-      decirc(obj, "", 0, [], void 0, 0, options);
-      var res;
-      try {
-        if (replacerStack.length === 0) {
-          res = JSON.stringify(obj, replacer, spacer);
-        } else {
-          res = JSON.stringify(obj, replaceGetterValues(replacer), spacer);
-        }
-      } catch (_) {
-        return JSON.stringify("[unable to serialize, circular reference is too complex to analyze]");
-      } finally {
-        while (arr.length !== 0) {
-          var part = arr.pop();
-          if (part.length === 4) {
-            Object.defineProperty(part[0], part[1], part[3]);
-          } else {
-            part[0][part[1]] = part[2];
-          }
-        }
-      }
-      return res;
-    }
-    function setReplace(replace, val, k, parent) {
-      var propertyDescriptor = Object.getOwnPropertyDescriptor(parent, k);
-      if (propertyDescriptor.get !== void 0) {
-        if (propertyDescriptor.configurable) {
-          Object.defineProperty(parent, k, { value: replace });
-          arr.push([parent, k, val, propertyDescriptor]);
-        } else {
-          replacerStack.push([val, k, replace]);
-        }
-      } else {
-        parent[k] = replace;
-        arr.push([parent, k, val]);
-      }
-    }
-    function decirc(val, k, edgeIndex, stack, parent, depth, options) {
-      depth += 1;
-      var i2;
-      if (typeof val === "object" && val !== null) {
-        for (i2 = 0; i2 < stack.length; i2++) {
-          if (stack[i2] === val) {
-            setReplace(CIRCULAR_REPLACE_NODE, val, k, parent);
-            return;
-          }
-        }
-        if (typeof options.depthLimit !== "undefined" && depth > options.depthLimit) {
-          setReplace(LIMIT_REPLACE_NODE, val, k, parent);
-          return;
-        }
-        if (typeof options.edgesLimit !== "undefined" && edgeIndex + 1 > options.edgesLimit) {
-          setReplace(LIMIT_REPLACE_NODE, val, k, parent);
-          return;
-        }
-        stack.push(val);
-        if (Array.isArray(val)) {
-          for (i2 = 0; i2 < val.length; i2++) {
-            decirc(val[i2], i2, i2, stack, val, depth, options);
-          }
-        } else {
-          var keys = Object.keys(val);
-          for (i2 = 0; i2 < keys.length; i2++) {
-            var key = keys[i2];
-            decirc(val[key], key, i2, stack, val, depth, options);
-          }
-        }
-        stack.pop();
-      }
-    }
-    function compareFunction(a, b) {
-      if (a < b) {
-        return -1;
-      }
-      if (a > b) {
-        return 1;
-      }
-      return 0;
-    }
-    function deterministicStringify(obj, replacer, spacer, options) {
-      if (typeof options === "undefined") {
-        options = defaultOptions();
-      }
-      var tmp = deterministicDecirc(obj, "", 0, [], void 0, 0, options) || obj;
-      var res;
-      try {
-        if (replacerStack.length === 0) {
-          res = JSON.stringify(tmp, replacer, spacer);
-        } else {
-          res = JSON.stringify(tmp, replaceGetterValues(replacer), spacer);
-        }
-      } catch (_) {
-        return JSON.stringify("[unable to serialize, circular reference is too complex to analyze]");
-      } finally {
-        while (arr.length !== 0) {
-          var part = arr.pop();
-          if (part.length === 4) {
-            Object.defineProperty(part[0], part[1], part[3]);
-          } else {
-            part[0][part[1]] = part[2];
-          }
-        }
-      }
-      return res;
-    }
-    function deterministicDecirc(val, k, edgeIndex, stack, parent, depth, options) {
-      depth += 1;
-      var i2;
-      if (typeof val === "object" && val !== null) {
-        for (i2 = 0; i2 < stack.length; i2++) {
-          if (stack[i2] === val) {
-            setReplace(CIRCULAR_REPLACE_NODE, val, k, parent);
-            return;
-          }
-        }
-        try {
-          if (typeof val.toJSON === "function") {
-            return;
-          }
-        } catch (_) {
-          return;
-        }
-        if (typeof options.depthLimit !== "undefined" && depth > options.depthLimit) {
-          setReplace(LIMIT_REPLACE_NODE, val, k, parent);
-          return;
-        }
-        if (typeof options.edgesLimit !== "undefined" && edgeIndex + 1 > options.edgesLimit) {
-          setReplace(LIMIT_REPLACE_NODE, val, k, parent);
-          return;
-        }
-        stack.push(val);
-        if (Array.isArray(val)) {
-          for (i2 = 0; i2 < val.length; i2++) {
-            deterministicDecirc(val[i2], i2, i2, stack, val, depth, options);
-          }
-        } else {
-          var tmp = {};
-          var keys = Object.keys(val).sort(compareFunction);
-          for (i2 = 0; i2 < keys.length; i2++) {
-            var key = keys[i2];
-            deterministicDecirc(val[key], key, i2, stack, val, depth, options);
-            tmp[key] = val[key];
-          }
-          if (typeof parent !== "undefined") {
-            arr.push([parent, k, val]);
-            parent[k] = tmp;
-          } else {
-            return tmp;
-          }
-        }
-        stack.pop();
-      }
-    }
-    function replaceGetterValues(replacer) {
-      replacer = typeof replacer !== "undefined" ? replacer : function(k, v) {
-        return v;
-      };
-      return function(key, val) {
-        if (replacerStack.length > 0) {
-          for (var i2 = 0; i2 < replacerStack.length; i2++) {
-            var part = replacerStack[i2];
-            if (part[1] === key && part[0] === val) {
-              val = part[2];
-              replacerStack.splice(i2, 1);
-              break;
-            }
-          }
-        }
-        return replacer.call(this, key, val);
-      };
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-error.js
-var require_prettify_error = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-error.js"(exports, module) {
-    "use strict";
-    module.exports = prettifyError2;
-    var joinLinesWithIndentation = require_join_lines_with_indentation();
-    function prettifyError2({ keyName, lines, eol, ident }) {
-      let result = "";
-      const joinedLines = joinLinesWithIndentation({ input: lines, ident, eol });
-      const splitLines = `${ident}${keyName}: ${joinedLines}${eol}`.split(eol);
-      for (let j = 0; j < splitLines.length; j += 1) {
-        if (j !== 0) result += eol;
-        const line2 = splitLines[j];
-        if (/^\s*"stack"/.test(line2)) {
-          const matches = /^(\s*"stack":)\s*(".*"),?$/.exec(line2);
-          if (matches && matches.length === 3) {
-            const indentSize = /^\s*/.exec(line2)[0].length + 4;
-            const indentation = " ".repeat(indentSize);
-            const stackMessage = matches[2];
-            result += matches[1] + eol + indentation + JSON.parse(stackMessage).replace(/\n/g, eol + indentation);
-          } else {
-            result += line2;
-          }
-        } else {
-          result += line2;
-        }
-      }
-      return result;
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-object.js
-var require_prettify_object = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-object.js"(exports, module) {
-    "use strict";
-    module.exports = prettifyObject;
-    var {
-      LOGGER_KEYS
-    } = require_constants4();
-    var stringifySafe = require_fast_safe_stringify();
-    var joinLinesWithIndentation = require_join_lines_with_indentation();
-    var prettifyError2 = require_prettify_error();
-    function prettifyObject({
-      log,
-      excludeLoggerKeys = true,
-      skipKeys = [],
-      context
-    }) {
-      const {
-        EOL: eol,
-        IDENT: ident,
-        customPrettifiers,
-        errorLikeObjectKeys: errorLikeKeys,
-        objectColorizer,
-        singleLine,
-        colorizer
-      } = context;
-      const keysToIgnore = [].concat(skipKeys);
-      if (excludeLoggerKeys === true) Array.prototype.push.apply(keysToIgnore, LOGGER_KEYS);
-      let result = "";
-      const { plain, errors } = Object.entries(log).reduce(({ plain: plain2, errors: errors2 }, [k, v]) => {
-        if (keysToIgnore.includes(k) === false) {
-          const pretty2 = typeof customPrettifiers[k] === "function" ? customPrettifiers[k](v, k, log, { colors: colorizer.colors }) : v;
-          if (errorLikeKeys.includes(k)) {
-            errors2[k] = pretty2;
-          } else {
-            plain2[k] = pretty2;
-          }
-        }
-        return { plain: plain2, errors: errors2 };
-      }, { plain: {}, errors: {} });
-      if (singleLine) {
-        if (Object.keys(plain).length > 0) {
-          result += objectColorizer.greyMessage(stringifySafe(plain));
-        }
-        result += eol;
-        result = result.replace(/\\\\/gi, "\\");
-      } else {
-        Object.entries(plain).forEach(([keyName, keyValue]) => {
-          let lines = typeof customPrettifiers[keyName] === "function" ? keyValue : stringifySafe(keyValue, null, 2);
-          if (lines === void 0) return;
-          lines = lines.replace(/\\\\/gi, "\\");
-          const joinedLines = joinLinesWithIndentation({ input: lines, ident, eol });
-          result += `${ident}${objectColorizer.property(keyName)}:${joinedLines.startsWith(eol) ? "" : " "}${joinedLines}${eol}`;
-        });
-      }
-      Object.entries(errors).forEach(([keyName, keyValue]) => {
-        const lines = typeof customPrettifiers[keyName] === "function" ? keyValue : stringifySafe(keyValue, null, 2);
-        if (lines === void 0) return;
-        result += prettifyError2({ keyName, lines, eol, ident });
-      });
-      return result;
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-error-log.js
-var require_prettify_error_log = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-error-log.js"(exports, module) {
-    "use strict";
-    module.exports = prettifyErrorLog;
-    var {
-      LOGGER_KEYS
-    } = require_constants4();
-    var isObject2 = require_is_object();
-    var joinLinesWithIndentation = require_join_lines_with_indentation();
-    var prettifyObject = require_prettify_object();
-    function prettifyErrorLog({ log, context }) {
-      const {
-        EOL: eol,
-        IDENT: ident,
-        errorProps: errorProperties,
-        messageKey
-      } = context;
-      const stack = log.stack;
-      const joinedLines = joinLinesWithIndentation({ input: stack, ident, eol });
-      let result = `${ident}${joinedLines}${eol}`;
-      if (errorProperties.length > 0) {
-        const excludeProperties = LOGGER_KEYS.concat(messageKey, "type", "stack");
-        let propertiesToPrint;
-        if (errorProperties[0] === "*") {
-          propertiesToPrint = Object.keys(log).filter((k) => excludeProperties.includes(k) === false);
-        } else {
-          propertiesToPrint = errorProperties.filter((k) => excludeProperties.includes(k) === false);
-        }
-        for (let i2 = 0; i2 < propertiesToPrint.length; i2 += 1) {
-          const key = propertiesToPrint[i2];
-          if (key in log === false) continue;
-          if (isObject2(log[key])) {
-            const prettifiedObject = prettifyObject({
-              log: log[key],
-              excludeLoggerKeys: false,
-              context: {
-                ...context,
-                IDENT: ident + ident
-              }
-            });
-            result = `${result}${ident}${key}: {${eol}${prettifiedObject}${ident}}${eol}`;
-            continue;
-          }
-          result = `${result}${ident}${key}: ${log[key]}${eol}`;
-        }
-      }
-      return result;
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-level.js
-var require_prettify_level = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-level.js"(exports, module) {
-    "use strict";
-    module.exports = prettifyLevel;
-    var getPropertyValue = require_get_property_value();
-    function prettifyLevel({ log, context }) {
-      const {
-        colorizer,
-        customLevels,
-        customLevelNames,
-        levelKey,
-        getLevelLabelData
-      } = context;
-      const prettifier = context.customPrettifiers?.level;
-      const output = getPropertyValue(log, levelKey);
-      if (output === void 0) return void 0;
-      const labelColorized = colorizer(output, { customLevels, customLevelNames });
-      if (prettifier) {
-        const [label] = getLevelLabelData(output);
-        return prettifier(output, levelKey, log, { label, labelColorized, colors: colorizer.colors });
-      }
-      return labelColorized;
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-message.js
-var require_prettify_message = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-message.js"(exports, module) {
-    "use strict";
-    module.exports = prettifyMessage;
-    var {
-      LEVELS
-    } = require_constants4();
-    var getPropertyValue = require_get_property_value();
-    var interpretConditionals = require_interpret_conditionals();
-    function prettifyMessage({ log, context }) {
-      const {
-        colorizer,
-        customLevels,
-        levelKey,
-        levelLabel,
-        messageFormat,
-        messageKey,
-        useOnlyCustomProps
-      } = context;
-      if (messageFormat && typeof messageFormat === "string") {
-        const parsedMessageFormat = interpretConditionals(messageFormat, log);
-        const message = String(parsedMessageFormat).replace(
-          /{([^{}]+)}/g,
-          function(match2, p1) {
-            let level;
-            if (p1 === levelLabel && (level = getPropertyValue(log, levelKey)) !== void 0) {
-              const condition = useOnlyCustomProps ? customLevels === void 0 : customLevels[level] === void 0;
-              return condition ? LEVELS[level] : customLevels[level];
-            }
-            const value = getPropertyValue(log, p1);
-            return value !== void 0 ? value : "";
-          }
-        );
-        return colorizer.message(message);
-      }
-      if (messageFormat && typeof messageFormat === "function") {
-        const msg = messageFormat(log, messageKey, levelLabel, { colors: colorizer.colors });
-        return colorizer.message(msg);
-      }
-      if (messageKey in log === false) return void 0;
-      if (typeof log[messageKey] !== "string" && typeof log[messageKey] !== "number" && typeof log[messageKey] !== "boolean") return void 0;
-      return colorizer.message(log[messageKey]);
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-metadata.js
-var require_prettify_metadata = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-metadata.js"(exports, module) {
-    "use strict";
-    module.exports = prettifyMetadata;
-    function prettifyMetadata({ log, context }) {
-      const { customPrettifiers: prettifiers, colorizer } = context;
-      let line2 = "";
-      if (log.name || log.pid || log.hostname) {
-        line2 += "(";
-        if (log.name) {
-          line2 += prettifiers.name ? prettifiers.name(log.name, "name", log, { colors: colorizer.colors }) : log.name;
-        }
-        if (log.pid) {
-          const prettyPid = prettifiers.pid ? prettifiers.pid(log.pid, "pid", log, { colors: colorizer.colors }) : log.pid;
-          if (log.name && log.pid) {
-            line2 += "/" + prettyPid;
-          } else {
-            line2 += prettyPid;
-          }
-        }
-        if (log.hostname) {
-          const prettyHostname = prettifiers.hostname ? prettifiers.hostname(log.hostname, "hostname", log, { colors: colorizer.colors }) : log.hostname;
-          line2 += `${line2 === "(" ? "on" : " on"} ${prettyHostname}`;
-        }
-        line2 += ")";
-      }
-      if (log.caller) {
-        const prettyCaller = prettifiers.caller ? prettifiers.caller(log.caller, "caller", log, { colors: colorizer.colors }) : log.caller;
-        line2 += `${line2 === "" ? "" : " "}<${prettyCaller}>`;
-      }
-      if (line2 === "") {
-        return void 0;
-      } else {
-        return line2;
-      }
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-time.js
-var require_prettify_time = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-time.js"(exports, module) {
-    "use strict";
-    module.exports = prettifyTime;
-    var formatTime = require_format_time();
-    function prettifyTime({ log, context }) {
-      const {
-        timestampKey,
-        translateTime: translateFormat
-      } = context;
-      const prettifier = context.customPrettifiers?.time;
-      let time4 = null;
-      if (timestampKey in log) {
-        time4 = log[timestampKey];
-      } else if ("timestamp" in log) {
-        time4 = log.timestamp;
-      }
-      if (time4 === null) return void 0;
-      const output = translateFormat ? formatTime(time4, translateFormat) : time4;
-      return prettifier ? prettifier(output) : `[${output}]`;
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/index.js
-var require_utils9 = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/index.js"(exports, module) {
-    "use strict";
-    module.exports = {
-      buildSafeSonicBoom: require_build_safe_sonic_boom(),
-      createDate: require_create_date(),
-      deleteLogProperty: require_delete_log_property(),
-      filterLog: require_filter_log(),
-      formatTime: require_format_time(),
-      getPropertyValue: require_get_property_value(),
-      handleCustomLevelsNamesOpts: require_handle_custom_levels_names_opts(),
-      handleCustomLevelsOpts: require_handle_custom_levels_opts(),
-      interpretConditionals: require_interpret_conditionals(),
-      isObject: require_is_object(),
-      isValidDate: require_is_valid_date(),
-      joinLinesWithIndentation: require_join_lines_with_indentation(),
-      noop: require_noop(),
-      parseFactoryOptions: require_parse_factory_options(),
-      prettifyErrorLog: require_prettify_error_log(),
-      prettifyError: require_prettify_error(),
-      prettifyLevel: require_prettify_level(),
-      prettifyMessage: require_prettify_message(),
-      prettifyMetadata: require_prettify_metadata(),
-      prettifyObject: require_prettify_object(),
-      prettifyTime: require_prettify_time(),
-      splitPropertyKey: require_split_property_key(),
-      getLevelLabelData: require_get_level_label_data()
-    };
-  }
-});
-
-// ../../node_modules/.pnpm/secure-json-parse@4.1.0/node_modules/secure-json-parse/index.js
-var require_secure_json_parse = __commonJS({
-  "../../node_modules/.pnpm/secure-json-parse@4.1.0/node_modules/secure-json-parse/index.js"(exports, module) {
-    "use strict";
-    var hasBuffer = typeof Buffer !== "undefined";
-    var suspectProtoRx = /"(?:_|\\u005[Ff])(?:_|\\u005[Ff])(?:p|\\u0070)(?:r|\\u0072)(?:o|\\u006[Ff])(?:t|\\u0074)(?:o|\\u006[Ff])(?:_|\\u005[Ff])(?:_|\\u005[Ff])"\s*:/;
-    var suspectConstructorRx = /"(?:c|\\u0063)(?:o|\\u006[Ff])(?:n|\\u006[Ee])(?:s|\\u0073)(?:t|\\u0074)(?:r|\\u0072)(?:u|\\u0075)(?:c|\\u0063)(?:t|\\u0074)(?:o|\\u006[Ff])(?:r|\\u0072)"\s*:/;
-    function _parse2(text2, reviver, options) {
-      if (options == null) {
-        if (reviver !== null && typeof reviver === "object") {
-          options = reviver;
-          reviver = void 0;
-        }
-      }
-      if (hasBuffer && Buffer.isBuffer(text2)) {
-        text2 = text2.toString();
-      }
-      if (text2 && text2.charCodeAt(0) === 65279) {
-        text2 = text2.slice(1);
-      }
-      const obj = JSON.parse(text2, reviver);
-      if (obj === null || typeof obj !== "object") {
-        return obj;
-      }
-      const protoAction = options && options.protoAction || "error";
-      const constructorAction = options && options.constructorAction || "error";
-      if (protoAction === "ignore" && constructorAction === "ignore") {
-        return obj;
-      }
-      if (protoAction !== "ignore" && constructorAction !== "ignore") {
-        if (suspectProtoRx.test(text2) === false && suspectConstructorRx.test(text2) === false) {
-          return obj;
-        }
-      } else if (protoAction !== "ignore" && constructorAction === "ignore") {
-        if (suspectProtoRx.test(text2) === false) {
-          return obj;
-        }
-      } else {
-        if (suspectConstructorRx.test(text2) === false) {
-          return obj;
-        }
-      }
-      return filter2(obj, { protoAction, constructorAction, safe: options && options.safe });
-    }
-    function filter2(obj, { protoAction = "error", constructorAction = "error", safe } = {}) {
-      let next = [obj];
-      while (next.length) {
-        const nodes = next;
-        next = [];
-        for (const node of nodes) {
-          if (protoAction !== "ignore" && Object.prototype.hasOwnProperty.call(node, "__proto__")) {
-            if (safe === true) {
-              return null;
-            } else if (protoAction === "error") {
-              throw new SyntaxError("Object contains forbidden prototype property");
-            }
-            delete node.__proto__;
-          }
-          if (constructorAction !== "ignore" && Object.prototype.hasOwnProperty.call(node, "constructor") && node.constructor !== null && typeof node.constructor === "object" && Object.prototype.hasOwnProperty.call(node.constructor, "prototype")) {
-            if (safe === true) {
-              return null;
-            } else if (constructorAction === "error") {
-              throw new SyntaxError("Object contains forbidden prototype property");
-            }
-            delete node.constructor;
-          }
-          for (const key in node) {
-            const value = node[key];
-            if (value && typeof value === "object") {
-              next.push(value);
-            }
-          }
-        }
-      }
-      return obj;
-    }
-    function parse4(text2, reviver, options) {
-      const { stackTraceLimit } = Error;
-      Error.stackTraceLimit = 0;
-      try {
-        return _parse2(text2, reviver, options);
-      } finally {
-        Error.stackTraceLimit = stackTraceLimit;
-      }
-    }
-    function safeParse3(text2, reviver) {
-      const { stackTraceLimit } = Error;
-      Error.stackTraceLimit = 0;
-      try {
-        return _parse2(text2, reviver, { safe: true });
-      } catch {
-        return void 0;
-      } finally {
-        Error.stackTraceLimit = stackTraceLimit;
-      }
-    }
-    module.exports = parse4;
-    module.exports.default = parse4;
-    module.exports.parse = parse4;
-    module.exports.safeParse = safeParse3;
-    module.exports.scan = filter2;
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/pretty.js
-var require_pretty = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/pretty.js"(exports, module) {
-    "use strict";
-    module.exports = pretty2;
-    var sjs = require_secure_json_parse();
-    var isObject2 = require_is_object();
-    var prettifyErrorLog = require_prettify_error_log();
-    var prettifyLevel = require_prettify_level();
-    var prettifyMessage = require_prettify_message();
-    var prettifyMetadata = require_prettify_metadata();
-    var prettifyObject = require_prettify_object();
-    var prettifyTime = require_prettify_time();
-    var filterLog = require_filter_log();
-    var {
-      LEVELS,
-      LEVEL_KEY,
-      LEVEL_NAMES
-    } = require_constants4();
-    var jsonParser = (input) => {
-      try {
-        return { value: sjs.parse(input, { protoAction: "remove" }) };
-      } catch (err) {
-        return { err };
-      }
-    };
-    function pretty2(inputData) {
-      let log;
-      if (!isObject2(inputData)) {
-        const parsed = jsonParser(inputData);
-        if (parsed.err || !isObject2(parsed.value)) {
-          return inputData + this.EOL;
-        }
-        log = parsed.value;
-      } else {
-        log = inputData;
-      }
-      if (this.minimumLevel) {
-        let condition;
-        if (this.useOnlyCustomProps) {
-          condition = this.customLevels;
-        } else {
-          condition = this.customLevelNames[this.minimumLevel] !== void 0;
-        }
-        let minimum;
-        if (condition) {
-          minimum = this.customLevelNames[this.minimumLevel];
-        } else {
-          minimum = LEVEL_NAMES[this.minimumLevel];
-        }
-        if (!minimum) {
-          minimum = typeof this.minimumLevel === "string" ? LEVEL_NAMES[this.minimumLevel] : LEVEL_NAMES[LEVELS[this.minimumLevel].toLowerCase()];
-        }
-        const level = log[this.levelKey === void 0 ? LEVEL_KEY : this.levelKey];
-        if (level < minimum) return;
-      }
-      const prettifiedMessage = prettifyMessage({ log, context: this.context });
-      if (this.ignoreKeys || this.includeKeys) {
-        log = filterLog({ log, context: this.context });
-      }
-      const prettifiedLevel = prettifyLevel({
-        log,
-        context: {
-          ...this.context,
-          // This is odd. The colorizer ends up relying on the value of
-          // `customProperties` instead of the original `customLevels` and
-          // `customLevelNames`.
-          ...this.context.customProperties
-        }
-      });
-      const prettifiedMetadata = prettifyMetadata({ log, context: this.context });
-      const prettifiedTime = prettifyTime({ log, context: this.context });
-      let line2 = "";
-      if (this.levelFirst && prettifiedLevel) {
-        line2 = `${prettifiedLevel}`;
-      }
-      if (prettifiedTime && line2 === "") {
-        line2 = `${prettifiedTime}`;
-      } else if (prettifiedTime) {
-        line2 = `${line2} ${prettifiedTime}`;
-      }
-      if (!this.levelFirst && prettifiedLevel) {
-        if (line2.length > 0) {
-          line2 = `${line2} ${prettifiedLevel}`;
-        } else {
-          line2 = prettifiedLevel;
-        }
-      }
-      if (prettifiedMetadata) {
-        if (line2.length > 0) {
-          line2 = `${line2} ${prettifiedMetadata}:`;
-        } else {
-          line2 = prettifiedMetadata;
-        }
-      }
-      if (line2.endsWith(":") === false && line2 !== "") {
-        line2 += ":";
-      }
-      if (prettifiedMessage !== void 0) {
-        if (line2.length > 0) {
-          line2 = `${line2} ${prettifiedMessage}`;
-        } else {
-          line2 = prettifiedMessage;
-        }
-      }
-      if (line2.length > 0 && !this.singleLine) {
-        line2 += this.EOL;
-      }
-      if (log.type === "Error" && typeof log.stack === "string") {
-        const prettifiedErrorLog = prettifyErrorLog({ log, context: this.context });
-        if (this.singleLine) line2 += this.EOL;
-        line2 += prettifiedErrorLog;
-      } else if (this.hideObject === false) {
-        const skipKeys = [
-          this.messageKey,
-          this.levelKey,
-          this.timestampKey
-        ].map((key) => key.replaceAll(/\\/g, "")).filter((key) => {
-          return typeof log[key] === "string" || typeof log[key] === "number" || typeof log[key] === "boolean";
-        });
-        const prettifiedObject = prettifyObject({
-          log,
-          skipKeys,
-          context: this.context
-        });
-        if (this.singleLine && !/^\s$/.test(prettifiedObject)) {
-          line2 += " ";
-        }
-        line2 += prettifiedObject;
-      }
-      return line2;
-    }
-  }
-});
-
-// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/index.js
-var require_pino_pretty = __commonJS({
-  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/index.js"(exports, module) {
-    "use strict";
-    var { isColorSupported } = require_colorette();
-    var pump2 = require_pump();
-    var { Transform: Transform7 } = __require("node:stream");
-    var abstractTransport = require_pino_abstract_transport();
-    var colors = require_colors();
-    var {
-      ERROR_LIKE_KEYS,
-      LEVEL_KEY,
-      LEVEL_LABEL,
-      MESSAGE_KEY,
-      TIMESTAMP_KEY
-    } = require_constants4();
-    var {
-      buildSafeSonicBoom,
-      parseFactoryOptions
-    } = require_utils9();
-    var pretty2 = require_pretty();
-    var defaultOptions = {
-      colorize: isColorSupported,
-      colorizeObjects: true,
-      crlf: false,
-      customColors: null,
-      customLevels: null,
-      customPrettifiers: {},
-      errorLikeObjectKeys: ERROR_LIKE_KEYS,
-      errorProps: "",
-      hideObject: false,
-      ignore: "hostname",
-      include: void 0,
-      levelFirst: false,
-      levelKey: LEVEL_KEY,
-      levelLabel: LEVEL_LABEL,
-      messageFormat: null,
-      messageKey: MESSAGE_KEY,
-      minimumLevel: void 0,
-      outputStream: process.stdout,
-      singleLine: false,
-      timestampKey: TIMESTAMP_KEY,
-      translateTime: true,
-      useOnlyCustomProps: true
-    };
-    function prettyFactory(options) {
-      const context = parseFactoryOptions(Object.assign({}, defaultOptions, options));
-      return pretty2.bind({ ...context, context });
-    }
-    function build(opts = {}) {
-      let pretty3 = prettyFactory(opts);
-      let destination;
-      return abstractTransport(function(source) {
-        source.on("message", function pinoConfigListener(message) {
-          if (!message || message.code !== "PINO_CONFIG") return;
-          Object.assign(opts, {
-            messageKey: message.config.messageKey,
-            errorLikeObjectKeys: Array.from(/* @__PURE__ */ new Set([...opts.errorLikeObjectKeys || ERROR_LIKE_KEYS, message.config.errorKey])),
-            customLevels: message.config.levels.values
-          });
-          pretty3 = prettyFactory(opts);
-          source.off("message", pinoConfigListener);
-        });
-        const stream2 = new Transform7({
-          objectMode: true,
-          autoDestroy: true,
-          transform(chunk, enc, cb) {
-            const line2 = pretty3(chunk);
-            cb(null, line2);
-          }
-        });
-        if (typeof opts.destination === "object" && typeof opts.destination.write === "function") {
-          destination = opts.destination;
-        } else {
-          destination = buildSafeSonicBoom({
-            dest: opts.destination || 1,
-            append: opts.append,
-            mkdir: opts.mkdir,
-            sync: opts.sync
-            // by default sonic will be async
-          });
-        }
-        source.on("unknown", function(line2) {
-          destination.write(line2 + "\n");
-        });
-        pump2(source, stream2, destination);
-        return stream2;
-      }, {
-        parse: "lines",
-        close(err, cb) {
-          destination.on("close", () => {
-            cb(err);
-          });
-        }
-      });
-    }
-    module.exports = build;
-    module.exports.build = build;
-    module.exports.PinoPretty = build;
-    module.exports.prettyFactory = prettyFactory;
-    module.exports.colorizerFactory = colors;
-    module.exports.isColorSupported = isColorSupported;
-    module.exports.default = build;
+      {
+        id: "units",
+        title: "Speciality : Units (Select the preferences)",
+        description: "Choose the preferred center for each fellowship based on the official Jan-27 Seat Matrix.",
+        enabled: true,
+        fields: [
+          { id: "unit_cornea", type: "checkbox_group", label: "Cornea Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Jaipur", "Shimoga"], visibleIf: { field: "specialization", contains: "Cornea" } },
+          { id: "unit_glaucoma", type: "checkbox_group", label: "Glaucoma Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga"], visibleIf: { field: "specialization", contains: "Glaucoma" } },
+          { id: "unit_iol", type: "checkbox_group", label: "IOL Preferred Center", options: ["Anand", "Coimbatore", "Guntur", "Hyderabad", "Indore", "Jaipur", "Kanpur", "Krishnankoil", "Ludhiana", "Panvel", "Shimoga", "Varanasi"], visibleIf: { field: "specialization", contains: "IOL" } },
+          { id: "unit_medical_retina", type: "checkbox_group", label: "Medical Retina Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Indore", "Shimoga"], visibleIf: { field: "specialization", contains: "Medical Retina" } },
+          { id: "unit_oculoplasty", type: "checkbox_group", label: "Oculoplasty Preferred Center", options: ["Coimbatore", "Guntur", "Varanasi"], visibleIf: { field: "specialization", contains: "Oculoplasty" } },
+          { id: "unit_pediatric", type: "checkbox_group", label: "Pediatric Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga"], visibleIf: { field: "specialization", contains: "Pediatric Ophthalmology" } },
+          { id: "unit_phaco", type: "checkbox_group", label: "Phaco Refractive Preferred Center", options: ["Bangalore", "Coimbatore"], visibleIf: { field: "specialization", contains: "Phaco Refractive" } },
+          { id: "unit_vitreo_retina", type: "checkbox_group", label: "Vitreo Retina Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga"], visibleIf: { field: "specialization", contains: "Vitreo Retina" } },
+          { id: "referralSource", type: "select", label: "Where did you hear about this Fellowship?", required: true, options: ["Sankara Website", "Word of Mouth", "Referred by any Faculty or exiting trainee at Sankara", "IJO Advertisement", "Social Media Platforms (Instagram/Facebook/Whatsapp/LinkedIn)"], isStandard: true, mapping: "referralSource" }
+        ]
+      },
+      {
+        id: "referral_info",
+        title: "Referral Information",
+        description: "Details of the person who referred you.",
+        enabled: true,
+        visibleIf: { field: "referralSource", contains: "Referred" },
+        fields: [
+          { id: "referredByName", type: "text", label: "Name of referred Faculty/Existing Trainee", isStandard: true, mapping: "referredByName", visibleIf: { field: "referralSource", contains: "Referred" } }
+        ]
+      },
+      {
+        id: "social_media",
+        title: "Social Media",
+        description: "Specify the media source if applicable.",
+        enabled: true,
+        visibleIf: { field: "referralSource", contains: "Social Media" },
+        fields: [
+          { id: "mediaSource", type: "text", label: "Media Source", isStandard: true, mapping: "mediaSource", visibleIf: { field: "referralSource", contains: "Social Media" } }
+        ]
+      },
+      {
+        id: "personal_details",
+        title: "Let us know you better",
+        description: "Basic information to identify you.",
+        enabled: true,
+        fields: [
+          { id: "fullName", type: "text", label: "Name in Full", required: true, isStandard: true, mapping: "fullName" },
+          { id: "permanentAddress", type: "textarea", label: "Permanent Address", required: true, isStandard: true, mapping: "permanentAddress" },
+          { id: "mailingAddress", type: "textarea", label: "Preferred Mailing Address (or N/A)", required: true, isStandard: true, mapping: "mailingAddress" },
+          { id: "phone", type: "phone", label: "Mobile Number (10 digits)", required: true, isStandard: true, mapping: "phone" },
+          { id: "email", type: "text", label: "E-mail ID", required: true, isStandard: true, mapping: "email" },
+          { id: "dateOfBirth", type: "date", label: "Date of Birth", required: true, isStandard: true, mapping: "dateOfBirth" },
+          { id: "maritalStatus", type: "radio", label: "Marital Status", options: ["Married", "Unmarried"], required: true, isStandard: true, mapping: "maritalStatus" },
+          { id: "spouseDetails", type: "text", label: "If Married, Spouse Details (Name & Profession)", isStandard: true, mapping: "spouseDetails" }
+        ]
+      },
+      {
+        id: "previous_entrance",
+        title: "Previous Entrance",
+        description: "Did you appear for the entrance earlier?",
+        enabled: true,
+        fields: [
+          { id: "prev_appeared", type: "radio", label: "Appeared Earlier?", options: ["Yes", "No"] },
+          { id: "previousApplicationMonthYear", type: "text", label: "If Yes, Month & Year", isStandard: true, mapping: "previousApplicationMonthYear", visibleIf: { field: "prev_appeared", equals: "Yes" } }
+        ]
+      },
+      {
+        id: "medical_history",
+        title: "Medical History",
+        description: "Declare any ailments.",
+        enabled: true,
+        fields: [
+          { id: "medicalConditions", type: "checkbox_group", label: "Ailments / Medications", options: ["Asthma", "Hypertension", "Diabetes", "Skin Allergy", "Hearing Impairment", "Tuberculosis", "Any Heart Related Issues", "Any Liver Related Issues", "None of the Above"], isStandard: true, mapping: "medicalConditions" }
+        ]
+      },
+      {
+        id: "educational_qual",
+        title: "Educational Qualifications",
+        description: "Undergraduate and Postgraduate details.",
+        enabled: true,
+        fields: [
+          { id: "medicalCollege", type: "text", label: "Medical College Qualified From", required: true, isStandard: true, mapping: "medicalCollege" },
+          { id: "university", type: "text", label: "University (MBBS Awarded)", required: true, isStandard: true, mapping: "university" },
+          { id: "qualification_matrix", type: "qualification_matrix", label: "Postgraduate Qualifications", isStandard: true, mapping: "qualificationMatrix" },
+          { id: "do_details", type: "text", label: "If DO: College, University & Year", isStandard: true, mapping: "doDetails", visibleIf: { field: "qualification_matrix", key: "DO (Diploma Ophthlmology)", equals: "Yes" } },
+          { id: "ms_md_details", type: "text", label: "If MS: College, University & Year", isStandard: true, mapping: "msMdDetails", visibleIf: { field: "qualification_matrix", key: "MS/MD ( Masters in Ophthalmology)", equals: "Yes" } },
+          { id: "dnb_details", type: "text", label: "If DNB: Institution & Year", isStandard: true, mapping: "dnbDetails", visibleIf: { field: "qualification_matrix", key: "DNB", equals: "Yes" } },
+          { id: "otherTraining", type: "text", label: "Any Other Training / Certification", isStandard: true, mapping: "otherTraining" },
+          { id: "medicalCouncilNumber", type: "text", label: "Medical Council Registration Number", required: true, isStandard: true, mapping: "medicalCouncilNumber" }
+        ]
+      },
+      {
+        id: "clinical_exp",
+        title: "Clinical Experience",
+        description: "Document your diagnostic and surgical experience.",
+        enabled: true,
+        fields: [
+          { id: "diagnostic_skills", type: "skills_table", label: "Diagnostic Skills", options: ["Beginner", "Intermittent", "Expert"], rows: ["Slit Lamp", "Fundus Exam +90D", "Indirect Ophthalmoscopy", "Applanation Tonometry", "Gonioscopy", "Biometry (Keratometry, A Scan)", "Ultrasound B Scan", "Corneal Topgraphy", "Specular Microscopy", "Visual Fields (HFA)", "Fundus Flourescien Angiography (FFA)", "Ocular Coherence Tomography (OCT)", "Yag Capsulotomy /Iridotomy", "Argon LASER", "Hess Charting"], isStandard: true, mapping: "diagnosticSkills" },
+          { id: "surgery_experience", type: "surgery_table", label: "Surgical Experience", rows: ["ECCE", "SICS", "PHACO", "TRABECULECTOMY", "RETINA LASERS", "DCR"], isStandard: true, mapping: "surgicalExperience" },
+          { id: "totalSurgeries", type: "number", label: "Total No. of Surgeries performed till date (Confirmation)", required: true, isStandard: true, mapping: "totalSurgeries" }
+        ]
+      },
+      {
+        id: "publications",
+        title: "Publications & Presentation",
+        description: "Academic presentations & publications.",
+        enabled: true,
+        fields: [
+          { id: "publications", type: "textarea", label: "Journal Publications", required: true, isStandard: true, mapping: "publications" },
+          { id: "presentations", type: "textarea", label: "Conference Presentations", required: true, isStandard: true, mapping: "presentations" }
+        ]
+      },
+      {
+        id: "lor",
+        title: "LETTER OF RECOMMENDATION (LOR)",
+        description: "Upload two LORs from the last 6 months (PDF).",
+        enabled: true,
+        fields: [
+          { id: "lor1Url", type: "file", label: "LOR 1 PDF", required: true, isStandard: true, mapping: "lor1Url" },
+          { id: "lor1RefName", type: "text", label: "Name & Designation of Reference 1", required: true, isStandard: true, mapping: "lor1RefName" },
+          { id: "lor1RefContact", type: "text", label: "Contact number of Reference 1", required: true, isStandard: true, mapping: "lor1RefContact" },
+          { id: "lor1RefEmail", type: "text", label: "Email ID of Reference 1", required: true, isStandard: true, mapping: "lor1RefEmail" },
+          { id: "lor2Url", type: "file", label: "LOR 2 PDF", required: true, isStandard: true, mapping: "lor2Url" },
+          { id: "lor2RefName", type: "text", label: "Name & Designation of Reference 2", required: true, isStandard: true, mapping: "lor2RefName" },
+          { id: "lor2RefContact", type: "text", label: "Contact number of Reference 2", required: true, isStandard: true, mapping: "lor2RefContact" },
+          { id: "lor2RefEmail", type: "text", label: "Email ID of Reference 2", required: true, isStandard: true, mapping: "lor2RefEmail" }
+        ]
+      },
+      {
+        id: "final",
+        title: "Declaration & Payment",
+        description: "Final information and documents.",
+        enabled: true,
+        fields: [
+          { id: "photoUrl", type: "file", label: "Passport Size Photograph", required: true, isStandard: true, mapping: "photoUrl" },
+          { id: "declarationAccepted", type: "checkbox", label: "I hereby declare that the information provided is true to the best of my knowledge.", required: true, isStandard: true, mapping: "declarationAccepted" }
+        ]
+      }
+    ];
   }
 });
 
@@ -1082190,7 +1077900,7 @@ var require_lib6 = __commonJS({
 });
 
 // ../../node_modules/.pnpm/whatwg-url@5.0.0/node_modules/whatwg-url/lib/utils.js
-var require_utils10 = __commonJS({
+var require_utils9 = __commonJS({
   "../../node_modules/.pnpm/whatwg-url@5.0.0/node_modules/whatwg-url/lib/utils.js"(exports, module) {
     "use strict";
     module.exports.mixin = function mixin(target, source) {
@@ -1083612,7 +1079322,7 @@ var require_URL = __commonJS({
   "../../node_modules/.pnpm/whatwg-url@5.0.0/node_modules/whatwg-url/lib/URL.js"(exports, module) {
     "use strict";
     var conversions = require_lib6();
-    var utils8 = require_utils10();
+    var utils8 = require_utils9();
     var Impl = require_URL_impl();
     var impl = utils8.implSymbol;
     function URL5(url3) {
@@ -1095152,7 +1090862,7 @@ var require_stream_duplex2 = __commonJS({
 });
 
 // ../../node_modules/.pnpm/readable-stream@3.6.2/node_modules/readable-stream/lib/internal/streams/end-of-stream.js
-var require_end_of_stream3 = __commonJS({
+var require_end_of_stream2 = __commonJS({
   "../../node_modules/.pnpm/readable-stream@3.6.2/node_modules/readable-stream/lib/internal/streams/end-of-stream.js"(exports, module) {
     "use strict";
     var ERR_STREAM_PREMATURE_CLOSE = require_errors4().codes.ERR_STREAM_PREMATURE_CLOSE;
@@ -1095268,7 +1090978,7 @@ var require_async_iterator = __commonJS({
       }
       return (hint === "string" ? String : Number)(input);
     }
-    var finished = require_end_of_stream3();
+    var finished = require_end_of_stream2();
     var kLastResolve = /* @__PURE__ */ Symbol("lastResolve");
     var kLastReject = /* @__PURE__ */ Symbol("lastReject");
     var kError = /* @__PURE__ */ Symbol("error");
@@ -1096423,7 +1092133,7 @@ var require_pipeline2 = __commonJS({
       stream2.on("close", function() {
         closed = true;
       });
-      if (eos === void 0) eos = require_end_of_stream3();
+      if (eos === void 0) eos = require_end_of_stream2();
       eos(stream2, {
         readable: reading,
         writable: writing
@@ -1096496,9 +1092206,92 @@ var require_readable3 = __commonJS({
       exports.Duplex = require_stream_duplex2();
       exports.Transform = require_stream_transform2();
       exports.PassThrough = require_stream_passthrough2();
-      exports.finished = require_end_of_stream3();
+      exports.finished = require_end_of_stream2();
       exports.pipeline = require_pipeline2();
     }
+  }
+});
+
+// ../../node_modules/.pnpm/end-of-stream@1.4.5/node_modules/end-of-stream/index.js
+var require_end_of_stream3 = __commonJS({
+  "../../node_modules/.pnpm/end-of-stream@1.4.5/node_modules/end-of-stream/index.js"(exports, module) {
+    var once = require_once();
+    var noop2 = function() {
+    };
+    var qnt = global.Bare ? queueMicrotask : process.nextTick.bind(process);
+    var isRequest2 = function(stream2) {
+      return stream2.setHeader && typeof stream2.abort === "function";
+    };
+    var isChildProcess = function(stream2) {
+      return stream2.stdio && Array.isArray(stream2.stdio) && stream2.stdio.length === 3;
+    };
+    var eos = function(stream2, opts, callback) {
+      if (typeof opts === "function") return eos(stream2, null, opts);
+      if (!opts) opts = {};
+      callback = once(callback || noop2);
+      var ws = stream2._writableState;
+      var rs = stream2._readableState;
+      var readable = opts.readable || opts.readable !== false && stream2.readable;
+      var writable = opts.writable || opts.writable !== false && stream2.writable;
+      var cancelled = false;
+      var onlegacyfinish = function() {
+        if (!stream2.writable) onfinish();
+      };
+      var onfinish = function() {
+        writable = false;
+        if (!readable) callback.call(stream2);
+      };
+      var onend = function() {
+        readable = false;
+        if (!writable) callback.call(stream2);
+      };
+      var onexit = function(exitCode) {
+        callback.call(stream2, exitCode ? new Error("exited with error code: " + exitCode) : null);
+      };
+      var onerror = function(err) {
+        callback.call(stream2, err);
+      };
+      var onclose = function() {
+        qnt(onclosenexttick);
+      };
+      var onclosenexttick = function() {
+        if (cancelled) return;
+        if (readable && !(rs && (rs.ended && !rs.destroyed))) return callback.call(stream2, new Error("premature close"));
+        if (writable && !(ws && (ws.ended && !ws.destroyed))) return callback.call(stream2, new Error("premature close"));
+      };
+      var onrequest = function() {
+        stream2.req.on("finish", onfinish);
+      };
+      if (isRequest2(stream2)) {
+        stream2.on("complete", onfinish);
+        stream2.on("abort", onclose);
+        if (stream2.req) onrequest();
+        else stream2.on("request", onrequest);
+      } else if (writable && !ws) {
+        stream2.on("end", onlegacyfinish);
+        stream2.on("close", onlegacyfinish);
+      }
+      if (isChildProcess(stream2)) stream2.on("exit", onexit);
+      stream2.on("end", onend);
+      stream2.on("finish", onfinish);
+      if (opts.error !== false) stream2.on("error", onerror);
+      stream2.on("close", onclose);
+      return function() {
+        cancelled = true;
+        stream2.removeListener("complete", onfinish);
+        stream2.removeListener("abort", onclose);
+        stream2.removeListener("request", onrequest);
+        if (stream2.req) stream2.req.removeListener("finish", onfinish);
+        stream2.removeListener("end", onlegacyfinish);
+        stream2.removeListener("close", onlegacyfinish);
+        stream2.removeListener("finish", onfinish);
+        stream2.removeListener("exit", onexit);
+        stream2.removeListener("end", onend);
+        stream2.removeListener("error", onerror);
+        stream2.removeListener("close", onclose);
+      };
+    };
+    module.exports = eos;
   }
 });
 
@@ -1096529,7 +1092322,7 @@ var require_stream_shift = __commonJS({
 var require_duplexify2 = __commonJS({
   "../../node_modules/.pnpm/duplexify@4.1.3/node_modules/duplexify/index.js"(exports, module) {
     var stream2 = require_readable3();
-    var eos = require_end_of_stream2();
+    var eos = require_end_of_stream3();
     var inherits = require_inherits();
     var shift = require_stream_shift();
     var SIGNAL_FLUSH = Buffer.from && Buffer.from !== Uint8Array.from ? Buffer.from([0]) : new Buffer([0]);
@@ -1100571,7 +1096364,7 @@ var init_signer = __esm({
 
 // ../../node_modules/.pnpm/@google-cloud+storage@7.19.0/node_modules/@google-cloud/storage/build/esm/src/file.js
 import * as crypto8 from "crypto";
-import * as fs7 from "fs";
+import * as fs6 from "fs";
 import { Writable as Writable2, pipeline as pipeline2 } from "stream";
 import * as zlib3 from "zlib";
 var import_promisify3, import_mime, import_duplexify2, import_async_retry2, __classPrivateFieldGet5, _File_instances, _File_validateIntegrity, ActionToHTTPMethod, GS_URL_REGEXP, COMPRESSIBLE_MIME_REGEX, RequestError, SEVEN_DAYS2, GS_UTIL_URL_REGEX, HTTPS_PUBLIC_URL_REGEX, FileExceptionMessages, File4;
@@ -1102105,7 +1097898,7 @@ var init_file2 = __esm({
         if (destination) {
           fileStream.on("error", callback).once("data", (data) => {
             receivedData = true;
-            const writable = fs7.createWriteStream(destination);
+            const writable = fs6.createWriteStream(destination);
             writable.write(data);
             fileStream.pipe(writable).on("error", (err) => {
               callback(err, Buffer.from(""));
@@ -1102116,7 +1097909,7 @@ var init_file2 = __esm({
             if (!receivedData) {
               const data = Buffer.alloc(0);
               try {
-                fs7.writeFileSync(destination, data);
+                fs6.writeFileSync(destination, data);
                 callback(null, data);
               } catch (e2) {
                 callback(e2, data);
@@ -1104383,8 +1100176,8 @@ var init_notification = __esm({
 });
 
 // ../../node_modules/.pnpm/@google-cloud+storage@7.19.0/node_modules/@google-cloud/storage/build/esm/src/bucket.js
-import * as fs8 from "fs";
-import * as path6 from "path";
+import * as fs7 from "fs";
+import * as path4 from "path";
 import { promisify as promisify2 } from "util";
 import { Readable as Readable3 } from "stream";
 import { URL as URL4 } from "url";
@@ -1107347,7 +1103140,7 @@ var init_bucket = __esm({
               if (options.onUploadProgress) {
                 writable.on("progress", options.onUploadProgress);
               }
-              fs8.createReadStream(pathString).on("error", bail).pipe(writable).on("error", (err) => {
+              fs7.createReadStream(pathString).on("error", bail).pipe(writable).on("error", (err) => {
                 if (this.storage.retryOptions.autoRetry && this.storage.retryOptions.retryableErrorFn(err)) {
                   return reject(err);
                 } else {
@@ -1107397,7 +1103190,7 @@ var init_bucket = __esm({
             preconditionOpts: this.instancePreconditionOpts
           });
         } else {
-          const destination = path6.basename(pathString);
+          const destination = path4.basename(pathString);
           newFile = this.file(destination, {
             encryptionKey: options.encryptionKey,
             kmsKeyName: options.kmsKeyName,
@@ -1109137,6 +1104930,7860 @@ var init_objectStorage = __esm({
         });
       }
     };
+  }
+});
+
+// src/routes/application-forms.ts
+import fs8 from "fs/promises";
+import path5 from "path";
+import os2 from "os";
+function generateToken() {
+  return Math.random().toString(36).substring(2, 10).toUpperCase();
+}
+function checkCompleteness(sub) {
+  return !!(sub.fullName && sub.email && sub.phone && sub.degree && sub.medicalCollege);
+}
+async function syncSubmissionToCandidateAndDocuments(candidateId, sub) {
+  await db.update(candidatesTable).set({
+    fullName: sub.fullName,
+    phone: sub.phone ?? null,
+    dateOfBirth: sub.dateOfBirth ?? null,
+    gender: sub.gender ?? null,
+    qualification: sub.degree ?? null,
+    collegeName: sub.medicalCollege ?? null,
+    address: sub.permanentAddress ?? null,
+    status: "approved"
+  }).where(eq(candidatesTable.id, candidateId));
+  const documentTypes = [
+    { type: "LOR1", url: sub.lor1Url, name: sub.lor1RefName ? `LOR1_${sub.lor1RefName}.pdf` : "LOR1.pdf" },
+    { type: "LOR2", url: sub.lor2Url, name: sub.lor2RefName ? `LOR2_${sub.lor2RefName}.pdf` : "LOR2.pdf" },
+    { type: "PHOTO", url: sub.photoUrl, name: "photo.jpg" },
+    { type: "PAYMENT", url: sub.paymentUrl, name: "payment_proof.jpg" }
+  ];
+  for (const doc of documentTypes) {
+    if (doc.url) {
+      const existingDoc = await db.select().from(documentsTable).where(
+        and(
+          eq(documentsTable.candidateId, candidateId),
+          eq(documentsTable.docType, doc.type)
+        )
+      );
+      if (existingDoc.length > 0) {
+        await db.update(documentsTable).set({
+          fileUrl: doc.url,
+          fileName: doc.name,
+          uploadedAt: /* @__PURE__ */ new Date()
+        }).where(eq(documentsTable.id, existingDoc[0].id));
+      } else {
+        await db.insert(documentsTable).values({
+          candidateId,
+          docType: doc.type,
+          fileName: doc.name,
+          fileUrl: doc.url,
+          uploadedAt: /* @__PURE__ */ new Date()
+        });
+      }
+    }
+  }
+}
+async function generateSubmissionPdfBuffer(sub, form, program, candidate) {
+  let photoBuffer = null;
+  const photoUrl = sub.photoUrl;
+  if (photoUrl) {
+    if (photoUrl.startsWith("/objects/")) {
+      const localPath = path5.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
+      try {
+        photoBuffer = await fs8.readFile(localPath);
+      } catch {
+      }
+    } else if (photoUrl.startsWith("http://") || photoUrl.startsWith("https://")) {
+      try {
+        const resp = await fetch(photoUrl, { signal: AbortSignal.timeout(3e3) });
+        if (resp.ok) {
+          photoBuffer = Buffer.from(await resp.arrayBuffer());
+        }
+      } catch {
+      }
+    }
+  }
+  return new Promise((resolve4, reject) => {
+    try {
+      const candidateCode = candidate?.candidateCode || `APP-${sub.id}`;
+      const doc = new import_pdfkit2.default({
+        margin: 36,
+        size: "LETTER",
+        bufferPages: true,
+        info: { Title: `Application - ${sub.fullName}`, Author: "Sankara Academy of Vision" }
+      });
+      const buffers = [];
+      doc.on("data", (chunk) => buffers.push(chunk));
+      doc.on("end", () => resolve4(Buffer.concat(buffers)));
+      doc.on("error", reject);
+      const colors = {
+        primary: "#0f172a",
+        secondary: "#475569",
+        accent: "#0b4a8f",
+        muted: "#94a3b8",
+        border: "#e2e8f0",
+        bgSection: "#f8fafc",
+        expertGreen: "#059669",
+        intermOrange: "#d97706",
+        basicSlate: "#64748b"
+      };
+      const drawSectionHeader = (title) => {
+        if (doc.y > 680) {
+          doc.addPage();
+          doc.y = 36;
+        }
+        doc.moveDown(0.5);
+        const y = doc.y;
+        doc.rect(36, y, 540, 18).fill(colors.bgSection);
+        doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(9.5).text(title.toUpperCase(), 44, y + 4, { width: 520 });
+        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(36, y + 18).lineTo(576, y + 18).stroke();
+        doc.y = y + 23;
+      };
+      const renderApplicationRecordRow = (label, value) => {
+        const valText = value === null || value === void 0 || value === "null" || value === "" ? "\u2014" : String(value);
+        const startY = doc.y;
+        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(8.5).text(label.toUpperCase(), 36, startY, { width: 115, lineGap: 1 });
+        const labelEndY = doc.y;
+        doc.fillColor(colors.primary).font("Helvetica").fontSize(9).text(`: ${valText}`, 155, startY, { width: 310, lineGap: 1 });
+        const valueEndY = doc.y;
+        doc.y = Math.max(labelEndY, valueEndY) + 2.5;
+      };
+      const renderGeneralRow = (label, value) => {
+        const valText = value === null || value === void 0 || value === "null" || value === "" ? "\u2014" : String(value);
+        if (doc.y > 700) {
+          doc.addPage();
+          doc.y = 36;
+        }
+        const currentY = doc.y;
+        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(8.5).text(label.toUpperCase(), 36, currentY, { width: 145, lineGap: 1 });
+        const labelEndY = doc.y;
+        doc.fillColor(colors.primary).font("Helvetica").fontSize(9).text(`: ${valText}`, 185, currentY, { width: 390, lineGap: 1 });
+        const valueEndY = doc.y;
+        doc.y = Math.max(labelEndY, valueEndY) + 3.5;
+      };
+      const parseCenterPreferences = (cp, customAnswers, sections) => {
+        if (cp) {
+          try {
+            const parsed = JSON.parse(cp);
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+          } catch {
+          }
+        }
+        if (customAnswers && typeof customAnswers === "object") {
+          const prefs = {};
+          Object.entries(customAnswers).forEach(([key, val]) => {
+            if (key.startsWith("unit_") && val) {
+              let label = key.replace("unit_", "").replace(/_/g, " ").toUpperCase();
+              if (sections) {
+                sections.forEach((sec) => {
+                  sec.fields?.forEach((f3) => {
+                    if (f3.id === key) label = f3.label.replace(" Preferred Center", "");
+                  });
+                });
+              }
+              prefs[label] = Array.isArray(val) ? val.join(", ") : String(val);
+            }
+          });
+          return prefs;
+        }
+        return {};
+      };
+      doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(18).text("SANKARA ACADEMY OF VISION", 36, 36, { width: 440, align: "left" });
+      doc.fillColor(colors.primary).font("Helvetica").fontSize(9).text("Educational unit of Sankara Eye Foundation, India \xB7 Sri Kanchi Kamakoti Medical Trust", 36, 57, { width: 440, align: "left" });
+      doc.fillColor(colors.muted).font("Helvetica-Bold").fontSize(8.5).text("FELLOWSHIP PROGRAM ADMISSIONS RECORD", 36, 70, { width: 440, align: "left" });
+      doc.strokeColor(colors.accent).lineWidth(1.5).moveTo(36, 84).lineTo(576, 84).stroke();
+      const photoX = 491;
+      const photoY = 94;
+      const photoW = 85;
+      const photoH = 105;
+      if (photoBuffer) {
+        try {
+          doc.image(photoBuffer, photoX, photoY, { width: photoW, height: photoH, fit: [photoW, photoH] });
+          doc.rect(photoX, photoY, photoW, photoH).strokeColor(colors.border).lineWidth(1).stroke();
+        } catch {
+          doc.rect(photoX, photoY, photoW, photoH).fill("#f1f5f9");
+          doc.fillColor(colors.muted).font("Helvetica").fontSize(7.5).text("PHOTO LOAD ERROR", photoX, photoY + 45, { width: photoW, align: "center" });
+        }
+      } else {
+        doc.rect(photoX, photoY, photoW, photoH).fill("#f1f5f9");
+        doc.fillColor(colors.muted).font("Helvetica").fontSize(7.5).text("NO PHOTO UPLOADED", photoX, photoY + 45, { width: photoW, align: "center" });
+      }
+      doc.y = 94;
+      doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(11).text("APPLICATION SUMMARY", 36, 94, { width: 350 });
+      doc.y = 112;
+      renderApplicationRecordRow("Application ID", `#APP-${sub.id}`);
+      renderApplicationRecordRow("Candidate Protocol", candidateCode);
+      renderApplicationRecordRow("Program Stream", program?.name || "Fellowship Program");
+      renderApplicationRecordRow("Submission Date", sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "\u2014");
+      renderApplicationRecordRow("Application Status", sub.status.toUpperCase());
+      if (doc.y < 210) {
+        doc.y = 210;
+      }
+      drawSectionHeader("Personal & Communication Details");
+      renderGeneralRow("Full Name", sub.fullName);
+      renderGeneralRow("Email Address", sub.email);
+      renderGeneralRow("Phone Number", sub.phone);
+      renderGeneralRow("Date of Birth", formatDOBToStandard(sub.dateOfBirth));
+      renderGeneralRow("Gender / Marital", [sub.gender, sub.maritalStatus].filter(Boolean).join(" \xB7 ") || "\u2014");
+      if (sub.spouseDetails) renderGeneralRow("Spouse Details", sub.spouseDetails);
+      renderGeneralRow("Permanent Address", sub.permanentAddress);
+      if (sub.mailingAddress) renderGeneralRow("Mailing Address", sub.mailingAddress);
+      if (sub.healthDeclaration || sub.medicalConditions || sub.healthDetails) {
+        renderGeneralRow("Health Declaration / Ailments", [sub.healthDeclaration, sub.medicalConditions, sub.healthDetails].filter(Boolean).join(" \xB7 ") || "Medically Fit");
+      }
+      drawSectionHeader("Academic & Professional Qualifications");
+      renderGeneralRow("Basic Degree (UG)", sub.degree || "MBBS");
+      renderGeneralRow("Medical College / University", [sub.medicalCollege, sub.university].filter(Boolean).join(" \xB7 ") || "\u2014");
+      renderGeneralRow("Medical Council Reg No", sub.medicalCouncilNumber);
+      if (sub.pgQualifications) renderGeneralRow("PG Qualifications", sub.pgQualifications);
+      if (sub.msMdQualification) renderGeneralRow("MS / MD Details", sub.msMdDetails || "Yes");
+      if (sub.dnbQualification) renderGeneralRow("DNB Details", sub.dnbDetails || "Yes");
+      if (sub.doQualification) renderGeneralRow("DO Details", sub.doDetails || "Yes");
+      if (sub.otherTraining) renderGeneralRow("Other Training / Exp", sub.otherTraining);
+      drawSectionHeader("Specialization & Center Preferences");
+      const specs = parseSpecializationString(sub.specialization);
+      const centerPrefs = parseCenterPreferences(sub.centerPreference, sub.customAnswers, form?.sectionsConfig ?? void 0);
+      if (specs.length === 0) {
+        if (doc.y > 700) {
+          doc.addPage();
+          doc.y = 36;
+        }
+        doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text("General Fellowship / No specific preference", 36, doc.y);
+      } else {
+        specs.forEach((sp, idx) => {
+          if (doc.y > 700) {
+            doc.addPage();
+            doc.y = 36;
+          }
+          const currentY = doc.y;
+          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(9).text(`${idx + 1}. ${sp}`, 36, currentY, { width: 220, lineGap: 1 });
+          const spEndY = doc.y;
+          doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text(`Preferred Center: ${centerPrefs[sp] || "Any Center"}`, 260, currentY, { width: 315, lineGap: 1 });
+          const centerEndY = doc.y;
+          doc.y = Math.max(spEndY, centerEndY) + 3;
+        });
+      }
+      const parsedSkills = parseDiagnosticSkills(sub.diagnosticSkills);
+      if (parsedSkills.length > 0) {
+        drawSectionHeader("Clinical Profile & Diagnostic Skills");
+        const colWidth = 265;
+        const colGap = 10;
+        let colIdx = 0;
+        let rowStartY = doc.y;
+        parsedSkills.forEach((skill) => {
+          if (rowStartY > 700) {
+            doc.addPage();
+            doc.y = 36;
+            rowStartY = doc.y;
+            colIdx = 0;
+          }
+          const curX = colIdx === 0 ? 36 : 36 + colWidth + colGap;
+          const levelColor = skill.level === "Expert" ? colors.expertGreen : skill.level === "Intermittent" ? colors.intermOrange : colors.basicSlate;
+          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(8.5).text(skill.name, curX, rowStartY, { width: 180, lineGap: 1 });
+          doc.fillColor(levelColor).font("Helvetica-Bold").fontSize(7.5).text(`[ ${skill.level.toUpperCase()} ]`, curX + 185, rowStartY, { width: 80, align: "right" });
+          if (colIdx === 0) {
+            colIdx = 1;
+          } else {
+            colIdx = 0;
+            rowStartY += 14;
+            doc.y = rowStartY;
+          }
+        });
+        if (colIdx === 1) {
+          rowStartY += 14;
+          doc.y = rowStartY;
+        }
+      }
+      const parsedSurgeries = parseSurgicalExperience(sub.surgicalExperience);
+      if (parsedSurgeries.length > 0 || sub.totalSurgeries) {
+        drawSectionHeader("Surgical Experience & Operative Log");
+        if (parsedSurgeries.length > 0) {
+          if (doc.y > 670) {
+            doc.addPage();
+            doc.y = 36;
+          }
+          const thY = doc.y;
+          doc.rect(36, thY, 540, 16).fill("#f1f5f9");
+          doc.strokeColor(colors.border).lineWidth(0.5).rect(36, thY, 540, 16).stroke();
+          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(8).text("SURGICAL PROCEDURE", 42, thY + 4, { width: 220 });
+          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(8).text("INDEPENDENT (SOLO)", 270, thY + 4, { width: 95, align: "center" });
+          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(8).text("UNDER SUPERVISION", 375, thY + 4, { width: 95, align: "center" });
+          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(8).text("TOTAL CASES", 475, thY + 4, { width: 95, align: "right" });
+          let rowY = thY + 16;
+          let sumInd = 0;
+          let sumSup = 0;
+          parsedSurgeries.forEach((s2, idx) => {
+            if (rowY > 700) {
+              doc.addPage();
+              doc.y = 36;
+              rowY = doc.y;
+            }
+            sumInd += s2.independent;
+            sumSup += s2.supervision;
+            const bg = idx % 2 === 0 ? "#ffffff" : "#f8fafc";
+            doc.rect(36, rowY, 540, 15).fill(bg);
+            doc.strokeColor(colors.border).lineWidth(0.3).rect(36, rowY, 540, 15).stroke();
+            doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(8).text(s2.procedure, 42, rowY + 3.5, { width: 220 });
+            doc.fillColor(colors.secondary).font("Helvetica").fontSize(8).text(String(s2.independent), 270, rowY + 3.5, { width: 95, align: "center" });
+            doc.fillColor(colors.secondary).font("Helvetica").fontSize(8).text(String(s2.supervision), 375, rowY + 3.5, { width: 95, align: "center" });
+            doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(8).text(String(s2.total), 475, rowY + 3.5, { width: 95, align: "right" });
+            rowY += 15;
+          });
+          const grandTotal = sumInd + sumSup;
+          doc.rect(36, rowY, 540, 17).fill("#e0f2fe");
+          doc.strokeColor(colors.accent).lineWidth(0.8).rect(36, rowY, 540, 17).stroke();
+          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(8.5).text("CUMULATIVE SURGICAL VOLUME", 42, rowY + 4, { width: 220 });
+          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(8.5).text(String(sumInd), 270, rowY + 4, { width: 95, align: "center" });
+          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(8.5).text(String(sumSup), 375, rowY + 4, { width: 95, align: "center" });
+          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(8.5).text(String(grandTotal), 475, rowY + 4, { width: 95, align: "right" });
+          doc.y = rowY + 22;
+        }
+        if (sub.totalSurgeries) {
+          renderGeneralRow("Declared Total Surgeries", sub.totalSurgeries);
+        }
+      }
+      if (sub.publications || sub.presentations) {
+        drawSectionHeader("Research, Publications & Presentations");
+        if (sub.publications) renderGeneralRow("Indexed Publications", sub.publications);
+        if (sub.presentations) renderGeneralRow("Conference Presentations", sub.presentations);
+      }
+      drawSectionHeader("References & Documents");
+      renderGeneralRow("Reference 1 (LOR)", `${sub.lor1RefName || "\u2014"} (${sub.lor1RefContact || "No contact"}${sub.lor1RefEmail ? ` \xB7 ${sub.lor1RefEmail}` : ""})`);
+      renderGeneralRow("Reference 2 (LOR)", `${sub.lor2RefName || "\u2014"} (${sub.lor2RefContact || "No contact"}${sub.lor2RefEmail ? ` \xB7 ${sub.lor2RefEmail}` : ""})`);
+      const docList = [];
+      if (sub.lor1Url) docList.push("LOR 1");
+      if (sub.lor2Url) docList.push("LOR 2");
+      if (sub.photoUrl) docList.push("Photo");
+      if (sub.paymentUrl) docList.push("Payment Receipt");
+      renderGeneralRow("Uploaded Dossier Files", docList.length > 0 ? docList.join(", ") : "No documents uploaded");
+      drawSectionHeader("Declaration & Fee Verification");
+      renderGeneralRow("Payment Reference ID", sub.paymentId || "\u2014");
+      renderGeneralRow("Payment Mode / Source", [sub.paymentMode?.toUpperCase(), sub.source?.toUpperCase()].filter(Boolean).join(" \xB7 ") || "\u2014");
+      renderGeneralRow("Fee Status", sub.paymentId ? "Verified & Paid" : "Pending");
+      if (doc.y > 670) {
+        doc.addPage();
+        doc.y = 36;
+      }
+      doc.moveDown(0.5);
+      doc.fillColor(colors.secondary).font("Helvetica-Oblique").fontSize(8).text(
+        "Declaration: I hereby declare that the information provided above is true and authentic to the best of my knowledge and belief.",
+        36,
+        doc.y,
+        { width: 540, lineGap: 1 }
+      );
+      doc.moveDown(1.5);
+      const signY = doc.y;
+      if (signY < 720) {
+        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(36, signY + 30).lineTo(180, signY + 30).stroke();
+        doc.fillColor(colors.secondary).font("Helvetica").fontSize(7.5).text("Candidate Signature", 36, signY + 34, { width: 144, align: "center" });
+        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(234, signY + 30).lineTo(378, signY + 30).stroke();
+        doc.fillColor(colors.secondary).font("Helvetica").fontSize(7.5).text("Reviewer Seal & Signature", 234, signY + 34, { width: 144, align: "center" });
+        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(432, signY + 30).lineTo(576, signY + 30).stroke();
+        doc.fillColor(colors.secondary).font("Helvetica").fontSize(7.5).text("Date of Verification", 432, signY + 34, { width: 144, align: "center" });
+      }
+      const range2 = doc.bufferedPageRange();
+      for (let i2 = range2.start; i2 < range2.start + range2.count; i2++) {
+        doc.switchToPage(i2);
+        doc.fillColor(colors.muted).fontSize(7.5).text(
+          `Page ${i2 + 1} of ${range2.count} | Sankara Academy of Vision Admissions Record`,
+          36,
+          doc.page.height - 24,
+          { width: 540, align: "center" }
+        );
+      }
+      doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+function normalizeToken(t2) {
+  if (!t2) return "";
+  const trimmed = t2.trim();
+  if (trimmed === "JAN2027" || trimmed === "jan2027" || trimmed === "january2027" || trimmed === "JAN2026" || trimmed === "jan2026" || trimmed === "january2026") {
+    return "JAN2027";
+  }
+  if (trimmed === "DEC2026" || trimmed === "dec2026" || trimmed === "december2026") return "DECEMBER2026";
+  return trimmed;
+}
+async function resolveFormByToken(rawToken) {
+  const token = normalizeToken(rawToken);
+  if (token.toUpperCase() === "JULY2026") {
+    return null;
+  }
+  if (!token || token.toLowerCase() === "active") {
+    const [activeForm] = await db.select().from(applicationFormsTable).where(and(eq(applicationFormsTable.isActive, true), ne(applicationFormsTable.token, "JULY2026"))).orderBy(sql`${applicationFormsTable.createdAt} DESC`).limit(1);
+    return activeForm || null;
+  }
+  let [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, token));
+  if (form) return form;
+  if (token === "JAN2026") {
+    [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, "JAN2027"));
+    if (form) return form;
+  }
+  if (token === "JAN2027") {
+    [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, "JAN2026"));
+    if (form) return form;
+  }
+  const [ciForm] = await db.select().from(applicationFormsTable).where(ilike(applicationFormsTable.token, token));
+  return ciForm || null;
+}
+async function saveBase64FileIfPresent(dataUrl, candidateName, fieldName) {
+  if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:")) return dataUrl;
+  try {
+    const matches = dataUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) return dataUrl;
+    const contentType = matches[1];
+    const buffer = Buffer.from(matches[2], "base64");
+    const ext2 = contentType.includes("pdf") ? "pdf" : contentType.includes("png") ? "png" : "jpg";
+    const folderName = candidateName ? candidateName.trim().replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_") : "candidate";
+    const filename = `${fieldName}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext2}`;
+    const objectPath = `/objects/uploads/${folderName}/${filename}`;
+    try {
+      const localDir = path5.join(process.cwd(), "uploads", folderName);
+      await fs8.mkdir(localDir, { recursive: true });
+      await fs8.writeFile(path5.join(localDir, filename), buffer);
+    } catch (_) {
+    }
+    try {
+      const tmpDir = path5.join(os2.tmpdir(), "uploads", folderName);
+      await fs8.mkdir(tmpDir, { recursive: true });
+      await fs8.writeFile(path5.join(tmpDir, filename), buffer);
+    } catch (_) {
+    }
+    await db.execute(sql`
+      INSERT INTO uploaded_files (file_path, file_name, content_type, file_data, file_size)
+      VALUES (${objectPath}, ${filename}, ${contentType}, ${buffer}, ${buffer.length})
+      ON CONFLICT (file_path) DO UPDATE SET
+        file_data = EXCLUDED.file_data,
+        file_size = EXCLUDED.file_size,
+        content_type = EXCLUDED.content_type,
+        created_at = NOW()
+    `);
+    return objectPath;
+  } catch (err) {
+    console.error("Failed to convert base64 upload:", err);
+    return dataUrl;
+  }
+}
+var import_express7, XLSX, import_googleapis2, import_pdfkit2, archiver, router7, application_forms_default;
+var init_application_forms2 = __esm({
+  "src/routes/application-forms.ts"() {
+    "use strict";
+    import_express7 = __toESM(require_express2(), 1);
+    init_default_sections();
+    init_drizzle_orm();
+    init_src();
+    init_auth2();
+    XLSX = __toESM(require_xlsx(), 1);
+    init_email();
+    init_letters();
+    import_googleapis2 = __toESM(require_src7(), 1);
+    import_pdfkit2 = __toESM(require_pdfkit(), 1);
+    init_archiver();
+    init_utils5();
+    archiver = archiver_exports?.default || archiver_exports;
+    router7 = (0, import_express7.Router)();
+    router7.get(
+      "/application-forms/submissions/:id/pdf",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      async (req, res) => {
+        try {
+          const id = Number(req.params.id);
+          const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, id));
+          if (!sub) return res.status(404).json({ error: "Submission not found" });
+          const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
+          const [program] = form ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
+          let candidate = null;
+          if (sub.email) {
+            const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.email, sub.email));
+            candidate = c || null;
+          }
+          const pdfBuffer = await generateSubmissionPdfBuffer(sub, form, program, candidate);
+          const cleanName = (sub.fullName || "Candidate").replace(/[^a-zA-Z0-9_-]/g, "_");
+          const filename = `Application_${cleanName}_${id}.pdf`;
+          res.setHeader("Content-Type", "application/pdf");
+          res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+          res.send(pdfBuffer);
+        } catch (e2) {
+          console.error("[pdf-gen] error:", e2);
+          if (!res.headersSent) res.status(500).json({ error: "Failed to generate PDF" });
+        }
+      }
+    );
+    router7.get(
+      "/application-forms/:id/export-applications-zip",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      async (req, res) => {
+        try {
+          const formId = Number(req.params.id);
+          const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, formId));
+          if (!form) return res.status(404).json({ error: "Application form not found" });
+          const [program] = await db.select().from(programsTable).where(eq(programsTable.id, form.programId));
+          const subs = await db.select().from(applicationSubmissionsTable).where(and(eq(applicationSubmissionsTable.formId, formId), ne(applicationSubmissionsTable.saveAsDraft, true))).orderBy(desc(applicationSubmissionsTable.submittedAt));
+          if (subs.length === 0) {
+            return res.status(400).json({ error: "No finalized submissions found to export" });
+          }
+          const emails = subs.map((s2) => s2.email).filter(Boolean);
+          const candidates = emails.length > 0 ? await db.select().from(candidatesTable).where(inArray(candidatesTable.email, emails)) : [];
+          const candidateByEmail = new Map(candidates.map((c) => [c.email.toLowerCase(), c]));
+          const archive = archiver("zip", { zlib: { level: 6 } });
+          const safeTitle = form.title.replace(/[^a-zA-Z0-9_-]/g, "_");
+          const zipFileName = `Applications_${safeTitle}_${Date.now()}.zip`;
+          res.setHeader("Content-Type", "application/zip");
+          res.setHeader("Content-Disposition", `attachment; filename="${zipFileName}"`);
+          archive.pipe(res);
+          for (const sub of subs) {
+            try {
+              const candidate = sub.email ? candidateByEmail.get(sub.email.toLowerCase()) : null;
+              const pdfBuffer = await generateSubmissionPdfBuffer(sub, form, program, candidate);
+              const rawFullName = sub.fullName || candidate?.fullName || "Candidate";
+              const cleanFullName = rawFullName.trim().replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+              const rawMobile = sub.phone || candidate?.phone || "NoMobile";
+              const cleanMobile = rawMobile.replace(/[^a-zA-Z0-9]/g, "");
+              const specs = parseSpecializationString(sub.specialization);
+              const targetSpecs = specs.length > 0 ? specs : ["General_Fellowship"];
+              for (const spec of targetSpecs) {
+                const cleanSpec = spec.trim().replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+                const folderName = cleanSpec || "General";
+                const fileName = `${cleanFullName}_${cleanSpec}_${cleanMobile}.pdf`;
+                const entryPath = `${folderName}/${fileName}`;
+                archive.append(pdfBuffer, { name: entryPath });
+              }
+            } catch (subErr) {
+              console.error(`[export-applications-zip] Failed to add PDF for sub ${sub.id}:`, subErr);
+            }
+          }
+          await archive.finalize();
+        } catch (err) {
+          console.error("[export-applications-zip] error:", err);
+          if (!res.headersSent) res.status(500).json({ error: err.message || "Failed to generate applications ZIP" });
+        }
+      }
+    );
+    router7.get(
+      "/application-forms",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      async (_req, res) => {
+        const rawForms = await db.select().from(applicationFormsTable).orderBy(desc(applicationFormsTable.createdAt));
+        const forms = rawForms.filter((f3) => f3.token !== "JULY2026" && !/july\s*2026/i.test(f3.title || ""));
+        const programs = await db.select().from(programsTable);
+        const submissions = await db.select().from(applicationSubmissionsTable);
+        const out = forms.map((f3) => {
+          const prog = programs.find((p) => p.id === f3.programId);
+          const subs = submissions.filter((s2) => s2.formId === f3.id);
+          return {
+            ...f3,
+            programName: prog?.name ?? null,
+            submissionCount: subs.length,
+            pendingCount: subs.filter((s2) => s2.status === "pending").length
+          };
+        });
+        res.json(out);
+      }
+    );
+    router7.post(
+      "/application-forms",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      async (req, res) => {
+        const { programId, title, description, deadline, sectionsConfig } = req.body;
+        if (!programId || !title) return res.status(400).json({ error: "programId and title required" });
+        const { customFields, loadDefaults, customToken } = req.body;
+        let token = generateToken();
+        if (customToken) {
+          const formattedToken = customToken.replace(/[^a-zA-Z0-9-]/g, "").toUpperCase();
+          const existing = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, formattedToken));
+          if (existing.length > 0) return res.status(400).json({ error: "Link code already in use" });
+          token = formattedToken;
+        }
+        let finalSectionsConfig = sectionsConfig ?? [];
+        if (loadDefaults && finalSectionsConfig.length === 0) {
+          finalSectionsConfig = DEFAULT_SECTIONS;
+        }
+        const [form] = await db.insert(applicationFormsTable).values({
+          token,
+          programId,
+          title,
+          description: description ?? null,
+          deadline: deadline ? new Date(deadline) : null,
+          isActive: true,
+          createdBy: req.user.userId,
+          customFields: customFields ?? [],
+          sectionsConfig: finalSectionsConfig
+        }).returning();
+        res.status(201).json(form);
+      }
+    );
+    router7.patch(
+      "/application-forms/:id",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      async (req, res) => {
+        const id = Number(req.params.id);
+        const { isActive, deadline, title, description, customFields, sectionsConfig } = req.body;
+        const updates = {};
+        if (isActive !== void 0) updates.isActive = isActive;
+        if (title !== void 0) updates.title = title;
+        if (description !== void 0) updates.description = description;
+        if (deadline !== void 0) updates.deadline = deadline ? new Date(deadline) : null;
+        if (customFields !== void 0) updates.customFields = customFields;
+        if (sectionsConfig !== void 0) updates.sectionsConfig = sectionsConfig;
+        const [updated] = await db.update(applicationFormsTable).set(updates).where(eq(applicationFormsTable.id, id)).returning();
+        if (!updated) return res.status(404).json({ error: "Form not found" });
+        res.json(updated);
+      }
+    );
+    router7.delete(
+      "/application-forms/:id",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      async (req, res) => {
+        const id = Number(req.params.id);
+        await db.delete(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.formId, id));
+        await db.delete(applicationFormsTable).where(eq(applicationFormsTable.id, id));
+        res.json({ success: true });
+      }
+    );
+    router7.get(
+      "/application-forms/:id/payment-settings",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      async (req, res) => {
+        const id = Number(req.params.id);
+        const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, id));
+        if (!form) return res.status(404).json({ error: "Form not found" });
+        const programId = form.programId;
+        const all = await db.select().from(paymentSettingsTable);
+        const specific = programId ? all.find((s2) => s2.programId === programId) : null;
+        const global2 = all.find((s2) => s2.programId === null);
+        const setting = specific ?? global2 ?? null;
+        res.json({
+          id: setting?.id ?? null,
+          programId: programId ?? null,
+          razorpayKeyId: setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "",
+          razorpayKeySecret: setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || "",
+          amountRs: setting ? setting.amount / 100 : 2750,
+          currency: setting?.currency || "INR",
+          description: setting?.description || "Fellowship Application Fee",
+          mode: setting?.mode || "live",
+          upiId: setting?.upiId || "sankaraeye@hdfcbank",
+          isActive: setting ? setting.isActive : true
+        });
+      }
+    );
+    router7.put(
+      "/application-forms/:id/payment-settings",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      async (req, res) => {
+        const id = Number(req.params.id);
+        const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, id));
+        if (!form) return res.status(404).json({ error: "Form not found" });
+        const { razorpayKeyId, razorpayKeySecret, amountRs, currency, description, mode, upiId, isActive } = req.body;
+        const programId = form.programId;
+        const LIVE_KEY_ID = "rzp_live_ddDz3Yp0860GqG";
+        const LIVE_SECRET = "LGVG9K6XjOwpHnfjfGMmgwxZ";
+        const [existing] = await db.select().from(paymentSettingsTable).where(eq(paymentSettingsTable.programId, programId));
+        let settingRecord;
+        const resolveKey = (incoming, existingVal) => {
+          if (incoming !== void 0 && incoming.trim() !== "" && incoming !== "[SENSITIVE]") return incoming.trim();
+          if (existingVal && existingVal.trim() !== "" && !existingVal.startsWith("rzp_test") && existingVal !== "[SENSITIVE]") return existingVal;
+          return LIVE_KEY_ID;
+        };
+        const resolveSecret = (incoming, existingVal) => {
+          if (incoming !== void 0 && incoming.trim() !== "" && incoming !== "[SENSITIVE]") return incoming.trim();
+          if (existingVal && existingVal.trim() !== "" && !existingVal.startsWith("test_") && existingVal !== "[SENSITIVE]") return existingVal;
+          return LIVE_SECRET;
+        };
+        const finalKeyId = resolveKey(razorpayKeyId, existing?.razorpayKeyId ?? null);
+        const finalSecret = resolveSecret(razorpayKeySecret, existing?.razorpayKeySecret ?? null);
+        if (existing) {
+          [settingRecord] = await db.update(paymentSettingsTable).set({
+            razorpayKeyId: finalKeyId,
+            razorpayKeySecret: finalSecret,
+            amount: amountRs !== void 0 ? Math.round(Number(amountRs) * 100) : existing.amount,
+            currency: currency ?? existing.currency,
+            description: description ?? existing.description,
+            mode: "live",
+            upiId: upiId !== void 0 ? upiId : existing.upiId,
+            isActive: isActive !== void 0 ? Boolean(isActive) : existing.isActive
+          }).where(eq(paymentSettingsTable.id, existing.id)).returning();
+        } else {
+          [settingRecord] = await db.insert(paymentSettingsTable).values({
+            programId,
+            razorpayKeyId: finalKeyId,
+            razorpayKeySecret: finalSecret,
+            amount: Math.round((Number(amountRs) || 2750) * 100),
+            currency: currency || "INR",
+            description: description || "Fellowship Application Fee January 2027",
+            mode: "live",
+            upiId: upiId || "sankaraeye@hdfcbank",
+            isActive: isActive !== void 0 ? Boolean(isActive) : true
+          }).returning();
+        }
+        if (programId) {
+          const progUpdates = {};
+          if (amountRs !== void 0) progUpdates.feeAmount = Math.round(Number(amountRs));
+          if (isActive !== void 0) progUpdates.requiresPayment = Boolean(isActive);
+          if (Object.keys(progUpdates).length > 0) {
+            await db.update(programsTable).set(progUpdates).where(eq(programsTable.id, programId));
+          }
+        }
+        res.json({
+          ...settingRecord,
+          amountRs: settingRecord.amount / 100
+        });
+      }
+    );
+    router7.get(
+      "/application-forms/:id/submissions",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      async (req, res) => {
+        const formId = Number(req.params.id);
+        const subs = await db.select({
+          submission: applicationSubmissionsTable,
+          candidateId: candidatesTable.id,
+          candidateCode: candidatesTable.candidateCode,
+          candidateStatus: candidatesTable.status,
+          candidateUnitId: candidatesTable.unitId
+        }).from(applicationSubmissionsTable).leftJoin(
+          candidatesTable,
+          or(
+            eq(candidatesTable.id, applicationSubmissionsTable.candidateId),
+            eq(candidatesTable.email, applicationSubmissionsTable.email)
+          )
+        ).where(and(eq(applicationSubmissionsTable.formId, formId), eq(applicationSubmissionsTable.isMock, req.isMockMode))).orderBy(desc(applicationSubmissionsTable.submittedAt));
+        res.json(subs.map((s2) => ({
+          ...s2.submission,
+          candidateId: s2.candidateId || s2.submission.candidateId || null,
+          candidateCode: s2.candidateCode || s2.submission.candidateCode || null,
+          candidateStatus: s2.candidateStatus || null,
+          candidateUnitId: s2.candidateUnitId || null
+        })));
+      }
+    );
+    router7.get(
+      "/application-forms/:id/student-list-pdf",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "unit_coordinator"),
+      async (req, res) => {
+        try {
+          const formId = Number(req.params.id);
+          const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, formId));
+          if (!form) return res.status(404).json({ error: "Application form not found" });
+          const [program] = await db.select().from(programsTable).where(eq(programsTable.id, form.programId));
+          const units = await db.select().from(unitsTable);
+          const subs = await db.select({
+            sub: applicationSubmissionsTable,
+            cand: candidatesTable
+          }).from(applicationSubmissionsTable).leftJoin(
+            candidatesTable,
+            or(
+              eq(candidatesTable.id, applicationSubmissionsTable.candidateId),
+              eq(candidatesTable.email, applicationSubmissionsTable.email)
+            )
+          ).where(eq(applicationSubmissionsTable.formId, formId)).orderBy(desc(applicationSubmissionsTable.submittedAt));
+          const candidatesList = subs.map((row, idx) => {
+            const s2 = row.sub;
+            const c = row.cand;
+            const specs = parseSpecializationString(s2.specialization);
+            const specStr = specs.length > 0 ? specs.join(", ") : s2.specialization || "Ophthalmology Fellowship";
+            let unitName = "";
+            if (c?.unitId) {
+              const u = units.find((unit) => unit.id === c.unitId);
+              if (u) unitName = u.name;
+            } else if (s2.centerPreference) {
+              unitName = String(s2.centerPreference).replace(/[{}"[\]]/g, "").trim();
+            }
+            const candidateCode = c?.candidateCode || s2.candidateCode || `APP-${String(s2.id).padStart(4, "0")}`;
+            const qualParts = [s2.degree, s2.pgQualifications, s2.medicalCouncilNumber ? `Reg: ${s2.medicalCouncilNumber}` : null].filter(Boolean);
+            const qualification = qualParts.join(" \xB7 ");
+            let effectiveStatus = s2.status || "pending";
+            if (c?.status === "allocated") {
+              effectiveStatus = "allocated";
+            }
+            return {
+              slNo: idx + 1,
+              candidateCode,
+              candidateName: s2.fullName,
+              email: s2.email,
+              phone: s2.phone,
+              qualification: qualification || "MBBS / MS / DNB",
+              college: s2.medicalCollege,
+              specialization: specStr,
+              status: effectiveStatus,
+              unitName: unitName || "\u2014",
+              submittedAt: s2.submittedAt ? new Date(s2.submittedAt).toISOString() : null
+            };
+          });
+          const pdfBuffer = await generateStudentDirectoryPdf({
+            programName: program?.name || form.title || "Fellowship Program December 2026",
+            academicSession: program?.academicYear || "December 2026",
+            candidates: candidatesList
+          });
+          const filename = `Student_List_December_2026_${form.token || formId}.pdf`;
+          res.setHeader("Content-Type", "application/pdf");
+          res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+          res.send(pdfBuffer);
+        } catch (err) {
+          console.error("[student-list-pdf] Error:", err);
+          res.status(500).json({ error: err.message || "Failed to generate student list PDF" });
+        }
+      }
+    );
+    router7.get(
+      "/application-forms/submissions/:id/call-letter-pdf",
+      requireAuth,
+      async (req, res) => {
+        try {
+          const subId = Number(req.params.id);
+          const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, subId));
+          if (!sub) return res.status(404).json({ error: "Submission not found" });
+          const [cand] = await db.select().from(candidatesTable).where(
+            or(
+              eq(candidatesTable.id, sub.candidateId || -1),
+              eq(candidatesTable.email, sub.email)
+            )
+          );
+          const candidateCode = cand?.candidateCode || sub.candidateCode || `APP-${String(sub.id).padStart(4, "0")}`;
+          const specs = parseSpecializationString(sub.specialization);
+          const spec = specs.length > 0 ? specs.join(", ") : sub.specialization || "Ophthalmology Fellowship";
+          const isRetina = isRetinaSpecialty(spec);
+          const defaultInterviewDate = isRetina ? "07.12.2026, Monday" : "08.12.2026, Tuesday";
+          const pdfBuffer = await generateCallLetterPdf({
+            candidateName: sub.fullName,
+            candidateCode,
+            specialization: spec,
+            email: sub.email,
+            phone: sub.phone,
+            address: sub.permanentAddress || sub.mailingAddress || cand?.address,
+            applicationId: sub.id,
+            interviewDate: req.query.interviewDate || defaultInterviewDate,
+            reportingTime: req.query.reportingTime || "8:00 AM Sharp",
+            venue: req.query.venue || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bengaluru \u2013 560037"
+          });
+          const filename = `Interview_Call_Letter_${candidateCode}.pdf`;
+          res.setHeader("Content-Type", "application/pdf");
+          res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+          res.send(pdfBuffer);
+        } catch (err) {
+          console.error("[submission call-letter-pdf] Error:", err);
+          res.status(500).json({ error: err.message || "Failed to generate call letter" });
+        }
+      }
+    );
+    router7.post(
+      "/application-forms/submissions/:id/send-call-letter",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator"),
+      async (req, res) => {
+        try {
+          const subId = Number(req.params.id);
+          const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, subId));
+          if (!sub) return res.status(404).json({ error: "Submission not found" });
+          const [cand] = await db.select().from(candidatesTable).where(
+            or(
+              eq(candidatesTable.id, sub.candidateId || -1),
+              eq(candidatesTable.email, sub.email)
+            )
+          );
+          const candidateCode = cand?.candidateCode || sub.candidateCode || `APP-${String(sub.id).padStart(4, "0")}`;
+          const specs = parseSpecializationString(sub.specialization);
+          const spec = req.body.specialization || (specs.length > 0 ? specs.join(", ") : sub.specialization || "Ophthalmology Fellowship");
+          const isRetina = isRetinaSpecialty(spec);
+          const interviewDate = req.body.interviewDate || (isRetina ? "07.12.2026, Monday" : "08.12.2026, Tuesday");
+          const reportingTime = req.body.reportingTime || "8:00 AM Sharp";
+          const venue = req.body.venue || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bengaluru \u2013 560037";
+          const pdfBuffer = await generateCallLetterPdf({
+            candidateName: sub.fullName,
+            candidateCode,
+            specialization: spec,
+            email: sub.email,
+            phone: sub.phone,
+            address: sub.permanentAddress || sub.mailingAddress || cand?.address,
+            applicationId: sub.id,
+            interviewDate,
+            reportingTime,
+            venue
+          });
+          const fileName = `Interview_Call_Letter_${candidateCode}.pdf`;
+          const emailResult = await sendCallLetterWithAttachment({
+            toEmail: sub.email,
+            toName: sub.fullName,
+            pdfBuffer,
+            fileName,
+            interviewDate,
+            reportingTime,
+            venue,
+            specialization: spec
+          });
+          await db.update(applicationSubmissionsTable).set({
+            reviewNotes: sub.reviewNotes ? `${sub.reviewNotes} | Call Letter Issued` : "Call Letter Issued"
+          }).where(eq(applicationSubmissionsTable.id, subId));
+          res.json({
+            success: true,
+            fileName,
+            emailSent: emailResult.sent,
+            message: emailResult.sent ? "Call letter dispatched by email and ready for download." : "Call letter PDF generated successfully. (Note: Email was not sent because SMTP is not configured. Download PDF directly)."
+          });
+        } catch (err) {
+          console.error("[submission send-call-letter] Error:", err);
+          res.status(500).json({ error: err.message || "Failed to generate call letter" });
+        }
+      }
+    );
+    router7.get(
+      "/application-forms/submissions/:id/offer-letter-pdf",
+      requireAuth,
+      async (req, res) => {
+        try {
+          const subId = Number(req.params.id);
+          const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, subId));
+          if (!sub) return res.status(404).json({ error: "Submission not found" });
+          const [cand] = await db.select().from(candidatesTable).where(
+            or(
+              eq(candidatesTable.id, sub.candidateId || -1),
+              eq(candidatesTable.email, sub.email)
+            )
+          );
+          const candidateCode = cand?.candidateCode || sub.candidateCode || `APP-${String(sub.id).padStart(4, "0")}`;
+          const units = await db.select().from(unitsTable);
+          let unitName = req.query.unitName || "";
+          if (!unitName && cand?.unitId) {
+            const u = units.find((x2) => x2.id === cand.unitId);
+            if (u) unitName = u.name;
+          }
+          if (!unitName && sub.centerPreference) {
+            unitName = String(sub.centerPreference).replace(/[{}"[\]]/g, "").trim().split(",")[0] || "Bangalore";
+          }
+          if (!unitName) unitName = "Bangalore";
+          const specs = parseSpecializationString(sub.specialization);
+          const specialization = req.query.specialization || (specs[0] || "Cataract & IOL");
+          const duration3 = req.query.duration ? Number(req.query.duration) : isRetinaSpecialty(specialization) ? 24 : 18;
+          const effectiveDate = req.query.effectiveDate || "6th January 2027";
+          const interviewDate = req.query.interviewDate || (isRetinaSpecialty(specialization) ? "7th December 2026" : "8th December 2026");
+          const pdfBuffer = await generateOfferLetterPdf({
+            candidateName: sub.fullName,
+            candidateCode,
+            specialization,
+            unitName,
+            cmoName: req.query.cmoName,
+            address: sub.permanentAddress || sub.mailingAddress || cand?.address,
+            durationMonths: duration3,
+            effectiveDate,
+            interviewDate,
+            stipendAmount: req.query.stipend || "Rs 40,000"
+          });
+          const filename = `Fellowship_Offer_Letter_${candidateCode}.pdf`;
+          res.setHeader("Content-Type", "application/pdf");
+          res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+          res.send(pdfBuffer);
+        } catch (err) {
+          console.error("[submission offer-letter-pdf] Error:", err);
+          res.status(500).json({ error: err.message || "Failed to generate offer letter" });
+        }
+      }
+    );
+    router7.post(
+      "/application-forms/submissions/:id/send-offer-letter",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator"),
+      async (req, res) => {
+        try {
+          const subId = Number(req.params.id);
+          const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, subId));
+          if (!sub) return res.status(404).json({ error: "Submission not found" });
+          const [cand] = await db.select().from(candidatesTable).where(
+            or(
+              eq(candidatesTable.id, sub.candidateId || -1),
+              eq(candidatesTable.email, sub.email)
+            )
+          );
+          const candidateCode = cand?.candidateCode || sub.candidateCode || `APP-${String(sub.id).padStart(4, "0")}`;
+          const units = await db.select().from(unitsTable);
+          let unitName = req.body.unitName || "";
+          if (!unitName && cand?.unitId) {
+            const u = units.find((x2) => x2.id === cand.unitId);
+            if (u) unitName = u.name;
+          }
+          if (!unitName && sub.centerPreference) {
+            unitName = String(sub.centerPreference).replace(/[{}"[\]]/g, "").trim().split(",")[0] || "Bangalore";
+          }
+          if (!unitName) unitName = "Bangalore";
+          const specs = parseSpecializationString(sub.specialization);
+          const specialization = req.body.specialization || (specs[0] || "Cataract & IOL");
+          const duration3 = req.body.duration ? Number(req.body.duration) : isRetinaSpecialty(specialization) ? 24 : 18;
+          const effectiveDate = req.body.effectiveDate || "6th January 2027";
+          const interviewDate = req.body.interviewDate || (isRetinaSpecialty(specialization) ? "7th December 2026" : "8th December 2026");
+          const pdfBuffer = await generateOfferLetterPdf({
+            candidateName: sub.fullName,
+            candidateCode,
+            specialization,
+            unitName,
+            cmoName: req.body.cmoName,
+            address: sub.permanentAddress || sub.mailingAddress || cand?.address,
+            durationMonths: duration3,
+            effectiveDate,
+            interviewDate,
+            stipendAmount: req.body.stipend || "Rs 40,000"
+          });
+          const fileName = `Fellowship_Offer_Letter_${candidateCode}.pdf`;
+          await sendOfferLetterWithAttachment({
+            toEmail: sub.email,
+            toName: sub.fullName,
+            pdfBuffer,
+            fileName,
+            unitName,
+            specialization,
+            effectiveDate
+          });
+          res.json({ success: true, fileName });
+        } catch (err) {
+          console.error("[submission send-offer-letter] Error:", err);
+          res.status(500).json({ error: err.message || "Failed to send offer letter" });
+        }
+      }
+    );
+    router7.get(
+      "/application-forms/:id/export",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      async (req, res) => {
+        const formId = Number(req.params.id);
+        const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, formId));
+        const subs = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.formId, formId)).orderBy(desc(applicationSubmissionsTable.submittedAt));
+        const rows = subs.map((s2) => {
+          const specParsed = parseSpecializationString(s2.specialization);
+          const specString = specParsed.join(", ");
+          const getFormattedSpecialityPrefs = (specializationStr, centerPreferenceStr, formData, customAnswers, sectionsConfig) => {
+            const specs = parseSpecializationString(specializationStr);
+            if (specs.length === 0) return [];
+            const prefs = {};
+            if (centerPreferenceStr) {
+              try {
+                const parsed = JSON.parse(centerPreferenceStr);
+                if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                  Object.entries(parsed).forEach(([k, v]) => {
+                    prefs[k] = Array.isArray(v) ? v.join(", ") : String(v);
+                  });
+                }
+              } catch {
+              }
+            }
+            const extractUnitFields = (obj) => {
+              if (obj && typeof obj === "object") {
+                Object.entries(obj).forEach(([key, val]) => {
+                  if (key.startsWith("unit_") && val) {
+                    let label = key.replace("unit_", "").replace(/_/g, " ").toUpperCase();
+                    if (sectionsConfig) {
+                      sectionsConfig.forEach((sec) => {
+                        sec.fields?.forEach((f3) => {
+                          if (f3.id === key && f3.label) {
+                            label = f3.label.replace(" Preferred Center", "");
+                          }
+                        });
+                      });
+                    }
+                    prefs[label] = Array.isArray(val) ? val.join(", ") : String(val);
+                  }
+                });
+              }
+            };
+            extractUnitFields(formData);
+            extractUnitFields(customAnswers);
+            if (formData && formData.formData) {
+              extractUnitFields(formData.formData);
+            }
+            const normalize2 = (str) => {
+              return str.toLowerCase().replace(/[^a-z0-9]/g, "");
+            };
+            const normalizedPrefs = {};
+            Object.entries(prefs).forEach(([k, v]) => {
+              normalizedPrefs[normalize2(k)] = v;
+              if (k.startsWith("unit_")) {
+                normalizedPrefs[normalize2(k.substring(5))] = v;
+              }
+            });
+            const result = [];
+            specs.forEach((spec) => {
+              const normSpec = normalize2(spec);
+              let loc = normalizedPrefs[normSpec];
+              if (!loc) {
+                const key = Object.keys(normalizedPrefs).find((k) => k.includes(normSpec) || normSpec.includes(k));
+                if (key) {
+                  loc = normalizedPrefs[key];
+                }
+              }
+              if (!loc && centerPreferenceStr) {
+                const trimmedCp = centerPreferenceStr.trim();
+                if (!trimmedCp.startsWith("{") && !trimmedCp.startsWith("[") && trimmedCp !== "0" && trimmedCp.toLowerCase() !== "not applicable") {
+                  loc = trimmedCp;
+                }
+              }
+              if (loc && (loc.toLowerCase().trim() === "not applicable" || loc.toLowerCase().trim() === "not_applicable")) {
+                loc = "";
+              }
+              result.push({
+                spec,
+                location: loc ? loc.trim() : null
+              });
+            });
+            return result;
+          };
+          const caParsed = {
+            ...s2.formData || {},
+            ...s2.customAnswers || {}
+          };
+          const specPrefs = getFormattedSpecialityPrefs(s2.specialization, s2.centerPreference, caParsed, s2.customAnswers, form?.sectionsConfig ?? void 0);
+          const specWithCentersList = specPrefs.map(({ spec, location }) => location ? `${spec}: ${location}` : spec);
+          const specWithCentersString = specWithCentersList.length > 0 ? specWithCentersList.join("; ") : specString;
+          const cpParsed = {};
+          specPrefs.forEach(({ spec, location }) => {
+            if (location) {
+              cpParsed[spec] = location;
+            }
+          });
+          const segments = specParsed.map((spec) => {
+            const sName = spec.trim().toLowerCase();
+            if (sName.includes("retina")) {
+              return "Retina";
+            }
+            return "Anterior";
+          });
+          const segmentString = [...new Set(segments)].join(", ");
+          const baseRow = {
+            "Submission ID": s2.id,
+            "Date": formatToDDMMYYYY(s2.submittedAt),
+            "Specialities": specWithCentersString,
+            "Retina/Anterior": segmentString || "Anterior",
+            "Timestamp": formatToLocalDateTime(s2.submittedAt),
+            "Name in Full (First Name, Middle Name, Last/Family Name)": s2.fullName,
+            "E-mail (this would be the ID all communication would be shared on)": s2.email,
+            "Mobile Number (only 10 digits)": s2.phone ?? "",
+            "Date of Birth": formatDOBToStandard(s2.dateOfBirth),
+            "Marital Status": s2.maritalStatus ?? "",
+            "Permanent Address (including postal pin code)": s2.permanentAddress ?? "",
+            "Select 1 option from the dropbox": specWithCentersString,
+            "Cornea - Choose the preferred center": cpParsed["Cornea"] ? Array.isArray(cpParsed["Cornea"]) ? cpParsed["Cornea"].join(", ") : cpParsed["Cornea"] : "Not Applicable",
+            "Glaucoma - Choose the preferred center": cpParsed["Glaucoma"] ? Array.isArray(cpParsed["Glaucoma"]) ? cpParsed["Glaucoma"].join(", ") : cpParsed["Glaucoma"] : "Not Applicable",
+            "IOL - Choose the preferred center": cpParsed["IOL"] ? Array.isArray(cpParsed["IOL"]) ? cpParsed["IOL"].join(", ") : cpParsed["IOL"] : "Not Applicable",
+            "Medical Retina - Choose the preferred center": cpParsed["Medical Retina"] ? Array.isArray(cpParsed["Medical Retina"]) ? cpParsed["Medical Retina"].join(", ") : cpParsed["Medical Retina"] : "Not Applicable",
+            "Oculoplasty - Choose the preferred center": cpParsed["Oculoplasty"] ? Array.isArray(cpParsed["Oculoplasty"]) ? cpParsed["Oculoplasty"].join(", ") : cpParsed["Oculoplasty"] : "Not Applicable",
+            "Pediatric Ophthalmology - Choose the preferred center": cpParsed["Pediatric Ophthalmology"] ? Array.isArray(cpParsed["Pediatric Ophthalmology"]) ? cpParsed["Pediatric Ophthalmology"].join(", ") : cpParsed["Pediatric Ophthalmology"] : "Not Applicable",
+            "Phaco Refractive - Choose the preferred center": cpParsed["Phaco Refractive"] ? Array.isArray(cpParsed["Phaco Refractive"]) ? cpParsed["Phaco Refractive"].join(", ") : cpParsed["Phaco Refractive"] : "Not Applicable",
+            "Vitreo Retina - Choose the preferred center": cpParsed["Vitreo Retina"] ? Array.isArray(cpParsed["Vitreo Retina"]) ? cpParsed["Vitreo Retina"].join(", ") : cpParsed["Vitreo Retina"] : "Not Applicable"
+          };
+          for (const [key, val] of Object.entries(cpParsed)) {
+            if (!["Cornea", "Glaucoma", "IOL", "Medical Retina", "Oculoplasty", "Pediatric Ophthalmology", "Phaco Refractive", "Vitreo Retina"].includes(key)) {
+              const valString = Array.isArray(val) ? val.join(", ") : val;
+              baseRow[`${key} - Choose the preferred center`] = valString;
+            }
+          }
+          baseRow["Where did you hear about this Fellowship?"] = s2.referralSource ?? "";
+          baseRow["Mention the name of referred Faculty/Existing Trainee from Sankara"] = s2.referredByName ?? "";
+          baseRow["Degrees & Other Qualifications (Mention University name, passing month/year)"] = s2.degree ?? "";
+          baseRow["Medical College Qualified From"] = s2.medicalCollege ?? "";
+          baseRow["University from which Medical College is affiliated"] = s2.university ?? "";
+          baseRow["Postgraduate Qualifications"] = s2.pgQualifications ?? "";
+          baseRow["Qualification [DO (Diploma Ophthlmology)]"] = s2.doQualification ? "Yes" : "No";
+          baseRow["If DO then College & University Qualified from and year of Qualification"] = s2.doDetails ?? "";
+          baseRow["Qualification [MS/MD ( Masters in Ophthalmology)]"] = s2.msMdQualification ? "Yes" : "No";
+          baseRow["If MS then College & University Qualified from and year of Qualification"] = s2.msMdDetails ?? "";
+          baseRow["Qualification [DNB]"] = s2.dnbQualification ? "Yes" : "No";
+          baseRow["If DNB then institution completed from and year of Qualification"] = s2.dnbDetails ?? "";
+          baseRow["Any Other Training / Certification undertaken"] = s2.otherTraining ?? "";
+          baseRow["Medical Council Registration Number (MCI)"] = s2.medicalCouncilNumber ?? "";
+          let diagnosticParsed = {};
+          try {
+            diagnosticParsed = JSON.parse(s2.diagnosticSkills ?? "{}");
+          } catch {
+          }
+          for (const [k, v] of Object.entries(diagnosticParsed)) {
+            baseRow[`Perform & Interpret Diagnostics [${k}]`] = v;
+          }
+          let surgicalParsed = {};
+          try {
+            surgicalParsed = JSON.parse(s2.surgicalExperience ?? "{}");
+          } catch {
+          }
+          for (const [k, v] of Object.entries(surgicalParsed)) {
+            baseRow[`Approximate No of ${k} (Under Supervision)`] = v?.supervision ?? "";
+            baseRow[`Approximate No of ${k} (Independently)`] = v?.independent ?? "";
+          }
+          baseRow["Total No of Surgeries performed till date"] = s2.totalSurgeries ?? "";
+          baseRow["Publications"] = s2.publications ?? "";
+          baseRow["Presentations"] = s2.presentations ?? "";
+          baseRow["Letter of recommendation 1"] = s2.lor1Url ?? "";
+          baseRow["LOR 1 Name & Designation"] = s2.lor1RefName ?? "";
+          baseRow["LOR 1 Contact"] = s2.lor1RefContact ?? "";
+          baseRow["LOR 1 Email"] = s2.lor1RefEmail ?? "";
+          baseRow["Letter of recommendation 2"] = s2.lor2Url ?? "";
+          baseRow["LOR 2 Name & Designation"] = s2.lor2RefName ?? "";
+          baseRow["LOR 2 Contact"] = s2.lor2RefContact ?? "";
+          baseRow["LOR 2 Email"] = s2.lor2RefEmail ?? "";
+          baseRow["If Married Spouse Details(Name & Profession)"] = s2.spouseDetails ?? "";
+          baseRow["Medical Conditions Declaration"] = s2.healthDeclaration ?? "";
+          baseRow["Other pertinent information"] = s2.otherInformation ?? "";
+          baseRow["Passport size photograph"] = s2.photoUrl ?? "";
+          baseRow["Transaction ID/ UTR No"] = s2.paymentUrl ?? "";
+          baseRow["Status"] = s2.status;
+          baseRow["Source"] = s2.source ?? "internal";
+          baseRow["Review Notes"] = s2.reviewNotes ?? "";
+          for (const [key, val] of Object.entries(caParsed)) {
+            const valString = Array.isArray(val) ? val.join(", ") : val;
+            baseRow[key] = valString;
+          }
+          return baseRow;
+        });
+        const wb = XLSX.utils.book_new();
+        const addAutoFilter = (ws) => {
+          if (!ws["!ref"]) return;
+          try {
+            const range2 = XLSX.utils.decode_range(ws["!ref"]);
+            ws["!autofilter"] = {
+              ref: XLSX.utils.encode_range({
+                s: { c: 0, r: 0 },
+                e: { c: range2.e.c, r: range2.e.r }
+              })
+            };
+          } catch (err) {
+            console.error("Failed to add autofilter:", err);
+          }
+        };
+        const wsGeneral = XLSX.utils.json_to_sheet(rows);
+        const colWidths = Object.keys(rows[0] ?? {}).map((k) => ({ wch: Math.max(k.length + 2, 22) }));
+        wsGeneral["!cols"] = colWidths;
+        wsGeneral["!rows"] = [{ hpt: 35 }];
+        addAutoFilter(wsGeneral);
+        XLSX.utils.book_append_sheet(wb, wsGeneral, "General");
+        const specialitiesConfig = [
+          { dbName: "Cornea", sheetName: "Cornea" },
+          { dbName: "Glaucoma", sheetName: "Glaucoma" },
+          { dbName: "IOL", sheetName: "IOL Fellowship" },
+          { dbName: "Medical Retina", sheetName: "Medical Retina" },
+          { dbName: "Oculoplasty", sheetName: "Oculoplasty" },
+          { dbName: "Pediatric Ophthalmology", sheetName: "Pediatric Ophthalmology" },
+          { dbName: "Phaco Refractive", sheetName: "Phaco Refractive" },
+          { dbName: "Vitreo Retina", sheetName: "Vitreo Retina" }
+        ];
+        const matchRowToSpeciality = (row, dbName) => {
+          const specsStr = String(row["Specialities"] ?? "").toLowerCase();
+          const name2 = dbName.toLowerCase();
+          if (name2 === "iol") {
+            return specsStr.includes("iol");
+          }
+          if (name2 === "pediatric ophthalmology") {
+            return specsStr.includes("pediatric");
+          }
+          return specsStr.includes(name2);
+        };
+        const headers = Object.keys(rows[0] ?? {});
+        specialitiesConfig.forEach((config2) => {
+          const specRows = rows.filter((r2) => matchRowToSpeciality(r2, config2.dbName));
+          let wsSpec;
+          if (specRows.length > 0) {
+            wsSpec = XLSX.utils.json_to_sheet(specRows);
+          } else {
+            wsSpec = XLSX.utils.json_to_sheet([], { header: headers });
+          }
+          wsSpec["!cols"] = colWidths;
+          wsSpec["!rows"] = [{ hpt: 30 }];
+          addAutoFilter(wsSpec);
+          XLSX.utils.book_append_sheet(wb, wsSpec, config2.sheetName);
+        });
+        const safeName = (form?.title ?? `form-${formId}`).replace(/[^a-zA-Z0-9-_]/g, "_").slice(0, 40);
+        const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+        const filename = `SAV_${safeName}_Admissions_${today}.xlsx`;
+        const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        res.send(buffer);
+      }
+    );
+    router7.patch(
+      "/application-forms/submissions/:id",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      async (req, res) => {
+        const id = Number(req.params.id);
+        const body = req.body;
+        const updates = {};
+        const possibleFields = [
+          "status",
+          "reviewNotes",
+          "formData",
+          "fullName",
+          "email",
+          "phone",
+          "permanentAddress",
+          "mailingAddress",
+          "dateOfBirth",
+          "maritalStatus",
+          "spouseDetails",
+          "degree",
+          "medicalCollege",
+          "university",
+          "medicalCouncilNumber",
+          "diagnosticSkills",
+          "surgicalExperience",
+          "totalSurgeries",
+          "specialization",
+          "centerPreference",
+          "customAnswers",
+          "readyForReview",
+          "gender",
+          "pgQualifications",
+          "doQualification",
+          "doDetails",
+          "msMdQualification",
+          "msMdDetails",
+          "dnbQualification",
+          "dnbDetails",
+          "otherTraining",
+          "publications",
+          "presentations",
+          "otherInformation",
+          "lor1Url",
+          "lor2Url",
+          "photoUrl"
+        ];
+        possibleFields.forEach((field) => {
+          if (body[field] !== void 0) {
+            if (field === "formData" || field === "customAnswers") {
+              updates[field] = body[field];
+            } else {
+              updates[field] = body[field];
+            }
+          }
+        });
+        updates.reviewedAt = /* @__PURE__ */ new Date();
+        const [oldSub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, id));
+        if (!oldSub) return res.status(404).json({ error: "Submission not found" });
+        const fileFields = ["lor1Url", "lor2Url", "photoUrl", "paymentUrl"];
+        for (const field of fileFields) {
+          const oldValue = oldSub[field];
+          const newValue = updates[field];
+          if (newValue !== void 0 && newValue !== oldValue) {
+            if (oldValue && typeof oldValue === "string" && oldValue.startsWith("/objects/uploads/")) {
+              const isReplit = !!process.env.REPL_ID;
+              if (!isReplit) {
+                try {
+                  const fsPromises = await import("fs/promises");
+                  const localPath = path5.join(process.cwd(), "uploads", oldValue.replace("/objects/uploads/", ""));
+                  await fsPromises.unlink(localPath);
+                  req.log?.info?.({ localPath }, `Successfully deleted replaced file from disk`);
+                } catch (err) {
+                  req.log?.warn?.({ err, path: oldValue }, `Failed to delete replaced file from disk (might not exist)`);
+                }
+              } else {
+                try {
+                  const { ObjectStorageService: ObjectStorageService2 } = await Promise.resolve().then(() => (init_objectStorage(), objectStorage_exports));
+                  const objectStorageService2 = new ObjectStorageService2();
+                  const objectFile = await objectStorageService2.getObjectEntityFile(oldValue);
+                  await objectFile.delete();
+                  req.log?.info?.({ objectPath: oldValue }, `Successfully deleted replaced file from object storage`);
+                } catch (err) {
+                  req.log?.warn?.({ err, path: oldValue }, `Failed to delete replaced file from object storage`);
+                }
+              }
+            }
+          }
+        }
+        const [updated] = await db.update(applicationSubmissionsTable).set(updates).where(eq(applicationSubmissionsTable.id, id)).returning();
+        if (!updated) return res.status(404).json({ error: "Submission not found" });
+        const existingCandidate = await db.select().from(candidatesTable).where(eq(candidatesTable.email, updated.email));
+        if (existingCandidate.length > 0) {
+          await syncSubmissionToCandidateAndDocuments(existingCandidate[0].id, updated);
+        }
+        if (updates.status === "approved" || updates.status === "reviewed") {
+          const existing = await db.select().from(candidatesTable).where(eq(candidatesTable.email, updated.email));
+          let candidateId;
+          if (existing.length === 0) {
+            const year = (/* @__PURE__ */ new Date()).getFullYear();
+            const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+            const code = `SAV-${year}-${rand}`;
+            const [candidate] = await db.insert(candidatesTable).values({
+              candidateCode: code,
+              fullName: updated.fullName,
+              email: updated.email,
+              phone: updated.phone ?? null,
+              dateOfBirth: updated.dateOfBirth ?? null,
+              gender: null,
+              address: updated.permanentAddress ?? null,
+              qualification: updated.degree ?? null,
+              collegeName: updated.medicalCollege ?? null,
+              status: "approved"
+            }).returning();
+            candidateId = candidate.id;
+            if (updated.specialization && candidate) {
+              const specList = parseSpecializationString(updated.specialization);
+              if (Array.isArray(specList) && specList.length > 0) {
+                const specs = await db.select().from(specialitiesTable);
+                let order = 1;
+                for (const specName of specList) {
+                  const spec = specs.find((s2) => s2.name.toLowerCase() === specName.toLowerCase());
+                  if (spec) {
+                    await db.insert(candidatePreferencesTable).values({
+                      candidateId: candidate.id,
+                      specialityId: spec.id,
+                      preferenceOrder: order++
+                    }).onConflictDoNothing();
+                  }
+                }
+              }
+            }
+          } else {
+            candidateId = existing[0].id;
+          }
+          if (updated.specialization) {
+            const specList = parseSpecializationString(updated.specialization);
+            if (Array.isArray(specList) && specList.length > 0) {
+              const specs = await db.select().from(specialitiesTable);
+              for (const specName of specList) {
+                const spec = specs.find((s2) => s2.name.toLowerCase() === specName.toLowerCase());
+                if (spec) {
+                  const existingApp = await db.select().from(applicationsTable).where(
+                    and(
+                      eq(applicationsTable.candidateId, candidateId),
+                      eq(applicationsTable.specialityId, spec.id)
+                    )
+                  );
+                  if (existingApp.length === 0) {
+                    const prefix = spec.code ? spec.code.toUpperCase() : "GEN";
+                    const year = 2026;
+                    const countResult = await db.execute(sql`
+                  SELECT COUNT(*)::int as count FROM applications WHERE speciality_id = ${spec.id} AND hall_ticket_number IS NOT NULL
+                `);
+                    const seq = Number(countResult.rows[0]?.count ?? 0) + 1;
+                    const hallTicketNumber = `${prefix}-${year}-${String(seq).padStart(3, "0")}`;
+                    await db.insert(applicationsTable).values({
+                      candidateId,
+                      specialityId: spec.id,
+                      hallTicketNumber,
+                      status: "approved"
+                    });
+                  }
+                }
+              }
+            }
+          }
+        }
+        res.json(updated);
+      }
+    );
+    router7.post(
+      "/application-submissions/merge",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator"),
+      async (req, res) => {
+        try {
+          const { primaryId, secondaryId, deleteSecondary } = req.body;
+          if (!primaryId || !secondaryId || Number(primaryId) === Number(secondaryId)) {
+            return res.status(400).json({ error: "Please select two distinct applications to merge." });
+          }
+          const [prim] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, Number(primaryId)));
+          const [sec] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, Number(secondaryId)));
+          if (!prim || !sec) {
+            return res.status(404).json({ error: "One or both applications could not be found." });
+          }
+          const primSpecs = parseSpecializationString(prim.specialization);
+          const secSpecs = parseSpecializationString(sec.specialization);
+          const combinedSpecs = Array.from(/* @__PURE__ */ new Set([...primSpecs, ...secSpecs]));
+          const parseCenterPrefs = (cp) => {
+            if (!cp) return {};
+            if (typeof cp === "object" && !Array.isArray(cp)) return cp;
+            try {
+              return JSON.parse(cp);
+            } catch {
+              return {};
+            }
+          };
+          const primPrefs = parseCenterPrefs(prim.centerPreference);
+          const secPrefs = parseCenterPrefs(sec.centerPreference);
+          const combinedPrefs = { ...secPrefs, ...primPrefs };
+          const primFormData = prim.formData || {};
+          const secFormData = sec.formData || {};
+          const combinedFormData = { ...secFormData, ...primFormData };
+          const primCustomAnswers = prim.customAnswers || {};
+          const secCustomAnswers = sec.customAnswers || {};
+          const combinedCustomAnswers = { ...secCustomAnswers, ...primCustomAnswers };
+          const mergedFields = {
+            specialization: JSON.stringify(combinedSpecs),
+            centerPreference: JSON.stringify(combinedPrefs),
+            formData: combinedFormData,
+            customAnswers: combinedCustomAnswers,
+            phone: prim.phone || sec.phone,
+            dateOfBirth: prim.dateOfBirth || sec.dateOfBirth,
+            gender: prim.gender || sec.gender,
+            maritalStatus: prim.maritalStatus || sec.maritalStatus,
+            spouseDetails: prim.spouseDetails || sec.spouseDetails,
+            permanentAddress: prim.permanentAddress || sec.permanentAddress,
+            mailingAddress: prim.mailingAddress || sec.mailingAddress,
+            degree: prim.degree || sec.degree,
+            medicalCollege: prim.medicalCollege || sec.medicalCollege,
+            university: prim.university || sec.university,
+            medicalCouncilNumber: prim.medicalCouncilNumber || sec.medicalCouncilNumber,
+            pgQualifications: prim.pgQualifications || sec.pgQualifications,
+            diagnosticSkills: prim.diagnosticSkills || sec.diagnosticSkills,
+            surgicalExperience: prim.surgicalExperience || sec.surgicalExperience,
+            totalSurgeries: prim.totalSurgeries || sec.totalSurgeries,
+            publications: prim.publications || sec.publications,
+            presentations: prim.presentations || sec.presentations,
+            photoUrl: prim.photoUrl || sec.photoUrl,
+            lor1Url: prim.lor1Url || sec.lor1Url,
+            lor1RefName: prim.lor1RefName || sec.lor1RefName,
+            lor1RefContact: prim.lor1RefContact || sec.lor1RefContact,
+            lor1RefEmail: prim.lor1RefEmail || sec.lor1RefEmail,
+            lor2Url: prim.lor2Url || sec.lor2Url,
+            lor2RefName: prim.lor2RefName || sec.lor2RefName,
+            lor2RefContact: prim.lor2RefContact || sec.lor2RefContact,
+            lor2RefEmail: prim.lor2RefEmail || sec.lor2RefEmail,
+            paymentId: prim.paymentId || sec.paymentId,
+            paymentMode: prim.paymentMode || sec.paymentMode,
+            paymentUrl: prim.paymentUrl || sec.paymentUrl,
+            paidAmount: Math.round(Number(prim.paidAmount || 0) + Number(sec.paidAmount || 0)) || Math.round(Number(prim.paidAmount || 0)) || 0,
+            reviewNotes: [prim.reviewNotes, `[Merged with #APP-${sec.id}]: ${sec.reviewNotes || ""}`].filter(Boolean).join(" | "),
+            reviewedAt: /* @__PURE__ */ new Date()
+          };
+          const [updatedPrim] = await db.update(applicationSubmissionsTable).set(mergedFields).where(eq(applicationSubmissionsTable.id, prim.id)).returning();
+          const primCandidate = prim.candidateId ? (await db.select().from(candidatesTable).where(eq(candidatesTable.id, prim.candidateId)))[0] : (await db.select().from(candidatesTable).where(eq(candidatesTable.email, prim.email.toLowerCase().trim())))[0];
+          const secCandidate = sec.candidateId ? (await db.select().from(candidatesTable).where(eq(candidatesTable.id, sec.candidateId)))[0] : (await db.select().from(candidatesTable).where(eq(candidatesTable.email, sec.email.toLowerCase().trim())))[0];
+          if (primCandidate && secCandidate && primCandidate.id !== secCandidate.id) {
+            await db.update(documentsTable).set({ candidateId: primCandidate.id }).where(eq(documentsTable.candidateId, secCandidate.id)).catch(() => {
+            });
+            await db.update(interviewScoresTable).set({ candidateId: primCandidate.id }).where(eq(interviewScoresTable.candidateId, secCandidate.id)).catch(() => {
+            });
+            await db.update(examAttemptsTable).set({ candidateId: primCandidate.id }).where(eq(examAttemptsTable.candidateId, secCandidate.id)).catch(() => {
+            });
+            await db.update(candidateExamAssignmentsTable).set({ candidateId: primCandidate.id }).where(eq(candidateExamAssignmentsTable.candidateId, secCandidate.id)).catch(() => {
+            });
+            await db.update(batchCandidatesTable).set({ candidateId: primCandidate.id }).where(eq(batchCandidatesTable.candidateId, secCandidate.id)).catch(() => {
+            });
+            await db.update(doctorAssignmentsTable).set({ candidateId: primCandidate.id }).where(eq(doctorAssignmentsTable.candidateId, secCandidate.id)).catch(() => {
+            });
+            const secApps = await db.select().from(applicationsTable).where(eq(applicationsTable.candidateId, secCandidate.id));
+            for (const sapp of secApps) {
+              const existingPrimApp = await db.select().from(applicationsTable).where(
+                and(
+                  eq(applicationsTable.candidateId, primCandidate.id),
+                  eq(applicationsTable.specialityId, sapp.specialityId)
+                )
+              );
+              if (existingPrimApp.length > 0) {
+                await db.delete(applicationsTable).where(eq(applicationsTable.id, sapp.id)).catch(() => {
+                });
+              } else {
+                await db.update(applicationsTable).set({ candidateId: primCandidate.id }).where(eq(applicationsTable.id, sapp.id)).catch(() => {
+                });
+              }
+            }
+            await db.delete(candidatePreferencesTable).where(eq(candidatePreferencesTable.candidateId, secCandidate.id)).catch(() => {
+            });
+            const specs = await db.select().from(specialitiesTable);
+            let order = 1;
+            for (const specName of combinedSpecs) {
+              const spec = specs.find((s2) => s2.name.toLowerCase() === specName.toLowerCase());
+              if (spec) {
+                await db.insert(candidatePreferencesTable).values({
+                  candidateId: primCandidate.id,
+                  specialityId: spec.id,
+                  preferenceOrder: order++
+                }).onConflictDoNothing().catch(() => {
+                });
+              }
+            }
+            await db.update(candidatesTable).set({
+              qualification: primCandidate.qualification || secCandidate.qualification || updatedPrim.degree,
+              collegeName: primCandidate.collegeName || secCandidate.collegeName || updatedPrim.medicalCollege,
+              address: primCandidate.address || secCandidate.address || updatedPrim.permanentAddress,
+              phone: primCandidate.phone || secCandidate.phone || updatedPrim.phone,
+              status: "approved"
+            }).where(eq(candidatesTable.id, primCandidate.id)).catch(() => {
+            });
+            await db.update(applicationSubmissionsTable).set({ candidateId: primCandidate.id }).where(eq(applicationSubmissionsTable.candidateId, secCandidate.id)).catch(() => {
+            });
+            await db.update(applicationSubmissionsTable).set({ candidateId: primCandidate.id }).where(eq(applicationSubmissionsTable.id, prim.id)).catch(() => {
+            });
+            await db.delete(candidatesTable).where(eq(candidatesTable.id, secCandidate.id)).catch(() => {
+            });
+          } else if (primCandidate) {
+            const specs = await db.select().from(specialitiesTable);
+            let order = 1;
+            for (const specName of combinedSpecs) {
+              const spec = specs.find((s2) => s2.name.toLowerCase() === specName.toLowerCase());
+              if (spec) {
+                await db.insert(candidatePreferencesTable).values({
+                  candidateId: primCandidate.id,
+                  specialityId: spec.id,
+                  preferenceOrder: order++
+                }).onConflictDoNothing().catch(() => {
+                });
+              }
+            }
+            await db.update(candidatesTable).set({
+              qualification: primCandidate.qualification || updatedPrim.degree,
+              collegeName: primCandidate.collegeName || updatedPrim.medicalCollege,
+              address: primCandidate.address || updatedPrim.permanentAddress,
+              phone: primCandidate.phone || updatedPrim.phone,
+              status: "approved"
+            }).where(eq(candidatesTable.id, primCandidate.id)).catch(() => {
+            });
+            await db.update(applicationSubmissionsTable).set({ candidateId: primCandidate.id }).where(eq(applicationSubmissionsTable.id, prim.id)).catch(() => {
+            });
+          } else if (secCandidate) {
+            await db.update(candidatesTable).set({
+              email: updatedPrim.email,
+              fullName: updatedPrim.fullName,
+              qualification: secCandidate.qualification || updatedPrim.degree,
+              collegeName: secCandidate.collegeName || updatedPrim.medicalCollege,
+              address: secCandidate.address || updatedPrim.permanentAddress,
+              phone: secCandidate.phone || updatedPrim.phone,
+              status: "approved"
+            }).where(eq(candidatesTable.id, secCandidate.id)).catch(() => {
+            });
+            const specs = await db.select().from(specialitiesTable);
+            let order = 1;
+            for (const specName of combinedSpecs) {
+              const spec = specs.find((s2) => s2.name.toLowerCase() === specName.toLowerCase());
+              if (spec) {
+                await db.insert(candidatePreferencesTable).values({
+                  candidateId: secCandidate.id,
+                  specialityId: spec.id,
+                  preferenceOrder: order++
+                }).onConflictDoNothing().catch(() => {
+                });
+              }
+            }
+            await db.update(applicationSubmissionsTable).set({ candidateId: secCandidate.id }).where(eq(applicationSubmissionsTable.id, prim.id)).catch(() => {
+            });
+          }
+          await db.delete(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, sec.id));
+          return res.json({
+            success: true,
+            message: `Successfully merged Application #APP-${sec.id} into #APP-${prim.id}`,
+            primarySubmission: updatedPrim
+          });
+        } catch (err) {
+          console.error("[merge-application] error:", err);
+          return res.status(500).json({ error: "Failed to merge applications", details: err.message });
+        }
+      }
+    );
+    router7.post(
+      "/application-forms/submissions/:id/approve",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      async (req, res) => {
+        const id = Number(req.params.id);
+        const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, id));
+        if (!sub) return res.status(404).json({ error: "Submission not found" });
+        const form = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
+        const programId = form[0]?.programId ?? 1;
+        const subEmail = sub.email.toLowerCase().trim();
+        const existing = await db.select().from(candidatesTable).where(eq(candidatesTable.email, subEmail));
+        if (existing.length > 0) {
+          const candidateId = existing[0].id;
+          await db.update(applicationSubmissionsTable).set({ status: "approved", candidateId, reviewedAt: /* @__PURE__ */ new Date() }).where(eq(applicationSubmissionsTable.id, id));
+          await syncSubmissionToCandidateAndDocuments(candidateId, sub);
+          if (sub.specialization) {
+            const specList = parseSpecializationString(sub.specialization);
+            if (Array.isArray(specList) && specList.length > 0) {
+              const specs = await db.select().from(specialitiesTable);
+              let order = 1;
+              for (const specName of specList) {
+                const spec = specs.find((s2) => s2.name.toLowerCase() === specName.toLowerCase());
+                if (spec) {
+                  const existingPref = await db.select().from(candidatePreferencesTable).where(
+                    and(
+                      eq(candidatePreferencesTable.candidateId, candidateId),
+                      eq(candidatePreferencesTable.specialityId, spec.id)
+                    )
+                  );
+                  if (existingPref.length === 0) {
+                    await db.insert(candidatePreferencesTable).values({
+                      candidateId,
+                      specialityId: spec.id,
+                      preferenceOrder: order
+                    });
+                  }
+                  const existingApp = await db.select().from(applicationsTable).where(
+                    and(
+                      eq(applicationsTable.candidateId, candidateId),
+                      eq(applicationsTable.specialityId, spec.id)
+                    )
+                  );
+                  if (existingApp.length === 0) {
+                    const prefix = spec.code ? spec.code.toUpperCase() : "GEN";
+                    const year2 = 2026;
+                    const countResult = await db.execute(sql`
+                  SELECT COUNT(*)::int as count FROM applications WHERE speciality_id = ${spec.id} AND hall_ticket_number IS NOT NULL
+                `);
+                    const seq = Number(countResult.rows[0]?.count ?? 0) + 1;
+                    const hallTicketNumber = `${prefix}-${year2}-${String(seq).padStart(3, "0")}`;
+                    await db.insert(applicationsTable).values({
+                      candidateId,
+                      specialityId: spec.id,
+                      hallTicketNumber,
+                      status: "approved"
+                    });
+                  }
+                  order++;
+                }
+              }
+            }
+          }
+          return res.json({ message: "Candidate already exists", candidateId });
+        }
+        const year = (/* @__PURE__ */ new Date()).getFullYear();
+        const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+        const code = `SAV-${year}-${rand}`;
+        const [candidate] = await db.insert(candidatesTable).values({
+          candidateCode: code,
+          fullName: sub.fullName,
+          email: subEmail,
+          phone: sub.phone ?? null,
+          dateOfBirth: sub.dateOfBirth ?? null,
+          gender: sub.gender ?? null,
+          address: sub.permanentAddress ?? null,
+          qualification: sub.degree ?? null,
+          collegeName: sub.medicalCollege ?? null,
+          status: "approved"
+        }).returning();
+        if (!candidate) {
+          return res.status(500).json({ error: "Failed to create candidate" });
+        }
+        if (sub.specialization) {
+          const specList = parseSpecializationString(sub.specialization);
+          if (Array.isArray(specList) && specList.length > 0) {
+            const specs = await db.select().from(specialitiesTable);
+            let order = 1;
+            for (const specName of specList) {
+              const spec = specs.find((s2) => s2.name.toLowerCase() === specName.toLowerCase());
+              if (spec) {
+                await db.insert(candidatePreferencesTable).values({
+                  candidateId: candidate.id,
+                  specialityId: spec.id,
+                  preferenceOrder: order++
+                });
+                const existingApp = await db.select().from(applicationsTable).where(
+                  and(
+                    eq(applicationsTable.candidateId, candidate.id),
+                    eq(applicationsTable.specialityId, spec.id)
+                  )
+                );
+                if (existingApp.length === 0) {
+                  const prefix = spec.code ? spec.code.toUpperCase() : "GEN";
+                  const year2 = 2026;
+                  const countResult = await db.execute(sql`
+                SELECT COUNT(*)::int as count FROM applications WHERE speciality_id = ${spec.id} AND hall_ticket_number IS NOT NULL
+              `);
+                  const seq = Number(countResult.rows[0]?.count ?? 0) + 1;
+                  const hallTicketNumber = `${prefix}-${year2}-${String(seq).padStart(3, "0")}`;
+                  await db.insert(applicationsTable).values({
+                    candidateId: candidate.id,
+                    specialityId: spec.id,
+                    hallTicketNumber,
+                    status: "approved"
+                  });
+                }
+              }
+            }
+          }
+        }
+        await syncSubmissionToCandidateAndDocuments(candidate.id, sub);
+        await db.update(applicationSubmissionsTable).set({ status: "approved", candidateId: candidate.id, reviewedAt: /* @__PURE__ */ new Date() }).where(eq(applicationSubmissionsTable.id, id));
+        const prog = await db.select().from(programsTable).where(eq(programsTable.id, programId));
+        sendApplicationApprovalEmail({
+          toEmail: subEmail,
+          toName: sub.fullName,
+          candidateCode: candidate.candidateCode,
+          programName: prog[0]?.name ?? "Fellowship Program",
+          formTitle: form[0]?.title ?? "Application"
+        }).catch((e2) => console.warn("[email] failed:", e2.message));
+        res.json({ message: "Candidate created", candidateId: candidate.id });
+      }
+    );
+    router7.post(
+      "/application-forms/:formId/submissions/bulk-action",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      async (req, res) => {
+        const formId = Number(req.params.formId);
+        const { action, ids } = req.body;
+        if (!action || !Array.isArray(ids) || ids.length === 0) {
+          return res.status(400).json({ error: "action and ids required" });
+        }
+        if (action === "reject") {
+          const result = await db.update(applicationSubmissionsTable).set({ status: "rejected", reviewedAt: /* @__PURE__ */ new Date() }).where(and(
+            inArray(applicationSubmissionsTable.id, ids),
+            eq(applicationSubmissionsTable.formId, formId)
+          )).returning({ id: applicationSubmissionsTable.id });
+          return res.json({ success: true, processed: result.length });
+        }
+        if (action === "approve") {
+          let approved = 0;
+          for (const id of ids) {
+            try {
+              const [sub] = await db.select().from(applicationSubmissionsTable).where(and(eq(applicationSubmissionsTable.id, id), eq(applicationSubmissionsTable.formId, formId)));
+              if (!sub || sub.status === "approved") continue;
+              const form = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
+              const programId = form[0]?.programId ?? 1;
+              const subEmail = sub.email.toLowerCase().trim();
+              const existing = await db.select().from(candidatesTable).where(eq(candidatesTable.email, subEmail));
+              if (existing.length > 0) {
+                const candidateId = existing[0].id;
+                await db.update(applicationSubmissionsTable).set({ status: "approved", candidateId, reviewedAt: /* @__PURE__ */ new Date() }).where(eq(applicationSubmissionsTable.id, id));
+                await syncSubmissionToCandidateAndDocuments(candidateId, sub);
+                if (sub.specialization) {
+                  const specList = parseSpecializationString(sub.specialization);
+                  if (Array.isArray(specList) && specList.length > 0) {
+                    const specs = await db.select().from(specialitiesTable);
+                    let order = 1;
+                    for (const specName of specList) {
+                      const spec = specs.find((s2) => s2.name.toLowerCase() === specName.toLowerCase());
+                      if (spec) {
+                        const existingPref = await db.select().from(candidatePreferencesTable).where(
+                          and(
+                            eq(candidatePreferencesTable.candidateId, candidateId),
+                            eq(candidatePreferencesTable.specialityId, spec.id)
+                          )
+                        );
+                        if (existingPref.length === 0) {
+                          await db.insert(candidatePreferencesTable).values({
+                            candidateId,
+                            specialityId: spec.id,
+                            preferenceOrder: order
+                          });
+                        }
+                        const existingApp = await db.select().from(applicationsTable).where(
+                          and(
+                            eq(applicationsTable.candidateId, candidateId),
+                            eq(applicationsTable.specialityId, spec.id)
+                          )
+                        );
+                        if (existingApp.length === 0) {
+                          const prefix = spec.code ? spec.code.toUpperCase() : "GEN";
+                          const year2 = 2026;
+                          const countResult = await db.execute(sql`
+                        SELECT COUNT(*)::int as count FROM applications WHERE speciality_id = ${spec.id} AND hall_ticket_number IS NOT NULL
+                      `);
+                          const seq = Number(countResult.rows[0]?.count ?? 0) + 1;
+                          const hallTicketNumber = `${prefix}-${year2}-${String(seq).padStart(3, "0")}`;
+                          await db.insert(applicationsTable).values({
+                            candidateId,
+                            specialityId: spec.id,
+                            hallTicketNumber,
+                            status: "approved"
+                          });
+                        }
+                        order++;
+                      }
+                    }
+                  }
+                }
+                approved++;
+                continue;
+              }
+              const year = (/* @__PURE__ */ new Date()).getFullYear();
+              const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+              const code = `SAV-${year}-${rand}`;
+              const [candidate] = await db.insert(candidatesTable).values({
+                candidateCode: code,
+                fullName: sub.fullName,
+                email: subEmail,
+                phone: sub.phone ?? null,
+                dateOfBirth: sub.dateOfBirth ?? null,
+                gender: sub.gender ?? null,
+                address: sub.permanentAddress ?? null,
+                qualification: sub.degree ?? null,
+                collegeName: sub.medicalCollege ?? null,
+                status: "approved"
+              }).returning();
+              if (!candidate) continue;
+              if (sub.specialization) {
+                const specList = parseSpecializationString(sub.specialization);
+                if (Array.isArray(specList) && specList.length > 0) {
+                  const specs = await db.select().from(specialitiesTable);
+                  let order = 1;
+                  for (const specName of specList) {
+                    const spec = specs.find((s2) => s2.name.toLowerCase() === specName.toLowerCase());
+                    if (spec) {
+                      await db.insert(candidatePreferencesTable).values({
+                        candidateId: candidate.id,
+                        specialityId: spec.id,
+                        preferenceOrder: order++
+                      }).onConflictDoNothing();
+                      const existingApp = await db.select().from(applicationsTable).where(
+                        and(
+                          eq(applicationsTable.candidateId, candidate.id),
+                          eq(applicationsTable.specialityId, spec.id)
+                        )
+                      );
+                      if (existingApp.length === 0) {
+                        const prefix = spec.code ? spec.code.toUpperCase() : "GEN";
+                        const year2 = 2026;
+                        const countResult = await db.execute(sql`
+                      SELECT COUNT(*)::int as count FROM applications WHERE speciality_id = ${spec.id} AND hall_ticket_number IS NOT NULL
+                    `);
+                        const seq = Number(countResult.rows[0]?.count ?? 0) + 1;
+                        const hallTicketNumber = `${prefix}-${year2}-${String(seq).padStart(3, "0")}`;
+                        await db.insert(applicationsTable).values({
+                          candidateId: candidate.id,
+                          specialityId: spec.id,
+                          hallTicketNumber,
+                          status: "approved"
+                        });
+                      }
+                    }
+                  }
+                }
+              }
+              await syncSubmissionToCandidateAndDocuments(candidate.id, sub);
+              await db.update(applicationSubmissionsTable).set({ status: "approved", candidateId: candidate.id, reviewedAt: /* @__PURE__ */ new Date() }).where(eq(applicationSubmissionsTable.id, id));
+              const prog = await db.select().from(programsTable).where(eq(programsTable.id, programId));
+              sendApplicationApprovalEmail({
+                toEmail: subEmail,
+                toName: sub.fullName,
+                candidateCode: candidate.candidateCode,
+                programName: prog[0]?.name ?? "Fellowship Program",
+                formTitle: form[0]?.title ?? "Application"
+              }).catch(() => {
+              });
+              approved++;
+            } catch (e2) {
+              console.warn(`[bulk-approve] id=${id} failed:`, e2);
+            }
+          }
+          return res.json({ success: true, processed: approved });
+        }
+        return res.status(400).json({ error: "Invalid action" });
+      }
+    );
+    router7.get(
+      "/application-forms/:id/google-forms-config",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      async (req, res) => {
+        const id = Number(req.params.id);
+        const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, id));
+        if (!form) return res.status(404).json({ error: "Form not found" });
+        const cfg = form.googleFormsConfig;
+        res.json({
+          googleFormId: cfg?.formId ?? "",
+          hasServiceAccount: !!cfg?.serviceAccountJson
+        });
+      }
+    );
+    router7.put(
+      "/application-forms/:id/google-forms-config",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      async (req, res) => {
+        const id = Number(req.params.id);
+        const { googleFormId, serviceAccountJson } = req.body;
+        let parsedJson;
+        if (serviceAccountJson && serviceAccountJson.trim()) {
+          try {
+            parsedJson = typeof serviceAccountJson === "string" ? JSON.parse(serviceAccountJson) : serviceAccountJson;
+          } catch {
+            return res.status(400).json({ error: "Invalid service account JSON" });
+          }
+        }
+        const [existing] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, id));
+        if (!existing) return res.status(404).json({ error: "Form not found" });
+        const existingCfg = existing.googleFormsConfig;
+        const newConfig = {
+          formId: googleFormId,
+          serviceAccountJson: parsedJson ?? existingCfg?.serviceAccountJson ?? void 0
+        };
+        await db.update(applicationFormsTable).set({ googleFormsConfig: newConfig }).where(eq(applicationFormsTable.id, id));
+        res.json({ success: true });
+      }
+    );
+    router7.post(
+      "/application-forms/:id/sync-google-forms",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      async (req, res) => {
+        const id = Number(req.params.id);
+        const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, id));
+        if (!form) return res.status(404).json({ error: "Form not found" });
+        const cfg = form.googleFormsConfig;
+        if (!cfg?.formId || !cfg?.serviceAccountJson) {
+          return res.status(400).json({ error: "Google Forms integration not configured. Please enter a Form ID and Service Account JSON." });
+        }
+        try {
+          const auth = new import_googleapis2.google.auth.GoogleAuth({
+            credentials: cfg.serviceAccountJson,
+            scopes: ["https://www.googleapis.com/auth/forms.responses.readonly"]
+          });
+          const formsApi = import_googleapis2.google.forms({ version: "v1", auth });
+          const responsesResp = await formsApi.forms.responses.list({ formId: cfg.formId });
+          const responses = responsesResp.data.responses ?? [];
+          const existingResult = await db.execute(sql`
+        SELECT google_forms_response_id FROM application_submissions
+        WHERE form_id = ${id} AND google_forms_response_id IS NOT NULL
+      `);
+          const existingIds = new Set(
+            existingResult.rows.flatMap((r2) => r2.google_forms_response_id.split(",").map((id2) => id2.trim()))
+          );
+          const formMetaResp = await formsApi.forms.get({ formId: cfg.formId });
+          const items = formMetaResp.data.items ?? [];
+          const questionMap = /* @__PURE__ */ new Map();
+          for (const item of items) {
+            if (item.questionItem?.question?.questionId && item.title) {
+              questionMap.set(item.questionItem.question.questionId, item.title.toLowerCase());
+            }
+          }
+          const emailGroups = /* @__PURE__ */ new Map();
+          for (const resp of responses) {
+            if (!resp.responseId || existingIds.has(resp.responseId)) continue;
+            const answers = resp.answers ?? {};
+            const makeExtract = (ans) => (keywords) => {
+              for (const [qId, answer] of Object.entries(ans)) {
+                const title = questionMap.get(qId) ?? "";
+                if (keywords.some((k) => new RegExp(k, "i").test(title))) {
+                  return (answer.textAnswers?.answers ?? []).map((a) => a.value ?? "").join(", ").trim();
+                }
+              }
+              return "";
+            };
+            const extract = makeExtract(answers);
+            const fullName = extract(["name in full", "full name", "your name"]);
+            const rawEmail = extract(["e-mail", "email"]);
+            if (!fullName || !rawEmail) continue;
+            const emailKey = rawEmail.toLowerCase().replace(/\s+/g, "");
+            const spec = extract(["applying for", "subspecialt", "special"]);
+            const centerPref = extract(["cornea.*center", "glaucoma.*center", "iol.*center", "oculoplasty.*center", "pediatric.*center", "phaco.*center"]) || extract(["center", "location", "unit", "prefer"]);
+            if (!emailGroups.has(emailKey)) {
+              emailGroups.set(emailKey, {
+                email: rawEmail.trim(),
+                fullName,
+                latestTs: resp.lastSubmittedTime ?? "",
+                specializations: [],
+                responseIds: [],
+                masterExtract: extract,
+                masterAnswers: answers
+              });
+            }
+            const group = emailGroups.get(emailKey);
+            group.responseIds.push(resp.responseId);
+            if (spec && !group.specializations.find((s2) => s2.name === spec)) {
+              group.specializations.push({ name: spec, centerPref: centerPref || "" });
+            }
+            if ((resp.lastSubmittedTime ?? "") >= group.latestTs) {
+              group.latestTs = resp.lastSubmittedTime ?? "";
+              group.masterExtract = extract;
+              group.masterAnswers = answers;
+            }
+          }
+          let imported = 0;
+          let merged = 0;
+          for (const [emailKey, group] of emailGroups) {
+            const ex = group.masterExtract;
+            const specializationJson = JSON.stringify(
+              group.specializations.length > 0 ? group.specializations.map((s2) => s2.name) : []
+            );
+            const centerPrefJson = group.specializations.length > 0 ? JSON.stringify(Object.fromEntries(group.specializations.map((s2) => [s2.name, s2.centerPref]))) : null;
+            const allResponseIds = group.responseIds.join(",");
+            const phone = ex(["mobile number", "phone number", "mobile", "phone", "contact number"]);
+            const degree = ex(["degrees & other", "degree", "qualification", "mbbs"]);
+            const medicalCollege = ex(["medical college qualified", "medical college", "college"]);
+            const university = ex(["university from which", "university"]);
+            const pgQualifications = ex(["postgraduate qual", "pg qual"]);
+            const medicalCouncilNumber = ex(["medical council registration", "council registration", "registration number"]);
+            const publications = ex(["journal.*publication", "publications"]);
+            const presentations = ex(["presentations.*conference", "presentations"]);
+            const referralSource = ex(["where did you hear", "hear about"]);
+            const referredByName = ex(["referred.*faculty", "faculty.*trainee", "referred by"]);
+            const permanentAddress = ex(["permanent address"]);
+            const dateOfBirth = ex(["date of birth"]);
+            const maritalStatus = ex(["marital status"]);
+            const healthDeclaration = ex(["medical condition", "ailments", "suffering"]);
+            const lor1Url = ex(["lor 1", "letter of recommendation 1"]);
+            const lor1RefName = ex(["name.*designation.*reference", "designation of reference"]);
+            const lor1RefContact = ex(["contact number of reference"]);
+            const lor1RefEmail = ex(["email id of reference", "email.*reference"]);
+            const lor2Url = ex(["lor 2", "letter of recommendation 2"]);
+            const paymentUrl = ex(["screenshot.*transaction", "payment.*screenshot", "transaction id", "utr"]);
+            const photoUrl = ex(["passport size photograph", "passport photo", "photograph"]);
+            const existingSubResult = await db.execute(sql`
+          SELECT id, specialization, center_preference FROM application_submissions
+          WHERE form_id = ${id} AND LOWER(email) = ${emailKey}
+          LIMIT 1
+        `);
+            const existingSub = existingSubResult.rows[0];
+            if (existingSub) {
+              const existingSpecs = parseSpecializationString(existingSub.specialization);
+              const newSpecs = group.specializations.map((s2) => s2.name);
+              const mergedSpecs = [.../* @__PURE__ */ new Set([...existingSpecs, ...newSpecs])];
+              let existingCenterPrefs = {};
+              try {
+                existingCenterPrefs = JSON.parse(existingSub.center_preference ?? "{}");
+              } catch {
+              }
+              const newCenterPrefs = Object.fromEntries(group.specializations.map((s2) => [s2.name, s2.centerPref]));
+              const mergedCenterPrefs = { ...existingCenterPrefs, ...newCenterPrefs };
+              await db.execute(sql`
+            UPDATE application_submissions SET
+              specialization = ${JSON.stringify(mergedSpecs)},
+              center_preference = ${JSON.stringify(mergedCenterPrefs)},
+              google_forms_response_id = ${allResponseIds},
+              updated_at = NOW()
+            WHERE id = ${existingSub.id}
+          `);
+              merged++;
+            } else {
+              const subData = {
+                formId: id,
+                status: "pending",
+                source: "google_forms",
+                googleFormsResponseId: allResponseIds,
+                fullName: group.fullName,
+                email: group.email,
+                phone: phone || null,
+                specialization: specializationJson,
+                centerPreference: centerPrefJson,
+                degree: degree || null,
+                medicalCollege: medicalCollege || null,
+                university: university || null,
+                pgQualifications: pgQualifications || null,
+                medicalCouncilNumber: medicalCouncilNumber || null,
+                publications: publications || null,
+                presentations: presentations || null,
+                referralSource: referralSource || null,
+                referredByName: referredByName || null,
+                permanentAddress: permanentAddress || null,
+                dateOfBirth: dateOfBirth || null,
+                maritalStatus: maritalStatus || null,
+                healthDeclaration: healthDeclaration || null,
+                lor1Url: lor1Url || null,
+                lor1RefName: lor1RefName || null,
+                lor1RefContact: lor1RefContact || null,
+                lor1RefEmail: lor1RefEmail || null,
+                lor2Url: lor2Url || null,
+                paymentUrl: paymentUrl || null,
+                photoUrl: photoUrl || null,
+                declarationAccepted: true,
+                customAnswers: {}
+              };
+              const isComplete = checkCompleteness(subData);
+              await db.insert(applicationSubmissionsTable).values({ ...subData, readyForReview: isComplete });
+              imported++;
+            }
+          }
+          res.json({ success: true, imported, merged, total: responses.length, uniqueApplicants: emailGroups.size });
+        } catch (e2) {
+          console.error("[google-forms-sync] error:", e2);
+          const msg = e2 instanceof Error ? e2.message : "Unknown error";
+          res.status(500).json({ error: `Google Forms sync failed: ${msg}` });
+        }
+      }
+    );
+    router7.get(
+      "/application-forms/:id/google-sheets-config",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      async (req, res) => {
+        const id = Number(req.params.id);
+        const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, id));
+        if (!form) return res.status(404).json({ error: "Form not found" });
+        const cfg = form.googleSheetsConfig;
+        res.json({
+          spreadsheetId: cfg?.spreadsheetId ?? "",
+          sheetName: cfg?.sheetName ?? "Form Responses 1",
+          hasServiceAccount: !!cfg?.serviceAccountJson
+        });
+      }
+    );
+    router7.put(
+      "/application-forms/:id/google-sheets-config",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      async (req, res) => {
+        const id = Number(req.params.id);
+        const { spreadsheetId, sheetName, serviceAccountJson } = req.body;
+        let parsedJson;
+        if (serviceAccountJson && serviceAccountJson.trim()) {
+          try {
+            parsedJson = typeof serviceAccountJson === "string" ? JSON.parse(serviceAccountJson) : serviceAccountJson;
+          } catch {
+            return res.status(400).json({ error: "Invalid service account JSON" });
+          }
+        }
+        const [existing] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, id));
+        if (!existing) return res.status(404).json({ error: "Form not found" });
+        const existingCfg = existing.googleSheetsConfig;
+        const newConfig = {
+          spreadsheetId,
+          sheetName,
+          serviceAccountJson: parsedJson ?? existingCfg?.serviceAccountJson ?? void 0
+        };
+        await db.update(applicationFormsTable).set({ googleSheetsConfig: newConfig }).where(eq(applicationFormsTable.id, id));
+        res.json({ success: true });
+      }
+    );
+    router7.post(
+      "/application-forms/:id/sync-google-sheets",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      async (req, res) => {
+        const id = Number(req.params.id);
+        const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, id));
+        if (!form) return res.status(404).json({ error: "Form not found" });
+        const cfg = form.googleSheetsConfig;
+        if (!cfg?.spreadsheetId || !cfg?.serviceAccountJson) {
+          return res.status(400).json({ error: "Google Sheets integration not configured. Please enter a Spreadsheet ID and Service Account JSON." });
+        }
+        try {
+          const auth = new import_googleapis2.google.auth.GoogleAuth({
+            credentials: cfg.serviceAccountJson,
+            scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+          });
+          const sheets = import_googleapis2.google.sheets({ version: "v4", auth });
+          let sheetName = cfg.sheetName || "Form Responses 1";
+          let rows = null;
+          try {
+            const response = await sheets.spreadsheets.values.get({
+              spreadsheetId: cfg.spreadsheetId,
+              range: `'${sheetName}'!A1:ZZ`
+            });
+            rows = response.data.values;
+          } catch (e2) {
+            console.warn(`[google-sheets-sync] Could not find sheet "${sheetName}", attempting auto-discovery...`, e2.message);
+            const spreadsheet = await sheets.spreadsheets.get({
+              spreadsheetId: cfg.spreadsheetId
+            });
+            const sheetTitles = spreadsheet.data.sheets?.map((s2) => s2.properties?.title).filter(Boolean);
+            if (!sheetTitles || sheetTitles.length === 0) {
+              throw new Error("No sheets found in this spreadsheet.");
+            }
+            const bestMatch = sheetTitles.find((t2) => t2.toLowerCase().includes("responses")) || sheetTitles.find((t2) => t2.toLowerCase().includes("form")) || sheetTitles[0];
+            console.info(`[google-sheets-sync] Auto-discovered sheet: "${bestMatch}"`);
+            sheetName = bestMatch;
+            const response = await sheets.spreadsheets.values.get({
+              spreadsheetId: cfg.spreadsheetId,
+              range: `'${sheetName}'!A1:ZZ`
+            });
+            rows = response.data.values;
+          }
+          if (!rows || rows.length <= 1) {
+            return res.json({ success: true, imported: 0, message: `No data found in sheet "${sheetName}"` });
+          }
+          const headers = rows[0].map((h2) => h2.trim());
+          const dataRows = rows.slice(1);
+          const spreadsheetRowIds = /* @__PURE__ */ new Set();
+          const existingResult = await db.execute(sql`
+        SELECT google_sheets_row_id, email FROM application_submissions
+        WHERE form_id = ${id} AND google_sheets_row_id IS NOT NULL
+      `);
+          const existingIds = new Set(existingResult.rows.map((r2) => r2.google_sheets_row_id));
+          let imported = 0;
+          let merged = 0;
+          const rowsByEmail = /* @__PURE__ */ new Map();
+          for (const row of dataRows) {
+            const rowData = {};
+            headers.forEach((header, index3) => {
+              rowData[header] = row[index3] || "";
+            });
+            const timestamp2 = rowData["Timestamp"];
+            const email3 = rowData["E-mail (this would be the ID all communication would be shared on)"] || rowData["E-mail"] || rowData["Email"] || "";
+            const rowId = `${timestamp2}_${email3}`.toLowerCase().replace(/\s+/g, "");
+            spreadsheetRowIds.add(rowId);
+            const key = email3.toLowerCase().trim();
+            if (!key) continue;
+            if (!rowsByEmail.has(key)) {
+              rowsByEmail.set(key, []);
+            }
+            rowsByEmail.get(key).push({ rowData, rowId, email: email3 });
+          }
+          const existingByEmailResult = await db.execute(sql`
+        SELECT id, email, google_sheets_row_id FROM application_submissions
+        WHERE form_id = ${id} AND google_sheets_row_id IS NOT NULL
+      `);
+          const existingByEmail = /* @__PURE__ */ new Map();
+          for (const r2 of existingByEmailResult.rows) {
+            if (r2.email) {
+              const key = r2.email.toLowerCase().trim();
+              if (!existingByEmail.has(key)) {
+                existingByEmail.set(key, []);
+              }
+              existingByEmail.get(key).push(r2);
+            }
+          }
+          for (const [emailKey, group] of rowsByEmail.entries()) {
+            const mergedSubData = {};
+            let combinedRowIds = [];
+            let combinedSpecializations = [];
+            for (const item of group) {
+              const { rowData, rowId, email: email3 } = item;
+              combinedRowIds.push(rowId);
+              const specialization = rowData["Select 1 option from the dropbox"];
+              if (specialization && !combinedSpecializations.includes(specialization)) {
+                combinedSpecializations.push(specialization);
+              }
+              const centerPrefHeaders = [
+                "Cornea",
+                "Glaucoma",
+                "IOL",
+                "Medical Retina",
+                "Oculoplasty",
+                "Pediatric",
+                "Phaco Refractive",
+                "Vitreo Retina"
+              ];
+              let centerPreference = "";
+              for (const h2 of headers) {
+                if (centerPrefHeaders.some((cp) => h2.startsWith(cp)) && h2.toLowerCase().includes("choose the preferred center")) {
+                  if (rowData[h2] && rowData[h2] !== "Not Applicable") {
+                    centerPreference = rowData[h2];
+                    break;
+                  }
+                }
+              }
+              const diagnosticSkills = {};
+              headers.forEach((h2) => {
+                if (h2.startsWith("Perform & Interpret Diagnostics")) {
+                  const match2 = h2.match(/\[(.*?)\]/);
+                  if (match2 && match2[1]) {
+                    diagnosticSkills[match2[1]] = rowData[h2];
+                  }
+                }
+              });
+              const surgicalExperience = {};
+              const surgicalCategories = ["ECCE", "SICS", "PHACO", "TRABECULECTOMY", "RETINA LASERS", "DCR"];
+              surgicalCategories.forEach((cat) => {
+                const supKey = headers.find((h2) => h2.includes(`Approximate No of ${cat}`) && h2.includes("(Under Supervision)"));
+                const indKey = headers.find((h2) => h2.includes(`Approximate No of ${cat}`) && h2.includes("(Independently)"));
+                surgicalExperience[cat] = {
+                  supervision: supKey ? rowData[supKey] : "0",
+                  independent: indKey ? rowData[indKey] : "0"
+                };
+              });
+              const subData = {
+                formId: id,
+                status: "pending",
+                source: "google_sheets",
+                fullName: rowData["Name in Full (First Name, Middle Name, Last/Family Name)"] || rowData["Name in Full"] || "",
+                email: email3 || "",
+                phone: rowData["Mobile Number (only 10 digits)"] || rowData["Mobile Number"] || "",
+                centerPreference,
+                referralSource: rowData["Where did you hear about this Fellowship?"],
+                referredByName: rowData["Mention the name of referred Faculty/Existing Trainee from Sankara"],
+                mediaSource: rowData["Mention the Media Source"],
+                permanentAddress: rowData["Permanent Address (including postal pin code)"],
+                mailingAddress: rowData["Preferred Mailing Address (if different from the Permanent Address then fill if same as permanent put N/A)"],
+                dateOfBirth: rowData["Date of Birth"] || rowData["Date of Birth "],
+                maritalStatus: rowData["Marital Status"] || rowData["Marital Status "],
+                spouseDetails: rowData["If Married Spouse Details(Name & Profession)"] || rowData["If Married Spouse Details(Name & Profession) "],
+                previousApplicationMonthYear: rowData["If you have responded yes, month & year"],
+                medicalConditions: rowData["Kindly declare if you are suffering any of the following ailments and are on medications."] || rowData["Kindly declare if you are suffering any of the following ailments and are on medications. "],
+                degree: rowData["Degree"],
+                medicalCollege: rowData["Medical College Qualified From ( College, City , State, Country)"],
+                university: rowData["University from which MBBS Degree Awarded"],
+                pgQualifications: rowData["Postgraduate Qualifications"] || rowData["Postgraduate Qualifications "],
+                doQualification: rowData["Qualification [DO (Diploma Ophthlmology)]"] === "Yes",
+                doDetails: rowData["If DO then College & University Qualified from and year of Qualification"] || rowData["If DO then College & University Qualified from and year of Qualification "],
+                msMdQualification: rowData["Qualification [MS/MD ( Masters in Ophthalmology)]"] === "Yes",
+                msMdDetails: rowData["If MS then College & University Qualified from and year of Qualification"],
+                dnbQualification: rowData["Qualification [DNB]"] === "Yes",
+                dnbDetails: rowData["If DNB then institution completed from and year of Qualification"],
+                otherTraining: rowData["Any Other Training / Certification undertaken"] || rowData["Any Other Training / Certification undertaken "],
+                medicalCouncilNumber: rowData["Medical Council Registration Number ( indicate complete number and state of registration)"],
+                diagnosticSkills: JSON.stringify(diagnosticSkills),
+                surgicalExperience: JSON.stringify(surgicalExperience),
+                totalSurgeries: rowData["7. Total No of Surgeries performed till date"] || rowData["7. Total No of Surgeries performed till date "],
+                publications: rowData["Journal - List of all publications in the format of - Journal, Date, Title, Co - Authors"],
+                presentations: rowData["Presentations  - List of presentations at Conferences in the format of - Journal, Date, Title, Co - Authors"],
+                lor1Url: rowData["LOR 1,  Issue Date and Signature are mandatory on the Letter"] || rowData["LOR 1,  Issue Date and Signature are mandatory on the Letter "],
+                lor1RefName: rowData["Name & Designation of Reference:"],
+                lor1RefContact: rowData["Contact number of Reference:"],
+                lor1RefEmail: rowData["Email ID of Reference"],
+                lor2Url: rowData["LOR 2,  Issue Date and Signature are mandatory on the Letter"],
+                lor2RefName: rowData["Name & Designation of Reference"],
+                lor2RefContact: rowData["Contact number of Reference:"],
+                lor2RefEmail: rowData["Email id of Reference:"],
+                otherInformation: rowData["If there is any other information you deem pertinent for us to consider as part of your application please share that here."],
+                declarationAccepted: rowData["Declaration"] === "Yes" || rowData["Declaration"] === "I Accept",
+                paymentUrl: rowData["Upload the screenshot with Transaction ID/UTR details of the payment of Rs.2750/-  (Fee including Tax)"] || rowData["Upload the screenshot with Transaction ID/UTR details of the payment of Rs.2750/-  (Fee including Tax) "],
+                photoUrl: rowData["Please upload your latest passport size photograph"] || rowData["Please upload your latest passport size photograph "],
+                customAnswers: {}
+              };
+              for (const [k, v] of Object.entries(subData)) {
+                if (v !== void 0 && v !== null && v !== "" && v !== "{}" && v !== '{"ECCE":{"supervision":"0","independent":"0"},"SICS":{"supervision":"0","independent":"0"},"PHACO":{"supervision":"0","independent":"0"},"TRABECULECTOMY":{"supervision":"0","independent":"0"},"RETINA LASERS":{"supervision":"0","independent":"0"},"DCR":{"supervision":"0","independent":"0"}}') {
+                  if (!mergedSubData[k] || mergedSubData[k] === "{}" || typeof mergedSubData[k] === "string" && mergedSubData[k].startsWith('{"ECCE"')) {
+                    mergedSubData[k] = v;
+                  }
+                }
+              }
+            }
+            mergedSubData.specialization = combinedSpecializations;
+            mergedSubData.googleSheetsRowId = combinedRowIds.join(",");
+            const isComplete = Boolean(
+              mergedSubData.fullName && mergedSubData.email && mergedSubData.phone && mergedSubData.specialization && mergedSubData.specialization.length > 0
+            );
+            mergedSubData.readyForReview = isComplete;
+            const existingList = existingByEmail.get(emailKey) || [];
+            if (existingList.length > 0) {
+              const primary = existingList[0];
+              if (existingList.length > 1) {
+                const extraIds = existingList.slice(1).map((r2) => r2.id);
+                await db.delete(applicationSubmissionsTable).where(inArray(applicationSubmissionsTable.id, extraIds));
+              }
+              if (primary.google_sheets_row_id !== mergedSubData.googleSheetsRowId) {
+                await db.update(applicationSubmissionsTable).set(mergedSubData).where(eq(applicationSubmissionsTable.id, primary.id));
+                merged++;
+              }
+            } else {
+              await db.insert(applicationSubmissionsTable).values(mergedSubData);
+              imported++;
+            }
+          }
+          let deletedCount = 0;
+          const idsToDelete = [];
+          const emailsToDelete = [];
+          for (const rowId of existingIds) {
+            const subIds = rowId.split(",");
+            const anyExist = subIds.some((id2) => spreadsheetRowIds.has(id2));
+            if (!anyExist) {
+              const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.googleSheetsRowId, rowId));
+              if (sub) {
+                idsToDelete.push(rowId);
+                emailsToDelete.push(sub.email);
+              }
+            }
+          }
+          if (idsToDelete.length > 0) {
+            for (const email3 of emailsToDelete) {
+              await db.delete(candidatesTable).where(eq(candidatesTable.email, email3));
+            }
+            await db.delete(applicationSubmissionsTable).where(and(
+              eq(applicationSubmissionsTable.formId, id),
+              inArray(applicationSubmissionsTable.googleSheetsRowId, idsToDelete)
+            ));
+            deletedCount = idsToDelete.length;
+          }
+          res.json({ success: true, imported, merged, deleted: deletedCount, total: dataRows.length });
+        } catch (e2) {
+          console.error("[google-sheets-sync] error:", e2);
+          const msg = e2 instanceof Error ? e2.message : "Unknown error";
+          res.status(500).json({ error: `Google Sheets sync failed: ${msg}` });
+        }
+      }
+    );
+    router7.post("/apply/:token/request-upload-url", async (req, res) => {
+      const form = await resolveFormByToken(req.params.token);
+      if (!form) return res.status(404).json({ error: "Form not found" });
+      const token = form.token;
+      if (!form.isActive) return res.status(410).json({ error: "This form is no longer accepting submissions" });
+      if (form.deadline && /* @__PURE__ */ new Date() > form.deadline) {
+        return res.status(410).json({ error: "The deadline for this form has passed" });
+      }
+      const { name: name2, contentType, size, candidateName, fieldName } = req.body ?? {};
+      if (!name2 || typeof name2 !== "string" || !name2.trim()) {
+        return res.status(400).json({ error: "Missing required field: name" });
+      }
+      const cleanContentType = contentType && typeof contentType === "string" ? contentType : "application/octet-stream";
+      try {
+        const isReplit = !!process.env.REPL_ID;
+        if (!isReplit) {
+          const objectId = Math.random().toString(36).substring(2, 10);
+          const ext2 = name2.split(".").pop() ?? "bin";
+          const sanitizedName = name2.split(".")[0].replace(/[^a-zA-Z0-9]/g, "_");
+          let folderName = candidateName ? candidateName.trim().replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_") : "Unknown_Candidate";
+          const filename = `${sanitizedName}_${objectId}.${ext2}`;
+          const uploadURL2 = `/api/apply/${token}/local-upload/${folderName}/${filename}`;
+          const objectPath2 = `/objects/uploads/${folderName}/${filename}`;
+          return res.json({ uploadURL: uploadURL2, objectPath: objectPath2, metadata: { name: name2.trim(), size, contentType: cleanContentType } });
+        }
+        const { ObjectStorageService: ObjectStorageService2 } = await Promise.resolve().then(() => (init_objectStorage(), objectStorage_exports));
+        const objectStorageService2 = new ObjectStorageService2();
+        const uploadURL = await objectStorageService2.getObjectEntityUploadURL();
+        const objectPath = objectStorageService2.normalizeObjectEntityPath(uploadURL);
+        return res.json({ uploadURL, objectPath, metadata: { name: name2.trim(), size, contentType: cleanContentType } });
+      } catch (error40) {
+        console.error("UPLOAD ENDPOINT ERROR:", error40);
+        return res.status(500).json({ error: "Failed to generate upload URL", details: error40 instanceof Error ? error40.message : String(error40) });
+      }
+    });
+    router7.put("/apply/:token/local-upload/:folderName/:filename", async (req, res) => {
+      try {
+        const chunks = [];
+        req.on("data", (chunk) => {
+          chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+        });
+        req.on("end", async () => {
+          try {
+            const buffer = Buffer.concat(chunks);
+            const folderName = req.params.folderName;
+            const filename = req.params.filename;
+            const objectPath = `/objects/uploads/${folderName}/${filename}`;
+            const contentType = req.headers["content-type"] || "application/octet-stream";
+            try {
+              const tmpUploadDir = path5.join(os2.tmpdir(), "uploads", folderName);
+              await fs8.mkdir(tmpUploadDir, { recursive: true });
+              await fs8.writeFile(path5.join(tmpUploadDir, filename), buffer);
+            } catch (_) {
+            }
+            try {
+              const localUploadDir = path5.join(process.cwd(), "uploads", folderName);
+              await fs8.mkdir(localUploadDir, { recursive: true });
+              await fs8.writeFile(path5.join(localUploadDir, filename), buffer);
+            } catch (_) {
+            }
+            await db.execute(sql`
+          INSERT INTO uploaded_files (file_path, file_name, content_type, file_data, file_size)
+          VALUES (${objectPath}, ${filename}, ${contentType}, ${buffer}, ${buffer.length})
+          ON CONFLICT (file_path) DO UPDATE SET
+            file_data = EXCLUDED.file_data,
+            file_size = EXCLUDED.file_size,
+            content_type = EXCLUDED.content_type,
+            created_at = NOW()
+        `);
+            res.json({ success: true, path: objectPath });
+          } catch (saveErr) {
+            console.error("Failed to save uploaded file:", saveErr);
+            res.status(500).json({ error: saveErr.message || "Failed to save file" });
+          }
+        });
+        req.on("error", (err) => {
+          console.error("Upload stream error:", err);
+          if (!res.headersSent) res.status(500).json({ error: "Upload stream failed" });
+        });
+      } catch (error40) {
+        console.error("Local upload catch error:", error40);
+        if (!res.headersSent) res.status(500).json({ error: "Failed to process upload" });
+      }
+    });
+    router7.get("/apply/:token", async (req, res) => {
+      const form = await resolveFormByToken(req.params.token);
+      if (!form) return res.status(404).json({ error: "Form not found" });
+      if (!form.isActive) return res.status(410).json({ error: "This form is no longer accepting submissions" });
+      if (form.deadline && /* @__PURE__ */ new Date() > form.deadline) {
+        return res.status(410).json({ error: "The deadline for this form has passed" });
+      }
+      const [program] = await db.select().from(programsTable).where(eq(programsTable.id, form.programId));
+      const CANONICAL_SPECIALITIES = [
+        "Cornea",
+        "Glaucoma",
+        "IOL Fellowship",
+        "Medical Retina",
+        "Oculoplasty",
+        "Pediatric Ophthalmology",
+        "Phaco Refractive",
+        "Vitreo Retina"
+      ];
+      const CANONICAL_UNITS = [
+        "Anand",
+        "Bangalore",
+        "Coimbatore",
+        "Guntur",
+        "Hyderabad",
+        "Indore",
+        "Jaipur",
+        "Kanpur",
+        "Krishnankoil",
+        "Ludhiana",
+        "Panvel",
+        "Shimoga",
+        "Varanasi"
+      ];
+      const specResult = await db.execute(sql`
+    SELECT DISTINCT speciality FROM seat_matrix_entries
+    WHERE speciality !~ '^[0-9]' AND speciality != 'Date'
+    ORDER BY speciality
+  `);
+      const dbSpecs = specResult.rows.map((r2) => r2.speciality);
+      const specialities = dbSpecs.length > 0 ? dbSpecs : CANONICAL_SPECIALITIES;
+      const unitResult = await db.execute(sql`
+    SELECT DISTINCT unit_name FROM seat_matrix_entries
+    WHERE unit_name !~ '^[0-9]'
+    ORDER BY unit_name
+  `);
+      const dbUnits = unitResult.rows.map((r2) => r2.unit_name);
+      const units = dbUnits.length > 0 ? dbUnits : CANONICAL_UNITS;
+      let sectionsConfig = form.sectionsConfig ?? [];
+      if (Array.isArray(sectionsConfig) && form.programId) {
+        try {
+          const matrixResult = await db.execute(sql`
+        SELECT speciality, unit_name, total_seats
+        FROM seat_matrix_entries
+        WHERE program_id = ${form.programId} AND total_seats > 0
+        ORDER BY unit_name
+      `);
+          const matrixRows = matrixResult.rows;
+          const specToUnits = /* @__PURE__ */ new Map();
+          for (const row of matrixRows) {
+            const normSpec = row.speciality.toLowerCase().trim();
+            const list = specToUnits.get(normSpec) || [];
+            if (!list.includes(row.unit_name)) list.push(row.unit_name);
+            specToUnits.set(normSpec, list);
+          }
+          sectionsConfig = sectionsConfig.map((sec) => ({
+            ...sec,
+            fields: sec.fields?.map((f3) => {
+              if (f3.id && f3.id.startsWith("unit_") && f3.visibleIf?.contains) {
+                const specCondition = f3.visibleIf.contains.toLowerCase().trim();
+                for (const [sKey, uList] of specToUnits.entries()) {
+                  if (sKey === specCondition || sKey.includes(specCondition) || specCondition.includes(sKey) || specCondition === "iol" && sKey.includes("iol") || specCondition.includes("medical retina") && sKey.includes("medical retina") || specCondition.includes("pediatric") && sKey.includes("pediatric")) {
+                    if (uList.length > 0) {
+                      const existingOpts = Array.isArray(f3.options) ? f3.options : [];
+                      const merged = Array.from(/* @__PURE__ */ new Set([...existingOpts, ...uList]));
+                      return { ...f3, options: merged };
+                    }
+                  }
+                }
+              }
+              return f3;
+            })
+          }));
+        } catch (_) {
+        }
+      }
+      res.json({
+        ...form,
+        programName: program?.name ?? null,
+        specialities,
+        units,
+        customFields: form.customFields ?? [],
+        sectionsConfig
+      });
+    });
+    router7.get("/apply/:token/payment-config", async (req, res) => {
+      const form = await resolveFormByToken(req.params.token);
+      const programId = form?.programId ?? null;
+      const all = await db.select().from(paymentSettingsTable).where(eq(paymentSettingsTable.isActive, true));
+      const specific = programId ? all.find((s2) => s2.programId === programId) : null;
+      const global2 = all.find((s2) => s2.programId === null);
+      const setting = specific ?? global2 ?? null;
+      const LIVE_KEY_ID = "rzp_live_ddDz3Yp0860GqG";
+      const LIVE_SECRET = "LGVG9K6XjOwpHnfjfGMmgwxZ";
+      let keyId = setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || LIVE_KEY_ID;
+      if (!keyId || keyId.startsWith("rzp_test") || keyId === "[SENSITIVE]") {
+        keyId = LIVE_KEY_ID;
+      }
+      let keySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || LIVE_SECRET;
+      if (!keySecret || keySecret.startsWith("test_") || keySecret === "[SENSITIVE]") {
+        keySecret = LIVE_SECRET;
+      }
+      res.json({
+        mock: false,
+        keyId,
+        amount: setting?.amount || 275e3,
+        currency: setting?.currency || "INR",
+        description: setting?.description || "Fellowship Application Fee January 2027",
+        mode: "live",
+        bankDetails: {
+          accountName: "Sankara Academy of Vision",
+          accountNumber: "50100004642084",
+          bankName: "HDFC Bank",
+          branch: "Saravanampatti Branch, Coimbatore",
+          ifscCode: "HDFC0002231",
+          upiId: setting?.upiId || "sankaraeye@hdfcbank"
+        }
+      });
+    });
+    router7.post("/apply/:token", async (req, res) => {
+      try {
+        const form = await resolveFormByToken(req.params.token);
+        if (!form) return res.status(404).json({ error: "Form not found" });
+        if (!form.isActive) return res.status(410).json({ error: "This form is no longer accepting submissions" });
+        if (form.deadline && /* @__PURE__ */ new Date() > form.deadline) {
+          return res.status(410).json({ error: "The deadline for this form has passed" });
+        }
+        const body = req.body;
+        const sections = form.sectionsConfig || [];
+        const subData = {
+          formId: form.id,
+          status: body.saveAsDraft ? "draft" : "pending",
+          saveAsDraft: body.saveAsDraft ?? false,
+          source: "internal",
+          customAnswers: {},
+          submittedAt: /* @__PURE__ */ new Date()
+        };
+        const centerPrefs = {};
+        sections.forEach((sec) => {
+          if (!sec.enabled) return;
+          sec.fields.forEach((f3) => {
+            let val = body[f3.id];
+            if (val === void 0) return;
+            if (f3.id.startsWith("unit_") && val) {
+              const specName = f3.label.replace(" Preferred Center", "");
+              centerPrefs[specName] = Array.isArray(val) ? val.join(", ") : String(val);
+            }
+            if (f3.isStandard && f3.mapping) {
+              if (["specialization", "medicalConditions", "diagnosticSkills", "surgicalExperience", "qualificationMatrix"].includes(f3.mapping)) {
+                if (val && typeof val !== "string") val = JSON.stringify(val);
+              }
+              subData[f3.mapping] = val;
+            } else {
+              subData.customAnswers[f3.id] = val;
+            }
+          });
+        });
+        if (Object.keys(centerPrefs).length > 0 && !subData.centerPreference) {
+          subData.centerPreference = JSON.stringify(centerPrefs);
+        }
+        if (!subData.fullName && body.fullName) subData.fullName = body.fullName;
+        if (!subData.email && body.email) subData.email = body.email;
+        if (!subData.fullName || !subData.email) {
+          return res.status(400).json({ error: "Full name and email are required" });
+        }
+        const fileFields = ["lor1Url", "lor2Url", "photoUrl", "paymentUrl"];
+        for (const f3 of fileFields) {
+          const val = subData[f3] || body[f3];
+          if (val && !subData[f3]) subData[f3] = val;
+        }
+        const candidateName = subData.fullName || "candidate";
+        if (subData.lor1Url && subData.lor1Url.startsWith("data:")) {
+          subData.lor1Url = await saveBase64FileIfPresent(subData.lor1Url, candidateName, "lor1");
+        }
+        if (subData.lor2Url && subData.lor2Url.startsWith("data:")) {
+          subData.lor2Url = await saveBase64FileIfPresent(subData.lor2Url, candidateName, "lor2");
+        }
+        if (subData.photoUrl && subData.photoUrl.startsWith("data:")) {
+          subData.photoUrl = await saveBase64FileIfPresent(subData.photoUrl, candidateName, "photo");
+        }
+        if (subData.paymentUrl && subData.paymentUrl.startsWith("data:")) {
+          subData.paymentUrl = await saveBase64FileIfPresent(subData.paymentUrl, candidateName, "payment_proof");
+        }
+        const razorpayId = body.paymentId || body.payment_id || body.paymentUTR;
+        if (razorpayId) {
+          let specCount = 1;
+          try {
+            if (subData.specialization) {
+              const parsed = JSON.parse(subData.specialization);
+              if (Array.isArray(parsed)) {
+                specCount = parsed.length;
+              }
+            }
+          } catch (e2) {
+          }
+          const isDirectBankTransfer = body.paymentMode === "Direct Bank Transfer / UPI" || body.paymentMode === "bank_transfer" || !!body.paymentUTR;
+          const isManualOffline = body.paymentMode === "Manual Offline";
+          if (isDirectBankTransfer) {
+            subData.paymentId = razorpayId;
+            subData.paymentMode = "Direct Bank Transfer / UPI";
+            subData.paymentUrl = subData.paymentUrl || body.paymentUrl || `direct_transfer:${razorpayId}`;
+            subData.paidAmount = body.paidAmount ? body.paidAmount > 1e5 ? Math.round(body.paidAmount / 100) : Number(body.paidAmount) : 2750 * specCount;
+          } else if (isManualOffline) {
+            subData.paymentId = razorpayId;
+            subData.paymentMode = "Manual Offline";
+            subData.paidAmount = body.paidAmount ? Number(body.paidAmount) : 0;
+          } else {
+            subData.paymentId = razorpayId;
+            subData.paymentUrl = subData.paymentUrl || `razorpay:${razorpayId}`;
+            subData.paymentMode = "Razorpay";
+            subData.paidAmount = body.paidAmount ? body.paidAmount > 1e5 ? Math.round(body.paidAmount / 100) : Number(body.paidAmount) : 2750 * specCount;
+          }
+          const existingSub = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.paymentId, razorpayId));
+          if (existingSub.length > 0) {
+            const isComplete2 = checkCompleteness(subData);
+            await db.update(applicationSubmissionsTable).set({ ...subData, readyForReview: isComplete2 }).where(eq(applicationSubmissionsTable.id, existingSub[0].id));
+            return res.status(200).json({ success: true, submissionId: existingSub[0].id });
+          }
+        }
+        const isComplete = checkCompleteness(subData);
+        const [sub] = await db.insert(applicationSubmissionsTable).values({
+          ...subData,
+          readyForReview: isComplete
+        }).returning();
+        if (sub && subData.email) {
+          (async () => {
+            try {
+              const formRecord = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
+              const programRecord = formRecord[0]?.programId ? await db.select().from(programsTable).where(eq(programsTable.id, formRecord[0].programId)) : [];
+              await sendApplicationSubmissionConfirmationEmail({
+                toEmail: subData.email,
+                toName: subData.fullName || "Applicant",
+                submissionId: sub.id,
+                programName: programRecord[0]?.name ?? "Sankara Fellowship Examination Program",
+                formTitle: formRecord[0]?.title ?? "Fellowship Application",
+                specialization: subData.specialization,
+                paymentId: subData.paymentId,
+                paymentMode: subData.paymentMode,
+                paidAmount: subData.paidAmount
+              });
+            } catch (err) {
+              console.warn("[email] Failed to send submission confirmation email:", err.message);
+            }
+          })();
+        }
+        res.status(201).json({ success: true, submissionId: sub.id });
+      } catch (err) {
+        console.error("[POST /apply/:token fatal error]:", err);
+        res.status(500).json({
+          error: err.message || "Failed to process application submission. Please contact admissions with your Payment ID."
+        });
+      }
+    });
+    router7.post(
+      "/application-forms/reconcile-payment",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator"),
+      async (req, res) => {
+        try {
+          const { paymentId, fullName, email: email3, phone, specialization, formToken = "JAN2027", notes } = req.body;
+          if (!paymentId || !String(paymentId).trim()) {
+            return res.status(400).json({ error: "Payment ID is required" });
+          }
+          const cleanPaymentId = String(paymentId).trim();
+          const existing = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.paymentId, cleanPaymentId));
+          if (existing.length > 0) {
+            return res.json({
+              success: true,
+              message: "Payment is already linked to submission ID #" + existing[0].id,
+              submission: existing[0]
+            });
+          }
+          let form = await resolveFormByToken(formToken);
+          if (!form) {
+            [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.isActive, true)).limit(1);
+          }
+          if (!form) return res.status(404).json({ error: "Active application form not found" });
+          const [newSub] = await db.insert(applicationSubmissionsTable).values({
+            formId: form.id,
+            status: "pending",
+            fullName: fullName || "Applicant (" + cleanPaymentId + ")",
+            email: email3 || `recovered_${cleanPaymentId.replace(/[^a-zA-Z0-9]/g, "")}@sankaraeye.com`,
+            phone: phone || null,
+            specialization: specialization ? Array.isArray(specialization) ? JSON.stringify(specialization) : String(specialization) : '["IOL"]',
+            paymentId: cleanPaymentId,
+            paymentMode: "Razorpay (Reconciled)",
+            paidAmount: 2750,
+            source: "reconciliation",
+            readyForReview: true,
+            reviewNotes: notes || "Payment reconciled by administrator",
+            submittedAt: /* @__PURE__ */ new Date()
+          }).returning();
+          return res.status(201).json({
+            success: true,
+            message: "Application submission successfully recovered and linked to Payment ID " + cleanPaymentId,
+            submissionId: newSub.id
+          });
+        } catch (err) {
+          console.error("[reconcile-payment error]:", err);
+          return res.status(500).json({ error: err.message || "Failed to reconcile payment" });
+        }
+      }
+    );
+    router7.get(["/apply/:token/receipt/:submissionId", "/apply/receipt/:submissionId"], async (req, res) => {
+      try {
+        let numberToWordsINR2 = function(amount) {
+          const ones = [
+            "",
+            "One",
+            "Two",
+            "Three",
+            "Four",
+            "Five",
+            "Six",
+            "Seven",
+            "Eight",
+            "Nine",
+            "Ten",
+            "Eleven",
+            "Twelve",
+            "Thirteen",
+            "Fourteen",
+            "Fifteen",
+            "Sixteen",
+            "Seventeen",
+            "Eighteen",
+            "Nineteen"
+          ];
+          const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+          function numToWords(n) {
+            if (n === 0) return "";
+            if (n < 20) return ones[n] + " ";
+            if (n < 100) return tens[Math.floor(n / 10)] + " " + (n % 10 ? ones[n % 10] + " " : "");
+            if (n < 1e3) return ones[Math.floor(n / 100)] + " Hundred " + (n % 100 ? "and " + numToWords(n % 100) : "");
+            if (n < 1e5) return numToWords(Math.floor(n / 1e3)) + "Thousand " + (n % 1e3 ? numToWords(n % 1e3) : "");
+            if (n < 1e7) return numToWords(Math.floor(n / 1e5)) + "Lakh " + (n % 1e5 ? numToWords(n % 1e5) : "");
+            return numToWords(Math.floor(n / 1e7)) + "Crore " + (n % 1e7 ? numToWords(n % 1e7) : "");
+          }
+          const rounded = Math.round(amount);
+          if (rounded <= 0) return "Zero Rupees Only";
+          const words = numToWords(rounded).trim().replace(/\s+/g, " ");
+          return `${words} Rupees Only`;
+        };
+        var numberToWordsINR = numberToWordsINR2;
+        const subId = Number(req.params.submissionId);
+        if (isNaN(subId)) return res.status(400).json({ error: "Invalid submission ID" });
+        const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, subId));
+        if (!sub) return res.status(404).json({ error: "Application submission not found" });
+        if (req.params.token) {
+          const form2 = await resolveFormByToken(String(req.params.token));
+          if (form2 && sub.formId !== form2.id) {
+            return res.status(403).json({ error: "Access denied" });
+          }
+        }
+        const subAny = sub;
+        const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
+        const [program] = form?.programId ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
+        const cleanName = cleanDoctorName(sub.fullName);
+        const doc = new import_pdfkit2.default({
+          margin: 36,
+          size: "LETTER",
+          bufferPages: true,
+          info: {
+            Title: `Payment Receipt & Admission Summary - Dr. ${cleanName}`,
+            Author: "Sankara Academy of Vision"
+          }
+        });
+        const filename = `SAV_Invoice_Receipt_${sub.id}_${cleanName.replace(/\s+/g, "_")}.pdf`;
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+        doc.pipe(res);
+        const colors = {
+          navy: "#000066",
+          darkNavy: "#00003b",
+          accentNavy: "#1e3a8a",
+          primary: "#0f172a",
+          secondary: "#475569",
+          muted: "#64748b",
+          border: "#cbd5e1",
+          borderStrong: "#94a3b8",
+          bgLight: "#f8fafc",
+          bgCard: "#f1f5f9",
+          emeraldBg: "#f0fdf4",
+          emeraldBorder: "#86efac",
+          emeraldText: "#15803d",
+          emeraldDark: "#166534",
+          amberBg: "#fffbeb",
+          amberBorder: "#fcd34d",
+          amberDark: "#92400e"
+        };
+        doc.rect(36, 36, 540, 56).fill(colors.navy);
+        doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(14).text("SANKARA ACADEMY OF VISION", 48, 44);
+        doc.fillColor("#93c5fd").font("Helvetica").fontSize(8).text("A Unit of Sri Kanchi Kamakoti Medical Trust", 48, 60);
+        doc.fillColor("#cbd5e1").font("Helvetica").fontSize(7.5).text("Bangalore Campus: Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore \u2013 560037", 48, 73);
+        doc.fillColor("#93c5fd").font("Helvetica-Bold").fontSize(8.5).text("OFFICIAL TAX INVOICE & RECEIPT", 320, 44, { width: 246, align: "right" });
+        doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(10).text(`APP REF: #APP-${sub.id}`, 320, 58, { width: 246, align: "right" });
+        doc.fillColor("#cbd5e1").font("Helvetica").fontSize(7.5).text("radhika@sankaraeye.com | +91 9666677505", 320, 73, { width: 246, align: "right" });
+        const billCardY = 98;
+        const billCardHeight = 84;
+        doc.rect(36, billCardY, 540, billCardHeight).fill(colors.emeraldBg);
+        doc.strokeColor(colors.emeraldBorder).lineWidth(1.2).rect(36, billCardY, 540, billCardHeight).stroke();
+        doc.rect(48, billCardY + 8, 320, 16).fill("#dcfce7");
+        doc.strokeColor(colors.emeraldBorder).lineWidth(0.6).rect(48, billCardY + 8, 320, 16).stroke();
+        doc.fillColor(colors.emeraldDark).font("Helvetica-Bold").fontSize(7.5).text("[OFFICIAL] AUTOMATED COMPUTER-GENERATED BILL & PAYMENT RECEIPT", 52, billCardY + 12, { width: 312, align: "center" });
+        const invoiceNo = `SAV-INV-${sub.id}-${(sub.paymentId || "RZP").replace(/[^a-zA-Z0-9]/g, "").slice(-8).toUpperCase()}`;
+        const formattedDate = formatToLocalDateTime(sub.submittedAt || /* @__PURE__ */ new Date());
+        const drawMetaRow = (label, val, yPos) => {
+          doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.5).text(label, 48, yPos);
+          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(8).text(val, 150, yPos);
+        };
+        drawMetaRow("INVOICE / BILL NO:", invoiceNo, billCardY + 28);
+        drawMetaRow("INVOICE DATE & TIME:", `${formattedDate} IST`, billCardY + 41);
+        drawMetaRow("RAZORPAY PAYMENT ID:", sub.paymentId || "Verified via Razorpay Gateway", billCardY + 54);
+        drawMetaRow("PAYMENT STATUS:", "PAID & VERIFIED (RAZORPAY ONLINE GATEWAY)", billCardY + 67);
+        doc.rect(385, billCardY + 8, 180, 68).fill("#ffffff");
+        doc.strokeColor(colors.emeraldBorder).lineWidth(0.8).rect(385, billCardY + 8, 180, 68).stroke();
+        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.5).text("TOTAL AMOUNT PAID", 390, billCardY + 14, { width: 170, align: "center" });
+        const specs = parseSpecializationString(sub.specialization);
+        const specCount = Math.max(1, specs.length);
+        const displayAmount = sub.paidAmount && sub.paidAmount > 0 ? sub.paidAmount > 1e5 ? Math.round(sub.paidAmount / 100) : sub.paidAmount : 2750 * specCount;
+        doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(16).text(`INR ${displayAmount.toLocaleString("en-IN")}`, 390, billCardY + 26, { width: 170, align: "center" });
+        doc.fillColor(colors.emeraldDark).font("Helvetica-Bold").fontSize(7).text("TRANSACTION RECONCILED & CONFIRMED", 390, billCardY + 46, { width: 170, align: "center" });
+        doc.fillColor(colors.muted).font("Helvetica-Oblique").fontSize(6.5).text(numberToWordsINR2(displayAmount), 390, billCardY + 57, { width: 170, align: "center" });
+        const billedToY = 188;
+        const billedToH = 46;
+        doc.rect(36, billedToY, 540, billedToH).fill(colors.bgLight);
+        doc.strokeColor(colors.border).lineWidth(0.8).rect(36, billedToY, 540, billedToH).stroke();
+        doc.rect(36, billedToY, 540, 14).fill(colors.bgCard);
+        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(36, billedToY + 14).lineTo(576, billedToY + 14).stroke();
+        doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(7.5).text("BILLED TO / CANDIDATE IDENTIFICATION", 44, billedToY + 3.5);
+        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.5).text("Candidate Name:", 44, billedToY + 18);
+        doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(8).text(`Dr. ${cleanName}`, 120, billedToY + 18);
+        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.5).text("Email Address:", 260, billedToY + 18);
+        doc.fillColor(colors.primary).font("Helvetica").fontSize(8).text(sub.email, 330, billedToY + 18);
+        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.5).text("Contact Phone:", 44, billedToY + 30);
+        doc.fillColor(colors.primary).font("Helvetica").fontSize(8).text(sub.phone || "\u2014", 120, billedToY + 30);
+        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.5).text("Address on File:", 260, billedToY + 30);
+        doc.fillColor(colors.primary).font("Helvetica").fontSize(7.5).text((sub.permanentAddress || "On file").replace(/\n/g, " "), 330, billedToY + 30, { width: 236, ellipsis: true });
+        const tableY = 240;
+        doc.rect(36, tableY, 540, 18).fill(colors.navy);
+        doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(7.5);
+        doc.text("SL", 42, tableY + 5, { width: 20 });
+        doc.text("SERVICE / PROGRAM DESCRIPTION", 66, tableY + 5, { width: 250 });
+        doc.text("SAC CODE", 320, tableY + 5, { width: 50, align: "center" });
+        doc.text("QTY", 375, tableY + 5, { width: 35, align: "center" });
+        doc.text("RATE (INR)", 415, tableY + 5, { width: 65, align: "right" });
+        doc.text("AMOUNT (INR)", 485, tableY + 5, { width: 85, align: "right" });
+        const row1Y = tableY + 18;
+        const row1H = 34;
+        doc.rect(36, row1Y, 540, row1H).fill("#ffffff");
+        doc.strokeColor(colors.border).lineWidth(0.5).rect(36, row1Y, 540, row1H).stroke();
+        doc.fillColor(colors.primary).font("Helvetica").fontSize(8).text("1", 42, row1Y + 6);
+        doc.font("Helvetica-Bold").text("Fellowship Entrance Examination & Application Processing Fee", 66, row1Y + 5, { width: 250 });
+        doc.font("Helvetica").fontSize(7).fillColor(colors.secondary).text(`Session: ${program?.name || "Fellowship Program January 2027"} | Subspecialties: ${specs.length ? specs.join(", ") : "Ophthalmology Fellowship"}`, 66, row1Y + 17, { width: 250 });
+        doc.fillColor(colors.primary).font("Helvetica").fontSize(8);
+        doc.text("9992", 320, row1Y + 11, { width: 50, align: "center" });
+        doc.text(`${specCount}`, 375, row1Y + 11, { width: 35, align: "center" });
+        doc.text("2,750.00", 415, row1Y + 11, { width: 65, align: "right" });
+        doc.font("Helvetica-Bold").text(`${displayAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, 485, row1Y + 11, { width: 85, align: "right" });
+        const sumY = row1Y + row1H;
+        const drawSummaryRow = (lbl, val, isBold = false, isGreen = false) => {
+          const cy = doc.y;
+          doc.rect(36, cy, 540, 15).fill(isBold ? colors.bgCard : "#ffffff");
+          doc.strokeColor(colors.border).lineWidth(0.5).rect(36, cy, 540, 15).stroke();
+          doc.fillColor(isBold ? colors.navy : colors.secondary).font(isBold ? "Helvetica-Bold" : "Helvetica").fontSize(7.5).text(lbl, 48, cy + 3.5, { width: 360, align: "right" });
+          doc.fillColor(isGreen ? colors.emeraldDark : isBold ? colors.navy : colors.primary).font(isBold ? "Helvetica-Bold" : "Helvetica").fontSize(isBold ? 8 : 7.5).text(val, 485, cy + 3.5, { width: 85, align: "right" });
+          doc.y = cy + 15;
+        };
+        doc.y = sumY;
+        drawSummaryRow("Subtotal (Entrance Examination Fee):", `INR ${displayAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`);
+        drawSummaryRow("Central & State GST (Exempt under SAC 9992 Educational Admissions):", "INR 0.00");
+        drawSummaryRow("Grand Total Paid via Razorpay:", `INR ${displayAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, true, true);
+        drawSummaryRow("Balance Due:", "INR 0.00 (Fully Paid)", false, true);
+        const noteY = doc.y + 4;
+        doc.fillColor(colors.muted).font("Helvetica-Oblique").fontSize(6.8).text(
+          "* This document is an automated computer-generated electronic bill and official receipt. It serves as verified proof of application fee payment.",
+          36,
+          noteY,
+          { width: 540, align: "center" }
+        );
+        const drawSectionHeader = (title, topY) => {
+          if (topY) doc.y = topY;
+          if (doc.y > 690) {
+            doc.addPage();
+            doc.y = 36;
+          }
+          doc.moveDown(0.3);
+          const y = doc.y;
+          doc.rect(36, y, 540, 16).fill(colors.bgCard);
+          doc.strokeColor(colors.border).lineWidth(0.6).rect(36, y, 540, 16).stroke();
+          doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(8.5).text(title.toUpperCase(), 44, y + 4, { width: 520 });
+          doc.y = y + 19;
+        };
+        const renderRow = (label, value) => {
+          const valText = value === null || value === void 0 || value === "null" || value === "" ? "\u2014" : String(value);
+          if (doc.y > 720) {
+            doc.addPage();
+            doc.y = 36;
+          }
+          const currentY = doc.y;
+          doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.5).text(label.toUpperCase(), 44, currentY, { width: 155, lineGap: 1 });
+          const labelEndY = doc.y;
+          doc.fillColor(colors.primary).font("Helvetica").fontSize(8).text(`: ${valText}`, 204, currentY, { width: 366, lineGap: 1 });
+          const valueEndY = doc.y;
+          doc.y = Math.max(labelEndY, valueEndY) + 2.5;
+        };
+        drawSectionHeader("1. Fellowship Application & Unit Preferences", noteY + 14);
+        renderRow("Fellowship Program", program?.name || "Fellowship Program January 2027");
+        renderRow("Subspecialties Applied", specs.length > 0 ? specs.join(", ") : sub.specialization || "\u2014");
+        let centerStr = "\u2014";
+        if (sub.centerPreference) {
+          try {
+            const parsed = JSON.parse(sub.centerPreference);
+            if (typeof parsed === "object") {
+              centerStr = Object.entries(parsed).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join("   |   ");
+            } else {
+              centerStr = String(parsed);
+            }
+          } catch {
+            centerStr = String(sub.centerPreference);
+          }
+        }
+        renderRow("Preferred Hospital Units", centerStr);
+        drawSectionHeader("2. Candidate Qualifications & Licensing");
+        renderRow("Medical Council Reg No", subAny.medicalCouncilNumber || subAny.medicalCouncilRegNumber || "On Record");
+        renderRow("State Medical Council", subAny.stateMedicalCouncil || "State Medical Council on Record");
+        renderRow("Post-Graduate Degree", `${subAny.degree || "MS/MD/DNB/DO"}${subAny.medicalCollege ? " - " + subAny.medicalCollege : ""} (${subAny.postGraduationPassingYear || "Completed"})`);
+        renderRow("MBBS Degree & Institution", `${subAny.mbbsCollege || subAny.university || "Medical College"} (${subAny.mbbsPassingYear || "Completed"})`);
+        if (sub.diagnosticSkills || sub.surgicalExperience) {
+          const skillsSummary = [];
+          if (sub.diagnosticSkills) {
+            try {
+              const ds = JSON.parse(sub.diagnosticSkills);
+              skillsSummary.push(`Diagnostic Competencies: ${Object.keys(ds).length} listed`);
+            } catch {
+              skillsSummary.push("Diagnostic Competencies recorded");
+            }
+          }
+          if (sub.surgicalExperience) {
+            try {
+              const se = JSON.parse(sub.surgicalExperience);
+              skillsSummary.push(`Surgical Experience: ${Object.keys(se).length} listed`);
+            } catch {
+              skillsSummary.push("Surgical Experience recorded");
+            }
+          }
+          renderRow("Clinical Profile", skillsSummary.join("   |   "));
+        }
+        doc.addPage();
+        doc.y = 36;
+        doc.rect(36, 36, 540, 24).fill(colors.navy);
+        doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(8.5).text("SANKARA ACADEMY OF VISION \u2014 ADMISSION DOSSIER", 48, 43);
+        doc.fillColor("#cbd5e1").font("Helvetica").fontSize(8).text(`Candidate: Dr. ${cleanName}   |   Ref: #APP-${sub.id}`, 350, 43, { width: 216, align: "right" });
+        const lorHeaderY = 68;
+        doc.rect(36, lorHeaderY, 540, 16).fill(colors.bgCard);
+        doc.strokeColor(colors.border).lineWidth(0.6).rect(36, lorHeaderY, 540, 16).stroke();
+        doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(8.5).text("3. LETTERS OF RECOMMENDATION (LOR) VERIFICATION STATUS", 44, lorHeaderY + 4);
+        const drawLorCard = (lorNum, refName, refContact, refEmail, url3, yPos) => {
+          const cardH = 60;
+          const isUploaded = !!url3 && url3.trim().length > 0;
+          doc.rect(36, yPos, 540, cardH).fill(isUploaded ? "#f0fdf4" : "#fffbeb");
+          doc.strokeColor(isUploaded ? colors.emeraldBorder : colors.amberBorder).lineWidth(0.8).rect(36, yPos, 540, cardH).stroke();
+          doc.rect(36, yPos, 540, 16).fill(isUploaded ? "#dcfce7" : "#fef3c7");
+          doc.strokeColor(isUploaded ? colors.emeraldBorder : colors.amberBorder).lineWidth(0.5).moveTo(36, yPos + 16).lineTo(576, yPos + 16).stroke();
+          doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(7.5).text(`RECOMMENDATION #${lorNum} (LOR ${lorNum})`, 44, yPos + 4);
+          if (isUploaded) {
+            doc.fillColor(colors.emeraldDark).font("Helvetica-Bold").fontSize(7.2).text("[UPLOADED & ATTACHED] (DOCUMENT ON FILE)", 320, yPos + 4, { width: 246, align: "right" });
+          } else {
+            doc.fillColor(colors.amberDark).font("Helvetica-Bold").fontSize(7.2).text("[PENDING UPLOAD / NOT RECEIVED]", 320, yPos + 4, { width: 246, align: "right" });
+          }
+          const refY = yPos + 19;
+          doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.2).text("Referee Name & Title:", 44, refY);
+          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(7.8).text(refName || "Not Specified", 150, refY);
+          doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.2).text("Designation / Institution:", 44, refY + 11);
+          doc.fillColor(colors.primary).font("Helvetica").fontSize(7.5).text(refContact || "Not Specified", 150, refY + 11);
+          doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.2).text("Official Email Address:", 44, refY + 22);
+          doc.fillColor(colors.primary).font("Helvetica").fontSize(7.5).text(refEmail || "Not Specified", 150, refY + 22);
+          doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.2).text("File Attachment Status:", 44, refY + 33);
+          if (isUploaded) {
+            const cleanFile = url3.split("/").pop()?.split("?")[0] || `LOR_${lorNum}_Dossier.pdf`;
+            doc.fillColor(colors.emeraldDark).font("Helvetica-Bold").fontSize(7.2).text(`[VERIFIED] Document Attached: ${cleanFile} (On Candidate Dossier)`, 150, refY + 33);
+          } else {
+            doc.fillColor(colors.amberDark).font("Helvetica").fontSize(7.2).text("Document file not uploaded. Pending receipt before interview.", 150, refY + 33);
+          }
+        };
+        drawLorCard(1, sub.lor1RefName || "", sub.lor1RefContact || "", sub.lor1RefEmail || "", sub.lor1Url, 88);
+        drawLorCard(2, sub.lor2RefName || "", sub.lor2RefContact || "", sub.lor2RefEmail || "", sub.lor2Url, 152);
+        const checkHeaderY = 220;
+        doc.rect(36, checkHeaderY, 540, 16).fill(colors.bgCard);
+        doc.strokeColor(colors.border).lineWidth(0.6).rect(36, checkHeaderY, 540, 16).stroke();
+        doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(8.5).text("4. CANDIDATE UPLOADED DOSSIER & DOCUMENT CHECKLIST", 44, checkHeaderY + 4);
+        const chkTblY = checkHeaderY + 18;
+        doc.rect(36, chkTblY, 540, 16).fill(colors.navy);
+        doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(7.5);
+        doc.text("NO.", 42, chkTblY + 4.5, { width: 22 });
+        doc.text("DOCUMENT / CREDENTIAL ITEM", 68, chkTblY + 4.5, { width: 175 });
+        doc.text("DETAILS / IDENTIFIER", 248, chkTblY + 4.5, { width: 180 });
+        doc.text("STATUS", 432, chkTblY + 4.5, { width: 68, align: "center" });
+        doc.text("VERIFICATION", 502, chkTblY + 4.5, { width: 68, align: "center" });
+        const checklistItems = [
+          {
+            no: "1",
+            name: "Candidate Passport Photograph",
+            details: sub.photoUrl ? "Formal Colour Passport Photo for Admit Card & ID" : "Photograph required for Admit Card",
+            uploaded: !!sub.photoUrl,
+            statusText: sub.photoUrl ? "UPLOADED" : "PENDING",
+            verification: sub.photoUrl ? "Verified on File" : "Pending Upload"
+          },
+          {
+            no: "2",
+            name: "Letter of Recommendation #1 (LOR)",
+            details: sub.lor1RefName ? `${sub.lor1RefName}
+(${sub.lor1RefEmail || "Email on file"})` : "Referee details pending",
+            uploaded: !!sub.lor1Url,
+            statusText: sub.lor1Url ? "UPLOADED" : "PENDING",
+            verification: sub.lor1Url ? "Attached & Verified" : "Pending Receipt"
+          },
+          {
+            no: "3",
+            name: "Letter of Recommendation #2 (LOR)",
+            details: sub.lor2RefName ? `${sub.lor2RefName}
+(${sub.lor2RefEmail || "Email on file"})` : "Referee details pending",
+            uploaded: !!sub.lor2Url,
+            statusText: sub.lor2Url ? "UPLOADED" : "PENDING",
+            verification: sub.lor2Url ? "Attached & Verified" : "Pending Receipt"
+          },
+          {
+            no: "4",
+            name: "Application Fee Payment Proof",
+            details: `Razorpay Online Gateway Ref:
+${sub.paymentId || "Confirmed"}`,
+            uploaded: true,
+            statusText: "VERIFIED",
+            verification: "Razorpay Confirmed"
+          },
+          {
+            no: "5",
+            name: "Medical Council Registration",
+            details: `Reg No: ${subAny.medicalCouncilNumber || subAny.medicalCouncilRegNumber || "On Record"}
+(${subAny.stateMedicalCouncil || "State Council"})`,
+            uploaded: true,
+            statusText: "ON RECORD",
+            verification: "Record Verified"
+          },
+          {
+            no: "6",
+            name: "Postgraduate Medical Qualification",
+            details: `${subAny.degree || "MS/MD/DNB/DO"}${subAny.medicalCollege ? " - " + (subAny.medicalCollege.length > 25 ? subAny.medicalCollege.slice(0, 24) + "..." : subAny.medicalCollege) : ""}
+Status: ${subAny.postGraduationPassingYear ? "Passed " + subAny.postGraduationPassingYear : "Completed"}`,
+            uploaded: true,
+            statusText: "ON RECORD",
+            verification: "Qualifying Degree"
+          },
+          {
+            no: "7",
+            name: "Primary Medical Degree (MBBS)",
+            details: `${subAny.mbbsCollege || subAny.university || "Medical College"}
+(${subAny.mbbsPassingYear || "Completed"})`,
+            uploaded: true,
+            statusText: "ON RECORD",
+            verification: "MBBS Degree"
+          },
+          {
+            no: "8",
+            name: "Candidate Legal Declaration",
+            details: `Affirmed on ${formattedDate} IST
+Electronic Acceptance on File`,
+            uploaded: true,
+            statusText: "ACCEPTED",
+            verification: "Digital Affirmation"
+          }
+        ];
+        if (sub.customAnswers && typeof sub.customAnswers === "object") {
+          let customIdx = 9;
+          for (const [key, val] of Object.entries(sub.customAnswers)) {
+            if (typeof val === "string" && (val.includes("/uploads/") || val.endsWith(".pdf") || val.endsWith(".jpg") || val.endsWith(".png") || val.startsWith("http"))) {
+              const cleanKey = key.replace(/([A-Z])/g, " $1").replace(/_/g, " ").replace(/^./, (str) => str.toUpperCase());
+              checklistItems.push({
+                no: String(customIdx++),
+                name: `Uploaded Document: ${cleanKey}`,
+                details: val.split("/").pop() || "Candidate Attached File",
+                uploaded: true,
+                statusText: "UPLOADED",
+                verification: "Attached to File"
+              });
+            }
+          }
+        }
+        let chkCurrentY = chkTblY + 16;
+        checklistItems.slice(0, 8).forEach((item, idx) => {
+          const rowBg = idx % 2 === 0 ? "#ffffff" : colors.bgLight;
+          const rowH = 24;
+          doc.rect(36, chkCurrentY, 540, rowH).fill(rowBg);
+          doc.strokeColor(colors.border).lineWidth(0.4).rect(36, chkCurrentY, 540, rowH).stroke();
+          doc.fillColor(colors.primary).font("Helvetica").fontSize(7.5).text(item.no, 42, chkCurrentY + 7, { width: 22 });
+          doc.font("Helvetica-Bold").fontSize(7.5).text(item.name, 68, chkCurrentY + 4, { width: 175 });
+          doc.font("Helvetica").fontSize(6.8).fillColor(colors.secondary).text(item.details, 248, chkCurrentY + 3.5, { width: 180, lineGap: 1 });
+          doc.fillColor(item.uploaded ? colors.emeraldDark : colors.amberDark).font("Helvetica-Bold").fontSize(7).text(item.statusText, 432, chkCurrentY + 8, { width: 68, align: "center" });
+          doc.fillColor(colors.primary).font("Helvetica").fontSize(7).text(item.verification, 502, chkCurrentY + 8, { width: 68, align: "center" });
+          chkCurrentY += rowH;
+        });
+        const certBlockY = chkCurrentY + 14;
+        const certBlockH = 118;
+        doc.rect(36, certBlockY, 540, certBlockH).fill("#f8fafc");
+        doc.strokeColor(colors.navy).lineWidth(1).rect(36, certBlockY, 540, certBlockH).stroke();
+        doc.rect(36, certBlockY, 540, 18).fill(colors.navy);
+        doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(8.5).text("OFFICIAL ELECTRONIC ADMISSION CERTIFICATION", 46, certBlockY + 5);
+        doc.fillColor("#93c5fd").font("Helvetica").fontSize(7.5).text("AUTOMATED COMPUTER-GENERATED OFFICIAL RECORD", 320, certBlockY + 5, { width: 246, align: "right" });
+        const certText = "This document is an electronically generated official application fee payment receipt and candidate admission summary issued by Sankara Academy of Vision. Payment has been verified via Razorpay. No physical signature is required.\nPlease retain this copy for your admission interview, written test, and original document verification.";
+        doc.fillColor(colors.primary).font("Helvetica").fontSize(7.5).text(certText, 46, certBlockY + 23, { width: 375, lineGap: 2.2 });
+        const contactY = certBlockY + 70;
+        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(46, contactY - 4).lineTo(566, contactY - 4).stroke();
+        doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(7.5).text("Admissions Office:", 46, contactY);
+        doc.fillColor(colors.primary).font("Helvetica").fontSize(7.5).text("radhika@sankaraeye.com", 125, contactY);
+        doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(7.5).text("SAV Coordinator Desk:", 240, contactY);
+        doc.fillColor(colors.primary).font("Helvetica").fontSize(7.5).text("+91 9666677505", 345, contactY);
+        doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(7.5).text("Bangalore Desk:", 425, contactY);
+        doc.fillColor(colors.primary).font("Helvetica").fontSize(7.5).text("+91 80 2854 2727", 495, contactY);
+        doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(7.5).text("Bangalore Unit:", 46, contactY + 13);
+        doc.fillColor(colors.secondary).font("Helvetica").fontSize(7.2).text("Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore - 560037, Karnataka, India", 125, contactY + 13, { width: 440 });
+        doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(7.5).text("Central Desk:", 46, contactY + 26);
+        doc.fillColor(colors.secondary).font("Helvetica").fontSize(7.2).text("+91 422 4234500   |   Website: www.sankaraeye.com", 125, contactY + 26);
+        const sealX = 432;
+        const sealY = certBlockY + 23;
+        const sealW = 134;
+        const sealH = 34;
+        doc.rect(sealX, sealY, sealW, sealH).fill("#ffffff");
+        doc.strokeColor(colors.navy).lineWidth(0.8).rect(sealX, sealY, sealW, sealH).stroke();
+        doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(6.5).text("SANKARA ACADEMY OF VISION", sealX + 2, sealY + 4, { width: sealW - 4, align: "center" });
+        doc.fillColor(colors.emeraldDark).font("Helvetica-Bold").fontSize(6.5).text("DIGITALLY AUTHENTICATED", sealX + 2, sealY + 13, { width: sealW - 4, align: "center" });
+        doc.fillColor(colors.muted).font("Helvetica").fontSize(5.8).text(`AUTOGEN AUDIT REF: SAV-${sub.id}`, sealX + 2, sealY + 22, { width: sealW - 4, align: "center" });
+        const range2 = doc.bufferedPageRange();
+        for (let i2 = range2.start; i2 < range2.start + range2.count; i2++) {
+          doc.switchToPage(i2);
+          doc.fillColor(colors.muted).font("Helvetica").fontSize(7.2).text(
+            `Page ${i2 + 1} of ${range2.count}   |   Sankara Academy of Vision \u2014 Bangalore Unit   |   Automated Electronic Tax Invoice & Receipt`,
+            36,
+            760,
+            { width: 540, align: "center" }
+          );
+        }
+        doc.end();
+      } catch (err) {
+        console.error("Receipt generation error:", err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: "Failed to generate payment receipt: " + err.message });
+        }
+      }
+    });
+    router7.post(
+      "/application-submissions",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      async (req, res) => {
+        try {
+          const body = req.body;
+          const required2 = ["fullName", "email", "formId", "paymentId", "paidAmount", "paymentMode"];
+          for (const field of required2) {
+            if (!body[field]) {
+              return res.status(400).json({ error: `${field} is required for manual submission` });
+            }
+          }
+          const subData = {
+            ...body,
+            submittedAt: /* @__PURE__ */ new Date(),
+            source: "admin_manual",
+            status: body.status || "pending",
+            readyForReview: true,
+            paymentUrl: body.paymentId ? `razorpay:${body.paymentId}` : null
+          };
+          const jsonFields = ["specialization", "centerPreference", "customAnswers", "diagnosticSkills", "surgicalExperience", "qualificationMatrix", "medicalConditions"];
+          jsonFields.forEach((field) => {
+            if (subData[field] && typeof subData[field] === "object") {
+              subData[field] = JSON.stringify(subData[field]);
+            }
+          });
+          const [sub] = await db.insert(applicationSubmissionsTable).values(subData).returning();
+          res.status(201).json(sub);
+        } catch (error40) {
+          console.error("[manual_submission] error:", error40);
+          res.status(500).json({ error: error40.message });
+        }
+      }
+    );
+    router7.delete(
+      "/application-submissions/:id",
+      requireAuth,
+      requireRole("super_admin", "program_admin"),
+      async (req, res) => {
+        const id = Number(req.params.id);
+        const deleted = await db.delete(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, id)).returning();
+        if (deleted.length === 0) return res.status(404).json({ error: "Submission not found" });
+        res.json({ message: "Submission deleted" });
+      }
+    );
+    router7.post(
+      "/application-submissions/bulk-delete",
+      requireAuth,
+      requireRole("super_admin", "program_admin"),
+      async (req, res) => {
+        const { ids } = req.body;
+        if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: "No IDs provided" });
+        await db.delete(applicationSubmissionsTable).where(sql`${applicationSubmissionsTable.id} IN (${sql.join(ids, sql`, `)})`);
+        res.json({ message: `${ids.length} submissions deleted` });
+      }
+    );
+    router7.get("/application-forms/default-sections", requireAuth, requireRole("super_admin", "program_admin"), (req, res) => {
+      res.json(DEFAULT_SECTIONS);
+    });
+    application_forms_default = router7;
+  }
+});
+
+// src/routes/candidates.ts
+var candidates_exports = {};
+__export(candidates_exports, {
+  default: () => candidates_default,
+  recalculateCandidateStatus: () => recalculateCandidateStatus
+});
+import path6 from "path";
+async function fullCandidate(c) {
+  const units = await db.select().from(unitsTable);
+  const unit = c.unitId ? units.find((u) => u.id === c.unitId) : null;
+  const prefs = await db.select().from(candidatePreferencesTable).where(eq(candidatePreferencesTable.candidateId, c.id));
+  const specs = await db.select().from(specialitiesTable);
+  const programs = await db.select().from(programsTable);
+  const docs = await db.select().from(documentsTable).where(eq(documentsTable.candidateId, c.id));
+  const attempts = await db.select().from(examAttemptsTable).where(eq(examAttemptsTable.candidateId, c.id));
+  const exams = await db.select().from(examsTable);
+  const interviews = await db.select().from(interviewScoresTable).where(eq(interviewScoresTable.candidateId, c.id));
+  const apps = await db.select().from(applicationsTable).where(eq(applicationsTable.candidateId, c.id));
+  const [sub] = await db.select().from(applicationSubmissionsTable).where(
+    or(
+      eq(applicationSubmissionsTable.candidateId, c.id),
+      eq(applicationSubmissionsTable.email, c.email)
+    )
+  );
+  const mcqAttempts = attempts.filter((a) => {
+    const e2 = exams.find((x2) => x2.id === a.examId);
+    return e2?.kind === "mcq";
+  });
+  const psychoAttempts = attempts.filter((a) => {
+    const e2 = exams.find((x2) => x2.id === a.examId);
+    return e2?.kind?.startsWith("psychometric");
+  });
+  const mcqScore = mcqAttempts.length > 0 ? mcqAttempts.reduce((s2, a) => s2 + (a.score ?? 0), 0) / mcqAttempts.length : c.mcqScore ? parseFloat(c.mcqScore) : null;
+  const psychometricScore = psychoAttempts.length > 0 ? psychoAttempts.reduce((s2, a) => s2 + (a.score ?? 0), 0) / psychoAttempts.length : c.psychometricScore ? parseFloat(c.psychometricScore) : null;
+  const interviewScore = interviews.length > 0 ? interviews.reduce((s2, i2) => s2 + i2.score, 0) / interviews.length : null;
+  const totalScore = mcqScore != null || psychometricScore != null || interviewScore != null ? (mcqScore ?? 0) + (psychometricScore ?? 0) + (interviewScore ?? 0) : null;
+  let resolvedPrefs = prefs.sort((a, b) => a.preferenceOrder - b.preferenceOrder).map((p) => {
+    const sp = specs.find((s2) => s2.id === p.specialityId);
+    const pg2 = sp ? programs.find((g) => g.id === sp.programId) : null;
+    return {
+      id: p.id,
+      specialityId: p.specialityId,
+      specialityName: sp?.name ?? "",
+      specialityCode: sp?.code ?? "",
+      programName: pg2?.name ?? "",
+      preferenceOrder: p.preferenceOrder
+    };
+  });
+  if (resolvedPrefs.length === 0 && sub?.specialization) {
+    const parsedSpecs = parseSpecializationString(sub.specialization);
+    resolvedPrefs = parsedSpecs.map((specName, index3) => {
+      const sp = specs.find((s2) => s2.name.toLowerCase() === specName.toLowerCase());
+      const pg2 = sp ? programs.find((g) => g.id === sp.programId) : null;
+      return {
+        id: -(index3 + 1),
+        // virtual ID
+        specialityId: sp?.id ?? 0,
+        specialityName: sp?.name ?? specName,
+        specialityCode: sp?.code ?? "",
+        programName: pg2?.name ?? "",
+        preferenceOrder: index3 + 1
+      };
+    });
+  }
+  const specializations = resolvedPrefs.map((p) => p.specialityName).filter(Boolean);
+  const appSpecIds = new Set(apps.map((a) => a.specialityId));
+  for (const pref of resolvedPrefs) {
+    if (pref.specialityId && pref.specialityId > 0 && !appSpecIds.has(pref.specialityId)) {
+      const sp = specs.find((s2) => s2.id === pref.specialityId);
+      const prefix = sp?.code ? sp.code.toUpperCase() : "GEN";
+      const year = 2026;
+      try {
+        const countResult = await db.execute(sql`
+          SELECT COUNT(*)::int as count FROM applications WHERE speciality_id = ${pref.specialityId} AND hall_ticket_number IS NOT NULL
+        `);
+        const seq = Number(countResult.rows[0]?.count ?? 0) + 1;
+        const hallTicketNumber = `${prefix}-${year}-${String(seq).padStart(3, "0")}`;
+        const [newApp] = await db.insert(applicationsTable).values({
+          candidateId: c.id,
+          specialityId: pref.specialityId,
+          hallTicketNumber,
+          status: "approved"
+        }).returning();
+        if (newApp) {
+          apps.push(newApp);
+          appSpecIds.add(pref.specialityId);
+        }
+      } catch {
+        apps.push({
+          id: -pref.specialityId,
+          candidateId: c.id,
+          specialityId: pref.specialityId,
+          hallTicketNumber: `${prefix}-${year}-001`,
+          status: "approved",
+          batchId: null,
+          interviewSlot: null,
+          createdAt: /* @__PURE__ */ new Date(),
+          updatedAt: /* @__PURE__ */ new Date()
+        });
+      }
+    }
+  }
+  const appliedSpecialities = resolvedPrefs.map((p) => {
+    const scoreEntry = interviews.find((i2) => i2.specialityId === p.specialityId);
+    return {
+      specialityId: p.specialityId,
+      specialityName: p.specialityName,
+      specialityCode: p.specialityCode,
+      preferenceOrder: p.preferenceOrder,
+      score: scoreEntry ? scoreEntry.score : null,
+      remarks: scoreEntry ? scoreEntry.remarks : null,
+      submittedAt: scoreEntry?.submittedAt ? scoreEntry.submittedAt.toISOString() : null,
+      doctorId: scoreEntry ? scoreEntry.doctorId : null
+    };
+  });
+  return {
+    id: c.id,
+    candidateCode: c.candidateCode,
+    fullName: c.fullName,
+    email: c.email,
+    phone: c.phone,
+    unitId: c.unitId,
+    unitName: unit?.name ?? null,
+    status: c.status,
+    mcqScore,
+    psychometricScore,
+    interviewScore,
+    totalScore,
+    rank: null,
+    createdAt: c.createdAt.toISOString(),
+    dateOfBirth: formatDOBToStandard(c.dateOfBirth),
+    gender: c.gender || sub?.gender || null,
+    qualification: c.qualification || sub?.degree || null,
+    collegeName: c.collegeName || sub?.medicalCollege || null,
+    address: c.address || sub?.permanentAddress || null,
+    specializations,
+    preferences: resolvedPrefs,
+    appliedSpecialities,
+    interviewScores: interviews.map((i2) => ({
+      id: i2.id,
+      specialityId: i2.specialityId,
+      doctorId: i2.doctorId,
+      score: i2.score,
+      remarks: i2.remarks,
+      submittedAt: i2.submittedAt.toISOString()
+    })),
+    documents: docs.map((d) => ({
+      id: d.id,
+      docType: d.docType,
+      fileName: d.fileName,
+      fileUrl: d.fileUrl ?? null,
+      uploadedAt: d.uploadedAt.toISOString()
+    })),
+    attempts: attempts.map((a) => {
+      const e2 = exams.find((x2) => x2.id === a.examId);
+      return {
+        id: a.id,
+        examId: a.examId,
+        examTitle: e2?.title ?? "",
+        examKind: e2?.kind ?? "",
+        score: a.score,
+        maxScore: a.maxScore,
+        submittedAt: a.submittedAt?.toISOString() ?? null,
+        startedAt: a.startedAt.toISOString()
+      };
+    }),
+    paymentInfo: sub ? {
+      amount: sub.paidAmount ? sub.paidAmount > 1e5 ? sub.paidAmount / 100 : sub.paidAmount : null,
+      id: sub.paymentId,
+      mode: sub.paymentMode
+    } : null,
+    centerPreference: sub?.centerPreference ?? null,
+    submissionId: sub?.id ?? null,
+    reviewNotes: sub?.reviewNotes ?? null,
+    pgQualifications: sub?.pgQualifications ?? null,
+    applications: apps.map((a) => ({
+      id: a.id,
+      specialityId: a.specialityId,
+      hallTicketNumber: a.hallTicketNumber,
+      status: a.status,
+      batchId: a.batchId,
+      interviewSlot: a.interviewSlot
+    })),
+    // Detailed application submission fields for doctor view
+    submission: sub ? {
+      id: sub.id,
+      applicationId: sub.applicationId,
+      fullName: sub.fullName,
+      email: sub.email,
+      phone: sub.phone,
+      dateOfBirth: formatDOBToStandard(sub.dateOfBirth),
+      gender: sub.gender,
+      maritalStatus: sub.maritalStatus,
+      spouseDetails: sub.spouseDetails,
+      permanentAddress: sub.permanentAddress,
+      mailingAddress: sub.mailingAddress,
+      degree: sub.degree,
+      medicalCollege: sub.medicalCollege,
+      university: sub.university,
+      medicalCouncilNumber: sub.medicalCouncilNumber,
+      pgQualifications: sub.pgQualifications,
+      doQualification: sub.doQualification,
+      doDetails: sub.doDetails,
+      msMdQualification: sub.msMdQualification,
+      msMdDetails: sub.msMdDetails,
+      dnbQualification: sub.dnbQualification,
+      dnbDetails: sub.dnbDetails,
+      otherTraining: sub.otherTraining,
+      diagnosticSkills: sub.diagnosticSkills,
+      surgicalExperience: sub.surgicalExperience,
+      totalSurgeries: sub.totalSurgeries,
+      publications: sub.publications,
+      presentations: sub.presentations,
+      healthDeclaration: sub.healthDeclaration,
+      healthDetails: sub.healthDetails,
+      medicalConditions: sub.medicalConditions,
+      previousApplicationMonthYear: sub.previousApplicationMonthYear,
+      referralSource: sub.referralSource,
+      referredByName: sub.referredByName,
+      mediaSource: sub.mediaSource,
+      lor1Url: sub.lor1Url,
+      lor1RefName: sub.lor1RefName,
+      lor1RefContact: sub.lor1RefContact,
+      lor1RefEmail: sub.lor1RefEmail,
+      lor2Url: sub.lor2Url,
+      lor2RefName: sub.lor2RefName,
+      lor2RefContact: sub.lor2RefContact,
+      lor2RefEmail: sub.lor2RefEmail,
+      photoUrl: sub.photoUrl,
+      paymentUrl: sub.paymentUrl,
+      otherInformation: sub.otherInformation,
+      customAnswers: sub.customAnswers ?? null,
+      formData: sub.formData ?? null,
+      declarationAccepted: sub.declarationAccepted ?? null,
+      submittedAt: sub.submittedAt ? sub.submittedAt.toISOString() : null
+    } : null
+  };
+}
+function buildStyledSheet(rows, sheetName) {
+  if (rows.length === 0) {
+    const ws2 = XLSX2.utils.json_to_sheet([]);
+    return ws2;
+  }
+  const headers = Object.keys(rows[0]);
+  const numCols = headers.length;
+  const numRows = rows.length;
+  const headerColor = SHEET_HEADER_COLORS[sheetName] ?? "0B4A8F";
+  const wsData = [headers, ...rows.map((r2) => headers.map((h2) => r2[h2] ?? ""))];
+  const ws = XLSX2.utils.aoa_to_sheet(wsData);
+  for (let R = 0; R <= numRows; R++) {
+    for (let C = 0; C < numCols; C++) {
+      const addr = XLSX2.utils.encode_cell({ r: R, c: C });
+      if (!ws[addr]) continue;
+      const cell2 = ws[addr];
+      if (R === 0) {
+        cell2.s = {
+          fill: { patternType: "solid", fgColor: { rgb: headerColor } },
+          font: HEADER_FONT,
+          alignment: HEADER_ALIGN,
+          border: THIN_BORDER
+        };
+      } else {
+        const colHeader = headers[C];
+        const cellVal = String(cell2.v ?? "");
+        const isRetina = colHeader === "Retina/Anterior" && cellVal === "Retina";
+        cell2.s = {
+          fill: isRetina ? RETINA_FILL : R % 2 === 0 ? ROW_ODD : ROW_EVEN,
+          font: isRetina ? RETINA_FONT : BODY_FONT,
+          alignment: BODY_ALIGN,
+          border: THIN_BORDER
+        };
+      }
+    }
+  }
+  ws["!cols"] = headers.map((h2) => {
+    let maxLen = h2.length;
+    for (const row of rows) {
+      const v = row[h2];
+      if (v != null) maxLen = Math.max(maxLen, String(v).length);
+    }
+    return { wch: Math.min(maxLen + 4, 50) };
+  });
+  ws["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft", state: "frozen" };
+  ws["!autofilter"] = {
+    ref: XLSX2.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: numCols - 1, r: numRows } })
+  };
+  ws["!rows"] = [{ hpt: 22 }, ...Array(numRows).fill({ hpt: 18 })];
+  return ws;
+}
+async function recalculateCandidateStatus(candidateId) {
+  const [cand] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, candidateId));
+  if (!cand) return;
+  if (cand.status === "allocated" || cand.status === "waitlisted" || cand.status === "rejected") return;
+  const apps = await db.select().from(applicationsTable).where(eq(applicationsTable.candidateId, candidateId));
+  if (apps.length === 0) return;
+  const scores = await db.select().from(interviewScoresTable).where(eq(interviewScoresTable.candidateId, candidateId));
+  let allSpecialtiesCompleted = true;
+  for (const app2 of apps) {
+    const hasScore = scores.some((s2) => s2.specialityId === app2.specialityId);
+    if (!hasScore) {
+      allSpecialtiesCompleted = false;
+      if (app2.status === "completed") {
+        await db.update(applicationsTable).set({ status: "approved" }).where(eq(applicationsTable.id, app2.id));
+      }
+    } else {
+      if (app2.status !== "completed") {
+        await db.update(applicationsTable).set({ status: "completed" }).where(eq(applicationsTable.id, app2.id));
+      }
+    }
+  }
+  const overallCompleted = allSpecialtiesCompleted || scores.length > 0;
+  if (overallCompleted) {
+    await db.update(candidatesTable).set({ status: "interview_completed" }).where(eq(candidatesTable.id, candidateId));
+  } else {
+    if (cand.status === "interview_completed") {
+      await db.update(candidatesTable).set({ status: "approved" }).where(eq(candidatesTable.id, candidateId));
+    }
+  }
+}
+async function createCandidateDossierPdfBuffer(c) {
+  return new Promise(async (resolve4, reject) => {
+    try {
+      const full = await fullCandidate(c);
+      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
+      const doc = new import_pdfkit3.default({ margin: 50, size: "A4" });
+      const buffers = [];
+      doc.on("data", (chunk) => buffers.push(chunk));
+      doc.on("end", () => resolve4(Buffer.concat(buffers)));
+      doc.on("error", reject);
+      const colors = {
+        primary: "#0f172a",
+        secondary: "#475569",
+        accent: "#f97316",
+        muted: "#94a3b8",
+        border: "#e2e8f0",
+        bgOrange: "#fff7ed"
+      };
+      const logoPath = path6.join(process.cwd(), "artifacts", "fellowship-exam", "src", "assets", "seh_sav_logo_1777703794142.jpg");
+      try {
+        doc.image(logoPath, 50, 40, { width: 130, height: 65 });
+      } catch (e2) {
+        doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(14).text("SANKARA ACADEMY OF VISION", 50, 50);
+      }
+      doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(16).text("CANDIDATE DOSSIER", 0, 45, { align: "right", width: 545 });
+      doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text("Sankara Academy of Vision \u2014 Fellowship Admissions", 0, 65, { align: "right", width: 545 });
+      doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text(`Protocol ID: ${c.candidateCode}`, 0, 78, { align: "right", width: 545 });
+      doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, 112).lineTo(550, 112).stroke();
+      const photoUrl = sub?.photoUrl;
+      if (photoUrl && photoUrl.startsWith("/objects/")) {
+        const localPath = path6.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
+        try {
+          doc.image(localPath, 460, 120, { width: 85, height: 105 });
+          doc.rect(460, 120, 85, 105).strokeColor(colors.border).lineWidth(1).stroke();
+        } catch (_) {
+        }
+      }
+      doc.y = 122;
+      doc.moveDown(2);
+      doc.rect(50, doc.y, 500, 30).fill(colors.bgOrange);
+      doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(12).text("ACADEMIC IDENTITY & PROFILE", 65, doc.y - 22);
+      doc.moveDown(0.5);
+      const leftCol = 70;
+      const rightCol = 320;
+      let currY = doc.y;
+      const renderField = (label, value, x2, y) => {
+        doc.fillColor(colors.muted).font("Helvetica-Bold").fontSize(8).text(label.toUpperCase(), x2, y);
+        doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(11).text(String(value || "\u2014"), x2, y + 12);
+      };
+      renderField("Full Name", full.fullName, leftCol, currY);
+      renderField("Contact Identity", full.email, rightCol, currY);
+      currY += 40;
+      renderField("Contact Phone", full.phone || "\u2014", leftCol, currY);
+      renderField("Date of Birth", formatDOBToStandard(full.dateOfBirth), rightCol, currY);
+      currY += 40;
+      renderField("MBBS Institution", full.collegeName || "\u2014", leftCol, currY);
+      renderField("Qualifying MBBS", full.qualification || "\u2014", rightCol, currY);
+      currY += 40;
+      if (sub?.pgQualifications) {
+        doc.rect(50, currY, 500, 24).fill("#f8fafc");
+        doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(10).text("POST-GRADUATE QUALIFICATIONS", 65, currY + 6);
+        currY += 32;
+        doc.fillColor(colors.secondary).font("Helvetica").fontSize(10).text(sub.pgQualifications, 65, currY, { width: 470 });
+        currY = doc.y + 16;
+      }
+      const bottom = 750;
+      doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, bottom).lineTo(550, bottom).stroke();
+      doc.fillColor(colors.muted).font("Helvetica").fontSize(8).text("CONFIDENTIAL DOCUMENT - FOR INTERNAL USE ONLY", 50, bottom + 10);
+      doc.text("SANKARA ACADEMY OF VISION - FELLOWSHIP ADMISSIONS HUB", 50, bottom + 22);
+      doc.text(`Generated on ${formatToLocalDateTime(/* @__PURE__ */ new Date())}`, 350, bottom + 10, { align: "right" });
+      doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+async function cascadeDeleteCandidates(ids) {
+  const { inArray: inArray4, sql: sql2 } = await Promise.resolve().then(() => (init_drizzle_orm(), drizzle_orm_exports));
+  if (!ids || ids.length === 0) return;
+  await db.delete(interviewScoresTable).where(inArray4(interviewScoresTable.candidateId, ids)).catch(() => {
+  });
+  await db.delete(doctorAssignmentsTable).where(inArray4(doctorAssignmentsTable.candidateId, ids)).catch(() => {
+  });
+  await db.delete(documentsTable).where(inArray4(documentsTable.candidateId, ids)).catch(() => {
+  });
+  await db.delete(candidateExamAssignmentsTable).where(inArray4(candidateExamAssignmentsTable.candidateId, ids)).catch(() => {
+  });
+  await db.delete(examAttemptsTable).where(inArray4(examAttemptsTable.candidateId, ids)).catch(() => {
+  });
+  await db.delete(candidatePreferencesTable).where(inArray4(candidatePreferencesTable.candidateId, ids)).catch(() => {
+  });
+  await db.delete(applicationsTable).where(inArray4(applicationsTable.candidateId, ids)).catch(() => {
+  });
+  await db.delete(batchCandidatesTable).where(inArray4(batchCandidatesTable.candidateId, ids)).catch(() => {
+  });
+  await db.execute(sql2`DELETE FROM panel_queue WHERE candidate_id = ANY(${ids})`).catch(() => {
+  });
+  await db.execute(sql2`DELETE FROM interview_panel_member_scores WHERE candidate_id = ANY(${ids})`).catch(() => {
+  });
+  await db.execute(sql2`DELETE FROM interview_panel_member_scoring_audit WHERE candidate_id = ANY(${ids})`).catch(() => {
+  });
+  await db.delete(candidatesTable).where(inArray4(candidatesTable.id, ids));
+}
+var import_express8, import_pdfkit3, XLSX2, archiver2, router8, HEADER_FONT, HEADER_ALIGN, ROW_EVEN, ROW_ODD, BODY_FONT, BODY_ALIGN, THIN_BORDER, RETINA_FILL, RETINA_FONT, SHEET_HEADER_COLORS, candidates_default;
+var init_candidates2 = __esm({
+  "src/routes/candidates.ts"() {
+    "use strict";
+    import_express8 = __toESM(require_express2(), 1);
+    init_drizzle_orm();
+    init_drizzle_orm();
+    init_src();
+    init_auth2();
+    init_email();
+    init_google_docs();
+    init_src();
+    import_pdfkit3 = __toESM(require_pdfkit(), 1);
+    init_utils5();
+    init_letters();
+    XLSX2 = __toESM(require_xlsx(), 1);
+    init_archiver();
+    init_application_forms2();
+    archiver2 = archiver_exports?.default || archiver_exports;
+    router8 = (0, import_express8.Router)();
+    router8.get("/candidates", requireAuth, async (req, res) => {
+      const programId = req.query["programId"] ? Number(req.query["programId"]) : null;
+      const unitIdRaw = req.query["unitId"] ? Number(req.query["unitId"]) : void 0;
+      const status = req.query["status"];
+      let effectiveUnit = unitIdRaw;
+      if (req.user.role === "unit_coordinator") {
+        const [u] = await readDb.select().from(usersTable).where(eq(usersTable.id, req.user.userId));
+        effectiveUnit = u?.unitId ?? -1;
+      }
+      let candidates = await readDb.select().from(candidatesTable).where(eq(candidatesTable.isMock, req.isMockMode)).orderBy(desc(candidatesTable.createdAt));
+      if (effectiveUnit !== void 0) candidates = candidates.filter((c) => c.unitId === effectiveUnit);
+      if (status) candidates = candidates.filter((c) => c.status === status);
+      if (programId) {
+        const specs = await readDb.select().from(specialitiesTable).where(eq(specialitiesTable.programId, programId));
+        const forms = await readDb.select().from(applicationFormsTable).where(eq(applicationFormsTable.programId, programId));
+        const specIds = new Set(specs.map((s2) => s2.id));
+        const formIds = new Set(forms.map((f3) => f3.id));
+        const candIdsFromPrefs = specIds.size > 0 ? (await readDb.select({ candidateId: candidatePreferencesTable.candidateId }).from(candidatePreferencesTable).where(inArray(candidatePreferencesTable.specialityId, [...specIds]))).map((p) => p.candidateId) : [];
+        const candIdsFromApps = specIds.size > 0 ? (await readDb.select({ candidateId: applicationsTable.candidateId }).from(applicationsTable).where(inArray(applicationsTable.specialityId, [...specIds]))).map((a) => a.candidateId) : [];
+        const candIdsFromSubs = formIds.size > 0 ? (await readDb.select({ candidateId: applicationSubmissionsTable.candidateId }).from(applicationSubmissionsTable).where(inArray(applicationSubmissionsTable.formId, [...formIds]))).map((s2) => s2.candidateId).filter((id) => typeof id === "number" && id > 0) : [];
+        const allowedCandIds = /* @__PURE__ */ new Set([...candIdsFromPrefs, ...candIdsFromApps, ...candIdsFromSubs]);
+        candidates = candidates.filter((c) => allowedCandIds.has(c.id));
+      }
+      let units = [];
+      let allPrefs = [];
+      let allSpecs = [];
+      let allDocs = [];
+      let allSubmissions = [];
+      let allApplications = [];
+      let allScores = [];
+      if (candidates.length > 0) {
+        const candidateIds = candidates.map((c) => c.id);
+        const emails = candidates.map((c) => c.email.toLowerCase().trim()).filter(Boolean);
+        units = await readDb.select().from(unitsTable);
+        allPrefs = await readDb.select().from(candidatePreferencesTable).where(inArray(candidatePreferencesTable.candidateId, candidateIds));
+        allSpecs = await readDb.select().from(specialitiesTable);
+        allDocs = await readDb.select().from(documentsTable).where(inArray(documentsTable.candidateId, candidateIds));
+        allSubmissions = emails.length > 0 ? await readDb.select().from(applicationSubmissionsTable).where(
+          or(
+            inArray(applicationSubmissionsTable.candidateId, candidateIds),
+            inArray(sql`LOWER(email)`, emails)
+          )
+        ) : await readDb.select().from(applicationSubmissionsTable).where(inArray(applicationSubmissionsTable.candidateId, candidateIds));
+        allApplications = await readDb.select().from(applicationsTable).where(inArray(applicationsTable.candidateId, candidateIds));
+        allScores = await readDb.select().from(interviewScoresTable).where(inArray(interviewScoresTable.candidateId, candidateIds));
+      }
+      const unitsMap = new Map(units.map((u) => [u.id, u]));
+      const specsMap = new Map(allSpecs.map((s2) => [s2.id, s2]));
+      const prefsByCandidate = /* @__PURE__ */ new Map();
+      for (const p of allPrefs) {
+        if (!prefsByCandidate.has(p.candidateId)) prefsByCandidate.set(p.candidateId, []);
+        prefsByCandidate.get(p.candidateId).push(p);
+      }
+      const docsByCandidate = /* @__PURE__ */ new Map();
+      for (const d of allDocs) {
+        if (!docsByCandidate.has(d.candidateId)) docsByCandidate.set(d.candidateId, []);
+        docsByCandidate.get(d.candidateId).push(d);
+      }
+      const submissionsByCandidate = /* @__PURE__ */ new Map();
+      const submissionsByEmail = /* @__PURE__ */ new Map();
+      for (const s2 of allSubmissions) {
+        if (s2.candidateId) submissionsByCandidate.set(s2.candidateId, s2);
+        if (s2.email) submissionsByEmail.set(s2.email.toLowerCase().trim(), s2);
+      }
+      const scoresByCandidate = /* @__PURE__ */ new Map();
+      for (const s2 of allScores) {
+        if (!scoresByCandidate.has(s2.candidateId)) scoresByCandidate.set(s2.candidateId, []);
+        scoresByCandidate.get(s2.candidateId).push(s2);
+      }
+      const out = candidates.map((c) => {
+        const unit = c.unitId ? unitsMap.get(c.unitId) : null;
+        const prefs = (prefsByCandidate.get(c.id) || []).sort((a, b) => a.preferenceOrder - b.preferenceOrder);
+        let specializations = prefs.map((p) => specsMap.get(p.specialityId)?.name ?? "").filter(Boolean);
+        if (specializations.length === 0) {
+          const sub2 = submissionsByCandidate.get(c.id) || (c.email ? submissionsByEmail.get(c.email.toLowerCase().trim()) : null);
+          if (sub2 && sub2.specialization) {
+            specializations = parseSpecializationString(sub2.specialization);
+          }
+        }
+        const documents = (docsByCandidate.get(c.id) || []).map((d) => ({ id: d.id, docType: d.docType, fileName: d.fileName, fileUrl: d.fileUrl }));
+        const candScores = scoresByCandidate.get(c.id) || [];
+        const sub = submissionsByCandidate.get(c.id) || (c.email ? submissionsByEmail.get(c.email.toLowerCase().trim()) : null);
+        return {
+          id: c.id,
+          candidateCode: c.candidateCode,
+          fullName: c.fullName,
+          email: c.email,
+          phone: c.phone,
+          unitId: c.unitId,
+          unitName: unit?.name ?? null,
+          status: c.status,
+          specializations,
+          preferences: prefs.map((p) => ({
+            id: p.id,
+            specialityId: p.specialityId,
+            preferenceOrder: p.preferenceOrder
+          })),
+          documents,
+          mcqScore: c.mcqScore ? parseFloat(c.mcqScore) : null,
+          psychometricScore: c.psychometricScore ? parseFloat(c.psychometricScore) : null,
+          interviewScore: candScores.length > 0 ? candScores.reduce((acc, s2) => acc + s2.score, 0) / candScores.length : null,
+          totalScore: (() => {
+            const mcq = c.mcqScore ? parseFloat(c.mcqScore) : null;
+            const psy = c.psychometricScore ? parseFloat(c.psychometricScore) : null;
+            const intv = candScores.length > 0 ? candScores.reduce((acc, s2) => acc + s2.score, 0) / candScores.length : null;
+            return mcq !== null || psy !== null || intv !== null ? (mcq ?? 0) + (psy ?? 0) + (intv ?? 0) : null;
+          })(),
+          rank: null,
+          createdAt: c.createdAt.toISOString(),
+          dateOfBirth: formatDOBToStandard(c.dateOfBirth),
+          gender: c.gender,
+          qualification: c.qualification,
+          collegeName: c.collegeName,
+          address: c.address,
+          photoUrl: sub?.photoUrl || documents.find((d) => d.docType?.toLowerCase().includes("photo"))?.fileUrl || null,
+          lor1Url: sub?.lor1Url || documents.find((d) => d.docType?.includes("LOR1"))?.fileUrl || null,
+          lor2Url: sub?.lor2Url || documents.find((d) => d.docType?.includes("LOR2"))?.fileUrl || null,
+          lor1RefName: sub?.lor1RefName || null,
+          lor2RefName: sub?.lor2RefName || null,
+          paymentInfo: (() => {
+            const s2 = sub || allSubmissions.find((s3) => s3.email?.toLowerCase() === c.email?.toLowerCase());
+            if (!s2) return null;
+            return {
+              amount: s2.paidAmount ? s2.paidAmount > 1e5 ? s2.paidAmount / 100 : s2.paidAmount : null,
+              id: s2.paymentId,
+              mode: s2.paymentMode
+            };
+          })(),
+          centerPreference: sub?.centerPreference ?? null,
+          submissionId: sub?.id ?? null,
+          reviewNotes: sub?.reviewNotes ?? null,
+          pgQualifications: sub?.pgQualifications ?? null,
+          applications: allApplications.filter((a) => a.candidateId === c.id).map((a) => ({
+            id: a.id,
+            specialityId: a.specialityId,
+            hallTicketNumber: a.hallTicketNumber,
+            status: a.status,
+            batchId: a.batchId,
+            interviewSlot: a.interviewSlot
+          }))
+        };
+      });
+      res.json(out);
+    });
+    HEADER_FONT = { bold: true, color: { rgb: "FFFFFF" }, sz: 11, name: "Calibri" };
+    HEADER_ALIGN = { horizontal: "center", vertical: "center", wrapText: false };
+    ROW_EVEN = { patternType: "solid", fgColor: { rgb: "E8F0FE" } };
+    ROW_ODD = { patternType: "solid", fgColor: { rgb: "FFFFFF" } };
+    BODY_FONT = { sz: 10, name: "Calibri" };
+    BODY_ALIGN = { horizontal: "left", vertical: "center", wrapText: false };
+    THIN_BORDER = {
+      top: { style: "thin", color: { rgb: "C5D3E8" } },
+      bottom: { style: "thin", color: { rgb: "C5D3E8" } },
+      left: { style: "thin", color: { rgb: "C5D3E8" } },
+      right: { style: "thin", color: { rgb: "C5D3E8" } }
+    };
+    RETINA_FILL = { patternType: "solid", fgColor: { rgb: "FFF3CD" } };
+    RETINA_FONT = { sz: 10, name: "Calibri", color: { rgb: "7B3F00" }, bold: true };
+    SHEET_HEADER_COLORS = {
+      "General": "0B4A8F",
+      // deep navy
+      "Cornea": "006064",
+      // teal
+      "Glaucoma": "311B92",
+      // deep purple
+      "IOL Fellowship": "1A237E",
+      // indigo
+      "Medical Retina": "880E4F",
+      // deep pink
+      "Oculoplasty": "BF360C",
+      // deep orange
+      "Pediatric Ophthalmology": "1B5E20",
+      // deep green
+      "Phaco Refractive": "4A148C",
+      // purple
+      "Vitreo Retina": "B71C1C"
+      // deep red
+    };
+    router8.get("/candidates/export", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+      try {
+        const candidates = await db.select().from(candidatesTable).where(eq(candidatesTable.isMock, req.isMockMode)).orderBy(desc(candidatesTable.createdAt));
+        const units = await db.select().from(unitsTable);
+        const allPrefs = await db.select().from(candidatePreferencesTable);
+        const allSpecs = await db.select().from(specialitiesTable);
+        const allSubmissions = await db.select().from(applicationSubmissionsTable);
+        const allForms = await db.select().from(applicationFormsTable);
+        const resolvedCandidates = candidates.map((c) => {
+          const unit = c.unitId ? units.find((u) => u.id === c.unitId) : null;
+          const prefs = allPrefs.filter((p) => p.candidateId === c.id).sort((a, b) => a.preferenceOrder - b.preferenceOrder);
+          let specializations = prefs.map((p) => allSpecs.find((s2) => s2.id === p.specialityId)?.name ?? "").filter(Boolean);
+          const submission = allSubmissions.find((s2) => s2.email?.toLowerCase() === c.email?.toLowerCase());
+          let activeSpecializations = specializations;
+          if (submission?.specialization) {
+            activeSpecializations = parseSpecializationString(submission.specialization);
+          }
+          const getFormattedSpecialityPrefs = (specs, centerPreferenceStr, formData, customAnswers, sectionsConfig) => {
+            if (specs.length === 0) return [];
+            const prefs2 = {};
+            if (centerPreferenceStr) {
+              try {
+                const parsed = JSON.parse(centerPreferenceStr);
+                if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                  Object.entries(parsed).forEach(([k, v]) => {
+                    prefs2[k] = Array.isArray(v) ? v.join(", ") : String(v);
+                  });
+                }
+              } catch {
+              }
+            }
+            const extractUnitFields = (obj) => {
+              if (obj && typeof obj === "object") {
+                Object.entries(obj).forEach(([key, val]) => {
+                  if (key.startsWith("unit_") && val) {
+                    let label = key.replace("unit_", "").replace(/_/g, " ").toUpperCase();
+                    if (sectionsConfig) {
+                      sectionsConfig.forEach((sec) => {
+                        sec.fields?.forEach((f3) => {
+                          if (f3.id === key && f3.label) {
+                            label = f3.label.replace(" Preferred Center", "");
+                          }
+                        });
+                      });
+                    }
+                    prefs2[label] = Array.isArray(val) ? val.join(", ") : String(val);
+                  }
+                });
+              }
+            };
+            extractUnitFields(formData);
+            extractUnitFields(customAnswers);
+            if (formData && formData.formData) {
+              extractUnitFields(formData.formData);
+            }
+            const normalize2 = (str) => {
+              return str.toLowerCase().replace(/[^a-z0-9]/g, "");
+            };
+            const normalizedPrefs = {};
+            Object.entries(prefs2).forEach(([k, v]) => {
+              normalizedPrefs[normalize2(k)] = v;
+              if (k.startsWith("unit_")) {
+                normalizedPrefs[normalize2(k.substring(5))] = v;
+              }
+            });
+            const result = [];
+            specs.forEach((spec) => {
+              const normSpec = normalize2(spec);
+              let loc = normalizedPrefs[normSpec];
+              if (!loc) {
+                const key = Object.keys(normalizedPrefs).find((k) => k.includes(normSpec) || normSpec.includes(k));
+                if (key) {
+                  loc = normalizedPrefs[key];
+                }
+              }
+              if (!loc && centerPreferenceStr) {
+                const trimmedCp = centerPreferenceStr.trim();
+                if (!trimmedCp.startsWith("{") && !trimmedCp.startsWith("[") && trimmedCp !== "0" && trimmedCp.toLowerCase() !== "not applicable") {
+                  loc = trimmedCp;
+                }
+              }
+              if (loc && (loc.toLowerCase().trim() === "not applicable" || loc.toLowerCase().trim() === "not_applicable")) {
+                loc = "";
+              }
+              result.push({
+                spec,
+                location: loc ? loc.trim() : null
+              });
+            });
+            return result;
+          };
+          const form = submission ? allForms.find((f3) => f3.id === submission.formId) : null;
+          const caParsed = {
+            ...submission?.formData || {},
+            ...submission?.customAnswers || {}
+          };
+          const specPrefs = getFormattedSpecialityPrefs(
+            activeSpecializations,
+            submission?.centerPreference,
+            caParsed,
+            submission?.customAnswers,
+            form?.sectionsConfig ?? void 0
+          );
+          const specWithCentersList = specPrefs.map(({ spec, location }) => location ? `${spec}: ${location}` : spec);
+          const specWithCentersString = specWithCentersList.length > 0 ? specWithCentersList.join("; ") : activeSpecializations.join(", ");
+          const centerPrefsString = specPrefs.filter((p) => p.location).map(({ spec, location }) => `${spec}: ${location}`).join("; ") || "N/A";
+          const finalSpecializations = specPrefs.map((p) => p.spec);
+          return {
+            id: c.id,
+            candidateCode: c.candidateCode,
+            fullName: c.fullName,
+            email: c.email,
+            phone: c.phone || "N/A",
+            dateOfBirth: formatDOBToStandard(c.dateOfBirth),
+            gender: c.gender || "N/A",
+            qualification: c.qualification || "N/A",
+            pgQualifications: submission?.pgQualifications || "N/A",
+            collegeName: c.collegeName || "N/A",
+            address: c.address || "N/A",
+            centerPreference: centerPrefsString,
+            specializations: finalSpecializations,
+            specialitiesStringFormatted: specWithCentersString,
+            status: c.status,
+            unitName: unit?.name || "N/A",
+            paymentAmount: (() => {
+              if (!submission?.paidAmount) return "N/A";
+              const amt = submission.paidAmount > 1e5 ? submission.paidAmount / 100 : submission.paidAmount;
+              return `Rs. ${amt.toLocaleString("en-IN")}`;
+            })(),
+            paymentMode: submission?.paymentMode || "N/A",
+            createdAt: c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-IN") : "N/A"
+          };
+        });
+        const specOrder = [
+          "Cornea",
+          "Glaucoma",
+          "IOL Fellowship",
+          "Medical Retina",
+          "Oculoplasty",
+          "Pediatric Ophthalmology",
+          "Phaco Refractive",
+          "Vitreo Retina"
+        ];
+        const STATUS_LABELS = {
+          pending: "Pending",
+          approved: "Approved",
+          rejected: "Rejected",
+          interview_completed: "Interview Completed",
+          waitlisted: "Waitlisted",
+          allocated: "Allocated"
+        };
+        const mapToExcelRow = (rc) => {
+          const specsString = rc.specialitiesStringFormatted;
+          const hasRetina = rc.specializations.some((s2) => s2.toLowerCase().includes("retina"));
+          const hasBoth = hasRetina && rc.specializations.some((s2) => !s2.toLowerCase().includes("retina"));
+          const segment = hasBoth ? "Anterior, Retina" : hasRetina ? "Retina" : "Anterior";
+          return {
+            "Candidate ID": rc.candidateCode,
+            "Name": rc.fullName,
+            "Email": rc.email,
+            "Phone": rc.phone,
+            "Date of Birth": rc.dateOfBirth,
+            "Gender": rc.gender,
+            "Qualification": rc.qualification,
+            "PG Qualification": rc.pgQualifications,
+            "College": rc.collegeName,
+            "Mailing Address": rc.address,
+            "Specialities": specsString,
+            "Retina/Anterior": segment,
+            "Preferred Center": rc.centerPreference,
+            "Allotted Unit": rc.unitName,
+            "Status": STATUS_LABELS[rc.status] ?? rc.status,
+            "Payment Amount": rc.paymentAmount,
+            "Payment Mode": rc.paymentMode,
+            "Registration Date": rc.createdAt
+          };
+        };
+        const wb = XLSX2.utils.book_new();
+        const generalRows = resolvedCandidates.map(mapToExcelRow);
+        const generalWs = buildStyledSheet(generalRows, "General");
+        XLSX2.utils.book_append_sheet(wb, generalWs, "General");
+        const approvedResolved = resolvedCandidates.filter((c) => c.status === "approved");
+        for (const spec of specOrder) {
+          const specCandidates = approvedResolved.filter(
+            (rc) => rc.specializations.some((s2) => {
+              const sN = s2.toLowerCase(), spN = spec.toLowerCase();
+              return spN === "iol fellowship" ? sN === "iol" || sN === "iol fellowship" : sN === spN;
+            })
+          );
+          const specRows = specCandidates.map(mapToExcelRow);
+          const specWs = buildStyledSheet(specRows, spec);
+          XLSX2.utils.book_append_sheet(wb, specWs, spec);
+        }
+        const buffer = XLSX2.write(wb, { type: "buffer", bookType: "xlsx", cellStyles: true });
+        const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+        res.setHeader("Content-Disposition", `attachment; filename="SAV_Candidates_${today}.xlsx"`);
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        res.send(buffer);
+      } catch (error40) {
+        res.status(500).json({ error: error40.message || "Failed to export candidates" });
+      }
+    });
+    router8.get("/candidates/me", requireAuth, requireRole("student"), async (req, res) => {
+      const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.userId, req.user.userId));
+      if (!c) {
+        res.status(404).json({ error: "Candidate not found" });
+        return;
+      }
+      res.json(await fullCandidate(c));
+    });
+    router8.patch("/candidates/me", requireAuth, requireRole("student"), async (req, res) => {
+      const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.userId, req.user.userId));
+      if (!c) {
+        res.status(404).json({ error: "Candidate not found" });
+        return;
+      }
+      const body = req.body;
+      const update = {};
+      for (const k of ["fullName", "phone", "dateOfBirth", "gender", "qualification", "collegeName", "address"]) {
+        if (body[k] !== void 0) update[k] = body[k];
+      }
+      const [updated] = await db.update(candidatesTable).set(update).where(eq(candidatesTable.id, c.id)).returning();
+      if (!updated) {
+        res.status(500).json({ error: "Failed" });
+        return;
+      }
+      res.json(await fullCandidate(updated));
+    });
+    router8.patch("/candidates/:candidateId", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "doctor"), async (req, res) => {
+      const id = Number(req.params["candidateId"]);
+      const body = req.body;
+      const allowed = ["status", "fullName", "email", "candidateCode", "phone", "dateOfBirth", "gender", "qualification", "collegeName", "address", "unitId", "mcqScore", "psychometricScore"];
+      const update = {};
+      for (const k of allowed) {
+        if (body[k] !== void 0) update[k] = body[k];
+      }
+      const [before] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
+      if (!before) {
+        res.status(404).json({ error: "Not found" });
+        return;
+      }
+      const [updated] = await db.update(candidatesTable).set(update).where(eq(candidatesTable.id, id)).returning();
+      if (!updated) {
+        res.status(404).json({ error: "Not found" });
+        return;
+      }
+      if (body.email && body.email !== before.email) {
+        await db.update(applicationSubmissionsTable).set({ email: String(body.email) }).where(eq(applicationSubmissionsTable.email, before.email)).catch(() => {
+        });
+      }
+      if (body.reviewNotes !== void 0) {
+        await db.update(applicationSubmissionsTable).set({ reviewNotes: String(body.reviewNotes) }).where(eq(applicationSubmissionsTable.email, updated.email));
+      }
+      const oldStatus = before.status;
+      const newStatus = updated.status;
+      if (newStatus !== oldStatus && (newStatus === "allocated" || oldStatus === "allocated")) {
+        const delta = newStatus === "allocated" ? 1 : -1;
+        const allUnits2 = await db.select().from(unitsTable);
+        const unitObj = updated.unitId ? allUnits2.find((u) => u.id === updated.unitId) : null;
+        const unitName = unitObj?.name ?? null;
+        let specialityName = null;
+        if (body.reviewNotes && typeof body.reviewNotes === "string" && body.reviewNotes.startsWith("Allocated to ")) {
+          specialityName = body.reviewNotes.replace("Allocated to ", "").trim();
+        } else {
+          const prefs = await db.select().from(candidatePreferencesTable).where(eq(candidatePreferencesTable.candidateId, id));
+          const firstPref = prefs.sort((a, b) => a.preferenceOrder - b.preferenceOrder)[0];
+          if (firstPref) {
+            const [spec] = await db.select().from(specialitiesTable).where(eq(specialitiesTable.id, firstPref.specialityId));
+            specialityName = spec?.name ?? null;
+          }
+        }
+        if (unitName && specialityName) {
+          await db.execute(sql`
+        INSERT INTO seat_matrix_entries (speciality, unit_name, total_seats, allocated_seats)
+        VALUES (${specialityName}, ${unitName}, 0, ${delta > 0 ? 1 : 0})
+        ON CONFLICT (speciality, unit_name) DO UPDATE
+          SET allocated_seats = GREATEST(0, seat_matrix_entries.allocated_seats + ${delta}), updated_at = NOW()
+      `);
+        }
+      }
+      const allUnits = await db.select().from(unitsTable);
+      const unit = updated.unitId ? allUnits.find((u) => u.id === updated.unitId) : null;
+      res.json({ id: updated.id, candidateCode: updated.candidateCode, fullName: updated.fullName, email: updated.email, phone: updated.phone, unitId: updated.unitId, unitName: unit?.name ?? null, status: updated.status });
+    });
+    router8.post("/candidates", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+      const { fullName, email: email3, phone, gender, qualification, collegeName, address, unitId, pgQualifications, centerPreference, specialityIds } = req.body;
+      if (!fullName || !email3) {
+        res.status(400).json({ error: "fullName and email required" });
+        return;
+      }
+      const cleanEmail = email3.toLowerCase().trim();
+      const existing = await db.select().from(candidatesTable).where(eq(candidatesTable.email, cleanEmail));
+      if (existing.length > 0) {
+        res.status(400).json({ error: "Candidate with this email already exists" });
+        return;
+      }
+      const count2 = await db.select().from(candidatesTable);
+      const candidateCode = `CAND-2026-${String(count2.length + 1).padStart(3, "0")}`;
+      const [c] = await db.insert(candidatesTable).values({
+        candidateCode,
+        fullName,
+        email: cleanEmail,
+        phone: phone ?? null,
+        gender: gender ?? null,
+        qualification: qualification ?? null,
+        collegeName: collegeName ?? null,
+        address: address ?? null,
+        unitId: unitId ?? null,
+        status: "pending"
+      }).returning();
+      if (!c) {
+        res.status(500).json({ error: "Failed" });
+        return;
+      }
+      const specialityNames = [];
+      if (Array.isArray(specialityIds) && specialityIds.length > 0) {
+        const specs = await db.select().from(specialitiesTable);
+        let order = 1;
+        for (const specId of specialityIds) {
+          const spec = specs.find((s2) => s2.id === specId);
+          if (spec) {
+            specialityNames.push(spec.name);
+            await db.insert(candidatePreferencesTable).values({
+              candidateId: c.id,
+              specialityId: spec.id,
+              preferenceOrder: order++
+            });
+            const prefix = spec.code ? spec.code.toUpperCase() : "GEN";
+            const year = 2026;
+            const countResult = await db.execute(sql`
+          SELECT COUNT(*)::int as count FROM applications WHERE speciality_id = ${spec.id} AND hall_ticket_number IS NOT NULL
+        `);
+            const seq = Number(countResult.rows[0]?.count ?? 0) + 1;
+            const hallTicketNumber = `${prefix}-${year}-${String(seq).padStart(3, "0")}`;
+            await db.insert(applicationsTable).values({
+              candidateId: c.id,
+              specialityId: spec.id,
+              hallTicketNumber,
+              status: "approved"
+            });
+          }
+        }
+      }
+      const activeForms = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.isActive, true));
+      const formId = activeForms[0]?.id ?? 1;
+      await db.insert(applicationSubmissionsTable).values({
+        candidateId: c.id,
+        formId,
+        fullName: c.fullName,
+        email: cleanEmail,
+        phone: c.phone,
+        permanentAddress: c.address,
+        degree: c.qualification,
+        medicalCollege: c.collegeName,
+        pgQualifications: pgQualifications || null,
+        centerPreference: centerPreference || null,
+        specialization: specialityNames.length > 0 ? JSON.stringify(specialityNames) : null,
+        status: "approved",
+        readyForReview: true,
+        source: "manual"
+      });
+      res.json({ id: c.id, candidateCode: c.candidateCode, fullName: c.fullName, email: c.email, phone: c.phone, unitId: c.unitId, unitName: null, status: c.status });
+    });
+    router8.patch("/candidates/:candidateId/marks", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+      try {
+        const id = Number(req.params["candidateId"]);
+        const { mcqScore, psychometricScore, vivaScore, specialityId, panelId, targetDoctorId } = req.body;
+        if (vivaScore !== void 0 && vivaScore !== null) {
+          if (vivaScore < 0 || vivaScore > 50) {
+            res.status(400).json({ error: "VIVA score must be between 0 and 50." });
+            return;
+          }
+        }
+        if (mcqScore !== void 0 && mcqScore !== null) {
+          if (mcqScore < 0 || mcqScore > 50) {
+            res.status(400).json({ error: "MCQ score must be between 0 and 50." });
+            return;
+          }
+        }
+        if (psychometricScore !== void 0 && psychometricScore !== null) {
+          if (psychometricScore < 0 || psychometricScore > 10) {
+            res.status(400).json({ error: "Mind Mapping score must be between 0 and 10." });
+            return;
+          }
+        }
+        const [candBefore] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
+        if (!candBefore) {
+          res.status(404).json({ error: "Candidate not found." });
+          return;
+        }
+        const update = {};
+        if (mcqScore !== void 0) update["mcqScore"] = mcqScore !== null ? String(mcqScore) : null;
+        if (psychometricScore !== void 0) update["psychometricScore"] = psychometricScore !== null ? String(psychometricScore) : null;
+        const [updated] = await db.update(candidatesTable).set(update).where(eq(candidatesTable.id, id)).returning();
+        if (!updated) {
+          res.status(404).json({ error: "Not found" });
+          return;
+        }
+        const ipAddress = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "127.0.0.1").split(",")[0].trim();
+        if (mcqScore !== void 0 && String(mcqScore) !== String(candBefore.mcqScore)) {
+          await db.insert(auditLogsTable).values({
+            userId: req.user.userId,
+            userEmail: req.user.email,
+            userName: req.user.email,
+            action: "MARK_MODIFY",
+            details: `Updated MCQ Score for candidate ${candBefore.fullName} (${candBefore.candidateCode}) from ${candBefore.mcqScore ?? "N/A"} to ${mcqScore ?? "N/A"}`,
+            ipAddress
+          });
+        }
+        if (psychometricScore !== void 0 && String(psychometricScore) !== String(candBefore.psychometricScore)) {
+          await db.insert(auditLogsTable).values({
+            userId: req.user.userId,
+            userEmail: req.user.email,
+            userName: req.user.email,
+            action: "MARK_MODIFY",
+            details: `Updated Mind Mapping Score for candidate ${candBefore.fullName} (${candBefore.candidateCode}) from ${candBefore.psychometricScore ?? "N/A"} to ${psychometricScore ?? "N/A"}`,
+            ipAddress
+          });
+        }
+        if (vivaScore !== void 0) {
+          let docId = req.user.userId;
+          if (targetDoctorId && (req.user.role === "super_admin" || req.user.role === "program_admin" || req.user.role === "central_exam_coordinator")) {
+            docId = Number(targetDoctorId);
+          }
+          let targetSpecId = specialityId;
+          if (!targetSpecId) {
+            const [firstPref] = await db.select().from(candidatePreferencesTable).where(eq(candidatePreferencesTable.candidateId, id)).orderBy(candidatePreferencesTable.preferenceOrder);
+            if (firstPref) {
+              targetSpecId = firstPref.specialityId;
+            }
+          }
+          if (targetSpecId) {
+            let finalDocId = docId;
+            if (!targetDoctorId) {
+              const specPanelDoctor = await db.execute(sql`
+            SELECT doctor_id FROM interview_panel_members ipm
+            JOIN interview_panels ip ON ip.id = ipm.panel_id
+            WHERE ip.speciality_id = ${targetSpecId} AND ip.is_active = TRUE
+            LIMIT 1
+          `);
+              if (specPanelDoctor.rows[0]) {
+                finalDocId = Number(specPanelDoctor.rows[0].doctor_id);
+              }
+            }
+            const [doc] = await db.select().from(usersTable).where(eq(usersTable.id, finalDocId));
+            const doctorName = doc?.fullName ?? `Doctor ID ${finalDocId}`;
+            const [spec] = await db.select().from(specialitiesTable).where(eq(specialitiesTable.id, targetSpecId));
+            const specName = spec?.name ?? `Specialty ID ${targetSpecId}`;
+            const existingScores = await db.select().from(interviewScoresTable).where(and(
+              eq(interviewScoresTable.candidateId, id),
+              eq(interviewScoresTable.specialityId, targetSpecId),
+              sql`doctor_id NOT IN (SELECT doctor_id FROM interview_panel_members WHERE panel_id IN (SELECT id FROM interview_panels WHERE is_mind_matter = TRUE))`
+            ));
+            const existing = existingScores[0];
+            const now = /* @__PURE__ */ new Date();
+            if (vivaScore === null) {
+              if (existing) {
+                await db.delete(interviewScoresTable).where(eq(interviewScoresTable.id, existing.id));
+                await db.insert(auditLogsTable).values({
+                  userId: req.user.userId,
+                  userEmail: req.user.email,
+                  action: "MARK_MODIFY",
+                  details: `Deleted Specialty ${specName} Viva score entered by Doctor ${doctorName} for candidate ${candBefore.fullName} (${candBefore.candidateCode})`,
+                  ipAddress
+                });
+              }
+            } else {
+              if (existing) {
+                await db.update(interviewScoresTable).set({
+                  score: vivaScore,
+                  submittedAt: now,
+                  lastModifiedBy: req.user.userId,
+                  lastModifiedAt: now
+                }).where(eq(interviewScoresTable.id, existing.id));
+                await db.insert(auditLogsTable).values({
+                  userId: req.user.userId,
+                  userEmail: req.user.email,
+                  action: "MARK_MODIFY",
+                  details: `Updated Specialty ${specName} Viva score for candidate ${candBefore.fullName} (${candBefore.candidateCode}) entered by Doctor ${doctorName} from ${existing.score} to ${vivaScore}`,
+                  ipAddress
+                });
+              } else {
+                await db.insert(interviewScoresTable).values({
+                  candidateId: id,
+                  doctorId: finalDocId,
+                  specialityId: targetSpecId,
+                  score: vivaScore,
+                  remarks: "Coordinator Direct Entry",
+                  enteredBy: req.user.userId,
+                  enteredAt: now,
+                  lastModifiedBy: req.user.userId,
+                  lastModifiedAt: now
+                });
+                await db.insert(auditLogsTable).values({
+                  userId: req.user.userId,
+                  userEmail: req.user.email,
+                  action: "MARK_ENTRY",
+                  details: `Directly entered Specialty ${specName} Viva score (${vivaScore}) for candidate ${candBefore.fullName} (${candBefore.candidateCode}) attributed to Doctor ${doctorName}`,
+                  ipAddress
+                });
+              }
+            }
+          }
+        }
+        await recalculateCandidateStatus(id);
+        if (panelId) {
+          const [maxRow] = (await db.execute(sql`
+        SELECT COALESCE(MAX(queue_position), -1) as max_pos FROM panel_queue WHERE panel_id = ${panelId}
+      `)).rows;
+          const nextPos = Number(maxRow["max_pos"]) + 1;
+          await db.execute(sql`
+        INSERT INTO panel_queue (panel_id, candidate_id, queue_position, status)
+        VALUES (${panelId}, ${id}, ${nextPos}, 'waiting')
+        ON CONFLICT (panel_id, candidate_id) DO NOTHING
+      `);
+        }
+        const updatedAny = updated;
+        res.json({
+          id: updated.id,
+          mcqScore: updatedAny.mcqScore != null ? Number(updatedAny.mcqScore) : null,
+          psychometricScore: updatedAny.psychometricScore != null ? Number(updatedAny.psychometricScore) : null
+        });
+      } catch (err) {
+        console.error("[candidates-marks-patch] error:", err);
+        res.status(500).json({ error: err.message || "An unexpected database error occurred while updating marks." });
+      }
+    });
+    router8.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "doctor"), async (req, res) => {
+      try {
+        const candidateId = Number(req.params["candidateId"]);
+        const { psychometricScore, specialityScores, status, unitId, reviewNotes } = req.body;
+        const [cand] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, candidateId));
+        if (!cand) {
+          return res.status(404).json({ error: "Candidate not found." });
+        }
+        const userId = req.user.userId;
+        const now = /* @__PURE__ */ new Date();
+        if (psychometricScore !== void 0) {
+          if (psychometricScore !== null && (psychometricScore < 0 || psychometricScore > 10)) {
+            return res.status(400).json({ error: "Psychometry / Mind Matter score must be between 0 and 10." });
+          }
+          await db.update(candidatesTable).set({ psychometricScore: psychometricScore !== null ? String(psychometricScore) : null }).where(eq(candidatesTable.id, candidateId));
+          if (psychometricScore !== null) {
+            const existingMm = await db.select().from(interviewScoresTable).where(
+              and(
+                eq(interviewScoresTable.candidateId, candidateId),
+                sql`speciality_id IS NULL`
+              )
+            );
+            if (existingMm.length > 0) {
+              await db.update(interviewScoresTable).set({
+                score: psychometricScore,
+                doctorId: userId,
+                submittedAt: now,
+                lastModifiedBy: userId,
+                lastModifiedAt: now
+              }).where(eq(interviewScoresTable.id, existingMm[0].id));
+            } else {
+              await db.insert(interviewScoresTable).values({
+                candidateId,
+                doctorId: userId,
+                specialityId: null,
+                score: psychometricScore,
+                remarks: "Mind Matter Station Evaluation",
+                enteredBy: userId,
+                enteredAt: now,
+                lastModifiedBy: userId,
+                lastModifiedAt: now,
+                submittedAt: now
+              });
+            }
+          }
+        }
+        if (Array.isArray(specialityScores) && specialityScores.length > 0) {
+          for (const item of specialityScores) {
+            const hasScore = typeof item.score === "number" && !isNaN(item.score);
+            const scoreVal = hasScore ? Math.max(0, Math.min(50, item.score)) : 0;
+            const existing = await db.select().from(interviewScoresTable).where(
+              and(
+                eq(interviewScoresTable.candidateId, candidateId),
+                eq(interviewScoresTable.specialityId, item.specialityId)
+              )
+            );
+            if (existing.length > 0) {
+              const oldScore = existing[0].score;
+              const finalScore = hasScore ? scoreVal : oldScore;
+              await db.update(interviewScoresTable).set({
+                score: finalScore,
+                remarks: item.remarks !== void 0 ? item.remarks : existing[0].remarks,
+                doctorId: userId,
+                submittedAt: now,
+                lastModifiedBy: userId,
+                lastModifiedAt: now
+              }).where(eq(interviewScoresTable.id, existing[0].id));
+              try {
+                await db.execute(sql`
+              INSERT INTO interview_scores_audit (candidate_id, speciality_id, doctor_id, old_score, new_score, remarks, action, changed_by_user_id)
+              VALUES (${candidateId}, ${item.specialityId}, ${userId}, ${oldScore}, ${finalScore}, ${item.remarks ?? null}, 'UPDATE', ${userId})
+            `);
+              } catch (_) {
+              }
+            } else {
+              await db.insert(interviewScoresTable).values({
+                candidateId,
+                doctorId: userId,
+                specialityId: item.specialityId,
+                score: scoreVal,
+                remarks: item.remarks ?? null,
+                submittedAt: now,
+                enteredBy: userId,
+                enteredAt: now,
+                lastModifiedBy: userId,
+                lastModifiedAt: now
+              });
+              try {
+                await db.execute(sql`
+              INSERT INTO interview_scores_audit (candidate_id, speciality_id, doctor_id, old_score, new_score, remarks, action, changed_by_user_id)
+              VALUES (${candidateId}, ${item.specialityId}, ${userId}, NULL, ${scoreVal}, ${item.remarks ?? null}, 'INSERT', ${userId})
+            `);
+              } catch (_) {
+              }
+            }
+          }
+        }
+        if (status) {
+          const allowedStatuses = ["approved", "interview_completed", "waitlisted", "allocated", "rejected"];
+          if (allowedStatuses.includes(status)) {
+            const candUpdate = { status };
+            if (unitId !== void 0) candUpdate.unitId = unitId;
+            await db.update(candidatesTable).set(candUpdate).where(eq(candidatesTable.id, candidateId));
+          }
+        } else if (unitId !== void 0) {
+          await db.update(candidatesTable).set({ unitId }).where(eq(candidatesTable.id, candidateId));
+        }
+        if (reviewNotes !== void 0) {
+          await db.update(applicationSubmissionsTable).set({ reviewNotes: String(reviewNotes) }).where(eq(applicationSubmissionsTable.email, cand.email));
+        }
+        if (!status) {
+          await recalculateCandidateStatus(candidateId);
+        }
+        const [updatedCandidate] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, candidateId));
+        res.json(await fullCandidate(updatedCandidate));
+      } catch (err) {
+        console.error("[doctor-marks-post] error:", err);
+        res.status(500).json({ error: err.message || "Failed to save marks." });
+      }
+    });
+    router8.get("/candidates/export-zip", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+      try {
+        const candidates = await db.select().from(candidatesTable).where(eq(candidatesTable.isMock, req.isMockMode)).orderBy(desc(candidatesTable.createdAt));
+        const archive = archiver2("zip", { zlib: { level: 6 } });
+        const filename = `Candidate_Applications_By_Speciality_${Date.now()}.zip`;
+        res.setHeader("Content-Type", "application/zip");
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        archive.pipe(res);
+        for (const c of candidates) {
+          try {
+            const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
+            let buffer;
+            let specs = [];
+            if (sub) {
+              const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
+              const [program] = form ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
+              buffer = await generateSubmissionPdfBuffer(sub, form, program, c);
+              specs = parseSpecializationString(sub.specialization);
+            } else {
+              buffer = await createCandidateDossierPdfBuffer(c);
+              const full = await fullCandidate(c);
+              if (full.preferences && full.preferences.length > 0) {
+                specs = full.preferences.map((p) => p.specialityName).filter(Boolean);
+              }
+            }
+            if (specs.length === 0) {
+              specs = ["General_Fellowship"];
+            }
+            const rawFullName = c.fullName || sub?.fullName || "Candidate";
+            const cleanFullName = rawFullName.trim().replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+            const rawMobile = c.phone || sub?.phone || "NoMobile";
+            const cleanMobile = rawMobile.replace(/[^a-zA-Z0-9]/g, "");
+            for (const spec of specs) {
+              const cleanSpec = spec.trim().replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+              const folderName = cleanSpec || "General";
+              const fileName = `${cleanFullName}_${cleanSpec}_${cleanMobile}.pdf`;
+              const entryPath = `${folderName}/${fileName}`;
+              archive.append(buffer, { name: entryPath });
+            }
+          } catch (err) {
+            console.error(`Failed to add PDF for candidate ${c.id}:`, err);
+          }
+        }
+        await archive.finalize();
+      } catch (err) {
+        console.error("[candidates-export-zip] error:", err);
+        if (!res.headersSent) res.status(500).json({ error: err.message || "Failed to generate ZIP archive." });
+      }
+    });
+    router8.get("/candidates/bulk-dossier-pdf", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+      try {
+        const candidates = await db.select().from(candidatesTable).where(eq(candidatesTable.isMock, req.isMockMode)).orderBy(desc(candidatesTable.createdAt));
+        const doc = new import_pdfkit3.default({ margin: 50, size: "A4", autoFirstPage: false });
+        const filename = `Cohort_Dossier_Compilation_${Date.now()}.pdf`;
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+        doc.pipe(res);
+        const colors = {
+          primary: "#0f172a",
+          secondary: "#475569",
+          accent: "#f97316",
+          muted: "#94a3b8",
+          border: "#e2e8f0",
+          bgOrange: "#fff7ed"
+        };
+        const logoPath = path6.join(process.cwd(), "artifacts", "fellowship-exam", "src", "assets", "seh_sav_logo_1777703794142.jpg");
+        for (let i2 = 0; i2 < candidates.length; i2++) {
+          const c = candidates[i2];
+          const full = await fullCandidate(c);
+          const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
+          doc.addPage();
+          doc.save();
+          doc.fillColor(colors.bgOrange).opacity(0.1);
+          doc.circle(550, 50, 150).fill();
+          doc.circle(50, 750, 100).fill();
+          doc.restore();
+          try {
+            doc.image(logoPath, 50, 40, { width: 130, height: 65 });
+          } catch (e2) {
+            doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(14).text("SANKARA ACADEMY OF VISION", 50, 50);
+          }
+          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(16).text("CANDIDATE DOSSIER", 0, 45, { align: "right", width: 545 });
+          doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text("Sankara Academy of Vision \u2014 Fellowship Admissions", 0, 65, { align: "right", width: 545 });
+          doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text(`Protocol ID: ${c.candidateCode} (Page ${i2 + 1}/${candidates.length})`, 0, 78, { align: "right", width: 545 });
+          doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, 112).lineTo(550, 112).stroke();
+          const photoUrl = sub?.photoUrl;
+          if (photoUrl && photoUrl.startsWith("/objects/")) {
+            const localPath = path6.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
+            try {
+              doc.image(localPath, 460, 120, { width: 85, height: 105 });
+              doc.rect(460, 120, 85, 105).strokeColor(colors.border).lineWidth(1).stroke();
+            } catch (_) {
+            }
+          }
+          doc.y = 122;
+          doc.moveDown(2);
+          doc.rect(50, doc.y, 500, 30).fill(colors.bgOrange);
+          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(12).text("ACADEMIC IDENTITY & PROFILE", 65, doc.y - 22);
+          doc.moveDown(0.5);
+          const leftCol = 70;
+          const rightCol = 320;
+          let currY = doc.y;
+          const renderField = (label, value, x2, y) => {
+            doc.fillColor(colors.muted).font("Helvetica-Bold").fontSize(8).text(label.toUpperCase(), x2, y);
+            doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(11).text(String(value || "\u2014"), x2, y + 12);
+          };
+          renderField("Full Name", full.fullName, leftCol, currY);
+          renderField("Contact Identity", full.email, rightCol, currY);
+          currY += 40;
+          renderField("Contact Phone", full.phone || "\u2014", leftCol, currY);
+          renderField("Date of Birth", formatDOBToStandard(full.dateOfBirth), rightCol, currY);
+          currY += 40;
+          renderField("MBBS Institution", full.collegeName || "\u2014", leftCol, currY);
+          renderField("Qualifying MBBS", full.qualification || "\u2014", rightCol, currY);
+          currY += 40;
+          if (sub?.pgQualifications) {
+            doc.rect(50, currY, 500, 24).fill("#f8fafc");
+            doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(10).text("POST-GRADUATE QUALIFICATIONS", 65, currY + 6);
+            currY += 32;
+            doc.fillColor(colors.secondary).font("Helvetica").fontSize(10).text(sub.pgQualifications, 65, currY, { width: 470 });
+            currY = doc.y + 16;
+          }
+          const bottom = 750;
+          doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, bottom).lineTo(550, bottom).stroke();
+          doc.fillColor(colors.muted).font("Helvetica").fontSize(8).text("CONFIDENTIAL DOCUMENT - FOR INTERNAL USE ONLY", 50, bottom + 10);
+          doc.text("SANKARA ACADEMY OF VISION - FELLOWSHIP ADMISSIONS HUB", 50, bottom + 22);
+          doc.text(`Candidate ${i2 + 1} of ${candidates.length} \xB7 Generated on ${formatToLocalDateTime(/* @__PURE__ */ new Date())}`, 350, bottom + 10, { align: "right" });
+        }
+        doc.end();
+      } catch (err) {
+        console.error("[bulk-dossier-pdf] error:", err);
+        if (!res.headersSent) res.status(500).json({ error: err.message || "Failed to generate bulk PDF compilation." });
+      }
+    });
+    router8.get("/candidates/:candidateId", requireAuth, async (req, res, next) => {
+      const id = Number(req.params["candidateId"]);
+      if (isNaN(id)) return next();
+      const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
+      if (!c) {
+        res.status(404).json({ error: "Not found" });
+        return;
+      }
+      res.json(await fullCandidate(c));
+    });
+    router8.post(
+      "/candidates/:candidateId/documents",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "doctor"),
+      async (req, res) => {
+        try {
+          const candidateId = Number(req.params["candidateId"]);
+          const { docType, fileName, fileUrl } = req.body;
+          if (!docType || !fileUrl) {
+            return res.status(400).json({ error: "docType and fileUrl are required" });
+          }
+          const existing = await db.select().from(documentsTable).where(
+            and(eq(documentsTable.candidateId, candidateId), eq(documentsTable.docType, docType))
+          );
+          let doc;
+          if (existing.length > 0) {
+            [doc] = await db.update(documentsTable).set({
+              fileUrl,
+              fileName: fileName || `${docType}.pdf`,
+              uploadedAt: /* @__PURE__ */ new Date()
+            }).where(eq(documentsTable.id, existing[0].id)).returning();
+          } else {
+            [doc] = await db.insert(documentsTable).values({
+              candidateId,
+              docType,
+              fileName: fileName || `${docType}.pdf`,
+              fileUrl,
+              uploadedAt: /* @__PURE__ */ new Date()
+            }).returning();
+          }
+          if (docType === "LOR1" || docType === "LOR2" || docType === "PHOTO") {
+            const field = docType === "LOR1" ? "lor1Url" : docType === "LOR2" ? "lor2Url" : "photoUrl";
+            await db.update(applicationSubmissionsTable).set({ [field]: fileUrl }).where(eq(applicationSubmissionsTable.candidateId, candidateId));
+          }
+          res.status(201).json(doc);
+        } catch (err) {
+          console.error("[candidate-document-attach] error:", err);
+          res.status(500).json({ error: err.message || "Failed to attach document" });
+        }
+      }
+    );
+    router8.post("/candidates/:candidateId/assign-unit", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+      const id = Number(req.params["candidateId"]);
+      const { unitId } = req.body;
+      const [c] = await db.update(candidatesTable).set({ unitId }).where(eq(candidatesTable.id, id)).returning();
+      if (!c) {
+        res.status(404).json({ error: "Not found" });
+        return;
+      }
+      const units = await db.select().from(unitsTable);
+      const unit = c.unitId ? units.find((u) => u.id === c.unitId) : null;
+      res.json({
+        id: c.id,
+        candidateCode: c.candidateCode,
+        fullName: c.fullName,
+        email: c.email,
+        phone: c.phone,
+        unitId: c.unitId,
+        unitName: unit?.name ?? null,
+        status: c.status,
+        mcqScore: null,
+        psychometricScore: null,
+        interviewScore: null,
+        totalScore: null,
+        rank: null,
+        createdAt: c.createdAt.toISOString()
+      });
+    });
+    router8.delete("/candidates/:id", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+      const id = Number(req.params.id);
+      if (!id) {
+        res.status(400).json({ error: "Invalid id" });
+        return;
+      }
+      await cascadeDeleteCandidates([id]);
+      res.json({ success: true });
+    });
+    router8.post("/candidates/bulk-delete", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"), async (req, res) => {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        res.status(400).json({ error: "ids array required" });
+        return;
+      }
+      await cascadeDeleteCandidates(ids);
+      res.json({ success: true, deleted: ids.length });
+    });
+    router8.post("/candidates/bulk-status", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"), async (req, res) => {
+      const { ids, status } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0 || !status) {
+        res.status(400).json({ error: "ids array and status string required" });
+        return;
+      }
+      await db.update(candidatesTable).set({ status }).where(inArray(candidatesTable.id, ids));
+      await db.update(applicationsTable).set({ status }).where(inArray(applicationsTable.candidateId, ids));
+      res.json({ success: true, updated: ids.length, status });
+    });
+    router8.post("/candidates/bulk-assign-batch", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"), async (req, res) => {
+      const { candidateIds, batchId } = req.body;
+      if (!Array.isArray(candidateIds) || candidateIds.length === 0 || !batchId) {
+        res.status(400).json({ error: "candidateIds array and batchId required" });
+        return;
+      }
+      await db.update(applicationsTable).set({ batchId }).where(inArray(applicationsTable.candidateId, candidateIds));
+      for (const cid of candidateIds) {
+        await db.insert(batchCandidatesTable).values({ batchId, candidateId: cid }).onConflictDoNothing();
+      }
+      res.json({ success: true, assigned: candidateIds.length, batchId });
+    });
+    router8.post("/candidates/:id/send-offer", requireAuth, requireRole("super_admin", "program_admin"), async (req, res) => {
+      const id = Number(req.params.id);
+      const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
+      if (!c) {
+        res.status(404).json({ error: "Candidate not found" });
+        return;
+      }
+      if (c.status !== "allocated") {
+        res.status(400).json({ error: "Candidate must be allocated before sending an offer letter" });
+        return;
+      }
+      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
+      const reviewNotes = sub?.reviewNotes || "";
+      let specialization = "Fellowship";
+      if (reviewNotes.startsWith("Allocated to ")) {
+        specialization = reviewNotes.replace("Allocated to ", "");
+      }
+      const units = await db.select().from(unitsTable);
+      const unit = c.unitId ? units.find((u) => u.id === c.unitId) : null;
+      const unitName = unit?.name || "Sankara Eye Hospital";
+      try {
+        const [settings] = await db.select().from(emailSettingsTable).limit(1);
+        let templateId = req.body.templateId;
+        if (!templateId) {
+          templateId = settings?.googleDocsTemplateId;
+          const [submission] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
+          if (submission?.formId) {
+            const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, submission.formId));
+            if (form?.programId) {
+              const [prog] = await db.select().from(programsTable).where(eq(programsTable.id, form.programId));
+              const progAny = prog;
+              if (progAny?.offerLetterTemplateId) {
+                templateId = String(progAny.offerLetterTemplateId);
+              }
+            }
+          }
+        } else {
+          const [tpl] = await db.select().from(documentTemplatesTable).where(eq(documentTemplatesTable.id, Number(templateId)));
+          if (tpl) templateId = tpl.googleDocId;
+        }
+        if (templateId && settings?.googleServiceAccountJson) {
+          const replacements = {
+            letter_date: (/* @__PURE__ */ new Date()).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" }),
+            name: c.fullName,
+            address: c.address || "",
+            interview_date: req.body.interview_date || "\u2014",
+            specialization,
+            unit: unitName,
+            duration: req.body.duration || "24 Months",
+            start_date: req.body.start_date || "\u2014",
+            reporting_date: req.body.reporting_date || "\u2014",
+            induction_dates: req.body.induction_dates || "\u2014",
+            stipend: String(req.body.stipend || "0"),
+            stipend_words: req.body.stipend_words || "Zero",
+            reporting_doctor: req.body.reporting_doctor || "the Chief Medical Officer",
+            signing_authority: req.body.signing_authority || "Director",
+            ...req.body.custom_fields || {}
+          };
+          const pdfBuffer = await processGoogleDocTemplate({
+            templateId,
+            serviceAccountJson: settings.googleServiceAccountJson,
+            replacements
+          });
+          await sendOfferLetterWithAttachment({
+            toEmail: c.email,
+            toName: c.fullName,
+            pdfBuffer,
+            fileName: `Offer_Letter_${c.candidateCode}.pdf`
+          });
+        } else {
+          await sendOfferLetterEmail({
+            toEmail: c.email,
+            toName: c.fullName,
+            candidateCode: c.candidateCode,
+            specialization,
+            unitName
+          });
+        }
+        const newNotes = reviewNotes + " [OFFER SENT]";
+        await db.update(applicationSubmissionsTable).set({ reviewNotes: newNotes }).where(eq(applicationSubmissionsTable.email, c.email));
+        res.json({ success: true, method: settings?.googleDocsTemplateId ? "google_docs" : "html" });
+      } catch (e2) {
+        console.error("[email] Failed to send offer letter", e2);
+        res.status(500).json({ error: e2.message || "Failed to send email." });
+      }
+    });
+    router8.post("/candidates/:id/generate-document", requireAuth, requireRole("super_admin", "program_admin"), async (req, res) => {
+      const id = Number(req.params.id);
+      const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
+      if (!c) {
+        res.status(404).json({ error: "Candidate not found" });
+        return;
+      }
+      const [subForNotes] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
+      const cReviewNotes = subForNotes?.reviewNotes ?? "";
+      const specialization = cReviewNotes.includes("Allocated to ") ? cReviewNotes.replace("Allocated to ", "").split(" [")[0] : "Fellowship";
+      const units = await db.select().from(unitsTable);
+      const unit = c.unitId ? units.find((u) => u.id === c.unitId) : null;
+      const unitName = unit?.name || "Sankara Eye Hospital";
+      try {
+        const [settings] = await db.select().from(emailSettingsTable).limit(1);
+        let googleDocId = req.body.templateId;
+        if (googleDocId && !isNaN(Number(googleDocId))) {
+          const [tpl] = await db.select().from(documentTemplatesTable).where(eq(documentTemplatesTable.id, Number(googleDocId)));
+          if (tpl) googleDocId = tpl.googleDocId;
+        }
+        if (!googleDocId) googleDocId = settings?.googleDocsTemplateId;
+        if (!googleDocId || !settings?.googleServiceAccountJson) {
+          return res.status(400).json({ error: "No document template configured." });
+        }
+        const replacements = {
+          letter_date: (/* @__PURE__ */ new Date()).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" }),
+          name: c.fullName,
+          address: c.address || "",
+          interview_date: req.body.interview_date || "\u2014",
+          specialization,
+          unit: unitName,
+          duration: req.body.duration || "24 Months",
+          start_date: req.body.start_date || "\u2014",
+          reporting_date: req.body.reporting_date || "\u2014",
+          induction_dates: req.body.induction_dates || "\u2014",
+          stipend: String(req.body.stipend || "0"),
+          stipend_words: req.body.stipend_words || "Zero",
+          reporting_doctor: req.body.reporting_doctor || "the Chief Medical Officer",
+          signing_authority: req.body.signing_authority || "Director",
+          ...req.body.custom_fields || {}
+        };
+        const pdfBuffer = await processGoogleDocTemplate({
+          templateId: googleDocId,
+          serviceAccountJson: settings.googleServiceAccountJson,
+          replacements
+        });
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename=Offer_${c.candidateCode}.pdf`);
+        res.send(pdfBuffer);
+      } catch (e2) {
+        console.error("[doc-gen] failed", e2);
+        res.status(500).json({ error: e2.message || "Failed to generate document." });
+      }
+    });
+    router8.get("/candidates/:id/call-letter-pdf", requireAuth, async (req, res) => {
+      try {
+        const id = Number(req.params.id);
+        let c = null;
+        let sub = null;
+        if (id > 0) {
+          const [found] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
+          c = found;
+          if (c) {
+            const [foundSub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
+            sub = foundSub;
+          }
+        }
+        const candidateName = req.query.candidateName || c?.fullName || "Dr. Candidate";
+        const candidateCode = req.query.candidateCode || c?.candidateCode || "SAV-2027-001";
+        let spec = req.query.specialization || "";
+        if (!spec && sub?.specialization) {
+          try {
+            const parsed = typeof sub.specialization === "string" && sub.specialization.startsWith("[") ? JSON.parse(sub.specialization) : [sub.specialization];
+            spec = Array.isArray(parsed) ? parsed.join(", ") : String(sub.specialization);
+          } catch (e2) {
+            spec = String(sub.specialization);
+          }
+        }
+        if (!spec) spec = "Vitreo Retina";
+        const pdfBuffer = await generateCallLetterPdf({
+          candidateName,
+          candidateCode,
+          specialization: spec,
+          email: req.query.email || c?.email || "candidate@sankaraeye.com",
+          phone: req.query.phone || c?.phone || "",
+          address: req.query.address || c?.address || "",
+          applicationId: sub?.id || (c?.id || 1),
+          interviewDate: req.query.interviewDate || (isRetinaSpecialty(spec) ? "07.12.2026, Monday" : "08.12.2026, Tuesday"),
+          reportingTime: req.query.reportingTime || "8:00 AM Sharp",
+          venue: req.query.venue || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bengaluru \u2013 560037"
+        });
+        const isRetina = isRetinaSpecialty(spec);
+        const filename = `Interview_Call_Letter_${isRetina ? "Retina" : "Anterior"}_${candidateCode}.pdf`;
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+        res.send(pdfBuffer);
+      } catch (err) {
+        console.error("[call-letter-pdf] Error:", err);
+        res.status(500).json({ error: err.message || "Failed to generate call letter" });
+      }
+    });
+    router8.get("/candidates/:id/offer-letter-pdf", requireAuth, async (req, res) => {
+      try {
+        const id = Number(req.params.id);
+        let c = null;
+        let sub = null;
+        if (id > 0) {
+          const [found] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
+          c = found;
+          if (c) {
+            const [foundSub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
+            sub = foundSub;
+          }
+        }
+        const units = await db.select().from(unitsTable);
+        let unitName = req.query.unitName || "";
+        if (!unitName && req.query.unitId) {
+          const u = units.find((x2) => x2.id === Number(req.query.unitId));
+          if (u) unitName = u.name;
+        }
+        if (!unitName) {
+          const unit = c?.unitId ? units.find((u) => u.id === c.unitId) : null;
+          unitName = unit?.name || "Bangalore";
+        }
+        const cReviewNotes = sub?.reviewNotes ?? "";
+        let specialization = req.query.specialization || "";
+        if (!specialization) {
+          specialization = cReviewNotes.includes("Allocated to ") ? cReviewNotes.replace("Allocated to ", "").split(" [")[0] : sub?.specialization ? parseSpecializationString(sub.specialization)[0] : "Vitreo Retina";
+        }
+        const stipendQuery = req.query.stipend;
+        let stipendFormatted = "Rs 40,000 (Rupees Forty Thousand Only)";
+        if (stipendQuery) {
+          const num = Number(stipendQuery.replace(/[^0-9]/g, ""));
+          if (num > 0) {
+            stipendFormatted = `Rs ${num.toLocaleString("en-IN")}`;
+          } else {
+            stipendFormatted = stipendQuery;
+          }
+        }
+        const duration3 = req.query.duration ? Number(req.query.duration) : isRetinaSpecialty(specialization) ? 24 : 18;
+        const effectiveDate = req.query.effectiveDate || "11.01.2027, Monday";
+        const candidateName = req.query.candidateName || c?.fullName || "Dr. Tejaswini";
+        const candidateCode = req.query.candidateCode || c?.candidateCode || "SAV-2027-001";
+        const pdfBuffer = await generateOfferLetterPdf({
+          candidateName,
+          candidateCode,
+          specialization: specialization || "Vitreo Retina",
+          unitName,
+          cmoName: req.query.cmoName || "Dr. Kaushik Murali - Chief Medical Officer",
+          address: req.query.address || c?.address || "Sankara Eye Hospital Campus",
+          durationMonths: duration3,
+          effectiveDate,
+          stipendAmount: stipendFormatted,
+          interviewDate: req.query.interviewDate,
+          inductionDate: req.query.inductionDate || "07.01.2027 & 08.01.2027 (Thursday & Friday) at Bengaluru"
+        });
+        const filename = `Fellowship_Offer_Letter_${candidateCode}.pdf`;
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+        res.send(pdfBuffer);
+      } catch (err) {
+        console.error("[offer-letter-pdf] Error:", err);
+        res.status(500).json({ error: err.message || "Failed to generate offer letter" });
+      }
+    });
+    router8.post("/candidates/:id/send-call-letter", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+      try {
+        const id = Number(req.params.id);
+        const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
+        if (!c) {
+          res.status(404).json({ error: "Candidate not found" });
+          return;
+        }
+        const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
+        let spec = req.body.specialization || "";
+        if (!spec && sub?.specialization) {
+          try {
+            const parsed = typeof sub.specialization === "string" && sub.specialization.startsWith("[") ? JSON.parse(sub.specialization) : [sub.specialization];
+            spec = Array.isArray(parsed) ? parsed.join(", ") : String(sub.specialization);
+          } catch (e2) {
+            spec = String(sub.specialization);
+          }
+        }
+        if (!spec) spec = "Ophthalmology Fellowship";
+        const pdfBuffer = await generateCallLetterPdf({
+          candidateName: req.body.candidateName || c.fullName,
+          candidateCode: c.candidateCode,
+          specialization: spec,
+          email: c.email,
+          phone: c.phone,
+          address: req.body.address || c.address,
+          applicationId: sub?.id || c.id,
+          interviewDate: req.body.interviewDate,
+          reportingTime: req.body.reportingTime,
+          venue: req.body.venue
+        });
+        const isRetina = isRetinaSpecialty(spec);
+        const fileName = `Interview_Call_Letter_${isRetina ? "Retina" : "Anterior"}_${c.candidateCode}.pdf`;
+        const emailResult = await sendCallLetterWithAttachment({
+          toEmail: c.email,
+          toName: c.fullName,
+          pdfBuffer,
+          fileName,
+          interviewDate: req.body.interviewDate,
+          reportingTime: req.body.reportingTime,
+          venue: req.body.venue,
+          specialization: spec
+        });
+        res.json({
+          success: true,
+          isRetina,
+          fileName,
+          emailSent: emailResult.sent,
+          message: emailResult.sent ? "Call letter dispatched by email and ready for download." : "Call letter PDF generated successfully. (Note: Email was not sent because SMTP is not configured. Download PDF directly)."
+        });
+      } catch (err) {
+        console.error("[send-call-letter] Error:", err);
+        res.status(500).json({ error: err.message || "Failed to generate call letter" });
+      }
+    });
+    router8.post("/candidates/:id/send-offer-letter", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+      try {
+        const id = Number(req.params.id);
+        const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
+        if (!c) {
+          res.status(404).json({ error: "Candidate not found" });
+          return;
+        }
+        const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
+        const units = await db.select().from(unitsTable);
+        let unitName = req.body.unitName || "";
+        if (!unitName && req.body.unitId) {
+          const u = units.find((x2) => x2.id === Number(req.body.unitId));
+          if (u) unitName = u.name;
+        }
+        if (!unitName) {
+          const unit = c.unitId ? units.find((u) => u.id === c.unitId) : null;
+          unitName = unit?.name || "Jaipur";
+        }
+        const cReviewNotes = sub?.reviewNotes ?? "";
+        let specialization = req.body.specialization || "";
+        if (!specialization) {
+          specialization = cReviewNotes.includes("Allocated to ") ? cReviewNotes.replace("Allocated to ", "").split(" [")[0] : sub?.specialization ? parseSpecializationString(sub.specialization)[0] : "Cataract & IOL";
+        }
+        const stipendBody = req.body.stipend;
+        let stipendFormatted = "Rs 40,000 (Rupees Forty Thousand Only)";
+        if (stipendBody) {
+          const num = typeof stipendBody === "number" ? stipendBody : Number(String(stipendBody).replace(/[^0-9]/g, ""));
+          if (num > 0) {
+            stipendFormatted = `Rs ${num.toLocaleString("en-IN")}`;
+          } else {
+            stipendFormatted = String(stipendBody);
+          }
+        }
+        const duration3 = req.body.duration ? Number(String(req.body.duration).replace(/[^0-9]/g, "")) : isRetinaSpecialty(specialization) ? 24 : 18;
+        const effectiveDate = req.body.effectiveDate || req.body.start_date || "11.01.2027, Monday";
+        const interviewDate = req.body.interviewDate || req.body.interview_date || (isRetinaSpecialty(specialization) ? "07.12.2026, Monday" : "08.12.2026, Tuesday");
+        const pdfBuffer = await generateOfferLetterPdf({
+          candidateName: req.body.candidateName || c.fullName,
+          candidateCode: c.candidateCode,
+          specialization: specialization || "Cataract & IOL",
+          unitName,
+          cmoName: req.body.cmoName,
+          address: req.body.address || c.address,
+          durationMonths: duration3,
+          effectiveDate,
+          stipendAmount: stipendFormatted,
+          interviewDate,
+          inductionDate: req.body.inductionDate || "07.01.2027 & 08.01.2027 (Thursday & Friday) at Bengaluru"
+        });
+        const fileName = `Fellowship_Offer_Letter_${c.candidateCode}.pdf`;
+        const emailResult = await sendOfferLetterWithAttachment({
+          toEmail: c.email,
+          toName: c.fullName,
+          pdfBuffer,
+          fileName,
+          specialization,
+          unitName
+        });
+        res.json({
+          success: true,
+          fileName,
+          emailSent: emailResult.sent,
+          message: emailResult.sent ? "Offer letter dispatched by email and ready for download." : "Offer letter PDF generated successfully. (Note: Email was not sent because SMTP is not configured. Download PDF directly)."
+        });
+      } catch (err) {
+        console.error("[send-offer-letter] Error:", err);
+        res.status(500).json({ error: err.message || "Failed to generate offer letter" });
+      }
+    });
+    router8.get(["/candidates/:id/summary-pdf", "/candidates/:id/application-pdf", "/candidates/:id/pdf"], requireAuth, async (req, res) => {
+      try {
+        const id = Number(req.params.id);
+        const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
+        if (!c) {
+          res.status(404).json({ error: "Candidate not found" });
+          return;
+        }
+        const full = await fullCandidate(c);
+        const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
+        const [bc] = await db.select().from(batchCandidatesTable).where(eq(batchCandidatesTable.candidateId, c.id));
+        let batch = null;
+        if (bc) {
+          [batch] = await db.select().from(batchesTable).where(eq(batchesTable.id, bc.batchId));
+        }
+        const doc = new import_pdfkit3.default({ margin: 50, size: "A4" });
+        const filename = `Dossier_${c.fullName.replace(/\s+/g, "_")}.pdf`;
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `inline; filename=${filename}`);
+        doc.pipe(res);
+        const colors = {
+          primary: "#0f172a",
+          secondary: "#475569",
+          accent: "#f97316",
+          // Orange
+          muted: "#94a3b8",
+          border: "#e2e8f0",
+          bgOrange: "#fff7ed"
+        };
+        doc.save();
+        doc.fillColor(colors.bgOrange).opacity(0.1);
+        doc.circle(550, 50, 150).fill();
+        doc.circle(50, 750, 100).fill();
+        doc.restore();
+        const logoPath = path6.join(process.cwd(), "artifacts", "fellowship-exam", "src", "assets", "seh_sav_logo_1777703794142.jpg");
+        let logoLoaded = false;
+        try {
+          doc.image(logoPath, 50, 40, { width: 130, height: 65 });
+          logoLoaded = true;
+        } catch (e2) {
+          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(14).text("SANKARA ACADEMY OF VISION", 50, 50);
+        }
+        doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(16).text("CANDIDATE DOSSIER", 0, 45, { align: "right", width: 545 });
+        doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text("Sankara Academy of Vision \u2014 Fellowship Admissions", 0, 65, { align: "right", width: 545 });
+        doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text(`Protocol ID: ${c.candidateCode}`, 0, 78, { align: "right", width: 545 });
+        doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, 112).lineTo(550, 112).stroke();
+        const photoUrl = sub?.photoUrl;
+        if (photoUrl && photoUrl.startsWith("/objects/")) {
+          const localPath = path6.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
+          try {
+            doc.image(localPath, 460, 120, { width: 85, height: 105 });
+            doc.rect(460, 120, 85, 105).strokeColor(colors.border).lineWidth(1).stroke();
+          } catch (e2) {
+          }
+        }
+        doc.y = 122;
+        doc.moveDown(2);
+        doc.rect(50, doc.y, 500, 30).fill(colors.bgOrange);
+        doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(12).text("ACADEMIC IDENTITY & PROFILE", 65, doc.y - 22);
+        doc.moveDown(0.5);
+        const leftCol = 70;
+        const rightCol = 320;
+        let currY = doc.y;
+        const renderField = (label, value, x2, y) => {
+          doc.fillColor(colors.muted).font("Helvetica-Bold").fontSize(8).text(label.toUpperCase(), x2, y);
+          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(11).text(String(value || "\u2014"), x2, y + 12);
+        };
+        renderField("Full Name", full.fullName, leftCol, currY);
+        renderField("Contact Identity", full.email, rightCol, currY);
+        currY += 40;
+        renderField("Mobile Registry", full.phone, leftCol, currY);
+        renderField("Academic Year", batch?.name || "DECEMBER 2026 CYCLE", rightCol, currY);
+        currY += 40;
+        renderField("Clinical Segment", (sub?.reviewNotes ?? "").replace("Allocated to ", "") || "Fellowship Track", leftCol, currY);
+        renderField("Reporting Unit", full.unitName || "Pending Allocation", rightCol, currY);
+        doc.moveDown(4);
+        doc.rect(50, doc.y, 500, 20).fill(colors.bgOrange);
+        doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(10).text("CLINICAL & SURGICAL PEDIGREE", 65, doc.y - 15);
+        doc.moveDown(0.5);
+        currY = doc.y;
+        renderField("Degree / Qualification", sub?.degree || c.qualification, leftCol, currY);
+        renderField("Medical College", sub?.medicalCollege || c.collegeName, rightCol, currY);
+        currY += 40;
+        renderField("Medical Council No.", sub?.medicalCouncilNumber, leftCol, currY);
+        renderField("Surgical Experience", sub?.surgicalExperience || "Standard Residency", rightCol, currY);
+        currY += 40;
+        renderField("Total Surgeries", sub?.totalSurgeries, leftCol, currY);
+        renderField("Research / Publications", sub?.publications ? "PRESENT" : "NONE LISTED", rightCol, currY);
+        doc.moveDown(5);
+        doc.rect(50, doc.y, 500, 25).fill(colors.primary);
+        doc.fillColor("white").font("Helvetica-Bold").fontSize(10).text("MERIT PERFORMANCE MATRIX", 65, doc.y - 18);
+        doc.moveDown(1);
+        const marksTableY = doc.y;
+        doc.fillColor(colors.muted).font("Helvetica-Bold").fontSize(9);
+        doc.text("EVALUATION STAGE", 70, marksTableY);
+        doc.text("MAXIMUM", 350, marksTableY);
+        doc.text("OBTAINED", 450, marksTableY);
+        doc.moveDown(0.5);
+        doc.strokeColor(colors.border).lineWidth(1).moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+        doc.moveDown(0.5);
+        const renderMarkRow = (label, max2, obtained) => {
+          const y = doc.y;
+          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(10).text(label, 70, y);
+          doc.fillColor(colors.secondary).font("Helvetica").fontSize(10).text(String(max2), 350, y);
+          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(11).text(obtained != null ? Number(obtained).toFixed(2) : "\u2014", 450, y);
+          doc.moveDown(0.8);
+          doc.strokeColor(colors.border).lineWidth(0.5).moveTo(70, doc.y).lineTo(530, doc.y).stroke();
+          doc.moveDown(0.5);
+        };
+        renderMarkRow("MCQ Assessment", batch?.mcqTotalMarks || 50, full.mcqScore);
+        renderMarkRow("Psychometry Profile", batch?.psychometricTotalMarks || 50, full.psychometricScore);
+        renderMarkRow("Clinical Interview", batch?.interviewTotalMarks || 100, full.interviewScore);
+        doc.moveDown(1);
+        doc.rect(400, doc.y, 130, 30).fill(colors.bgOrange);
+        doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(10).text("AGGREGATE", 410, doc.y - 20);
+        doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(14).text(full.totalScore != null ? full.totalScore.toFixed(2) : "\u2014", 480, doc.y - 23);
+        doc.moveDown(4);
+        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(11).text("STRATEGIC PREFERENCES", 50, doc.y);
+        doc.moveDown(0.5);
+        if (full.preferences.length > 0) {
+          full.preferences.forEach((p, i2) => {
+            doc.fillColor(colors.primary).font("Helvetica").fontSize(10).text(`${i2 + 1}. ${p.specialityName}`, { indent: 20 });
+          });
+        } else {
+          doc.fillColor(colors.muted).font("Helvetica").fontSize(10).text("Institutional Choice", { indent: 20 });
+        }
+        doc.moveDown(2);
+        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(11).text("PROFESSIONAL REFERENCES (LOR)", 50, doc.y);
+        doc.moveDown(0.5);
+        const renderLOR = (num, name2, contact, email3, status) => {
+          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(9).text(`LOR ${num}: ${name2 || "\u2014"}`, { indent: 20 });
+          doc.fillColor(colors.secondary).font("Helvetica").fontSize(8).text(`Contact: ${contact || "\u2014"} | Email: ${email3 || "\u2014"}`, { indent: 35 });
+          doc.fillColor(status ? "#10b981" : colors.muted).font("Helvetica-Bold").fontSize(8).text(`STATUS: ${status ? "PROCESSED & VERIFIED" : "PENDING"}`, { indent: 35 });
+          doc.moveDown(0.5);
+        };
+        renderLOR(1, sub?.lor1RefName || "", sub?.lor1RefContact || "", sub?.lor1RefEmail || "", !!sub?.lor1Url);
+        renderLOR(2, sub?.lor2RefName || "", sub?.lor2RefContact || "", sub?.lor2RefEmail || "", !!sub?.lor2Url);
+        const bottom = 750;
+        doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, bottom).lineTo(550, bottom).stroke();
+        doc.fillColor(colors.muted).font("Helvetica").fontSize(8).text("CONFIDENTIAL DOCUMENT - FOR INTERNAL USE ONLY", 50, bottom + 10);
+        doc.text("SANKARA ACADEMY OF VISION - FELLOWSHIP ADMISSIONS HUB", 50, bottom + 22);
+        doc.text(`Generated on ${formatToLocalDateTime(/* @__PURE__ */ new Date())}`, 350, bottom + 10, { align: "right" });
+        doc.end();
+      } catch (e2) {
+        console.error("[summary-pdf] failed", e2);
+        res.status(500).json({ error: e2.message || "Failed to generate summary PDF." });
+      }
+    });
+    router8.post("/candidates/:id/batches", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+      const candidateId = Number(req.params.id);
+      const { schedules } = req.body;
+      try {
+        for (const s2 of schedules) {
+          let appId = s2.applicationId;
+          if (appId <= 0) {
+            const specId = Math.abs(appId);
+            const [existingApp] = await db.select().from(applicationsTable).where(
+              and(eq(applicationsTable.candidateId, candidateId), eq(applicationsTable.specialityId, specId))
+            );
+            if (existingApp) {
+              appId = existingApp.id;
+            } else {
+              const sp = (await db.select().from(specialitiesTable).where(eq(specialitiesTable.id, specId)))[0];
+              const prefix = sp?.code ? sp.code.toUpperCase() : "GEN";
+              const countResult = await db.execute(sql`
+            SELECT COUNT(*)::int as count FROM applications WHERE speciality_id = ${specId} AND hall_ticket_number IS NOT NULL
+          `);
+              const seq = Number(countResult.rows[0]?.count ?? 0) + 1;
+              const hallTicketNumber = `${prefix}-2026-${String(seq).padStart(3, "0")}`;
+              const [newApp] = await db.insert(applicationsTable).values({
+                candidateId,
+                specialityId: specId,
+                hallTicketNumber,
+                status: "approved"
+              }).returning();
+              if (newApp) appId = newApp.id;
+            }
+          }
+          if (s2.batchId) {
+            await db.update(applicationsTable).set({ batchId: s2.batchId, status: "scheduled" }).where(and(eq(applicationsTable.id, appId), eq(applicationsTable.candidateId, candidateId)));
+            const existing = await db.select().from(batchCandidatesTable).where(
+              and(
+                eq(batchCandidatesTable.batchId, s2.batchId),
+                eq(batchCandidatesTable.candidateId, candidateId)
+              )
+            );
+            if (existing.length === 0) {
+              await db.insert(batchCandidatesTable).values({
+                batchId: s2.batchId,
+                candidateId,
+                status: "assigned"
+              });
+            }
+          } else {
+            const [appRow] = await db.select().from(applicationsTable).where(eq(applicationsTable.id, appId));
+            if (appRow && appRow.batchId) {
+              await db.delete(batchCandidatesTable).where(
+                and(
+                  eq(batchCandidatesTable.batchId, appRow.batchId),
+                  eq(batchCandidatesTable.candidateId, candidateId)
+                )
+              );
+            }
+            await db.update(applicationsTable).set({ batchId: null, status: "approved" }).where(and(eq(applicationsTable.id, appId), eq(applicationsTable.candidateId, candidateId)));
+          }
+        }
+        res.json({ success: true });
+      } catch (e2) {
+        res.status(500).json({ error: e2.message || "Failed to update schedules" });
+      }
+    });
+    router8.post(
+      "/candidates/merge",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator"),
+      async (req, res) => {
+        try {
+          const { primaryId, secondaryId, deleteSecondary } = req.body;
+          const primIdNum = Number(primaryId);
+          const secIdNum = Number(secondaryId);
+          if (!primIdNum || !secIdNum || primIdNum === secIdNum) {
+            return res.status(400).json({ error: "Please select two distinct candidates to merge." });
+          }
+          const [prim] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, primIdNum));
+          const [sec] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, secIdNum));
+          if (!prim || !sec) {
+            return res.status(404).json({ error: "One or both candidates could not be found." });
+          }
+          await db.update(applicationsTable).set({ candidateId: prim.id }).where(eq(applicationsTable.candidateId, sec.id));
+          const existingPrefs = await db.select().from(candidatePreferencesTable).where(eq(candidatePreferencesTable.candidateId, prim.id));
+          const secPrefs = await db.select().from(candidatePreferencesTable).where(eq(candidatePreferencesTable.candidateId, sec.id));
+          let nextOrder = existingPrefs.length > 0 ? Math.max(...existingPrefs.map((p) => p.preferenceOrder)) + 1 : 1;
+          for (const sp of secPrefs) {
+            const alreadyHas = existingPrefs.some((ep) => ep.specialityId === sp.specialityId);
+            if (!alreadyHas) {
+              await db.insert(candidatePreferencesTable).values({
+                candidateId: prim.id,
+                specialityId: sp.specialityId,
+                preferenceOrder: nextOrder++
+              }).onConflictDoNothing().catch(() => {
+              });
+            }
+          }
+          await db.delete(candidatePreferencesTable).where(eq(candidatePreferencesTable.candidateId, sec.id)).catch(() => {
+          });
+          await db.update(interviewScoresTable).set({ candidateId: prim.id }).where(eq(interviewScoresTable.candidateId, sec.id)).catch(() => {
+          });
+          await db.update(documentsTable).set({ candidateId: prim.id }).where(eq(documentsTable.candidateId, sec.id)).catch(() => {
+          });
+          await db.update(examAttemptsTable).set({ candidateId: prim.id }).where(eq(examAttemptsTable.candidateId, sec.id)).catch(() => {
+          });
+          await db.update(doctorAssignmentsTable).set({ candidateId: prim.id }).where(eq(doctorAssignmentsTable.candidateId, sec.id)).catch(() => {
+          });
+          await db.update(candidateExamAssignmentsTable).set({ candidateId: prim.id }).where(eq(candidateExamAssignmentsTable.candidateId, sec.id)).catch(() => {
+          });
+          await db.update(batchCandidatesTable).set({ candidateId: prim.id }).where(eq(batchCandidatesTable.candidateId, sec.id)).catch(() => {
+          });
+          await db.update(applicationSubmissionsTable).set({ candidateId: prim.id }).where(eq(applicationSubmissionsTable.candidateId, sec.id)).catch(() => {
+          });
+          const highestMcq = Math.max(parseFloat(prim.mcqScore || "0"), parseFloat(sec.mcqScore || "0"));
+          const highestPsycho = Math.max(parseFloat(prim.psychometricScore || "0"), parseFloat(sec.psychometricScore || "0"));
+          await db.update(candidatesTable).set({
+            phone: prim.phone || sec.phone,
+            dateOfBirth: prim.dateOfBirth || sec.dateOfBirth,
+            gender: prim.gender || sec.gender,
+            qualification: prim.qualification || sec.qualification,
+            collegeName: prim.collegeName || sec.collegeName,
+            address: prim.address || sec.address,
+            unitId: prim.unitId || sec.unitId,
+            mcqScore: highestMcq > 0 ? String(highestMcq) : prim.mcqScore || sec.mcqScore,
+            psychometricScore: highestPsycho > 0 ? String(highestPsycho) : prim.psychometricScore || sec.psychometricScore
+          }).where(eq(candidatesTable.id, prim.id));
+          await db.delete(candidatesTable).where(eq(candidatesTable.id, sec.id));
+          const mergedCand = await fullCandidate(prim);
+          return res.json({
+            success: true,
+            message: `Successfully merged Candidate ${sec.candidateCode} (${sec.fullName}) into ${prim.candidateCode} (${prim.fullName})`,
+            primaryCandidate: mergedCand
+          });
+        } catch (err) {
+          console.error("[merge-candidates] error:", err);
+          return res.status(500).json({ error: "Failed to merge candidates", details: err.message });
+        }
+      }
+    );
+    candidates_default = router8;
+  }
+});
+
+// ../../node_modules/.pnpm/colorette@2.0.20/node_modules/colorette/index.cjs
+var require_colorette = __commonJS({
+  "../../node_modules/.pnpm/colorette@2.0.20/node_modules/colorette/index.cjs"(exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    var tty = __require("tty");
+    function _interopNamespace(e2) {
+      if (e2 && e2.__esModule) return e2;
+      var n = /* @__PURE__ */ Object.create(null);
+      if (e2) {
+        Object.keys(e2).forEach(function(k) {
+          if (k !== "default") {
+            var d = Object.getOwnPropertyDescriptor(e2, k);
+            Object.defineProperty(n, k, d.get ? d : {
+              enumerable: true,
+              get: function() {
+                return e2[k];
+              }
+            });
+          }
+        });
+      }
+      n["default"] = e2;
+      return Object.freeze(n);
+    }
+    var tty__namespace = /* @__PURE__ */ _interopNamespace(tty);
+    var {
+      env = {},
+      argv = [],
+      platform = ""
+    } = typeof process === "undefined" ? {} : process;
+    var isDisabled = "NO_COLOR" in env || argv.includes("--no-color");
+    var isForced = "FORCE_COLOR" in env || argv.includes("--color");
+    var isWindows = platform === "win32";
+    var isDumbTerminal = env.TERM === "dumb";
+    var isCompatibleTerminal = tty__namespace && tty__namespace.isatty && tty__namespace.isatty(1) && env.TERM && !isDumbTerminal;
+    var isCI = "CI" in env && ("GITHUB_ACTIONS" in env || "GITLAB_CI" in env || "CIRCLECI" in env);
+    var isColorSupported = !isDisabled && (isForced || isWindows && !isDumbTerminal || isCompatibleTerminal || isCI);
+    var replaceClose = (index3, string4, close, replace, head = string4.substring(0, index3) + replace, tail = string4.substring(index3 + close.length), next = tail.indexOf(close)) => head + (next < 0 ? tail : replaceClose(next, tail, close, replace));
+    var clearBleed = (index3, string4, open, close, replace) => index3 < 0 ? open + string4 + close : open + replaceClose(index3, string4, close, replace) + close;
+    var filterEmpty = (open, close, replace = open, at = open.length + 1) => (string4) => string4 || !(string4 === "" || string4 === void 0) ? clearBleed(
+      ("" + string4).indexOf(close, at),
+      string4,
+      open,
+      close,
+      replace
+    ) : "";
+    var init = (open, close, replace) => filterEmpty(`\x1B[${open}m`, `\x1B[${close}m`, replace);
+    var colors = {
+      reset: init(0, 0),
+      bold: init(1, 22, "\x1B[22m\x1B[1m"),
+      dim: init(2, 22, "\x1B[22m\x1B[2m"),
+      italic: init(3, 23),
+      underline: init(4, 24),
+      inverse: init(7, 27),
+      hidden: init(8, 28),
+      strikethrough: init(9, 29),
+      black: init(30, 39),
+      red: init(31, 39),
+      green: init(32, 39),
+      yellow: init(33, 39),
+      blue: init(34, 39),
+      magenta: init(35, 39),
+      cyan: init(36, 39),
+      white: init(37, 39),
+      gray: init(90, 39),
+      bgBlack: init(40, 49),
+      bgRed: init(41, 49),
+      bgGreen: init(42, 49),
+      bgYellow: init(43, 49),
+      bgBlue: init(44, 49),
+      bgMagenta: init(45, 49),
+      bgCyan: init(46, 49),
+      bgWhite: init(47, 49),
+      blackBright: init(90, 39),
+      redBright: init(91, 39),
+      greenBright: init(92, 39),
+      yellowBright: init(93, 39),
+      blueBright: init(94, 39),
+      magentaBright: init(95, 39),
+      cyanBright: init(96, 39),
+      whiteBright: init(97, 39),
+      bgBlackBright: init(100, 49),
+      bgRedBright: init(101, 49),
+      bgGreenBright: init(102, 49),
+      bgYellowBright: init(103, 49),
+      bgBlueBright: init(104, 49),
+      bgMagentaBright: init(105, 49),
+      bgCyanBright: init(106, 49),
+      bgWhiteBright: init(107, 49)
+    };
+    var createColors = ({ useColor = isColorSupported } = {}) => useColor ? colors : Object.keys(colors).reduce(
+      (colors2, key) => ({ ...colors2, [key]: String }),
+      {}
+    );
+    var {
+      reset,
+      bold,
+      dim,
+      italic,
+      underline,
+      inverse,
+      hidden,
+      strikethrough,
+      black,
+      red,
+      green,
+      yellow,
+      blue,
+      magenta,
+      cyan,
+      white,
+      gray,
+      bgBlack,
+      bgRed,
+      bgGreen,
+      bgYellow,
+      bgBlue,
+      bgMagenta,
+      bgCyan,
+      bgWhite,
+      blackBright,
+      redBright,
+      greenBright,
+      yellowBright,
+      blueBright,
+      magentaBright,
+      cyanBright,
+      whiteBright,
+      bgBlackBright,
+      bgRedBright,
+      bgGreenBright,
+      bgYellowBright,
+      bgBlueBright,
+      bgMagentaBright,
+      bgCyanBright,
+      bgWhiteBright
+    } = createColors();
+    exports.bgBlack = bgBlack;
+    exports.bgBlackBright = bgBlackBright;
+    exports.bgBlue = bgBlue;
+    exports.bgBlueBright = bgBlueBright;
+    exports.bgCyan = bgCyan;
+    exports.bgCyanBright = bgCyanBright;
+    exports.bgGreen = bgGreen;
+    exports.bgGreenBright = bgGreenBright;
+    exports.bgMagenta = bgMagenta;
+    exports.bgMagentaBright = bgMagentaBright;
+    exports.bgRed = bgRed;
+    exports.bgRedBright = bgRedBright;
+    exports.bgWhite = bgWhite;
+    exports.bgWhiteBright = bgWhiteBright;
+    exports.bgYellow = bgYellow;
+    exports.bgYellowBright = bgYellowBright;
+    exports.black = black;
+    exports.blackBright = blackBright;
+    exports.blue = blue;
+    exports.blueBright = blueBright;
+    exports.bold = bold;
+    exports.createColors = createColors;
+    exports.cyan = cyan;
+    exports.cyanBright = cyanBright;
+    exports.dim = dim;
+    exports.gray = gray;
+    exports.green = green;
+    exports.greenBright = greenBright;
+    exports.hidden = hidden;
+    exports.inverse = inverse;
+    exports.isColorSupported = isColorSupported;
+    exports.italic = italic;
+    exports.magenta = magenta;
+    exports.magentaBright = magentaBright;
+    exports.red = red;
+    exports.redBright = redBright;
+    exports.reset = reset;
+    exports.strikethrough = strikethrough;
+    exports.underline = underline;
+    exports.white = white;
+    exports.whiteBright = whiteBright;
+    exports.yellow = yellow;
+    exports.yellowBright = yellowBright;
+  }
+});
+
+// ../../node_modules/.pnpm/pump@3.0.4/node_modules/pump/index.js
+var require_pump = __commonJS({
+  "../../node_modules/.pnpm/pump@3.0.4/node_modules/pump/index.js"(exports, module) {
+    var once = require_once();
+    var eos = require_end_of_stream3();
+    var fs16;
+    try {
+      fs16 = __require("fs");
+    } catch (e2) {
+    }
+    var noop2 = function() {
+    };
+    var ancient = typeof process === "undefined" ? false : /^v?\.0/.test(process.version);
+    var isFn = function(fn) {
+      return typeof fn === "function";
+    };
+    var isFS = function(stream2) {
+      if (!ancient) return false;
+      if (!fs16) return false;
+      return (stream2 instanceof (fs16.ReadStream || noop2) || stream2 instanceof (fs16.WriteStream || noop2)) && isFn(stream2.close);
+    };
+    var isRequest2 = function(stream2) {
+      return stream2.setHeader && isFn(stream2.abort);
+    };
+    var destroyer = function(stream2, reading, writing, callback) {
+      callback = once(callback);
+      var closed = false;
+      stream2.on("close", function() {
+        closed = true;
+      });
+      eos(stream2, { readable: reading, writable: writing }, function(err) {
+        if (err) return callback(err);
+        closed = true;
+        callback();
+      });
+      var destroyed = false;
+      return function(err) {
+        if (closed) return;
+        if (destroyed) return;
+        destroyed = true;
+        if (isFS(stream2)) return stream2.close(noop2);
+        if (isRequest2(stream2)) return stream2.abort();
+        if (isFn(stream2.destroy)) return stream2.destroy();
+        callback(err || new Error("stream was destroyed"));
+      };
+    };
+    var call = function(fn) {
+      fn();
+    };
+    var pipe2 = function(from, to) {
+      return from.pipe(to);
+    };
+    var pump2 = function() {
+      var streams = Array.prototype.slice.call(arguments);
+      var callback = isFn(streams[streams.length - 1] || noop2) && streams.pop() || noop2;
+      if (Array.isArray(streams[0])) streams = streams[0];
+      if (streams.length < 2) throw new Error("pump requires two streams per minimum");
+      var error40;
+      var destroys = streams.map(function(stream2, i2) {
+        var reading = i2 < streams.length - 1;
+        var writing = i2 > 0;
+        return destroyer(stream2, reading, writing, function(err) {
+          if (!error40) error40 = err;
+          if (err) destroys.forEach(call);
+          if (reading) return;
+          destroys.forEach(call);
+          callback(error40);
+        });
+      });
+      return streams.reduce(pipe2);
+    };
+    module.exports = pump2;
+  }
+});
+
+// ../../node_modules/.pnpm/pino-abstract-transport@3.0.0/node_modules/pino-abstract-transport/index.js
+var require_pino_abstract_transport = __commonJS({
+  "../../node_modules/.pnpm/pino-abstract-transport@3.0.0/node_modules/pino-abstract-transport/index.js"(exports, module) {
+    "use strict";
+    var metadata = /* @__PURE__ */ Symbol.for("pino.metadata");
+    var split = require_split2();
+    var { Duplex } = __require("stream");
+    var { parentPort, workerData } = __require("worker_threads");
+    function createDeferred() {
+      let resolve4;
+      let reject;
+      const promise2 = new Promise((_resolve, _reject) => {
+        resolve4 = _resolve;
+        reject = _reject;
+      });
+      promise2.resolve = resolve4;
+      promise2.reject = reject;
+      return promise2;
+    }
+    module.exports = function build(fn, opts = {}) {
+      const waitForConfig = opts.expectPinoConfig === true && workerData?.workerData?.pinoWillSendConfig === true;
+      const parseLines = opts.parse === "lines";
+      const parseLine = typeof opts.parseLine === "function" ? opts.parseLine : JSON.parse;
+      const close = opts.close || defaultClose;
+      const stream2 = split(function(line2) {
+        let value;
+        try {
+          value = parseLine(line2);
+        } catch (error40) {
+          this.emit("unknown", line2, error40);
+          return;
+        }
+        if (value === null) {
+          this.emit("unknown", line2, "Null value ignored");
+          return;
+        }
+        if (typeof value !== "object") {
+          value = {
+            data: value,
+            time: Date.now()
+          };
+        }
+        if (stream2[metadata]) {
+          stream2.lastTime = value.time;
+          stream2.lastLevel = value.level;
+          stream2.lastObj = value;
+        }
+        if (parseLines) {
+          return line2;
+        }
+        return value;
+      }, { autoDestroy: true });
+      stream2._destroy = function(err, cb) {
+        const promise2 = close(err, cb);
+        if (promise2 && typeof promise2.then === "function") {
+          promise2.then(cb, cb);
+        }
+      };
+      if (opts.expectPinoConfig === true && workerData?.workerData?.pinoWillSendConfig !== true) {
+        setImmediate(() => {
+          stream2.emit("error", new Error("This transport is not compatible with the current version of pino. Please upgrade pino to the latest version."));
+        });
+      }
+      if (opts.metadata !== false) {
+        stream2[metadata] = true;
+        stream2.lastTime = 0;
+        stream2.lastLevel = 0;
+        stream2.lastObj = null;
+      }
+      if (waitForConfig) {
+        let pinoConfig = {};
+        const configReceived = createDeferred();
+        parentPort.on("message", function handleMessage(message) {
+          if (message.code === "PINO_CONFIG") {
+            pinoConfig = message.config;
+            configReceived.resolve();
+            parentPort.off("message", handleMessage);
+          }
+        });
+        Object.defineProperties(stream2, {
+          levels: {
+            get() {
+              return pinoConfig.levels;
+            }
+          },
+          messageKey: {
+            get() {
+              return pinoConfig.messageKey;
+            }
+          },
+          errorKey: {
+            get() {
+              return pinoConfig.errorKey;
+            }
+          }
+        });
+        return configReceived.then(finish);
+      }
+      return finish();
+      function finish() {
+        let res = fn(stream2);
+        if (res && typeof res.catch === "function") {
+          res.catch((err) => {
+            stream2.destroy(err);
+          });
+          res = null;
+        } else if (opts.enablePipelining && res) {
+          return Duplex.from({ writable: stream2, readable: res });
+        }
+        return stream2;
+      }
+    };
+    function defaultClose(err, cb) {
+      process.nextTick(cb, err);
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/constants.js
+var require_constants4 = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/constants.js"(exports, module) {
+    "use strict";
+    module.exports = {
+      DATE_FORMAT: "yyyy-mm-dd HH:MM:ss.l o",
+      DATE_FORMAT_SIMPLE: "HH:MM:ss.l",
+      /**
+       * @type {K_ERROR_LIKE_KEYS}
+       */
+      ERROR_LIKE_KEYS: ["err", "error"],
+      MESSAGE_KEY: "msg",
+      LEVEL_KEY: "level",
+      LEVEL_LABEL: "levelLabel",
+      TIMESTAMP_KEY: "time",
+      LEVELS: {
+        default: "USERLVL",
+        60: "FATAL",
+        50: "ERROR",
+        40: "WARN",
+        30: "INFO",
+        20: "DEBUG",
+        10: "TRACE"
+      },
+      LEVEL_NAMES: {
+        fatal: 60,
+        error: 50,
+        warn: 40,
+        info: 30,
+        debug: 20,
+        trace: 10
+      },
+      // Object keys that probably came from a logger like Pino or Bunyan.
+      LOGGER_KEYS: [
+        "pid",
+        "hostname",
+        "name",
+        "level",
+        "time",
+        "timestamp",
+        "caller"
+      ]
+    };
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/get-level-label-data.js
+var require_get_level_label_data = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/get-level-label-data.js"(exports, module) {
+    "use strict";
+    module.exports = getLevelLabelData;
+    var { LEVELS, LEVEL_NAMES } = require_constants4();
+    function getLevelLabelData(useOnlyCustomProps, customLevels, customLevelNames) {
+      const levels = useOnlyCustomProps ? customLevels || LEVELS : Object.assign({}, LEVELS, customLevels);
+      const levelNames = useOnlyCustomProps ? customLevelNames || LEVEL_NAMES : Object.assign({}, LEVEL_NAMES, customLevelNames);
+      return function(level) {
+        let levelNum = "default";
+        if (Number.isInteger(+level)) {
+          levelNum = Object.prototype.hasOwnProperty.call(levels, level) ? level : levelNum;
+        } else {
+          levelNum = Object.prototype.hasOwnProperty.call(levelNames, level.toLowerCase()) ? levelNames[level.toLowerCase()] : levelNum;
+        }
+        return [levels[levelNum], levelNum];
+      };
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/colors.js
+var require_colors = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/colors.js"(exports, module) {
+    "use strict";
+    var nocolor = (input) => input;
+    var plain = {
+      default: nocolor,
+      60: nocolor,
+      50: nocolor,
+      40: nocolor,
+      30: nocolor,
+      20: nocolor,
+      10: nocolor,
+      message: nocolor,
+      greyMessage: nocolor,
+      property: nocolor
+    };
+    var { createColors } = require_colorette();
+    var getLevelLabelData = require_get_level_label_data();
+    var availableColors = createColors({ useColor: true });
+    var { white, bgRed, red, yellow, green, blue, gray, cyan, magenta } = availableColors;
+    var colored = {
+      default: white,
+      60: bgRed,
+      50: red,
+      40: yellow,
+      30: green,
+      20: blue,
+      10: gray,
+      message: cyan,
+      greyMessage: gray,
+      property: magenta
+    };
+    function resolveCustomColoredColorizer(customColors) {
+      return customColors.reduce(
+        function(agg, [level, color]) {
+          agg[level] = typeof availableColors[color] === "function" ? availableColors[color] : white;
+          return agg;
+        },
+        { default: white, message: cyan, greyMessage: gray, property: magenta }
+      );
+    }
+    function colorizeLevel(useOnlyCustomProps) {
+      return function(level, colorizer, { customLevels, customLevelNames } = {}) {
+        const [levelStr, levelNum] = getLevelLabelData(useOnlyCustomProps, customLevels, customLevelNames)(level);
+        return Object.prototype.hasOwnProperty.call(colorizer, levelNum) ? colorizer[levelNum](levelStr) : colorizer.default(levelStr);
+      };
+    }
+    function plainColorizer(useOnlyCustomProps) {
+      const newPlainColorizer = colorizeLevel(useOnlyCustomProps);
+      const customColoredColorizer = function(level, opts) {
+        return newPlainColorizer(level, plain, opts);
+      };
+      customColoredColorizer.message = plain.message;
+      customColoredColorizer.greyMessage = plain.greyMessage;
+      customColoredColorizer.property = plain.property;
+      customColoredColorizer.colors = createColors({ useColor: false });
+      return customColoredColorizer;
+    }
+    function coloredColorizer(useOnlyCustomProps) {
+      const newColoredColorizer = colorizeLevel(useOnlyCustomProps);
+      const customColoredColorizer = function(level, opts) {
+        return newColoredColorizer(level, colored, opts);
+      };
+      customColoredColorizer.message = colored.message;
+      customColoredColorizer.property = colored.property;
+      customColoredColorizer.greyMessage = colored.greyMessage;
+      customColoredColorizer.colors = availableColors;
+      return customColoredColorizer;
+    }
+    function customColoredColorizerFactory(customColors, useOnlyCustomProps) {
+      const onlyCustomColored = resolveCustomColoredColorizer(customColors);
+      const customColored = useOnlyCustomProps ? onlyCustomColored : Object.assign({}, colored, onlyCustomColored);
+      const colorizeLevelCustom = colorizeLevel(useOnlyCustomProps);
+      const customColoredColorizer = function(level, opts) {
+        return colorizeLevelCustom(level, customColored, opts);
+      };
+      customColoredColorizer.colors = availableColors;
+      customColoredColorizer.message = customColoredColorizer.message || customColored.message;
+      customColoredColorizer.property = customColoredColorizer.property || customColored.property;
+      customColoredColorizer.greyMessage = customColoredColorizer.greyMessage || customColored.greyMessage;
+      return customColoredColorizer;
+    }
+    module.exports = function getColorizer(useColors = false, customColors, useOnlyCustomProps) {
+      if (useColors && customColors !== void 0) {
+        return customColoredColorizerFactory(customColors, useOnlyCustomProps);
+      } else if (useColors) {
+        return coloredColorizer(useOnlyCustomProps);
+      }
+      return plainColorizer(useOnlyCustomProps);
+    };
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/noop.js
+var require_noop = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/noop.js"(exports, module) {
+    "use strict";
+    module.exports = function noop2() {
+    };
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/build-safe-sonic-boom.js
+var require_build_safe_sonic_boom = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/build-safe-sonic-boom.js"(exports, module) {
+    "use strict";
+    module.exports = buildSafeSonicBoom;
+    var { isMainThread } = __require("node:worker_threads");
+    var SonicBoom = require_sonic_boom();
+    var noop2 = require_noop();
+    function buildSafeSonicBoom(opts) {
+      const stream2 = new SonicBoom(opts);
+      stream2.on("error", filterBrokenPipe);
+      if (!opts.sync && isMainThread) {
+        setupOnExit(stream2);
+      }
+      return stream2;
+      function filterBrokenPipe(err) {
+        if (err.code === "EPIPE") {
+          stream2.write = noop2;
+          stream2.end = noop2;
+          stream2.flushSync = noop2;
+          stream2.destroy = noop2;
+          return;
+        }
+        stream2.removeListener("error", filterBrokenPipe);
+      }
+    }
+    function setupOnExit(stream2) {
+      if (global.WeakRef && global.WeakMap && global.FinalizationRegistry) {
+        const onExit = require_on_exit_leak_free();
+        onExit.register(stream2, autoEnd);
+        stream2.on("close", function() {
+          onExit.unregister(stream2);
+        });
+      }
+    }
+    function autoEnd(stream2, eventName) {
+      if (stream2.destroyed) {
+        return;
+      }
+      if (eventName === "beforeExit") {
+        stream2.flush();
+        stream2.on("drain", function() {
+          stream2.end();
+        });
+      } else {
+        stream2.flushSync();
+      }
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/is-valid-date.js
+var require_is_valid_date = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/is-valid-date.js"(exports, module) {
+    "use strict";
+    module.exports = isValidDate;
+    function isValidDate(date6) {
+      return date6 instanceof Date && !Number.isNaN(date6.getTime());
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/create-date.js
+var require_create_date = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/create-date.js"(exports, module) {
+    "use strict";
+    module.exports = createDate;
+    var isValidDate = require_is_valid_date();
+    function createDate(epoch) {
+      let date6 = new Date(epoch);
+      if (isValidDate(date6)) {
+        return date6;
+      }
+      date6 = /* @__PURE__ */ new Date(+epoch);
+      return date6;
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/split-property-key.js
+var require_split_property_key = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/split-property-key.js"(exports, module) {
+    "use strict";
+    module.exports = splitPropertyKey;
+    function splitPropertyKey(key) {
+      const result = [];
+      let backslash = false;
+      let segment = "";
+      for (let i2 = 0; i2 < key.length; i2++) {
+        const c = key.charAt(i2);
+        if (c === "\\") {
+          backslash = true;
+          continue;
+        }
+        if (backslash) {
+          backslash = false;
+          segment += c;
+          continue;
+        }
+        if (c === ".") {
+          result.push(segment);
+          segment = "";
+          continue;
+        }
+        segment += c;
+      }
+      if (segment.length) {
+        result.push(segment);
+      }
+      return result;
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/get-property-value.js
+var require_get_property_value = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/get-property-value.js"(exports, module) {
+    "use strict";
+    module.exports = getPropertyValue;
+    var splitPropertyKey = require_split_property_key();
+    function getPropertyValue(obj, property) {
+      const props = Array.isArray(property) ? property : splitPropertyKey(property);
+      for (const prop of props) {
+        if (!Object.prototype.hasOwnProperty.call(obj, prop)) {
+          return;
+        }
+        obj = obj[prop];
+      }
+      return obj;
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/delete-log-property.js
+var require_delete_log_property = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/delete-log-property.js"(exports, module) {
+    "use strict";
+    module.exports = deleteLogProperty;
+    var getPropertyValue = require_get_property_value();
+    var splitPropertyKey = require_split_property_key();
+    function deleteLogProperty(log, property) {
+      const props = splitPropertyKey(property);
+      const propToDelete = props.pop();
+      log = getPropertyValue(log, props);
+      if (log !== null && typeof log === "object" && Object.prototype.hasOwnProperty.call(log, propToDelete)) {
+        delete log[propToDelete];
+      }
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/fast-copy@4.0.2/node_modules/fast-copy/dist/cjs/index.cjs
+var require_cjs = __commonJS({
+  "../../node_modules/.pnpm/fast-copy@4.0.2/node_modules/fast-copy/dist/cjs/index.cjs"(exports) {
+    "use strict";
+    var toStringFunction = Function.prototype.toString;
+    var toStringObject = Object.prototype.toString;
+    function getCleanClone(prototype) {
+      if (!prototype) {
+        return /* @__PURE__ */ Object.create(null);
+      }
+      const Constructor = prototype.constructor;
+      if (Constructor === Object) {
+        return prototype === Object.prototype ? {} : Object.create(prototype);
+      }
+      if (Constructor && ~toStringFunction.call(Constructor).indexOf("[native code]")) {
+        try {
+          return new Constructor();
+        } catch (_a2) {
+        }
+      }
+      return Object.create(prototype);
+    }
+    function getTag(value) {
+      const stringTag = value[Symbol.toStringTag];
+      if (stringTag) {
+        return stringTag;
+      }
+      const type = toStringObject.call(value);
+      return type.substring(8, type.length - 1);
+    }
+    var { hasOwnProperty, propertyIsEnumerable } = Object.prototype;
+    function copyOwnDescriptor(original, clone3, property, state) {
+      const ownDescriptor = Object.getOwnPropertyDescriptor(original, property) || {
+        configurable: true,
+        enumerable: true,
+        value: original[property],
+        writable: true
+      };
+      const descriptor = ownDescriptor.get || ownDescriptor.set ? ownDescriptor : {
+        configurable: ownDescriptor.configurable,
+        enumerable: ownDescriptor.enumerable,
+        value: state.copier(ownDescriptor.value, state),
+        writable: ownDescriptor.writable
+      };
+      try {
+        Object.defineProperty(clone3, property, descriptor);
+      } catch (_a2) {
+        clone3[property] = descriptor.get ? descriptor.get() : descriptor.value;
+      }
+    }
+    function copyOwnPropertiesStrict(value, clone3, state) {
+      const names = Object.getOwnPropertyNames(value);
+      for (let index3 = 0; index3 < names.length; ++index3) {
+        copyOwnDescriptor(value, clone3, names[index3], state);
+      }
+      const symbols = Object.getOwnPropertySymbols(value);
+      for (let index3 = 0; index3 < symbols.length; ++index3) {
+        copyOwnDescriptor(value, clone3, symbols[index3], state);
+      }
+      return clone3;
+    }
+    function copyArrayLoose(array2, state) {
+      const clone3 = new state.Constructor();
+      state.cache.set(array2, clone3);
+      for (let index3 = 0; index3 < array2.length; ++index3) {
+        clone3[index3] = state.copier(array2[index3], state);
+      }
+      return clone3;
+    }
+    function copyArrayStrict(array2, state) {
+      const clone3 = new state.Constructor();
+      state.cache.set(array2, clone3);
+      return copyOwnPropertiesStrict(array2, clone3, state);
+    }
+    function copyArrayBuffer(arrayBuffer, _state) {
+      return arrayBuffer.slice(0);
+    }
+    function copyBlob(blob, _state) {
+      return blob.slice(0, blob.size, blob.type);
+    }
+    function copyDataView(dataView, state) {
+      return new state.Constructor(copyArrayBuffer(dataView.buffer));
+    }
+    function copyDate(date6, state) {
+      return new state.Constructor(date6.getTime());
+    }
+    function copyMapLoose(map2, state) {
+      const clone3 = new state.Constructor();
+      state.cache.set(map2, clone3);
+      map2.forEach((value, key) => {
+        clone3.set(key, state.copier(value, state));
+      });
+      return clone3;
+    }
+    function copyMapStrict(map2, state) {
+      return copyOwnPropertiesStrict(map2, copyMapLoose(map2, state), state);
+    }
+    function copyObjectLoose(object2, state) {
+      const clone3 = getCleanClone(state.prototype);
+      state.cache.set(object2, clone3);
+      for (const key in object2) {
+        if (hasOwnProperty.call(object2, key)) {
+          clone3[key] = state.copier(object2[key], state);
+        }
+      }
+      const symbols = Object.getOwnPropertySymbols(object2);
+      for (let index3 = 0; index3 < symbols.length; ++index3) {
+        const symbol2 = symbols[index3];
+        if (propertyIsEnumerable.call(object2, symbol2)) {
+          clone3[symbol2] = state.copier(object2[symbol2], state);
+        }
+      }
+      return clone3;
+    }
+    function copyObjectStrict(object2, state) {
+      const clone3 = getCleanClone(state.prototype);
+      state.cache.set(object2, clone3);
+      return copyOwnPropertiesStrict(object2, clone3, state);
+    }
+    function copyPrimitiveWrapper(primitiveObject, state) {
+      return new state.Constructor(primitiveObject.valueOf());
+    }
+    function copyRegExp(regExp, state) {
+      const clone3 = new state.Constructor(regExp.source, regExp.flags);
+      clone3.lastIndex = regExp.lastIndex;
+      return clone3;
+    }
+    function copySelf(value, _state) {
+      return value;
+    }
+    function copySetLoose(set2, state) {
+      const clone3 = new state.Constructor();
+      state.cache.set(set2, clone3);
+      set2.forEach((value) => {
+        clone3.add(state.copier(value, state));
+      });
+      return clone3;
+    }
+    function copySetStrict(set2, state) {
+      return copyOwnPropertiesStrict(set2, copySetLoose(set2, state), state);
+    }
+    function createDefaultCache() {
+      return /* @__PURE__ */ new WeakMap();
+    }
+    function getOptions({ createCache: createCacheOverride, methods: methodsOverride, strict: strict2 }) {
+      const defaultMethods = {
+        array: strict2 ? copyArrayStrict : copyArrayLoose,
+        arrayBuffer: copyArrayBuffer,
+        asyncGenerator: copySelf,
+        blob: copyBlob,
+        dataView: copyDataView,
+        date: copyDate,
+        error: copySelf,
+        generator: copySelf,
+        map: strict2 ? copyMapStrict : copyMapLoose,
+        object: strict2 ? copyObjectStrict : copyObjectLoose,
+        regExp: copyRegExp,
+        set: strict2 ? copySetStrict : copySetLoose
+      };
+      const methods = methodsOverride ? Object.assign(defaultMethods, methodsOverride) : defaultMethods;
+      const copiers = getTagSpecificCopiers(methods);
+      const createCache = createCacheOverride || createDefaultCache;
+      if (!copiers.Object || !copiers.Array) {
+        throw new Error("An object and array copier must be provided.");
+      }
+      return { createCache, copiers, methods, strict: Boolean(strict2) };
+    }
+    function getTagSpecificCopiers(methods) {
+      return {
+        Arguments: methods.object,
+        Array: methods.array,
+        ArrayBuffer: methods.arrayBuffer,
+        AsyncGenerator: methods.asyncGenerator,
+        Blob: methods.blob,
+        Boolean: copyPrimitiveWrapper,
+        DataView: methods.dataView,
+        Date: methods.date,
+        Error: methods.error,
+        Float32Array: methods.arrayBuffer,
+        Float64Array: methods.arrayBuffer,
+        Generator: methods.generator,
+        Int8Array: methods.arrayBuffer,
+        Int16Array: methods.arrayBuffer,
+        Int32Array: methods.arrayBuffer,
+        Map: methods.map,
+        Number: copyPrimitiveWrapper,
+        Object: methods.object,
+        Promise: copySelf,
+        RegExp: methods.regExp,
+        Set: methods.set,
+        String: copyPrimitiveWrapper,
+        WeakMap: copySelf,
+        WeakSet: copySelf,
+        Uint8Array: methods.arrayBuffer,
+        Uint8ClampedArray: methods.arrayBuffer,
+        Uint16Array: methods.arrayBuffer,
+        Uint32Array: methods.arrayBuffer,
+        Uint64Array: methods.arrayBuffer
+      };
+    }
+    function createCopier(options = {}) {
+      const { createCache, copiers } = getOptions(options);
+      const { Array: copyArray, Object: copyObject } = copiers;
+      function copier(value, state) {
+        state.prototype = state.Constructor = void 0;
+        if (!value || typeof value !== "object") {
+          return value;
+        }
+        if (state.cache.has(value)) {
+          return state.cache.get(value);
+        }
+        state.prototype = Object.getPrototypeOf(value);
+        state.Constructor = state.prototype && state.prototype.constructor;
+        if (!state.Constructor || state.Constructor === Object) {
+          return copyObject(value, state);
+        }
+        if (Array.isArray(value)) {
+          return copyArray(value, state);
+        }
+        const tagSpecificCopier = copiers[getTag(value)];
+        if (tagSpecificCopier) {
+          return tagSpecificCopier(value, state);
+        }
+        return typeof value.then === "function" ? value : copyObject(value, state);
+      }
+      return function copy2(value) {
+        return copier(value, {
+          Constructor: void 0,
+          cache: createCache(),
+          copier,
+          prototype: void 0
+        });
+      };
+    }
+    var copyStrict = createCopier({ strict: true });
+    var copy = createCopier();
+    exports.copy = copy;
+    exports.copyStrict = copyStrict;
+    exports.createCopier = createCopier;
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/filter-log.js
+var require_filter_log = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/filter-log.js"(exports, module) {
+    "use strict";
+    module.exports = filterLog;
+    var { createCopier } = require_cjs();
+    var fastCopy = createCopier({});
+    var deleteLogProperty = require_delete_log_property();
+    function filterLog({ log, context }) {
+      const { ignoreKeys, includeKeys } = context;
+      const logCopy = fastCopy(log);
+      if (includeKeys) {
+        const logIncluded = {};
+        includeKeys.forEach((key) => {
+          logIncluded[key] = logCopy[key];
+        });
+        return logIncluded;
+      }
+      ignoreKeys.forEach((ignoreKey) => {
+        deleteLogProperty(logCopy, ignoreKey);
+      });
+      return logCopy;
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/dateformat@4.6.3/node_modules/dateformat/lib/dateformat.js
+var require_dateformat = __commonJS({
+  "../../node_modules/.pnpm/dateformat@4.6.3/node_modules/dateformat/lib/dateformat.js"(exports, module) {
+    "use strict";
+    function _typeof(obj) {
+      "@babel/helpers - typeof";
+      if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
+        _typeof = function _typeof2(obj2) {
+          return typeof obj2;
+        };
+      } else {
+        _typeof = function _typeof2(obj2) {
+          return obj2 && typeof Symbol === "function" && obj2.constructor === Symbol && obj2 !== Symbol.prototype ? "symbol" : typeof obj2;
+        };
+      }
+      return _typeof(obj);
+    }
+    (function(global2) {
+      var _arguments = arguments;
+      var dateFormat = /* @__PURE__ */ (function() {
+        var token = /d{1,4}|D{3,4}|m{1,4}|yy(?:yy)?|([HhMsTt])\1?|W{1,2}|[LlopSZN]|"[^"]*"|'[^']*'/g;
+        var timezone = /\b(?:[PMCEA][SDP]T|(?:Pacific|Mountain|Central|Eastern|Atlantic) (?:Standard|Daylight|Prevailing) Time|(?:GMT|UTC)(?:[-+]\d{4})?)\b/g;
+        var timezoneClip = /[^-+\dA-Z]/g;
+        return function(date6, mask, utc, gmt) {
+          if (_arguments.length === 1 && kindOf(date6) === "string" && !/\d/.test(date6)) {
+            mask = date6;
+            date6 = void 0;
+          }
+          date6 = date6 || date6 === 0 ? date6 : /* @__PURE__ */ new Date();
+          if (!(date6 instanceof Date)) {
+            date6 = new Date(date6);
+          }
+          if (isNaN(date6)) {
+            throw TypeError("Invalid date");
+          }
+          mask = String(dateFormat.masks[mask] || mask || dateFormat.masks["default"]);
+          var maskSlice = mask.slice(0, 4);
+          if (maskSlice === "UTC:" || maskSlice === "GMT:") {
+            mask = mask.slice(4);
+            utc = true;
+            if (maskSlice === "GMT:") {
+              gmt = true;
+            }
+          }
+          var _ = function _2() {
+            return utc ? "getUTC" : "get";
+          };
+          var _d = function d() {
+            return date6[_() + "Date"]();
+          };
+          var D = function D2() {
+            return date6[_() + "Day"]();
+          };
+          var _m = function m2() {
+            return date6[_() + "Month"]();
+          };
+          var y = function y2() {
+            return date6[_() + "FullYear"]();
+          };
+          var _H = function H() {
+            return date6[_() + "Hours"]();
+          };
+          var _M = function M() {
+            return date6[_() + "Minutes"]();
+          };
+          var _s = function s2() {
+            return date6[_() + "Seconds"]();
+          };
+          var _L = function L() {
+            return date6[_() + "Milliseconds"]();
+          };
+          var _o = function o() {
+            return utc ? 0 : date6.getTimezoneOffset();
+          };
+          var _W = function W() {
+            return getWeek(date6);
+          };
+          var _N = function N() {
+            return getDayOfWeek(date6);
+          };
+          var flags = { d: function d() {
+            return _d();
+          }, dd: function dd() {
+            return pad(_d());
+          }, ddd: function ddd() {
+            return dateFormat.i18n.dayNames[D()];
+          }, DDD: function DDD() {
+            return getDayName({ y: y(), m: _m(), d: _d(), _: _(), dayName: dateFormat.i18n.dayNames[D()], short: true });
+          }, dddd: function dddd() {
+            return dateFormat.i18n.dayNames[D() + 7];
+          }, DDDD: function DDDD() {
+            return getDayName({ y: y(), m: _m(), d: _d(), _: _(), dayName: dateFormat.i18n.dayNames[D() + 7] });
+          }, m: function m2() {
+            return _m() + 1;
+          }, mm: function mm() {
+            return pad(_m() + 1);
+          }, mmm: function mmm() {
+            return dateFormat.i18n.monthNames[_m()];
+          }, mmmm: function mmmm() {
+            return dateFormat.i18n.monthNames[_m() + 12];
+          }, yy: function yy() {
+            return String(y()).slice(2);
+          }, yyyy: function yyyy() {
+            return pad(y(), 4);
+          }, h: function h2() {
+            return _H() % 12 || 12;
+          }, hh: function hh() {
+            return pad(_H() % 12 || 12);
+          }, H: function H() {
+            return _H();
+          }, HH: function HH() {
+            return pad(_H());
+          }, M: function M() {
+            return _M();
+          }, MM: function MM() {
+            return pad(_M());
+          }, s: function s2() {
+            return _s();
+          }, ss: function ss() {
+            return pad(_s());
+          }, l: function l() {
+            return pad(_L(), 3);
+          }, L: function L() {
+            return pad(Math.floor(_L() / 10));
+          }, t: function t2() {
+            return _H() < 12 ? dateFormat.i18n.timeNames[0] : dateFormat.i18n.timeNames[1];
+          }, tt: function tt() {
+            return _H() < 12 ? dateFormat.i18n.timeNames[2] : dateFormat.i18n.timeNames[3];
+          }, T: function T() {
+            return _H() < 12 ? dateFormat.i18n.timeNames[4] : dateFormat.i18n.timeNames[5];
+          }, TT: function TT() {
+            return _H() < 12 ? dateFormat.i18n.timeNames[6] : dateFormat.i18n.timeNames[7];
+          }, Z: function Z2() {
+            return gmt ? "GMT" : utc ? "UTC" : (String(date6).match(timezone) || [""]).pop().replace(timezoneClip, "").replace(/GMT\+0000/g, "UTC");
+          }, o: function o() {
+            return (_o() > 0 ? "-" : "+") + pad(Math.floor(Math.abs(_o()) / 60) * 100 + Math.abs(_o()) % 60, 4);
+          }, p: function p() {
+            return (_o() > 0 ? "-" : "+") + pad(Math.floor(Math.abs(_o()) / 60), 2) + ":" + pad(Math.floor(Math.abs(_o()) % 60), 2);
+          }, S: function S2() {
+            return ["th", "st", "nd", "rd"][_d() % 10 > 3 ? 0 : (_d() % 100 - _d() % 10 != 10) * _d() % 10];
+          }, W: function W() {
+            return _W();
+          }, WW: function WW() {
+            return pad(_W());
+          }, N: function N() {
+            return _N();
+          } };
+          return mask.replace(token, function(match2) {
+            if (match2 in flags) {
+              return flags[match2]();
+            }
+            return match2.slice(1, match2.length - 1);
+          });
+        };
+      })();
+      dateFormat.masks = { default: "ddd mmm dd yyyy HH:MM:ss", shortDate: "m/d/yy", paddedShortDate: "mm/dd/yyyy", mediumDate: "mmm d, yyyy", longDate: "mmmm d, yyyy", fullDate: "dddd, mmmm d, yyyy", shortTime: "h:MM TT", mediumTime: "h:MM:ss TT", longTime: "h:MM:ss TT Z", isoDate: "yyyy-mm-dd", isoTime: "HH:MM:ss", isoDateTime: "yyyy-mm-dd'T'HH:MM:sso", isoUtcDateTime: "UTC:yyyy-mm-dd'T'HH:MM:ss'Z'", expiresHeaderFormat: "ddd, dd mmm yyyy HH:MM:ss Z" };
+      dateFormat.i18n = { dayNames: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"], monthNames: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"], timeNames: ["a", "p", "am", "pm", "A", "P", "AM", "PM"] };
+      var pad = function pad2(val, len) {
+        val = String(val);
+        len = len || 2;
+        while (val.length < len) {
+          val = "0" + val;
+        }
+        return val;
+      };
+      var getDayName = function getDayName2(_ref) {
+        var y = _ref.y, m2 = _ref.m, d = _ref.d, _ = _ref._, dayName = _ref.dayName, _ref$short = _ref["short"], _short = _ref$short === void 0 ? false : _ref$short;
+        var today = /* @__PURE__ */ new Date();
+        var yesterday = /* @__PURE__ */ new Date();
+        yesterday.setDate(yesterday[_ + "Date"]() - 1);
+        var tomorrow = /* @__PURE__ */ new Date();
+        tomorrow.setDate(tomorrow[_ + "Date"]() + 1);
+        var today_d = function today_d2() {
+          return today[_ + "Date"]();
+        };
+        var today_m = function today_m2() {
+          return today[_ + "Month"]();
+        };
+        var today_y = function today_y2() {
+          return today[_ + "FullYear"]();
+        };
+        var yesterday_d = function yesterday_d2() {
+          return yesterday[_ + "Date"]();
+        };
+        var yesterday_m = function yesterday_m2() {
+          return yesterday[_ + "Month"]();
+        };
+        var yesterday_y = function yesterday_y2() {
+          return yesterday[_ + "FullYear"]();
+        };
+        var tomorrow_d = function tomorrow_d2() {
+          return tomorrow[_ + "Date"]();
+        };
+        var tomorrow_m = function tomorrow_m2() {
+          return tomorrow[_ + "Month"]();
+        };
+        var tomorrow_y = function tomorrow_y2() {
+          return tomorrow[_ + "FullYear"]();
+        };
+        if (today_y() === y && today_m() === m2 && today_d() === d) {
+          return _short ? "Tdy" : "Today";
+        } else if (yesterday_y() === y && yesterday_m() === m2 && yesterday_d() === d) {
+          return _short ? "Ysd" : "Yesterday";
+        } else if (tomorrow_y() === y && tomorrow_m() === m2 && tomorrow_d() === d) {
+          return _short ? "Tmw" : "Tomorrow";
+        }
+        return dayName;
+      };
+      var getWeek = function getWeek2(date6) {
+        var targetThursday = new Date(date6.getFullYear(), date6.getMonth(), date6.getDate());
+        targetThursday.setDate(targetThursday.getDate() - (targetThursday.getDay() + 6) % 7 + 3);
+        var firstThursday = new Date(targetThursday.getFullYear(), 0, 4);
+        firstThursday.setDate(firstThursday.getDate() - (firstThursday.getDay() + 6) % 7 + 3);
+        var ds = targetThursday.getTimezoneOffset() - firstThursday.getTimezoneOffset();
+        targetThursday.setHours(targetThursday.getHours() - ds);
+        var weekDiff = (targetThursday - firstThursday) / (864e5 * 7);
+        return 1 + Math.floor(weekDiff);
+      };
+      var getDayOfWeek = function getDayOfWeek2(date6) {
+        var dow = date6.getDay();
+        if (dow === 0) {
+          dow = 7;
+        }
+        return dow;
+      };
+      var kindOf = function kindOf2(val) {
+        if (val === null) {
+          return "null";
+        }
+        if (val === void 0) {
+          return "undefined";
+        }
+        if (_typeof(val) !== "object") {
+          return _typeof(val);
+        }
+        if (Array.isArray(val)) {
+          return "array";
+        }
+        return {}.toString.call(val).slice(8, -1).toLowerCase();
+      };
+      if (typeof define === "function" && define.amd) {
+        define(function() {
+          return dateFormat;
+        });
+      } else if ((typeof exports === "undefined" ? "undefined" : _typeof(exports)) === "object") {
+        module.exports = dateFormat;
+      } else {
+        global2.dateFormat = dateFormat;
+      }
+    })(void 0);
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/format-time.js
+var require_format_time = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/format-time.js"(exports, module) {
+    "use strict";
+    module.exports = formatTime;
+    var {
+      DATE_FORMAT,
+      DATE_FORMAT_SIMPLE
+    } = require_constants4();
+    var dateformat = require_dateformat();
+    var createDate = require_create_date();
+    var isValidDate = require_is_valid_date();
+    function formatTime(epoch, translateTime = false) {
+      if (translateTime === false) {
+        return epoch;
+      }
+      const instant = createDate(epoch);
+      if (!isValidDate(instant)) {
+        return epoch;
+      }
+      if (translateTime === true) {
+        return dateformat(instant, DATE_FORMAT_SIMPLE);
+      }
+      const upperFormat = translateTime.toUpperCase();
+      if (upperFormat === "SYS:STANDARD") {
+        return dateformat(instant, DATE_FORMAT);
+      }
+      const prefix = upperFormat.substr(0, 4);
+      if (prefix === "SYS:" || prefix === "UTC:") {
+        if (prefix === "UTC:") {
+          return dateformat(instant, translateTime);
+        }
+        return dateformat(instant, translateTime.slice(4));
+      }
+      return dateformat(instant, `UTC:${translateTime}`);
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/handle-custom-levels-names-opts.js
+var require_handle_custom_levels_names_opts = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/handle-custom-levels-names-opts.js"(exports, module) {
+    "use strict";
+    module.exports = handleCustomLevelsNamesOpts;
+    function handleCustomLevelsNamesOpts(cLevels) {
+      if (!cLevels) return {};
+      if (typeof cLevels === "string") {
+        return cLevels.split(",").reduce((agg, value, idx) => {
+          const [levelName, levelNum = idx] = value.split(":");
+          agg[levelName.toLowerCase()] = levelNum;
+          return agg;
+        }, {});
+      } else if (Object.prototype.toString.call(cLevels) === "[object Object]") {
+        return Object.keys(cLevels).reduce((agg, levelName) => {
+          agg[levelName.toLowerCase()] = cLevels[levelName];
+          return agg;
+        }, {});
+      } else {
+        return {};
+      }
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/handle-custom-levels-opts.js
+var require_handle_custom_levels_opts = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/handle-custom-levels-opts.js"(exports, module) {
+    "use strict";
+    module.exports = handleCustomLevelsOpts;
+    function handleCustomLevelsOpts(cLevels) {
+      if (!cLevels) return {};
+      if (typeof cLevels === "string") {
+        return cLevels.split(",").reduce(
+          (agg, value, idx) => {
+            const [levelName, levelNum = idx] = value.split(":");
+            agg[levelNum] = levelName.toUpperCase();
+            return agg;
+          },
+          { default: "USERLVL" }
+        );
+      } else if (Object.prototype.toString.call(cLevels) === "[object Object]") {
+        return Object.keys(cLevels).reduce((agg, levelName) => {
+          agg[cLevels[levelName]] = levelName.toUpperCase();
+          return agg;
+        }, { default: "USERLVL" });
+      } else {
+        return {};
+      }
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/interpret-conditionals.js
+var require_interpret_conditionals = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/interpret-conditionals.js"(exports, module) {
+    "use strict";
+    module.exports = interpretConditionals;
+    var getPropertyValue = require_get_property_value();
+    function interpretConditionals(messageFormat, log) {
+      messageFormat = messageFormat.replace(/{if (.*?)}(.*?){end}/g, replacer);
+      messageFormat = messageFormat.replace(/{if (.*?)}/g, "");
+      messageFormat = messageFormat.replace(/{end}/g, "");
+      return messageFormat.replace(/\s+/g, " ").trim();
+      function replacer(_, key, value) {
+        const propertyValue = getPropertyValue(log, key);
+        if (propertyValue && value.includes(key)) {
+          return value.replace(new RegExp("{" + key + "}", "g"), propertyValue);
+        } else {
+          return "";
+        }
+      }
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/is-object.js
+var require_is_object = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/is-object.js"(exports, module) {
+    "use strict";
+    module.exports = isObject2;
+    function isObject2(input) {
+      return Object.prototype.toString.apply(input) === "[object Object]";
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/join-lines-with-indentation.js
+var require_join_lines_with_indentation = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/join-lines-with-indentation.js"(exports, module) {
+    "use strict";
+    module.exports = joinLinesWithIndentation;
+    function joinLinesWithIndentation({ input, ident = "    ", eol = "\n" }) {
+      const lines = input.split(/\r?\n/);
+      for (let i2 = 1; i2 < lines.length; i2 += 1) {
+        lines[i2] = ident + lines[i2];
+      }
+      return lines.join(eol);
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/parse-factory-options.js
+var require_parse_factory_options = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/parse-factory-options.js"(exports, module) {
+    "use strict";
+    module.exports = parseFactoryOptions;
+    var {
+      LEVEL_NAMES
+    } = require_constants4();
+    var colors = require_colors();
+    var handleCustomLevelsOpts = require_handle_custom_levels_opts();
+    var handleCustomLevelsNamesOpts = require_handle_custom_levels_names_opts();
+    var handleLevelLabelData = require_get_level_label_data();
+    function parseFactoryOptions(options) {
+      const EOL = options.crlf ? "\r\n" : "\n";
+      const IDENT = "    ";
+      const {
+        customPrettifiers,
+        errorLikeObjectKeys,
+        hideObject,
+        levelFirst,
+        levelKey,
+        levelLabel,
+        messageFormat,
+        messageKey,
+        minimumLevel,
+        singleLine,
+        timestampKey,
+        translateTime
+      } = options;
+      const errorProps = options.errorProps.split(",");
+      const useOnlyCustomProps = typeof options.useOnlyCustomProps === "boolean" ? options.useOnlyCustomProps : options.useOnlyCustomProps === "true";
+      const customLevels = handleCustomLevelsOpts(options.customLevels);
+      const customLevelNames = handleCustomLevelsNamesOpts(options.customLevels);
+      const getLevelLabelData = handleLevelLabelData(useOnlyCustomProps, customLevels, customLevelNames);
+      let customColors;
+      if (options.customColors) {
+        if (typeof options.customColors === "string") {
+          customColors = options.customColors.split(",").reduce((agg, value) => {
+            const [level, color] = value.split(":");
+            const condition = useOnlyCustomProps ? options.customLevels : customLevelNames[level] !== void 0;
+            const levelNum = condition ? customLevelNames[level] : LEVEL_NAMES[level];
+            const colorIdx = levelNum !== void 0 ? levelNum : level;
+            agg.push([colorIdx, color]);
+            return agg;
+          }, []);
+        } else if (typeof options.customColors === "object") {
+          customColors = Object.keys(options.customColors).reduce((agg, value) => {
+            const [level, color] = [value, options.customColors[value]];
+            const condition = useOnlyCustomProps ? options.customLevels : customLevelNames[level] !== void 0;
+            const levelNum = condition ? customLevelNames[level] : LEVEL_NAMES[level];
+            const colorIdx = levelNum !== void 0 ? levelNum : level;
+            agg.push([colorIdx, color]);
+            return agg;
+          }, []);
+        } else {
+          throw new Error("options.customColors must be of type string or object.");
+        }
+      }
+      const customProperties = { customLevels, customLevelNames };
+      if (useOnlyCustomProps === true && !options.customLevels) {
+        customProperties.customLevels = void 0;
+        customProperties.customLevelNames = void 0;
+      }
+      const includeKeys = options.include !== void 0 ? new Set(options.include.split(",")) : void 0;
+      const ignoreKeys = !includeKeys && options.ignore ? new Set(options.ignore.split(",")) : void 0;
+      const colorizer = colors(options.colorize, customColors, useOnlyCustomProps);
+      const objectColorizer = options.colorizeObjects ? colorizer : colors(false, [], false);
+      return {
+        EOL,
+        IDENT,
+        colorizer,
+        customColors,
+        customLevelNames,
+        customLevels,
+        customPrettifiers,
+        customProperties,
+        errorLikeObjectKeys,
+        errorProps,
+        getLevelLabelData,
+        hideObject,
+        ignoreKeys,
+        includeKeys,
+        levelFirst,
+        levelKey,
+        levelLabel,
+        messageFormat,
+        messageKey,
+        minimumLevel,
+        objectColorizer,
+        singleLine,
+        timestampKey,
+        translateTime,
+        useOnlyCustomProps
+      };
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/fast-safe-stringify@2.1.1/node_modules/fast-safe-stringify/index.js
+var require_fast_safe_stringify = __commonJS({
+  "../../node_modules/.pnpm/fast-safe-stringify@2.1.1/node_modules/fast-safe-stringify/index.js"(exports, module) {
+    module.exports = stringify4;
+    stringify4.default = stringify4;
+    stringify4.stable = deterministicStringify;
+    stringify4.stableStringify = deterministicStringify;
+    var LIMIT_REPLACE_NODE = "[...]";
+    var CIRCULAR_REPLACE_NODE = "[Circular]";
+    var arr = [];
+    var replacerStack = [];
+    function defaultOptions() {
+      return {
+        depthLimit: Number.MAX_SAFE_INTEGER,
+        edgesLimit: Number.MAX_SAFE_INTEGER
+      };
+    }
+    function stringify4(obj, replacer, spacer, options) {
+      if (typeof options === "undefined") {
+        options = defaultOptions();
+      }
+      decirc(obj, "", 0, [], void 0, 0, options);
+      var res;
+      try {
+        if (replacerStack.length === 0) {
+          res = JSON.stringify(obj, replacer, spacer);
+        } else {
+          res = JSON.stringify(obj, replaceGetterValues(replacer), spacer);
+        }
+      } catch (_) {
+        return JSON.stringify("[unable to serialize, circular reference is too complex to analyze]");
+      } finally {
+        while (arr.length !== 0) {
+          var part = arr.pop();
+          if (part.length === 4) {
+            Object.defineProperty(part[0], part[1], part[3]);
+          } else {
+            part[0][part[1]] = part[2];
+          }
+        }
+      }
+      return res;
+    }
+    function setReplace(replace, val, k, parent) {
+      var propertyDescriptor = Object.getOwnPropertyDescriptor(parent, k);
+      if (propertyDescriptor.get !== void 0) {
+        if (propertyDescriptor.configurable) {
+          Object.defineProperty(parent, k, { value: replace });
+          arr.push([parent, k, val, propertyDescriptor]);
+        } else {
+          replacerStack.push([val, k, replace]);
+        }
+      } else {
+        parent[k] = replace;
+        arr.push([parent, k, val]);
+      }
+    }
+    function decirc(val, k, edgeIndex, stack, parent, depth, options) {
+      depth += 1;
+      var i2;
+      if (typeof val === "object" && val !== null) {
+        for (i2 = 0; i2 < stack.length; i2++) {
+          if (stack[i2] === val) {
+            setReplace(CIRCULAR_REPLACE_NODE, val, k, parent);
+            return;
+          }
+        }
+        if (typeof options.depthLimit !== "undefined" && depth > options.depthLimit) {
+          setReplace(LIMIT_REPLACE_NODE, val, k, parent);
+          return;
+        }
+        if (typeof options.edgesLimit !== "undefined" && edgeIndex + 1 > options.edgesLimit) {
+          setReplace(LIMIT_REPLACE_NODE, val, k, parent);
+          return;
+        }
+        stack.push(val);
+        if (Array.isArray(val)) {
+          for (i2 = 0; i2 < val.length; i2++) {
+            decirc(val[i2], i2, i2, stack, val, depth, options);
+          }
+        } else {
+          var keys = Object.keys(val);
+          for (i2 = 0; i2 < keys.length; i2++) {
+            var key = keys[i2];
+            decirc(val[key], key, i2, stack, val, depth, options);
+          }
+        }
+        stack.pop();
+      }
+    }
+    function compareFunction(a, b) {
+      if (a < b) {
+        return -1;
+      }
+      if (a > b) {
+        return 1;
+      }
+      return 0;
+    }
+    function deterministicStringify(obj, replacer, spacer, options) {
+      if (typeof options === "undefined") {
+        options = defaultOptions();
+      }
+      var tmp = deterministicDecirc(obj, "", 0, [], void 0, 0, options) || obj;
+      var res;
+      try {
+        if (replacerStack.length === 0) {
+          res = JSON.stringify(tmp, replacer, spacer);
+        } else {
+          res = JSON.stringify(tmp, replaceGetterValues(replacer), spacer);
+        }
+      } catch (_) {
+        return JSON.stringify("[unable to serialize, circular reference is too complex to analyze]");
+      } finally {
+        while (arr.length !== 0) {
+          var part = arr.pop();
+          if (part.length === 4) {
+            Object.defineProperty(part[0], part[1], part[3]);
+          } else {
+            part[0][part[1]] = part[2];
+          }
+        }
+      }
+      return res;
+    }
+    function deterministicDecirc(val, k, edgeIndex, stack, parent, depth, options) {
+      depth += 1;
+      var i2;
+      if (typeof val === "object" && val !== null) {
+        for (i2 = 0; i2 < stack.length; i2++) {
+          if (stack[i2] === val) {
+            setReplace(CIRCULAR_REPLACE_NODE, val, k, parent);
+            return;
+          }
+        }
+        try {
+          if (typeof val.toJSON === "function") {
+            return;
+          }
+        } catch (_) {
+          return;
+        }
+        if (typeof options.depthLimit !== "undefined" && depth > options.depthLimit) {
+          setReplace(LIMIT_REPLACE_NODE, val, k, parent);
+          return;
+        }
+        if (typeof options.edgesLimit !== "undefined" && edgeIndex + 1 > options.edgesLimit) {
+          setReplace(LIMIT_REPLACE_NODE, val, k, parent);
+          return;
+        }
+        stack.push(val);
+        if (Array.isArray(val)) {
+          for (i2 = 0; i2 < val.length; i2++) {
+            deterministicDecirc(val[i2], i2, i2, stack, val, depth, options);
+          }
+        } else {
+          var tmp = {};
+          var keys = Object.keys(val).sort(compareFunction);
+          for (i2 = 0; i2 < keys.length; i2++) {
+            var key = keys[i2];
+            deterministicDecirc(val[key], key, i2, stack, val, depth, options);
+            tmp[key] = val[key];
+          }
+          if (typeof parent !== "undefined") {
+            arr.push([parent, k, val]);
+            parent[k] = tmp;
+          } else {
+            return tmp;
+          }
+        }
+        stack.pop();
+      }
+    }
+    function replaceGetterValues(replacer) {
+      replacer = typeof replacer !== "undefined" ? replacer : function(k, v) {
+        return v;
+      };
+      return function(key, val) {
+        if (replacerStack.length > 0) {
+          for (var i2 = 0; i2 < replacerStack.length; i2++) {
+            var part = replacerStack[i2];
+            if (part[1] === key && part[0] === val) {
+              val = part[2];
+              replacerStack.splice(i2, 1);
+              break;
+            }
+          }
+        }
+        return replacer.call(this, key, val);
+      };
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-error.js
+var require_prettify_error = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-error.js"(exports, module) {
+    "use strict";
+    module.exports = prettifyError2;
+    var joinLinesWithIndentation = require_join_lines_with_indentation();
+    function prettifyError2({ keyName, lines, eol, ident }) {
+      let result = "";
+      const joinedLines = joinLinesWithIndentation({ input: lines, ident, eol });
+      const splitLines = `${ident}${keyName}: ${joinedLines}${eol}`.split(eol);
+      for (let j = 0; j < splitLines.length; j += 1) {
+        if (j !== 0) result += eol;
+        const line2 = splitLines[j];
+        if (/^\s*"stack"/.test(line2)) {
+          const matches = /^(\s*"stack":)\s*(".*"),?$/.exec(line2);
+          if (matches && matches.length === 3) {
+            const indentSize = /^\s*/.exec(line2)[0].length + 4;
+            const indentation = " ".repeat(indentSize);
+            const stackMessage = matches[2];
+            result += matches[1] + eol + indentation + JSON.parse(stackMessage).replace(/\n/g, eol + indentation);
+          } else {
+            result += line2;
+          }
+        } else {
+          result += line2;
+        }
+      }
+      return result;
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-object.js
+var require_prettify_object = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-object.js"(exports, module) {
+    "use strict";
+    module.exports = prettifyObject;
+    var {
+      LOGGER_KEYS
+    } = require_constants4();
+    var stringifySafe = require_fast_safe_stringify();
+    var joinLinesWithIndentation = require_join_lines_with_indentation();
+    var prettifyError2 = require_prettify_error();
+    function prettifyObject({
+      log,
+      excludeLoggerKeys = true,
+      skipKeys = [],
+      context
+    }) {
+      const {
+        EOL: eol,
+        IDENT: ident,
+        customPrettifiers,
+        errorLikeObjectKeys: errorLikeKeys,
+        objectColorizer,
+        singleLine,
+        colorizer
+      } = context;
+      const keysToIgnore = [].concat(skipKeys);
+      if (excludeLoggerKeys === true) Array.prototype.push.apply(keysToIgnore, LOGGER_KEYS);
+      let result = "";
+      const { plain, errors } = Object.entries(log).reduce(({ plain: plain2, errors: errors2 }, [k, v]) => {
+        if (keysToIgnore.includes(k) === false) {
+          const pretty2 = typeof customPrettifiers[k] === "function" ? customPrettifiers[k](v, k, log, { colors: colorizer.colors }) : v;
+          if (errorLikeKeys.includes(k)) {
+            errors2[k] = pretty2;
+          } else {
+            plain2[k] = pretty2;
+          }
+        }
+        return { plain: plain2, errors: errors2 };
+      }, { plain: {}, errors: {} });
+      if (singleLine) {
+        if (Object.keys(plain).length > 0) {
+          result += objectColorizer.greyMessage(stringifySafe(plain));
+        }
+        result += eol;
+        result = result.replace(/\\\\/gi, "\\");
+      } else {
+        Object.entries(plain).forEach(([keyName, keyValue]) => {
+          let lines = typeof customPrettifiers[keyName] === "function" ? keyValue : stringifySafe(keyValue, null, 2);
+          if (lines === void 0) return;
+          lines = lines.replace(/\\\\/gi, "\\");
+          const joinedLines = joinLinesWithIndentation({ input: lines, ident, eol });
+          result += `${ident}${objectColorizer.property(keyName)}:${joinedLines.startsWith(eol) ? "" : " "}${joinedLines}${eol}`;
+        });
+      }
+      Object.entries(errors).forEach(([keyName, keyValue]) => {
+        const lines = typeof customPrettifiers[keyName] === "function" ? keyValue : stringifySafe(keyValue, null, 2);
+        if (lines === void 0) return;
+        result += prettifyError2({ keyName, lines, eol, ident });
+      });
+      return result;
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-error-log.js
+var require_prettify_error_log = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-error-log.js"(exports, module) {
+    "use strict";
+    module.exports = prettifyErrorLog;
+    var {
+      LOGGER_KEYS
+    } = require_constants4();
+    var isObject2 = require_is_object();
+    var joinLinesWithIndentation = require_join_lines_with_indentation();
+    var prettifyObject = require_prettify_object();
+    function prettifyErrorLog({ log, context }) {
+      const {
+        EOL: eol,
+        IDENT: ident,
+        errorProps: errorProperties,
+        messageKey
+      } = context;
+      const stack = log.stack;
+      const joinedLines = joinLinesWithIndentation({ input: stack, ident, eol });
+      let result = `${ident}${joinedLines}${eol}`;
+      if (errorProperties.length > 0) {
+        const excludeProperties = LOGGER_KEYS.concat(messageKey, "type", "stack");
+        let propertiesToPrint;
+        if (errorProperties[0] === "*") {
+          propertiesToPrint = Object.keys(log).filter((k) => excludeProperties.includes(k) === false);
+        } else {
+          propertiesToPrint = errorProperties.filter((k) => excludeProperties.includes(k) === false);
+        }
+        for (let i2 = 0; i2 < propertiesToPrint.length; i2 += 1) {
+          const key = propertiesToPrint[i2];
+          if (key in log === false) continue;
+          if (isObject2(log[key])) {
+            const prettifiedObject = prettifyObject({
+              log: log[key],
+              excludeLoggerKeys: false,
+              context: {
+                ...context,
+                IDENT: ident + ident
+              }
+            });
+            result = `${result}${ident}${key}: {${eol}${prettifiedObject}${ident}}${eol}`;
+            continue;
+          }
+          result = `${result}${ident}${key}: ${log[key]}${eol}`;
+        }
+      }
+      return result;
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-level.js
+var require_prettify_level = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-level.js"(exports, module) {
+    "use strict";
+    module.exports = prettifyLevel;
+    var getPropertyValue = require_get_property_value();
+    function prettifyLevel({ log, context }) {
+      const {
+        colorizer,
+        customLevels,
+        customLevelNames,
+        levelKey,
+        getLevelLabelData
+      } = context;
+      const prettifier = context.customPrettifiers?.level;
+      const output = getPropertyValue(log, levelKey);
+      if (output === void 0) return void 0;
+      const labelColorized = colorizer(output, { customLevels, customLevelNames });
+      if (prettifier) {
+        const [label] = getLevelLabelData(output);
+        return prettifier(output, levelKey, log, { label, labelColorized, colors: colorizer.colors });
+      }
+      return labelColorized;
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-message.js
+var require_prettify_message = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-message.js"(exports, module) {
+    "use strict";
+    module.exports = prettifyMessage;
+    var {
+      LEVELS
+    } = require_constants4();
+    var getPropertyValue = require_get_property_value();
+    var interpretConditionals = require_interpret_conditionals();
+    function prettifyMessage({ log, context }) {
+      const {
+        colorizer,
+        customLevels,
+        levelKey,
+        levelLabel,
+        messageFormat,
+        messageKey,
+        useOnlyCustomProps
+      } = context;
+      if (messageFormat && typeof messageFormat === "string") {
+        const parsedMessageFormat = interpretConditionals(messageFormat, log);
+        const message = String(parsedMessageFormat).replace(
+          /{([^{}]+)}/g,
+          function(match2, p1) {
+            let level;
+            if (p1 === levelLabel && (level = getPropertyValue(log, levelKey)) !== void 0) {
+              const condition = useOnlyCustomProps ? customLevels === void 0 : customLevels[level] === void 0;
+              return condition ? LEVELS[level] : customLevels[level];
+            }
+            const value = getPropertyValue(log, p1);
+            return value !== void 0 ? value : "";
+          }
+        );
+        return colorizer.message(message);
+      }
+      if (messageFormat && typeof messageFormat === "function") {
+        const msg = messageFormat(log, messageKey, levelLabel, { colors: colorizer.colors });
+        return colorizer.message(msg);
+      }
+      if (messageKey in log === false) return void 0;
+      if (typeof log[messageKey] !== "string" && typeof log[messageKey] !== "number" && typeof log[messageKey] !== "boolean") return void 0;
+      return colorizer.message(log[messageKey]);
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-metadata.js
+var require_prettify_metadata = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-metadata.js"(exports, module) {
+    "use strict";
+    module.exports = prettifyMetadata;
+    function prettifyMetadata({ log, context }) {
+      const { customPrettifiers: prettifiers, colorizer } = context;
+      let line2 = "";
+      if (log.name || log.pid || log.hostname) {
+        line2 += "(";
+        if (log.name) {
+          line2 += prettifiers.name ? prettifiers.name(log.name, "name", log, { colors: colorizer.colors }) : log.name;
+        }
+        if (log.pid) {
+          const prettyPid = prettifiers.pid ? prettifiers.pid(log.pid, "pid", log, { colors: colorizer.colors }) : log.pid;
+          if (log.name && log.pid) {
+            line2 += "/" + prettyPid;
+          } else {
+            line2 += prettyPid;
+          }
+        }
+        if (log.hostname) {
+          const prettyHostname = prettifiers.hostname ? prettifiers.hostname(log.hostname, "hostname", log, { colors: colorizer.colors }) : log.hostname;
+          line2 += `${line2 === "(" ? "on" : " on"} ${prettyHostname}`;
+        }
+        line2 += ")";
+      }
+      if (log.caller) {
+        const prettyCaller = prettifiers.caller ? prettifiers.caller(log.caller, "caller", log, { colors: colorizer.colors }) : log.caller;
+        line2 += `${line2 === "" ? "" : " "}<${prettyCaller}>`;
+      }
+      if (line2 === "") {
+        return void 0;
+      } else {
+        return line2;
+      }
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-time.js
+var require_prettify_time = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/prettify-time.js"(exports, module) {
+    "use strict";
+    module.exports = prettifyTime;
+    var formatTime = require_format_time();
+    function prettifyTime({ log, context }) {
+      const {
+        timestampKey,
+        translateTime: translateFormat
+      } = context;
+      const prettifier = context.customPrettifiers?.time;
+      let time4 = null;
+      if (timestampKey in log) {
+        time4 = log[timestampKey];
+      } else if ("timestamp" in log) {
+        time4 = log.timestamp;
+      }
+      if (time4 === null) return void 0;
+      const output = translateFormat ? formatTime(time4, translateFormat) : time4;
+      return prettifier ? prettifier(output) : `[${output}]`;
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/index.js
+var require_utils10 = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/utils/index.js"(exports, module) {
+    "use strict";
+    module.exports = {
+      buildSafeSonicBoom: require_build_safe_sonic_boom(),
+      createDate: require_create_date(),
+      deleteLogProperty: require_delete_log_property(),
+      filterLog: require_filter_log(),
+      formatTime: require_format_time(),
+      getPropertyValue: require_get_property_value(),
+      handleCustomLevelsNamesOpts: require_handle_custom_levels_names_opts(),
+      handleCustomLevelsOpts: require_handle_custom_levels_opts(),
+      interpretConditionals: require_interpret_conditionals(),
+      isObject: require_is_object(),
+      isValidDate: require_is_valid_date(),
+      joinLinesWithIndentation: require_join_lines_with_indentation(),
+      noop: require_noop(),
+      parseFactoryOptions: require_parse_factory_options(),
+      prettifyErrorLog: require_prettify_error_log(),
+      prettifyError: require_prettify_error(),
+      prettifyLevel: require_prettify_level(),
+      prettifyMessage: require_prettify_message(),
+      prettifyMetadata: require_prettify_metadata(),
+      prettifyObject: require_prettify_object(),
+      prettifyTime: require_prettify_time(),
+      splitPropertyKey: require_split_property_key(),
+      getLevelLabelData: require_get_level_label_data()
+    };
+  }
+});
+
+// ../../node_modules/.pnpm/secure-json-parse@4.1.0/node_modules/secure-json-parse/index.js
+var require_secure_json_parse = __commonJS({
+  "../../node_modules/.pnpm/secure-json-parse@4.1.0/node_modules/secure-json-parse/index.js"(exports, module) {
+    "use strict";
+    var hasBuffer = typeof Buffer !== "undefined";
+    var suspectProtoRx = /"(?:_|\\u005[Ff])(?:_|\\u005[Ff])(?:p|\\u0070)(?:r|\\u0072)(?:o|\\u006[Ff])(?:t|\\u0074)(?:o|\\u006[Ff])(?:_|\\u005[Ff])(?:_|\\u005[Ff])"\s*:/;
+    var suspectConstructorRx = /"(?:c|\\u0063)(?:o|\\u006[Ff])(?:n|\\u006[Ee])(?:s|\\u0073)(?:t|\\u0074)(?:r|\\u0072)(?:u|\\u0075)(?:c|\\u0063)(?:t|\\u0074)(?:o|\\u006[Ff])(?:r|\\u0072)"\s*:/;
+    function _parse2(text2, reviver, options) {
+      if (options == null) {
+        if (reviver !== null && typeof reviver === "object") {
+          options = reviver;
+          reviver = void 0;
+        }
+      }
+      if (hasBuffer && Buffer.isBuffer(text2)) {
+        text2 = text2.toString();
+      }
+      if (text2 && text2.charCodeAt(0) === 65279) {
+        text2 = text2.slice(1);
+      }
+      const obj = JSON.parse(text2, reviver);
+      if (obj === null || typeof obj !== "object") {
+        return obj;
+      }
+      const protoAction = options && options.protoAction || "error";
+      const constructorAction = options && options.constructorAction || "error";
+      if (protoAction === "ignore" && constructorAction === "ignore") {
+        return obj;
+      }
+      if (protoAction !== "ignore" && constructorAction !== "ignore") {
+        if (suspectProtoRx.test(text2) === false && suspectConstructorRx.test(text2) === false) {
+          return obj;
+        }
+      } else if (protoAction !== "ignore" && constructorAction === "ignore") {
+        if (suspectProtoRx.test(text2) === false) {
+          return obj;
+        }
+      } else {
+        if (suspectConstructorRx.test(text2) === false) {
+          return obj;
+        }
+      }
+      return filter2(obj, { protoAction, constructorAction, safe: options && options.safe });
+    }
+    function filter2(obj, { protoAction = "error", constructorAction = "error", safe } = {}) {
+      let next = [obj];
+      while (next.length) {
+        const nodes = next;
+        next = [];
+        for (const node of nodes) {
+          if (protoAction !== "ignore" && Object.prototype.hasOwnProperty.call(node, "__proto__")) {
+            if (safe === true) {
+              return null;
+            } else if (protoAction === "error") {
+              throw new SyntaxError("Object contains forbidden prototype property");
+            }
+            delete node.__proto__;
+          }
+          if (constructorAction !== "ignore" && Object.prototype.hasOwnProperty.call(node, "constructor") && node.constructor !== null && typeof node.constructor === "object" && Object.prototype.hasOwnProperty.call(node.constructor, "prototype")) {
+            if (safe === true) {
+              return null;
+            } else if (constructorAction === "error") {
+              throw new SyntaxError("Object contains forbidden prototype property");
+            }
+            delete node.constructor;
+          }
+          for (const key in node) {
+            const value = node[key];
+            if (value && typeof value === "object") {
+              next.push(value);
+            }
+          }
+        }
+      }
+      return obj;
+    }
+    function parse4(text2, reviver, options) {
+      const { stackTraceLimit } = Error;
+      Error.stackTraceLimit = 0;
+      try {
+        return _parse2(text2, reviver, options);
+      } finally {
+        Error.stackTraceLimit = stackTraceLimit;
+      }
+    }
+    function safeParse3(text2, reviver) {
+      const { stackTraceLimit } = Error;
+      Error.stackTraceLimit = 0;
+      try {
+        return _parse2(text2, reviver, { safe: true });
+      } catch {
+        return void 0;
+      } finally {
+        Error.stackTraceLimit = stackTraceLimit;
+      }
+    }
+    module.exports = parse4;
+    module.exports.default = parse4;
+    module.exports.parse = parse4;
+    module.exports.safeParse = safeParse3;
+    module.exports.scan = filter2;
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/pretty.js
+var require_pretty = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/lib/pretty.js"(exports, module) {
+    "use strict";
+    module.exports = pretty2;
+    var sjs = require_secure_json_parse();
+    var isObject2 = require_is_object();
+    var prettifyErrorLog = require_prettify_error_log();
+    var prettifyLevel = require_prettify_level();
+    var prettifyMessage = require_prettify_message();
+    var prettifyMetadata = require_prettify_metadata();
+    var prettifyObject = require_prettify_object();
+    var prettifyTime = require_prettify_time();
+    var filterLog = require_filter_log();
+    var {
+      LEVELS,
+      LEVEL_KEY,
+      LEVEL_NAMES
+    } = require_constants4();
+    var jsonParser = (input) => {
+      try {
+        return { value: sjs.parse(input, { protoAction: "remove" }) };
+      } catch (err) {
+        return { err };
+      }
+    };
+    function pretty2(inputData) {
+      let log;
+      if (!isObject2(inputData)) {
+        const parsed = jsonParser(inputData);
+        if (parsed.err || !isObject2(parsed.value)) {
+          return inputData + this.EOL;
+        }
+        log = parsed.value;
+      } else {
+        log = inputData;
+      }
+      if (this.minimumLevel) {
+        let condition;
+        if (this.useOnlyCustomProps) {
+          condition = this.customLevels;
+        } else {
+          condition = this.customLevelNames[this.minimumLevel] !== void 0;
+        }
+        let minimum;
+        if (condition) {
+          minimum = this.customLevelNames[this.minimumLevel];
+        } else {
+          minimum = LEVEL_NAMES[this.minimumLevel];
+        }
+        if (!minimum) {
+          minimum = typeof this.minimumLevel === "string" ? LEVEL_NAMES[this.minimumLevel] : LEVEL_NAMES[LEVELS[this.minimumLevel].toLowerCase()];
+        }
+        const level = log[this.levelKey === void 0 ? LEVEL_KEY : this.levelKey];
+        if (level < minimum) return;
+      }
+      const prettifiedMessage = prettifyMessage({ log, context: this.context });
+      if (this.ignoreKeys || this.includeKeys) {
+        log = filterLog({ log, context: this.context });
+      }
+      const prettifiedLevel = prettifyLevel({
+        log,
+        context: {
+          ...this.context,
+          // This is odd. The colorizer ends up relying on the value of
+          // `customProperties` instead of the original `customLevels` and
+          // `customLevelNames`.
+          ...this.context.customProperties
+        }
+      });
+      const prettifiedMetadata = prettifyMetadata({ log, context: this.context });
+      const prettifiedTime = prettifyTime({ log, context: this.context });
+      let line2 = "";
+      if (this.levelFirst && prettifiedLevel) {
+        line2 = `${prettifiedLevel}`;
+      }
+      if (prettifiedTime && line2 === "") {
+        line2 = `${prettifiedTime}`;
+      } else if (prettifiedTime) {
+        line2 = `${line2} ${prettifiedTime}`;
+      }
+      if (!this.levelFirst && prettifiedLevel) {
+        if (line2.length > 0) {
+          line2 = `${line2} ${prettifiedLevel}`;
+        } else {
+          line2 = prettifiedLevel;
+        }
+      }
+      if (prettifiedMetadata) {
+        if (line2.length > 0) {
+          line2 = `${line2} ${prettifiedMetadata}:`;
+        } else {
+          line2 = prettifiedMetadata;
+        }
+      }
+      if (line2.endsWith(":") === false && line2 !== "") {
+        line2 += ":";
+      }
+      if (prettifiedMessage !== void 0) {
+        if (line2.length > 0) {
+          line2 = `${line2} ${prettifiedMessage}`;
+        } else {
+          line2 = prettifiedMessage;
+        }
+      }
+      if (line2.length > 0 && !this.singleLine) {
+        line2 += this.EOL;
+      }
+      if (log.type === "Error" && typeof log.stack === "string") {
+        const prettifiedErrorLog = prettifyErrorLog({ log, context: this.context });
+        if (this.singleLine) line2 += this.EOL;
+        line2 += prettifiedErrorLog;
+      } else if (this.hideObject === false) {
+        const skipKeys = [
+          this.messageKey,
+          this.levelKey,
+          this.timestampKey
+        ].map((key) => key.replaceAll(/\\/g, "")).filter((key) => {
+          return typeof log[key] === "string" || typeof log[key] === "number" || typeof log[key] === "boolean";
+        });
+        const prettifiedObject = prettifyObject({
+          log,
+          skipKeys,
+          context: this.context
+        });
+        if (this.singleLine && !/^\s$/.test(prettifiedObject)) {
+          line2 += " ";
+        }
+        line2 += prettifiedObject;
+      }
+      return line2;
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/index.js
+var require_pino_pretty = __commonJS({
+  "../../node_modules/.pnpm/pino-pretty@13.1.3/node_modules/pino-pretty/index.js"(exports, module) {
+    "use strict";
+    var { isColorSupported } = require_colorette();
+    var pump2 = require_pump();
+    var { Transform: Transform7 } = __require("node:stream");
+    var abstractTransport = require_pino_abstract_transport();
+    var colors = require_colors();
+    var {
+      ERROR_LIKE_KEYS,
+      LEVEL_KEY,
+      LEVEL_LABEL,
+      MESSAGE_KEY,
+      TIMESTAMP_KEY
+    } = require_constants4();
+    var {
+      buildSafeSonicBoom,
+      parseFactoryOptions
+    } = require_utils10();
+    var pretty2 = require_pretty();
+    var defaultOptions = {
+      colorize: isColorSupported,
+      colorizeObjects: true,
+      crlf: false,
+      customColors: null,
+      customLevels: null,
+      customPrettifiers: {},
+      errorLikeObjectKeys: ERROR_LIKE_KEYS,
+      errorProps: "",
+      hideObject: false,
+      ignore: "hostname",
+      include: void 0,
+      levelFirst: false,
+      levelKey: LEVEL_KEY,
+      levelLabel: LEVEL_LABEL,
+      messageFormat: null,
+      messageKey: MESSAGE_KEY,
+      minimumLevel: void 0,
+      outputStream: process.stdout,
+      singleLine: false,
+      timestampKey: TIMESTAMP_KEY,
+      translateTime: true,
+      useOnlyCustomProps: true
+    };
+    function prettyFactory(options) {
+      const context = parseFactoryOptions(Object.assign({}, defaultOptions, options));
+      return pretty2.bind({ ...context, context });
+    }
+    function build(opts = {}) {
+      let pretty3 = prettyFactory(opts);
+      let destination;
+      return abstractTransport(function(source) {
+        source.on("message", function pinoConfigListener(message) {
+          if (!message || message.code !== "PINO_CONFIG") return;
+          Object.assign(opts, {
+            messageKey: message.config.messageKey,
+            errorLikeObjectKeys: Array.from(/* @__PURE__ */ new Set([...opts.errorLikeObjectKeys || ERROR_LIKE_KEYS, message.config.errorKey])),
+            customLevels: message.config.levels.values
+          });
+          pretty3 = prettyFactory(opts);
+          source.off("message", pinoConfigListener);
+        });
+        const stream2 = new Transform7({
+          objectMode: true,
+          autoDestroy: true,
+          transform(chunk, enc, cb) {
+            const line2 = pretty3(chunk);
+            cb(null, line2);
+          }
+        });
+        if (typeof opts.destination === "object" && typeof opts.destination.write === "function") {
+          destination = opts.destination;
+        } else {
+          destination = buildSafeSonicBoom({
+            dest: opts.destination || 1,
+            append: opts.append,
+            mkdir: opts.mkdir,
+            sync: opts.sync
+            // by default sonic will be async
+          });
+        }
+        source.on("unknown", function(line2) {
+          destination.write(line2 + "\n");
+        });
+        pump2(source, stream2, destination);
+        return stream2;
+      }, {
+        parse: "lines",
+        close(err, cb) {
+          destination.on("close", () => {
+            cb(err);
+          });
+        }
+      });
+    }
+    module.exports = build;
+    module.exports.build = build;
+    module.exports.PinoPretty = build;
+    module.exports.prettyFactory = prettyFactory;
+    module.exports.colorizerFactory = colors;
+    module.exports.isColorSupported = isColorSupported;
+    module.exports.default = build;
   }
 });
 
@@ -1131063,11 +1134710,11 @@ var units_default = router6;
 init_candidates2();
 
 // src/routes/preferences.ts
-var import_express8 = __toESM(require_express2(), 1);
+var import_express9 = __toESM(require_express2(), 1);
 init_drizzle_orm();
 init_src();
 init_auth2();
-var router8 = (0, import_express8.Router)();
+var router9 = (0, import_express9.Router)();
 async function listPrefs(candidateId) {
   const prefs = await db.select().from(candidatePreferencesTable).where(eq(candidatePreferencesTable.candidateId, candidateId));
   const specs = await db.select().from(specialitiesTable);
@@ -1131084,7 +1134731,7 @@ async function listPrefs(candidateId) {
     };
   });
 }
-router8.get("/preferences/me", requireAuth, requireRole("student"), async (req, res) => {
+router9.get("/preferences/me", requireAuth, requireRole("student"), async (req, res) => {
   const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.userId, req.user.userId));
   if (!c) {
     res.status(404).json({ error: "Candidate not found" });
@@ -1131092,7 +1134739,7 @@ router8.get("/preferences/me", requireAuth, requireRole("student"), async (req, 
   }
   res.json(await listPrefs(c.id));
 });
-router8.put("/preferences/me", requireAuth, requireRole("student"), async (req, res) => {
+router9.put("/preferences/me", requireAuth, requireRole("student"), async (req, res) => {
   const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.userId, req.user.userId));
   if (!c) {
     res.status(404).json({ error: "Candidate not found" });
@@ -1131115,15 +1134762,15 @@ router8.put("/preferences/me", requireAuth, requireRole("student"), async (req, 
   }
   res.json(await listPrefs(c.id));
 });
-var preferences_default = router8;
+var preferences_default = router9;
 
 // src/routes/documents.ts
-var import_express9 = __toESM(require_express2(), 1);
+var import_express10 = __toESM(require_express2(), 1);
 init_drizzle_orm();
 init_src();
 init_auth2();
-var router9 = (0, import_express9.Router)();
-router9.get("/documents/me", requireAuth, requireRole("student"), async (req, res) => {
+var router10 = (0, import_express10.Router)();
+router10.get("/documents/me", requireAuth, requireRole("student"), async (req, res) => {
   const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.userId, req.user.userId));
   if (!c) {
     res.status(404).json({ error: "Candidate not found" });
@@ -1131132,7 +1134779,7 @@ router9.get("/documents/me", requireAuth, requireRole("student"), async (req, re
   const docs = await db.select().from(documentsTable).where(eq(documentsTable.candidateId, c.id));
   res.json(docs.map((d) => ({ id: d.id, docType: d.docType, fileName: d.fileName, fileUrl: d.fileUrl, uploadedAt: d.uploadedAt.toISOString() })));
 });
-router9.post("/documents/me", requireAuth, requireRole("student"), async (req, res) => {
+router10.post("/documents/me", requireAuth, requireRole("student"), async (req, res) => {
   const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.userId, req.user.userId));
   if (!c) {
     res.status(404).json({ error: "Candidate not found" });
@@ -1131150,15 +1134797,15 @@ router9.post("/documents/me", requireAuth, requireRole("student"), async (req, r
   }
   res.json({ id: d.id, docType: d.docType, fileName: d.fileName, fileUrl: d.fileUrl, uploadedAt: d.uploadedAt.toISOString() });
 });
-var documents_default = router9;
+var documents_default = router10;
 
 // src/routes/exams.ts
-var import_express10 = __toESM(require_express2(), 1);
+var import_express11 = __toESM(require_express2(), 1);
 init_drizzle_orm();
 init_src();
 init_auth2();
-var router10 = (0, import_express10.Router)();
-router10.get("/exams", requireAuth, async (req, res) => {
+var router11 = (0, import_express11.Router)();
+router11.get("/exams", requireAuth, async (req, res) => {
   const programId = req.query["programId"] ? Number(req.query["programId"]) : void 0;
   const kind = req.query["kind"];
   let exams = await db.select().from(examsTable).where(eq(examsTable.isMock, req.isMockMode));
@@ -1131195,7 +1134842,7 @@ router10.get("/exams", requireAuth, async (req, res) => {
     };
   }));
 });
-router10.post("/exams", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+router11.post("/exams", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   try {
     const {
       title,
@@ -1131247,7 +1134894,7 @@ router10.post("/exams", requireAuth, requireRole("super_admin", "program_admin",
     res.status(500).json({ error: error40.message || "Failed to create exam" });
   }
 });
-router10.get("/exams/:examId", requireAuth, async (req, res) => {
+router11.get("/exams/:examId", requireAuth, async (req, res) => {
   const id = Number(req.params["examId"]);
   const [e2] = await db.select().from(examsTable).where(eq(examsTable.id, id));
   if (!e2) {
@@ -1131273,7 +1134920,7 @@ router10.get("/exams/:examId", requireAuth, async (req, res) => {
     description: e2.description
   });
 });
-router10.delete("/exams/:examId", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+router11.delete("/exams/:examId", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   try {
     const id = Number(req.params["examId"]);
     await db.execute(sql`DELETE FROM exam_answers WHERE attempt_id IN (SELECT id FROM exam_attempts WHERE exam_id = ${id})`);
@@ -1131287,7 +1134934,7 @@ router10.delete("/exams/:examId", requireAuth, requireRole("super_admin", "progr
     res.status(500).json({ error: error40.message });
   }
 });
-router10.get("/exams/:examId/stats", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+router11.get("/exams/:examId/stats", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   const id = Number(req.params["examId"]);
   const assignments = await db.execute(sql`SELECT COUNT(*) as count FROM candidate_exam_assignments WHERE exam_id = ${id}`);
   const completed = await db.execute(sql`SELECT COUNT(*) as count FROM candidate_exam_results WHERE exam_id = ${id}`);
@@ -1131298,15 +1134945,15 @@ router10.get("/exams/:examId/stats", requireAuth, requireRole("super_admin", "pr
     averageScore: Number(avgScore?.["avg"] ?? 0)
   });
 });
-var exams_default = router10;
+var exams_default = router11;
 
 // src/routes/questions.ts
-var import_express11 = __toESM(require_express2(), 1);
+var import_express12 = __toESM(require_express2(), 1);
 init_drizzle_orm();
 init_src();
 init_auth2();
-var router11 = (0, import_express11.Router)();
-router11.get("/exams/:examId/questions", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+var router12 = (0, import_express12.Router)();
+router12.get("/exams/:examId/questions", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   const examId = Number(req.params["examId"]);
   const qs = await db.select().from(questionsTable).where(eq(questionsTable.examId, examId));
   res.json(qs.map((q) => ({
@@ -1131318,7 +1134965,7 @@ router11.get("/exams/:examId/questions", requireAuth, requireRole("super_admin",
     explanation: q.explanation
   })));
 });
-router11.post("/exams/:examId/questions", requireAuth, requireRole("super_admin", "program_admin"), async (req, res) => {
+router12.post("/exams/:examId/questions", requireAuth, requireRole("super_admin", "program_admin"), async (req, res) => {
   const examId = Number(req.params["examId"]);
   const [exam] = await db.select().from(examsTable).where(eq(examsTable.id, examId));
   if (!exam) {
@@ -1131343,7 +1134990,7 @@ router11.post("/exams/:examId/questions", requireAuth, requireRole("super_admin"
   }
   res.json({ id: q.id, examId: q.examId, text: q.text, choices: q.choices, correctIndex: q.correctIndex, explanation: q.explanation });
 });
-router11.post("/exams/:examId/questions/bulk", requireAuth, requireRole("super_admin", "program_admin"), async (req, res) => {
+router12.post("/exams/:examId/questions/bulk", requireAuth, requireRole("super_admin", "program_admin"), async (req, res) => {
   const examId = Number(req.params["examId"]);
   const [exam] = await db.select().from(examsTable).where(eq(examsTable.id, examId));
   if (!exam) {
@@ -1131367,15 +1135014,15 @@ router11.post("/exams/:examId/questions/bulk", requireAuth, requireRole("super_a
   }
   res.json({ inserted });
 });
-var questions_default = router11;
+var questions_default = router12;
 
 // src/routes/exam-assignments.ts
-var import_express12 = __toESM(require_express2(), 1);
+var import_express13 = __toESM(require_express2(), 1);
 init_drizzle_orm();
 init_src();
 init_auth2();
-var router12 = (0, import_express12.Router)();
-router12.get(
+var router13 = (0, import_express13.Router)();
+router13.get(
   "/candidates/:candidateId/exam-assignments",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
@@ -1131397,7 +1135044,7 @@ router12.get(
     );
   }
 );
-router12.put(
+router13.put(
   "/candidates/:candidateId/exam-assignments",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
@@ -1131448,7 +1135095,7 @@ router12.put(
     );
   }
 );
-router12.get(
+router13.get(
   "/exams/:examId/assigned-candidates",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
@@ -1131474,14 +1135121,14 @@ router12.get(
     void and;
   }
 );
-var exam_assignments_default = router12;
+var exam_assignments_default = router13;
 
 // src/routes/attempts.ts
-var import_express13 = __toESM(require_express2(), 1);
+var import_express14 = __toESM(require_express2(), 1);
 init_drizzle_orm();
 init_src();
 init_auth2();
-var router13 = (0, import_express13.Router)();
+var router14 = (0, import_express14.Router)();
 async function buildAttemptInProgress(attemptId) {
   const [a] = await db.select().from(examAttemptsTable).where(eq(examAttemptsTable.id, attemptId));
   if (!a) return null;
@@ -1131508,7 +1135155,7 @@ async function buildAttemptInProgress(attemptId) {
     }))
   };
 }
-router13.post("/attempts/start", requireAuth, requireRole("student"), async (req, res) => {
+router14.post("/attempts/start", requireAuth, requireRole("student"), async (req, res) => {
   const { examId } = req.body;
   const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.userId, req.user.userId));
   if (!c) {
@@ -1131556,7 +1135203,7 @@ router13.post("/attempts/start", requireAuth, requireRole("student"), async (req
   const out = await buildAttemptInProgress(att.id);
   res.json(out);
 });
-router13.get("/attempts/:attemptId", requireAuth, async (req, res) => {
+router14.get("/attempts/:attemptId", requireAuth, async (req, res) => {
   const id = Number(req.params["attemptId"]);
   const out = await buildAttemptInProgress(id);
   if (!out) {
@@ -1131565,7 +1135212,7 @@ router13.get("/attempts/:attemptId", requireAuth, async (req, res) => {
   }
   res.json(out);
 });
-router13.post("/attempts/:attemptId/answer", requireAuth, requireRole("student"), async (req, res) => {
+router14.post("/attempts/:attemptId/answer", requireAuth, requireRole("student"), async (req, res) => {
   const attemptId = Number(req.params["attemptId"]);
   const { questionId, selectedIndex } = req.body;
   const existing = await db.select().from(examAnswersTable).where(
@@ -1131578,7 +1135225,7 @@ router13.post("/attempts/:attemptId/answer", requireAuth, requireRole("student")
   }
   res.json({ ok: true });
 });
-router13.post("/attempts/:attemptId/submit", requireAuth, requireRole("student"), async (req, res) => {
+router14.post("/attempts/:attemptId/submit", requireAuth, requireRole("student"), async (req, res) => {
   const attemptId = Number(req.params["attemptId"]);
   const [att] = await db.select().from(examAttemptsTable).where(eq(examAttemptsTable.id, attemptId));
   if (!att) {
@@ -1131602,7 +1135249,7 @@ router13.post("/attempts/:attemptId/submit", requireAuth, requireRole("student")
   await db.update(examAttemptsTable).set({ submittedAt, score, maxScore }).where(eq(examAttemptsTable.id, attemptId));
   res.json({ id: att.id, examId: att.examId, score, maxScore, submittedAt: submittedAt.toISOString() });
 });
-router13.get("/attempts/me", requireAuth, requireRole("student"), async (req, res) => {
+router14.get("/attempts/me", requireAuth, requireRole("student"), async (req, res) => {
   const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.userId, req.user.userId));
   if (!c) {
     res.status(404).json({ error: "Candidate not found" });
@@ -1131615,16 +1135262,16 @@ router13.get("/attempts/me", requireAuth, requireRole("student"), async (req, re
     return { id: a.id, examId: a.examId, examTitle: e2?.title ?? "", examKind: e2?.kind ?? "", score: a.score, maxScore: a.maxScore, submittedAt: a.submittedAt?.toISOString() ?? null, startedAt: a.startedAt.toISOString() };
   }));
 });
-var attempts_default = router13;
+var attempts_default = router14;
 
 // src/routes/interviews.ts
-var import_express14 = __toESM(require_express2(), 1);
+var import_express15 = __toESM(require_express2(), 1);
 init_drizzle_orm();
 init_src();
 init_auth2();
-var XLSX2 = __toESM(require_xlsx(), 1);
-var router14 = (0, import_express14.Router)();
-router14.get("/interviews/assignments", requireAuth, requireRole("doctor", "super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+var XLSX3 = __toESM(require_xlsx(), 1);
+var router15 = (0, import_express15.Router)();
+router15.get("/interviews/assignments", requireAuth, requireRole("doctor", "super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   const userId = req.user.userId;
   const panelQuery = await db.execute(sql`
     SELECT ip.id as panel_id, ip.speciality_id, s.name as speciality_name, ip.name as panel_name, ip.is_mind_matter
@@ -1131768,7 +1135415,7 @@ router14.get("/interviews/assignments", requireAuth, requireRole("doctor", "supe
     };
   }));
 });
-router14.get("/interviews/scores", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+router15.get("/interviews/scores", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   const scores = await db.select().from(interviewScoresTable);
   const candidates = await db.select().from(candidatesTable);
   const users = await db.select().from(usersTable);
@@ -1131793,7 +1135440,7 @@ router14.get("/interviews/scores", requireAuth, requireRole("super_admin", "prog
     };
   }));
 });
-router14.patch("/interviews/scores/:scoreId", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+router15.patch("/interviews/scores/:scoreId", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   try {
     const scoreId = Number(req.params.scoreId);
     const { score, remarks } = req.body;
@@ -1131830,7 +1135477,7 @@ router14.patch("/interviews/scores/:scoreId", requireAuth, requireRole("super_ad
     res.status(500).json({ error: err.message });
   }
 });
-router14.delete("/interviews/scores/:scoreId", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+router15.delete("/interviews/scores/:scoreId", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   try {
     const scoreId = Number(req.params.scoreId);
     const [existingScore] = await db.select().from(interviewScoresTable).where(eq(interviewScoresTable.id, scoreId));
@@ -1131846,7 +1135493,7 @@ router14.delete("/interviews/scores/:scoreId", requireAuth, requireRole("super_a
     res.status(500).json({ error: err.message });
   }
 });
-router14.get("/interviews/doctor-assignments", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+router15.get("/interviews/doctor-assignments", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   const assigns = await db.select().from(doctorAssignmentsTable);
   const candidates = await db.select().from(candidatesTable);
   const users = await db.select().from(usersTable);
@@ -1131878,7 +1135525,7 @@ router14.get("/interviews/doctor-assignments", requireAuth, requireRole("super_a
     };
   }));
 });
-router14.post("/interviews/assign", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+router15.post("/interviews/assign", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   const { doctorId, candidateId, scheduledAt } = req.body;
   if (!doctorId || !candidateId) {
     res.status(400).json({ error: "doctorId and candidateId required" });
@@ -1131930,12 +1135577,12 @@ router14.post("/interviews/assign", requireAuth, requireRole("super_admin", "pro
   }
   res.json({ id: row.id, doctorId, candidateId, status: row.status, specialityId });
 });
-router14.delete("/interviews/assign/:assignmentId", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+router15.delete("/interviews/assign/:assignmentId", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   const id = Number(req.params["assignmentId"]);
   await db.delete(doctorAssignmentsTable).where(eq(doctorAssignmentsTable.id, id));
   res.json({ success: true });
 });
-router14.post("/interviews/scores", requireAuth, requireRole("doctor"), async (req, res) => {
+router15.post("/interviews/scores", requireAuth, requireRole("doctor"), async (req, res) => {
   const userId = req.user.userId;
   const { candidateId, score, remarks } = req.body;
   if (!candidateId || score == null) {
@@ -1132125,17 +1135772,17 @@ var THIN_BORDER2 = {
 };
 function buildStyledSheet2(rows, headerColorHex = "0B4A8F") {
   if (rows.length === 0) {
-    const ws2 = XLSX2.utils.json_to_sheet([]);
+    const ws2 = XLSX3.utils.json_to_sheet([]);
     return ws2;
   }
   const headers = Object.keys(rows[0]);
   const numCols = headers.length;
   const numRows = rows.length;
   const wsData = [headers, ...rows.map((r2) => headers.map((h2) => r2[h2] ?? ""))];
-  const ws = XLSX2.utils.aoa_to_sheet(wsData);
+  const ws = XLSX3.utils.aoa_to_sheet(wsData);
   for (let R = 0; R <= numRows; R++) {
     for (let C = 0; C < numCols; C++) {
-      const addr = XLSX2.utils.encode_cell({ r: R, c: C });
+      const addr = XLSX3.utils.encode_cell({ r: R, c: C });
       if (!ws[addr]) continue;
       const cell2 = ws[addr];
       if (R === 0) {
@@ -1132165,7 +1135812,7 @@ function buildStyledSheet2(rows, headerColorHex = "0B4A8F") {
   });
   ws["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft", state: "frozen" };
   ws["!autofilter"] = {
-    ref: XLSX2.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: numCols - 1, r: numRows } })
+    ref: XLSX3.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: numCols - 1, r: numRows } })
   };
   ws["!rows"] = [{ hpt: 22 }, ...Array(numRows).fill({ hpt: 18 })];
   return ws;
@@ -1132181,7 +1135828,7 @@ var parseSpecializationString2 = (spec) => {
   }
   return spec.split(",").map((s2) => s2.trim()).filter(Boolean);
 };
-router14.get("/interviews/my-scores/export", requireAuth, requireRole("doctor"), async (req, res) => {
+router15.get("/interviews/my-scores/export", requireAuth, requireRole("doctor"), async (req, res) => {
   try {
     const userId = req.user.userId;
     const scores = await db.select().from(interviewScoresTable).where(eq(interviewScoresTable.doctorId, userId));
@@ -1132206,10 +1135853,10 @@ router14.get("/interviews/my-scores/export", requireAuth, requireRole("doctor"),
         "Evaluation Date": s2.submittedAt ? s2.submittedAt.toLocaleDateString("en-IN") : "N/A"
       };
     });
-    const wb = XLSX2.utils.book_new();
+    const wb = XLSX3.utils.book_new();
     const ws = buildStyledSheet2(rows, "2563EB");
-    XLSX2.utils.book_append_sheet(wb, ws, "My Evaluations");
-    const buffer = XLSX2.write(wb, { type: "buffer", bookType: "xlsx", cellStyles: true });
+    XLSX3.utils.book_append_sheet(wb, ws, "My Evaluations");
+    const buffer = XLSX3.write(wb, { type: "buffer", bookType: "xlsx", cellStyles: true });
     res.setHeader("Content-Disposition", `attachment; filename="Doctor_Evaluations_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.xlsx"`);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.send(buffer);
@@ -1132217,7 +1135864,7 @@ router14.get("/interviews/my-scores/export", requireAuth, requireRole("doctor"),
     res.status(500).json({ error: error40.message || "Failed to export evaluations" });
   }
 });
-router14.get("/interviews/scores/export", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+router15.get("/interviews/scores/export", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   try {
     const specId = req.query["specialityId"] ? Number(req.query["specialityId"]) : void 0;
     const candidates = await db.select().from(candidatesTable).where(eq(candidatesTable.isMock, req.isMockMode));
@@ -1132338,11 +1135985,11 @@ router14.get("/interviews/scores/export", requireAuth, requireRole("super_admin"
       "Panel": row["Panel"],
       "Evaluators": row["Evaluators"]
     }));
-    const wb = XLSX2.utils.book_new();
+    const wb = XLSX3.utils.book_new();
     const sheetTitle = specId !== void 0 ? allSpecs.find((s2) => s2.id === specId)?.name || "Specialized" : "Central Marksheet";
     const ws = buildStyledSheet2(finalRows, "0B4A8F");
-    XLSX2.utils.book_append_sheet(wb, ws, sheetTitle.substring(0, 31));
-    const buffer = XLSX2.write(wb, { type: "buffer", bookType: "xlsx", cellStyles: true });
+    XLSX3.utils.book_append_sheet(wb, ws, sheetTitle.substring(0, 31));
+    const buffer = XLSX3.write(wb, { type: "buffer", bookType: "xlsx", cellStyles: true });
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     res.setHeader("Content-Disposition", `attachment; filename="Central_Coordinator_Marksheet_${today}.xlsx"`);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -1132351,7 +1135998,7 @@ router14.get("/interviews/scores/export", requireAuth, requireRole("super_admin"
     res.status(500).json({ error: error40.message || "Failed to export marksheet" });
   }
 });
-router14.get("/interviews/scores/specialty-export", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+router15.get("/interviews/scores/specialty-export", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   try {
     const candidates = await db.select().from(candidatesTable).where(eq(candidatesTable.isMock, req.isMockMode));
     const allSpecs = await db.select().from(specialitiesTable);
@@ -1132375,8 +1136022,8 @@ router14.get("/interviews/scores/specialty-export", requireAuth, requireRole("su
     const addAutoFilter = (ws) => {
       if (!ws["!ref"]) return;
       try {
-        const range2 = XLSX2.utils.decode_range(ws["!ref"]);
-        ws["!autofilter"] = { ref: XLSX2.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: range2.e.c, r: range2.e.r } }) };
+        const range2 = XLSX3.utils.decode_range(ws["!ref"]);
+        ws["!autofilter"] = { ref: XLSX3.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: range2.e.c, r: range2.e.r } }) };
       } catch {
       }
     };
@@ -1132478,20 +1136125,20 @@ router14.get("/interviews/scores/specialty-export", requireAuth, requireRole("su
         "Max Score": docScores.length > 0 ? Math.max(...docScores.map((s2) => s2.score)) : "\u2014"
       };
     });
-    const wb = XLSX2.utils.book_new();
-    const wsSummary = XLSX2.utils.json_to_sheet(summaryRows);
+    const wb = XLSX3.utils.book_new();
+    const wsSummary = XLSX3.utils.json_to_sheet(summaryRows);
     wsSummary["!cols"] = summaryRows[0] ? Object.keys(summaryRows[0]).map((_, i2) => ({ wch: i2 < 2 ? 35 : 22 })) : [];
     addAutoFilter(wsSummary);
-    XLSX2.utils.book_append_sheet(wb, wsSummary, "Specialty Summary");
-    const wsDetail = XLSX2.utils.json_to_sheet(detailRows);
+    XLSX3.utils.book_append_sheet(wb, wsSummary, "Specialty Summary");
+    const wsDetail = XLSX3.utils.json_to_sheet(detailRows);
     wsDetail["!cols"] = detailRows[0] ? Object.keys(detailRows[0]).map(() => ({ wch: 22 })) : [];
     addAutoFilter(wsDetail);
-    XLSX2.utils.book_append_sheet(wb, wsDetail, "Candidate Detail");
-    const wsDoctor = XLSX2.utils.json_to_sheet(doctorRows);
+    XLSX3.utils.book_append_sheet(wb, wsDetail, "Candidate Detail");
+    const wsDoctor = XLSX3.utils.json_to_sheet(doctorRows);
     wsDoctor["!cols"] = doctorRows[0] ? Object.keys(doctorRows[0]).map(() => ({ wch: 28 })) : [];
     addAutoFilter(wsDoctor);
-    XLSX2.utils.book_append_sheet(wb, wsDoctor, "Doctor Performance");
-    const buffer = XLSX2.write(wb, { type: "buffer", bookType: "xlsx" });
+    XLSX3.utils.book_append_sheet(wb, wsDoctor, "Doctor Performance");
+    const buffer = XLSX3.write(wb, { type: "buffer", bookType: "xlsx" });
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     res.setHeader("Content-Disposition", `attachment; filename="SAV_Specialty_Marks_Breakdown_${today}.xlsx"`);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -1132500,7 +1136147,7 @@ router14.get("/interviews/scores/specialty-export", requireAuth, requireRole("su
     res.status(500).json({ error: error40.message || "Failed to export specialty breakdown" });
   }
 });
-router14.get("/interviews/viva-summary/:candidateId", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+router15.get("/interviews/viva-summary/:candidateId", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   try {
     const candidateId = Number(req.params.candidateId);
     const specialityIdRaw = req.query.specialityId;
@@ -1132575,7 +1136222,7 @@ router14.get("/interviews/viva-summary/:candidateId", requireAuth, requireRole("
     res.status(500).json({ error: err.message });
   }
 });
-router14.post("/interviews/viva-override", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+router15.post("/interviews/viva-override", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   try {
     const { candidateId, specialityId, overrideScore, overrideReason } = req.body;
     if (!candidateId || !specialityId || overrideScore == null) {
@@ -1132619,7 +1136266,7 @@ router14.post("/interviews/viva-override", requireAuth, requireRole("super_admin
     res.status(500).json({ error: err.message });
   }
 });
-router14.delete("/interviews/viva-override/:candidateId/:specialityId", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+router15.delete("/interviews/viva-override/:candidateId/:specialityId", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   try {
     const candidateId = Number(req.params.candidateId);
     const specialityId = Number(req.params.specialityId);
@@ -1132637,10 +1136284,10 @@ router14.delete("/interviews/viva-override/:candidateId/:specialityId", requireA
     res.status(500).json({ error: err.message });
   }
 });
-var interviews_default = router14;
+var interviews_default = router15;
 
 // src/routes/panel.ts
-var import_express15 = __toESM(require_express2(), 1);
+var import_express16 = __toESM(require_express2(), 1);
 init_drizzle_orm();
 init_src();
 init_auth2();
@@ -1132669,7 +1136316,7 @@ var logger = (0, import_pino.default)(
 
 // src/routes/panel.ts
 init_utils5();
-var router15 = (0, import_express15.Router)();
+var router16 = (0, import_express16.Router)();
 db.execute(sql`ALTER TABLE interview_panels ADD COLUMN IF NOT EXISTS is_mind_matter BOOLEAN NOT NULL DEFAULT FALSE;`).catch((err) => {
   logger.error({ err }, "Defensive schema migration for is_mind_matter failed");
 });
@@ -1132720,7 +1136367,7 @@ async function getPanelQueue(panelId) {
     ORDER BY pq.queue_position ASC, pq.created_at ASC
   `)).rows;
 }
-router15.get(
+router16.get(
   "/panels",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator", "doctor", "display_operator"),
@@ -1132729,7 +1136376,7 @@ router15.get(
     res.json(await getPanels(req.isMockMode, programId));
   }
 );
-router15.post(
+router16.post(
   "/panels",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
@@ -1132781,7 +1136428,7 @@ router15.post(
     res.status(201).json(created);
   }
 );
-router15.patch(
+router16.patch(
   "/panels/:id",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
@@ -1132858,7 +1136505,7 @@ router15.patch(
     }
   }
 );
-router15.delete(
+router16.delete(
   "/panels/:id",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
@@ -1132870,7 +1136517,7 @@ router15.delete(
     res.json({ success: true });
   }
 );
-router15.post(
+router16.post(
   "/panels/:id/members",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
@@ -1132913,7 +1136560,7 @@ router15.post(
     }
   }
 );
-router15.delete(
+router16.delete(
   "/panels/:id/members/:doctorId",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
@@ -1132926,7 +1136573,7 @@ router15.delete(
     res.json({ success: true });
   }
 );
-router15.get(
+router16.get(
   "/panels/:id/queue",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator", "doctor", "display_operator"),
@@ -1132946,7 +1136593,7 @@ router15.get(
     })));
   }
 );
-router15.post(
+router16.post(
   "/panels/:id/queue",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
@@ -1133005,7 +1136652,7 @@ router15.post(
     res.json({ success: true });
   }
 );
-router15.patch(
+router16.patch(
   "/panels/:id/queue/:candidateId",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator", "doctor"),
@@ -1133074,7 +1136721,7 @@ router15.patch(
     res.json({ success: true });
   }
 );
-router15.delete(
+router16.delete(
   "/panels/:id/queue/:candidateId",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
@@ -1133101,7 +1136748,7 @@ router15.delete(
     }
   }
 );
-router15.post(
+router16.post(
   "/panels/:id/queue/auto-assign",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
@@ -1133185,7 +1136832,7 @@ router15.post(
     }
   }
 );
-router15.post(
+router16.post(
   "/panels/:id/queue/reorder",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
@@ -1133219,7 +1136866,7 @@ router15.post(
     }
   }
 );
-router15.post(
+router16.post(
   "/panels/:id/queue/insert",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
@@ -1133258,7 +1136905,7 @@ router15.post(
     }
   }
 );
-router15.post(
+router16.post(
   "/panels/:id/queue/reassign",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
@@ -1133305,7 +1136952,7 @@ router15.post(
     }
   }
 );
-router15.get(
+router16.get(
   "/display/live",
   async (req, res) => {
     try {
@@ -1133397,7 +1137044,7 @@ async function getLegacyPanelStatus() {
   `);
   return rows.rows;
 }
-router15.get("/panel/live", requireAuth, requireRole("central_exam_coordinator", "super_admin", "program_admin"), async (req, res) => {
+router16.get("/panel/live", requireAuth, requireRole("central_exam_coordinator", "super_admin", "program_admin"), async (req, res) => {
   const doctors = await db.select().from(usersTable).where(eq(usersTable.role, "doctor"));
   for (const d of doctors) {
     await db.execute(sql`INSERT INTO doctor_panel_status (doctor_id) VALUES (${d.id}) ON CONFLICT (doctor_id) DO NOTHING`);
@@ -1133417,7 +1137064,7 @@ router15.get("/panel/live", requireAuth, requireRole("central_exam_coordinator",
     updatedAt: r2["updated_at"]
   })));
 });
-router15.patch("/panel/status/:doctorId", requireAuth, requireRole("central_exam_coordinator", "super_admin", "program_admin"), async (req, res) => {
+router16.patch("/panel/status/:doctorId", requireAuth, requireRole("central_exam_coordinator", "super_admin", "program_admin"), async (req, res) => {
   const doctorId = Number(req.params.doctorId);
   const { isEngaged, candidateId } = req.body;
   await db.execute(sql`INSERT INTO doctor_panel_status (doctor_id) VALUES (${doctorId}) ON CONFLICT (doctor_id) DO NOTHING`);
@@ -1133439,7 +1137086,7 @@ router15.patch("/panel/status/:doctorId", requireAuth, requireRole("central_exam
   `)).rows;
   res.json({ doctorId, isEngaged: row["is_engaged"], currentCandidateId: row["current_candidate_id"], currentCandidateName: row["candidate_name"] });
 });
-router15.patch("/panel/status", requireAuth, requireRole("doctor"), async (req, res) => {
+router16.patch("/panel/status", requireAuth, requireRole("doctor"), async (req, res) => {
   const doctorId = req.user.userId;
   const { isEngaged, candidateId } = req.body;
   await db.execute(sql`INSERT INTO doctor_panel_status (doctor_id) VALUES (${doctorId}) ON CONFLICT (doctor_id) DO NOTHING`);
@@ -1133461,7 +1137108,7 @@ router15.patch("/panel/status", requireAuth, requireRole("doctor"), async (req, 
   `)).rows;
   res.json({ doctorId, isEngaged: row["is_engaged"], currentCandidateId: row["current_candidate_id"], currentCandidateName: row["candidate_name"] });
 });
-router15.get("/panel/my-status", requireAuth, requireRole("doctor"), async (req, res) => {
+router16.get("/panel/my-status", requireAuth, requireRole("doctor"), async (req, res) => {
   const doctorId = req.user.userId;
   await db.execute(sql`INSERT INTO doctor_panel_status (doctor_id) VALUES (${doctorId}) ON CONFLICT (doctor_id) DO NOTHING`);
   const [row] = (await db.execute(sql`
@@ -1133493,15 +1137140,15 @@ router15.get("/panel/my-status", requireAuth, requireRole("doctor"), async (req,
     marksEntryEnabled: row["marks_entry_enabled"] === true
   });
 });
-var panel_default = router15;
+var panel_default = router16;
 
 // src/routes/doctors.ts
-var import_express16 = __toESM(require_express2(), 1);
+var import_express17 = __toESM(require_express2(), 1);
 init_drizzle_orm();
 init_src();
 init_auth2();
-var router16 = (0, import_express16.Router)();
-router16.get("/doctors", requireAuth, requireRole("super_admin", "program_admin"), async (_req, res) => {
+var router17 = (0, import_express17.Router)();
+router17.get("/doctors", requireAuth, requireRole("super_admin", "program_admin"), async (_req, res) => {
   const allDoctors = (await db.select().from(usersTable)).filter((u) => u.role === "doctor");
   const units = await db.select().from(unitsTable);
   const assigns = await db.select().from(doctorAssignmentsTable);
@@ -1133519,7 +1137166,7 @@ router16.get("/doctors", requireAuth, requireRole("super_admin", "program_admin"
     };
   }));
 });
-router16.post("/doctors/:doctorId/assign-unit", requireAuth, requireRole("super_admin", "program_admin"), async (req, res) => {
+router17.post("/doctors/:doctorId/assign-unit", requireAuth, requireRole("super_admin", "program_admin"), async (req, res) => {
   const doctorId = Number(req.params["doctorId"]);
   const { unitId } = req.body;
   const [d] = await db.update(usersTable).set({ unitId }).where(
@@ -1133542,7 +1137189,7 @@ router16.post("/doctors/:doctorId/assign-unit", requireAuth, requireRole("super_
     assignedCandidates: assigns.length
   });
 });
-router16.post("/doctors/:doctorId/assign-candidate", requireAuth, requireRole("super_admin", "program_admin"), async (req, res) => {
+router17.post("/doctors/:doctorId/assign-candidate", requireAuth, requireRole("super_admin", "program_admin"), async (req, res) => {
   const doctorId = Number(req.params["doctorId"]);
   const { candidateId } = req.body;
   const [d] = await db.select().from(usersTable).where(eq(usersTable.id, doctorId));
@@ -1133585,10 +1137232,10 @@ router16.post("/doctors/:doctorId/assign-candidate", requireAuth, requireRole("s
     existingScore: null
   });
 });
-var doctors_default = router16;
+var doctors_default = router17;
 
 // src/routes/rankings.ts
-var import_express17 = __toESM(require_express2(), 1);
+var import_express18 = __toESM(require_express2(), 1);
 init_drizzle_orm();
 init_src();
 init_auth2();
@@ -1133815,8 +1137462,8 @@ async function computeScoresForProgram(programId) {
 }
 
 // src/routes/rankings.ts
-var XLSX3 = __toESM(require_xlsx(), 1);
-var router17 = (0, import_express17.Router)();
+var XLSX4 = __toESM(require_xlsx(), 1);
+var router18 = (0, import_express18.Router)();
 var HEADER_FONT3 = { bold: true, color: { rgb: "FFFFFF" }, sz: 11, name: "Calibri" };
 var HEADER_ALIGN3 = { horizontal: "center", vertical: "center", wrapText: false };
 var ROW_EVEN3 = { patternType: "solid", fgColor: { rgb: "E8F0FE" } };
@@ -1133831,17 +1137478,17 @@ var THIN_BORDER3 = {
 };
 function buildStyledSheet3(rows, headerColorHex = "0B4A8F") {
   if (rows.length === 0) {
-    const ws2 = XLSX3.utils.json_to_sheet([]);
+    const ws2 = XLSX4.utils.json_to_sheet([]);
     return ws2;
   }
   const headers = Object.keys(rows[0]);
   const numCols = headers.length;
   const numRows = rows.length;
   const wsData = [headers, ...rows.map((r2) => headers.map((h2) => r2[h2] ?? ""))];
-  const ws = XLSX3.utils.aoa_to_sheet(wsData);
+  const ws = XLSX4.utils.aoa_to_sheet(wsData);
   for (let R = 0; R <= numRows; R++) {
     for (let C = 0; C < numCols; C++) {
-      const addr = XLSX3.utils.encode_cell({ r: R, c: C });
+      const addr = XLSX4.utils.encode_cell({ r: R, c: C });
       if (!ws[addr]) continue;
       const cell2 = ws[addr];
       if (R === 0) {
@@ -1133871,12 +1137518,12 @@ function buildStyledSheet3(rows, headerColorHex = "0B4A8F") {
   });
   ws["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft", state: "frozen" };
   ws["!autofilter"] = {
-    ref: XLSX3.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: numCols - 1, r: numRows } })
+    ref: XLSX4.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: numCols - 1, r: numRows } })
   };
   ws["!rows"] = [{ hpt: 22 }, ...Array(numRows).fill({ hpt: 18 })];
   return ws;
 }
-router17.get(
+router18.get(
   "/rankings",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
@@ -1133954,7 +1137601,7 @@ router17.get(
     }
   }
 );
-router17.get(
+router18.get(
   "/rankings/export",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
@@ -1133967,7 +1137614,7 @@ router17.get(
     try {
       const scores = await computeScoresForProgram(programId);
       const specs = await readDb.select().from(specialitiesTable).where(eq(specialitiesTable.programId, programId));
-      const wb = XLSX3.utils.book_new();
+      const wb = XLSX4.utils.book_new();
       for (const spec of specs) {
         const specCandidates = scores.filter((s2) => s2.specialityScores[spec.id] !== void 0);
         specCandidates.sort((a, b) => {
@@ -1133995,9 +1137642,9 @@ router17.get(
         });
         const sheetName = spec.name.substring(0, 30);
         const wsSpec = buildStyledSheet3(specRows, "0B4A8F");
-        XLSX3.utils.book_append_sheet(wb, wsSpec, sheetName);
+        XLSX4.utils.book_append_sheet(wb, wsSpec, sheetName);
       }
-      const buf = XLSX3.write(wb, { type: "buffer", bookType: "xlsx" });
+      const buf = XLSX4.write(wb, { type: "buffer", bookType: "xlsx" });
       const now = /* @__PURE__ */ new Date();
       const YYYY = now.getFullYear();
       const MM = String(now.getMonth() + 1).padStart(2, "0");
@@ -1134014,15 +1137661,15 @@ router17.get(
     }
   }
 );
-var rankings_default = router17;
+var rankings_default = router18;
 
 // src/routes/dashboard.ts
-var import_express18 = __toESM(require_express2(), 1);
+var import_express19 = __toESM(require_express2(), 1);
 init_drizzle_orm();
 init_src();
 init_auth2();
-var router18 = (0, import_express18.Router)();
-router18.get("/dashboard/summary", requireAuth, async (req, res) => {
+var router19 = (0, import_express19.Router)();
+router19.get("/dashboard/summary", requireAuth, async (req, res) => {
   const isMock = req.isMockMode || false;
   const programIdParam = req.query.programId;
   const selectedProgramId = programIdParam && programIdParam !== "all" ? Number(programIdParam) : null;
@@ -1134234,7 +1137881,7 @@ router18.get("/dashboard/summary", requireAuth, async (req, res) => {
     res.status(500).json({ error: error40.message || "Failed to load dashboard metrics" });
   }
 });
-router18.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor"), async (req, res) => {
+router19.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor"), async (req, res) => {
   const doctorId = req.user.userId;
   const panelQuery = await readDb.execute(sql`
     SELECT ip.id as panel_id, ip.name as panel_name, ip.speciality_id,
@@ -1134312,17 +1137959,17 @@ router18.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor"), asyn
     }))
   });
 });
-var dashboard_default = router18;
+var dashboard_default = router19;
 
 // src/routes/import-excel.ts
-var import_express19 = __toESM(require_express2(), 1);
-var XLSX4 = __toESM(require_xlsx(), 1);
+var import_express20 = __toESM(require_express2(), 1);
+var XLSX5 = __toESM(require_xlsx(), 1);
 init_src();
 init_drizzle_orm();
 init_auth2();
-import * as fs6 from "fs";
-import * as path5 from "path";
-var router19 = (0, import_express19.Router)();
+import * as fs9 from "fs";
+import * as path7 from "path";
+var router20 = (0, import_express20.Router)();
 function excelDateToString(v) {
   if (!v) return null;
   if (typeof v === "string") {
@@ -1134411,19 +1138058,19 @@ function cell(row, col) {
   if (v == null) return "";
   return String(v).trim();
 }
-router19.post("/import/excel", requireAuth, requireRole("super_admin", "central_exam_coordinator"), async (_req, res) => {
+router20.post("/import/excel", requireAuth, requireRole("super_admin", "central_exam_coordinator"), async (_req, res) => {
   try {
-    const xlsxPath = path5.resolve(
+    const xlsxPath = path7.resolve(
       process.cwd(),
       "../../attached_assets/Fellowship_Application_form_-_Jan_2026_(Responses)_1777703761557.xlsx"
     );
-    if (!fs6.existsSync(xlsxPath)) {
+    if (!fs9.existsSync(xlsxPath)) {
       res.status(404).json({ error: "Excel file not found at " + xlsxPath });
       return;
     }
-    const wb = XLSX4.readFile(xlsxPath);
+    const wb = XLSX5.readFile(xlsxPath);
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX4.utils.sheet_to_json(ws, { header: 1 });
+    const rows = XLSX5.utils.sheet_to_json(ws, { header: 1 });
     const dataRows = rows.slice(1).filter((r2) => r2[COL.FULL_NAME] && r2[COL.EMAIL]);
     const [program] = await db.select().from(programsTable).limit(1);
     if (!program) {
@@ -1134676,14 +1138323,14 @@ var FIELD_LABELS = {
   PAYMENT_LINK: "Payment Screenshot",
   PHOTO_LINK: "Passport Photo"
 };
-router19.post("/import/excel/detect", requireAuth, requireRole("super_admin", "central_exam_coordinator"), async (req, res) => {
+router20.post("/import/excel/detect", requireAuth, requireRole("super_admin", "central_exam_coordinator"), async (req, res) => {
   try {
     const { fileData, fileName } = req.body;
     if (!fileData) return res.status(400).json({ error: "fileData (base64) is required" });
     const buf = Buffer.from(fileData, "base64");
-    const wb = XLSX4.read(buf, { type: "buffer" });
+    const wb = XLSX5.read(buf, { type: "buffer" });
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX4.utils.sheet_to_json(ws, { header: 1 });
+    const rows = XLSX5.utils.sheet_to_json(ws, { header: 1 });
     if (rows.length === 0) return res.status(400).json({ error: "Excel file is empty" });
     const headers = rows[0].map((h2) => String(h2 ?? "").trim());
     const suggestedMapping = autoDetectMapping(headers);
@@ -1134701,16 +1138348,16 @@ router19.post("/import/excel/detect", requireAuth, requireRole("super_admin", "c
     res.status(500).json({ error: String(err) });
   }
 });
-router19.post("/import/excel/process", requireAuth, requireRole("super_admin", "central_exam_coordinator"), async (req, res) => {
+router20.post("/import/excel/process", requireAuth, requireRole("super_admin", "central_exam_coordinator"), async (req, res) => {
   try {
     const { fileData, programId, mapping } = req.body;
     if (!fileData || !programId || !mapping) {
       return res.status(400).json({ error: "fileData, programId, and mapping are required" });
     }
     const buf = Buffer.from(fileData, "base64");
-    const wb = XLSX4.read(buf, { type: "buffer" });
+    const wb = XLSX5.read(buf, { type: "buffer" });
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX4.utils.sheet_to_json(ws, { header: 1 });
+    const rows = XLSX5.utils.sheet_to_json(ws, { header: 1 });
     const dataRows = rows.slice(1).filter((r2) => {
       const nameIdx = mapping["FULL_NAME"] ?? mapping["EMAIL"];
       return nameIdx != null ? r2[nameIdx] : r2.some((c) => c != null && c !== "");
@@ -1134868,3369 +1138515,10 @@ router19.post("/import/excel/process", requireAuth, requireRole("super_admin", "
     res.status(500).json({ error: String(err) });
   }
 });
-var import_excel_default = router19;
+var import_excel_default = router20;
 
-// src/routes/application-forms.ts
-var import_express20 = __toESM(require_express2(), 1);
-
-// src/lib/default-sections.ts
-var DEFAULT_SECTIONS = [
-  {
-    id: "instructions",
-    title: "Key Instructions & Schedule (January Intake)",
-    description: "Please read the following instructions and schedule carefully before proceeding.",
-    enabled: true,
-    fields: [
-      {
-        id: "intro_text",
-        type: "info",
-        label: "Entrance & Induction Schedule \u2014 January Intake",
-        defaultValue: "<b>1. Important Examination & Induction Dates:</b><br/>\u2022 <b>07.12.2026, Monday:</b> Retina Fellowship Entrance & Selection (Bengaluru)<br/>\u2022 <b>08.12.2026, Tuesday:</b> Anterior Segment Fellowship Entrance & Selection (Bengaluru)<br/>\u2022 <b>07.01.2027 & 08.01.2027 (Thursday & Friday):</b> Mandatory Induction for New Fellows (Bengaluru)<br/>\u2022 <b>11.01.2027, Monday:</b> New Fellows Reporting at respective Hospital Units<br/><br/><b>2. Multiple Sub-specialties:</b> Candidates can apply for multiple Sub-specialties in a single application form. Separate fees apply for each specialization (Rs. 2750/- per specialization).<br/><br/><b>3. Selection Process:</b> Selection involves an objective assessment of theoretical knowledge (MCQ pattern), OSCE, and skills evaluation with an interview by a panel of faculty.<br/><br/><b>4. Eligibility & Age Limit:</b> The age limit is 35 years. Applicants appearing for interviews must have cleared the results of PG (MS/MD) and DNB (Theory & Practical). Candidates awaiting PG results are not eligible.<br/><br/><b>5. Government Bond / Rural Service:</b> Applicants under Government bond or Compulsory Rural Service must submit a 'No Objection Certificate' during the examination.<br/><br/><b>6. State Medical Council NOC:</b> Selected fellows must submit NOC from their State Medical Council within 3 days of accepting the Fellowship Offer.<br/><br/><b>7. Required Documents:</b> Basic & post-graduate educational certificates, current valid medical registration license, complete CV, passport-size photograph, and two Letters of Recommendation."
-      }
-    ]
-  },
-  {
-    id: "subspecialty",
-    title: "Subspecialty Selection",
-    description: "Select the option(s) for which you are applying. You can select more than one.",
-    enabled: true,
-    fields: [
-      { id: "specialization", type: "checkbox_group", label: "Subspecialties", required: true, options: ["Cornea", "Glaucoma", "IOL", "Oculoplasty", "Pediatric Ophthalmology", "Phaco Refractive", "Medical Retina", "Vitreo Retina"], isStandard: true, mapping: "specialization" }
-    ]
-  },
-  {
-    id: "units",
-    title: "Speciality : Units (Select the preferences)",
-    description: "Choose the preferred center for each fellowship based on the official Jan-27 Seat Matrix.",
-    enabled: true,
-    fields: [
-      { id: "unit_cornea", type: "checkbox_group", label: "Cornea Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Jaipur", "Shimoga"], visibleIf: { field: "specialization", contains: "Cornea" } },
-      { id: "unit_glaucoma", type: "checkbox_group", label: "Glaucoma Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga"], visibleIf: { field: "specialization", contains: "Glaucoma" } },
-      { id: "unit_iol", type: "checkbox_group", label: "IOL Preferred Center", options: ["Anand", "Coimbatore", "Guntur", "Hyderabad", "Indore", "Jaipur", "Kanpur", "Krishnankoil", "Ludhiana", "Panvel", "Shimoga", "Varanasi"], visibleIf: { field: "specialization", contains: "IOL" } },
-      { id: "unit_medical_retina", type: "checkbox_group", label: "Medical Retina Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Indore", "Shimoga"], visibleIf: { field: "specialization", contains: "Medical Retina" } },
-      { id: "unit_oculoplasty", type: "checkbox_group", label: "Oculoplasty Preferred Center", options: ["Coimbatore", "Guntur", "Varanasi"], visibleIf: { field: "specialization", contains: "Oculoplasty" } },
-      { id: "unit_pediatric", type: "checkbox_group", label: "Pediatric Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga"], visibleIf: { field: "specialization", contains: "Pediatric Ophthalmology" } },
-      { id: "unit_phaco", type: "checkbox_group", label: "Phaco Refractive Preferred Center", options: ["Bangalore", "Coimbatore"], visibleIf: { field: "specialization", contains: "Phaco Refractive" } },
-      { id: "unit_vitreo_retina", type: "checkbox_group", label: "Vitreo Retina Preferred Center", options: ["Bangalore", "Coimbatore", "Guntur", "Shimoga"], visibleIf: { field: "specialization", contains: "Vitreo Retina" } },
-      { id: "referralSource", type: "select", label: "Where did you hear about this Fellowship?", required: true, options: ["Sankara Website", "Word of Mouth", "Referred by any Faculty or exiting trainee at Sankara", "IJO Advertisement", "Social Media Platforms (Instagram/Facebook/Whatsapp/LinkedIn)"], isStandard: true, mapping: "referralSource" }
-    ]
-  },
-  {
-    id: "referral_info",
-    title: "Referral Information",
-    description: "Details of the person who referred you.",
-    enabled: true,
-    visibleIf: { field: "referralSource", contains: "Referred" },
-    fields: [
-      { id: "referredByName", type: "text", label: "Name of referred Faculty/Existing Trainee", isStandard: true, mapping: "referredByName", visibleIf: { field: "referralSource", contains: "Referred" } }
-    ]
-  },
-  {
-    id: "social_media",
-    title: "Social Media",
-    description: "Specify the media source if applicable.",
-    enabled: true,
-    visibleIf: { field: "referralSource", contains: "Social Media" },
-    fields: [
-      { id: "mediaSource", type: "text", label: "Media Source", isStandard: true, mapping: "mediaSource", visibleIf: { field: "referralSource", contains: "Social Media" } }
-    ]
-  },
-  {
-    id: "personal_details",
-    title: "Let us know you better",
-    description: "Basic information to identify you.",
-    enabled: true,
-    fields: [
-      { id: "fullName", type: "text", label: "Name in Full", required: true, isStandard: true, mapping: "fullName" },
-      { id: "permanentAddress", type: "textarea", label: "Permanent Address", required: true, isStandard: true, mapping: "permanentAddress" },
-      { id: "mailingAddress", type: "textarea", label: "Preferred Mailing Address (or N/A)", required: true, isStandard: true, mapping: "mailingAddress" },
-      { id: "phone", type: "phone", label: "Mobile Number (10 digits)", required: true, isStandard: true, mapping: "phone" },
-      { id: "email", type: "text", label: "E-mail ID", required: true, isStandard: true, mapping: "email" },
-      { id: "dateOfBirth", type: "date", label: "Date of Birth", required: true, isStandard: true, mapping: "dateOfBirth" },
-      { id: "maritalStatus", type: "radio", label: "Marital Status", options: ["Married", "Unmarried"], required: true, isStandard: true, mapping: "maritalStatus" },
-      { id: "spouseDetails", type: "text", label: "If Married, Spouse Details (Name & Profession)", isStandard: true, mapping: "spouseDetails" }
-    ]
-  },
-  {
-    id: "previous_entrance",
-    title: "Previous Entrance",
-    description: "Did you appear for the entrance earlier?",
-    enabled: true,
-    fields: [
-      { id: "prev_appeared", type: "radio", label: "Appeared Earlier?", options: ["Yes", "No"] },
-      { id: "previousApplicationMonthYear", type: "text", label: "If Yes, Month & Year", isStandard: true, mapping: "previousApplicationMonthYear", visibleIf: { field: "prev_appeared", equals: "Yes" } }
-    ]
-  },
-  {
-    id: "medical_history",
-    title: "Medical History",
-    description: "Declare any ailments.",
-    enabled: true,
-    fields: [
-      { id: "medicalConditions", type: "checkbox_group", label: "Ailments / Medications", options: ["Asthma", "Hypertension", "Diabetes", "Skin Allergy", "Hearing Impairment", "Tuberculosis", "Any Heart Related Issues", "Any Liver Related Issues", "None of the Above"], isStandard: true, mapping: "medicalConditions" }
-    ]
-  },
-  {
-    id: "educational_qual",
-    title: "Educational Qualifications",
-    description: "Undergraduate and Postgraduate details.",
-    enabled: true,
-    fields: [
-      { id: "medicalCollege", type: "text", label: "Medical College Qualified From", required: true, isStandard: true, mapping: "medicalCollege" },
-      { id: "university", type: "text", label: "University (MBBS Awarded)", required: true, isStandard: true, mapping: "university" },
-      { id: "qualification_matrix", type: "qualification_matrix", label: "Postgraduate Qualifications", isStandard: true, mapping: "qualificationMatrix" },
-      { id: "do_details", type: "text", label: "If DO: College, University & Year", isStandard: true, mapping: "doDetails", visibleIf: { field: "qualification_matrix", key: "DO (Diploma Ophthlmology)", equals: "Yes" } },
-      { id: "ms_md_details", type: "text", label: "If MS: College, University & Year", isStandard: true, mapping: "msMdDetails", visibleIf: { field: "qualification_matrix", key: "MS/MD ( Masters in Ophthalmology)", equals: "Yes" } },
-      { id: "dnb_details", type: "text", label: "If DNB: Institution & Year", isStandard: true, mapping: "dnbDetails", visibleIf: { field: "qualification_matrix", key: "DNB", equals: "Yes" } },
-      { id: "otherTraining", type: "text", label: "Any Other Training / Certification", isStandard: true, mapping: "otherTraining" },
-      { id: "medicalCouncilNumber", type: "text", label: "Medical Council Registration Number", required: true, isStandard: true, mapping: "medicalCouncilNumber" }
-    ]
-  },
-  {
-    id: "clinical_exp",
-    title: "Clinical Experience",
-    description: "Document your diagnostic and surgical experience.",
-    enabled: true,
-    fields: [
-      { id: "diagnostic_skills", type: "skills_table", label: "Diagnostic Skills", options: ["Beginner", "Intermittent", "Expert"], rows: ["Slit Lamp", "Fundus Exam +90D", "Indirect Ophthalmoscopy", "Applanation Tonometry", "Gonioscopy", "Biometry (Keratometry, A Scan)", "Ultrasound B Scan", "Corneal Topgraphy", "Specular Microscopy", "Visual Fields (HFA)", "Fundus Flourescien Angiography (FFA)", "Ocular Coherence Tomography (OCT)", "Yag Capsulotomy /Iridotomy", "Argon LASER", "Hess Charting"], isStandard: true, mapping: "diagnosticSkills" },
-      { id: "surgery_experience", type: "surgery_table", label: "Surgical Experience", rows: ["ECCE", "SICS", "PHACO", "TRABECULECTOMY", "RETINA LASERS", "DCR"], isStandard: true, mapping: "surgicalExperience" },
-      { id: "totalSurgeries", type: "number", label: "Total No. of Surgeries performed till date (Confirmation)", required: true, isStandard: true, mapping: "totalSurgeries" }
-    ]
-  },
-  {
-    id: "publications",
-    title: "Publications & Presentation",
-    description: "Academic presentations & publications.",
-    enabled: true,
-    fields: [
-      { id: "publications", type: "textarea", label: "Journal Publications", required: true, isStandard: true, mapping: "publications" },
-      { id: "presentations", type: "textarea", label: "Conference Presentations", required: true, isStandard: true, mapping: "presentations" }
-    ]
-  },
-  {
-    id: "lor",
-    title: "LETTER OF RECOMMENDATION (LOR)",
-    description: "Upload two LORs from the last 6 months (PDF).",
-    enabled: true,
-    fields: [
-      { id: "lor1Url", type: "file", label: "LOR 1 PDF", required: true, isStandard: true, mapping: "lor1Url" },
-      { id: "lor1RefName", type: "text", label: "Name & Designation of Reference 1", required: true, isStandard: true, mapping: "lor1RefName" },
-      { id: "lor1RefContact", type: "text", label: "Contact number of Reference 1", required: true, isStandard: true, mapping: "lor1RefContact" },
-      { id: "lor1RefEmail", type: "text", label: "Email ID of Reference 1", required: true, isStandard: true, mapping: "lor1RefEmail" },
-      { id: "lor2Url", type: "file", label: "LOR 2 PDF", required: true, isStandard: true, mapping: "lor2Url" },
-      { id: "lor2RefName", type: "text", label: "Name & Designation of Reference 2", required: true, isStandard: true, mapping: "lor2RefName" },
-      { id: "lor2RefContact", type: "text", label: "Contact number of Reference 2", required: true, isStandard: true, mapping: "lor2RefContact" },
-      { id: "lor2RefEmail", type: "text", label: "Email ID of Reference 2", required: true, isStandard: true, mapping: "lor2RefEmail" }
-    ]
-  },
-  {
-    id: "final",
-    title: "Declaration & Payment",
-    description: "Final information and documents.",
-    enabled: true,
-    fields: [
-      { id: "photoUrl", type: "file", label: "Passport Size Photograph", required: true, isStandard: true, mapping: "photoUrl" },
-      { id: "declarationAccepted", type: "checkbox", label: "I hereby declare that the information provided is true to the best of my knowledge.", required: true, isStandard: true, mapping: "declarationAccepted" }
-    ]
-  }
-];
-
-// src/routes/application-forms.ts
-init_drizzle_orm();
-init_src();
-init_auth2();
-var XLSX5 = __toESM(require_xlsx(), 1);
-init_email();
-init_letters();
-var import_googleapis2 = __toESM(require_src7(), 1);
-var import_pdfkit3 = __toESM(require_pdfkit(), 1);
-init_utils5();
-import fs9 from "fs/promises";
-import path7 from "path";
-import os2 from "os";
-var router20 = (0, import_express20.Router)();
-function generateToken() {
-  return Math.random().toString(36).substring(2, 10).toUpperCase();
-}
-function checkCompleteness(sub) {
-  return !!(sub.fullName && sub.email && sub.phone && sub.degree && sub.medicalCollege);
-}
-async function syncSubmissionToCandidateAndDocuments(candidateId, sub) {
-  await db.update(candidatesTable).set({
-    fullName: sub.fullName,
-    phone: sub.phone ?? null,
-    dateOfBirth: sub.dateOfBirth ?? null,
-    gender: sub.gender ?? null,
-    qualification: sub.degree ?? null,
-    collegeName: sub.medicalCollege ?? null,
-    address: sub.permanentAddress ?? null,
-    status: "approved"
-  }).where(eq(candidatesTable.id, candidateId));
-  const documentTypes = [
-    { type: "LOR1", url: sub.lor1Url, name: sub.lor1RefName ? `LOR1_${sub.lor1RefName}.pdf` : "LOR1.pdf" },
-    { type: "LOR2", url: sub.lor2Url, name: sub.lor2RefName ? `LOR2_${sub.lor2RefName}.pdf` : "LOR2.pdf" },
-    { type: "PHOTO", url: sub.photoUrl, name: "photo.jpg" },
-    { type: "PAYMENT", url: sub.paymentUrl, name: "payment_proof.jpg" }
-  ];
-  for (const doc of documentTypes) {
-    if (doc.url) {
-      const existingDoc = await db.select().from(documentsTable).where(
-        and(
-          eq(documentsTable.candidateId, candidateId),
-          eq(documentsTable.docType, doc.type)
-        )
-      );
-      if (existingDoc.length > 0) {
-        await db.update(documentsTable).set({
-          fileUrl: doc.url,
-          fileName: doc.name,
-          uploadedAt: /* @__PURE__ */ new Date()
-        }).where(eq(documentsTable.id, existingDoc[0].id));
-      } else {
-        await db.insert(documentsTable).values({
-          candidateId,
-          docType: doc.type,
-          fileName: doc.name,
-          fileUrl: doc.url,
-          uploadedAt: /* @__PURE__ */ new Date()
-        });
-      }
-    }
-  }
-}
-router20.get(
-  "/application-forms/submissions/:id/pdf",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
-  async (req, res) => {
-    try {
-      const id = Number(req.params.id);
-      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, id));
-      if (!sub) return res.status(404).json({ error: "Submission not found" });
-      const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
-      const [program] = form ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
-      let candidateCode = "PENDING";
-      if (sub.email) {
-        const [candidate] = await db.select().from(candidatesTable).where(eq(candidatesTable.email, sub.email));
-        if (candidate) candidateCode = candidate.candidateCode;
-      }
-      const doc = new import_pdfkit3.default({
-        margin: 36,
-        size: "LETTER",
-        bufferPages: true,
-        info: { Title: `Application - ${sub.fullName}`, Author: "Sankara Academy of Vision" }
-      });
-      const filename = `Application_${sub.fullName.replace(/\s+/g, "_")}_${id}.pdf`;
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `inline; filename=${filename}`);
-      doc.pipe(res);
-      const colors = { primary: "#0f172a", secondary: "#475569", accent: "#0b4a8f", muted: "#94a3b8", border: "#e2e8f0", bgSection: "#f8fafc" };
-      const drawSectionHeader = (title) => {
-        if (doc.y > 680) {
-          doc.addPage();
-          doc.y = 36;
-        }
-        doc.moveDown(0.6);
-        const y = doc.y;
-        doc.rect(36, y, 540, 18).fill(colors.bgSection);
-        doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(10).text(title.toUpperCase(), 44, y + 4, { width: 520 });
-        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(36, y + 18).lineTo(576, y + 18).stroke();
-        doc.y = y + 24;
-      };
-      const renderApplicationRecordRow = (label, value) => {
-        const valText = value === null || value === void 0 || value === "null" || value === "" ? "\u2014" : String(value);
-        const startY = doc.y;
-        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(9).text(label.toUpperCase(), 36, startY, { width: 115, lineGap: 1 });
-        const labelEndY = doc.y;
-        doc.fillColor(colors.primary).font("Helvetica").fontSize(9.5).text(`: ${valText}`, 155, startY, { width: 310, lineGap: 1 });
-        const valueEndY = doc.y;
-        doc.y = Math.max(labelEndY, valueEndY) + 3;
-      };
-      const renderGeneralRow = (label, value) => {
-        const valText = value === null || value === void 0 || value === "null" || value === "" ? "\u2014" : String(value);
-        if (doc.y > 700) {
-          doc.addPage();
-          doc.y = 36;
-        }
-        const currentY = doc.y;
-        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(8.5).text(label.toUpperCase(), 36, currentY, { width: 145, lineGap: 1 });
-        const labelEndY = doc.y;
-        doc.fillColor(colors.primary).font("Helvetica").fontSize(9).text(`: ${valText}`, 185, currentY, { width: 390, lineGap: 1 });
-        const valueEndY = doc.y;
-        doc.y = Math.max(labelEndY, valueEndY) + 4;
-      };
-      const parseSpecializations = (spec) => {
-        return parseSpecializationString(spec);
-      };
-      const parseCenterPreferences = (cp, customAnswers, sections) => {
-        if (cp) {
-          try {
-            const parsed = JSON.parse(cp);
-            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
-          } catch {
-          }
-        }
-        if (customAnswers && typeof customAnswers === "object") {
-          const prefs = {};
-          Object.entries(customAnswers).forEach(([key, val]) => {
-            if (key.startsWith("unit_") && val) {
-              let label = key.replace("unit_", "").replace(/_/g, " ").toUpperCase();
-              if (sections) {
-                sections.forEach((sec) => {
-                  sec.fields?.forEach((f3) => {
-                    if (f3.id === key) label = f3.label.replace(" Preferred Center", "");
-                  });
-                });
-              }
-              prefs[label] = Array.isArray(val) ? val.join(", ") : String(val);
-            }
-          });
-          return prefs;
-        }
-        return {};
-      };
-      doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(18).text("SANKARA ACADEMY OF VISION", 36, 36, { width: 440, align: "left" });
-      doc.fillColor(colors.primary).font("Helvetica").fontSize(9).text("Educational unit of Sankara Eye Foundation, India", 36, 57, { width: 440, align: "left" });
-      doc.fillColor(colors.muted).font("Helvetica-Bold").fontSize(8.5).text("FELLOWSHIP PROGRAM ADMISSIONS RECORD", 36, 70, { width: 440, align: "left" });
-      doc.strokeColor(colors.accent).lineWidth(1.5).moveTo(36, 84).lineTo(576, 84).stroke();
-      const photoUrl = sub.photoUrl;
-      const photoX = 491;
-      const photoY = 94;
-      const photoW = 85;
-      const photoH = 105;
-      if (photoUrl && photoUrl.startsWith("/objects/")) {
-        const localPath = path7.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
-        try {
-          doc.image(localPath, photoX, photoY, { width: photoW, height: photoH });
-          doc.rect(photoX, photoY, photoW, photoH).strokeColor(colors.border).lineWidth(1).stroke();
-        } catch (e2) {
-          doc.rect(photoX, photoY, photoW, photoH).fill("#f1f5f9");
-          doc.fillColor(colors.muted).font("Helvetica").fontSize(7.5).text("PHOTO NOT AVAILABLE", photoX, photoY + 45, { width: photoW, align: "center" });
-        }
-      } else {
-        doc.rect(photoX, photoY, photoW, photoH).fill("#f1f5f9");
-        doc.fillColor(colors.muted).font("Helvetica").fontSize(7.5).text("NO PHOTO UPLOADED", photoX, photoY + 45, { width: photoW, align: "center" });
-      }
-      doc.y = 94;
-      doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(11).text("APPLICATION SUMMARY", 36, 94, { width: 350 });
-      doc.y = 112;
-      renderApplicationRecordRow("Application ID", `#APP-${id}`);
-      renderApplicationRecordRow("Program", program?.name || "Fellowship Program");
-      renderApplicationRecordRow("Submission Date", sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "\u2014");
-      renderApplicationRecordRow("Status", sub.status.toUpperCase());
-      if (doc.y < 210) {
-        doc.y = 210;
-      }
-      drawSectionHeader("Personal & Communication Details");
-      renderGeneralRow("Full Name", sub.fullName);
-      renderGeneralRow("Email Address", sub.email);
-      renderGeneralRow("Phone Number", sub.phone);
-      renderGeneralRow("Date of Birth", formatDOBToStandard(sub.dateOfBirth));
-      renderGeneralRow("Gender / Marital", [sub.gender, sub.maritalStatus].filter(Boolean).join(" \xB7 ") || "\u2014");
-      renderGeneralRow("Permanent Address", sub.permanentAddress);
-      drawSectionHeader("Academic & Professional Qualifications");
-      renderGeneralRow("Basic Degree", sub.degree);
-      renderGeneralRow("Medical College / University", [sub.medicalCollege, sub.university].filter(Boolean).join(" \xB7 ") || "\u2014");
-      renderGeneralRow("Medical Council Reg No", sub.medicalCouncilNumber);
-      if (sub.pgQualifications) renderGeneralRow("PG Qualifications", sub.pgQualifications);
-      drawSectionHeader("Specialization & Center Preferences");
-      const specs = parseSpecializations(sub.specialization);
-      const centerPrefs = parseCenterPreferences(sub.centerPreference, sub.customAnswers, form?.sectionsConfig ?? void 0);
-      if (specs.length === 0) {
-        if (doc.y > 700) {
-          doc.addPage();
-          doc.y = 36;
-        }
-        doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text("No specializations selected.", 36, doc.y);
-      } else {
-        specs.forEach((sp, idx) => {
-          if (doc.y > 700) {
-            doc.addPage();
-            doc.y = 36;
-          }
-          const currentY = doc.y;
-          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(9.5).text(`${idx + 1}. ${sp}`, 36, currentY, { width: 220, lineGap: 1 });
-          const spEndY = doc.y;
-          doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text(`Preferred Center: ${centerPrefs[sp] || "Any Center"}`, 260, currentY, { width: 315, lineGap: 1 });
-          const centerEndY = doc.y;
-          doc.y = Math.max(spEndY, centerEndY) + 4;
-        });
-      }
-      if (sub.diagnosticSkills) {
-        drawSectionHeader("Clinical Profile & Skills");
-        try {
-          const skills = typeof sub.diagnosticSkills === "string" ? JSON.parse(sub.diagnosticSkills) : sub.diagnosticSkills;
-          Object.entries(skills).forEach(([skill, val]) => {
-            renderGeneralRow(skill, val);
-          });
-        } catch {
-          if (doc.y > 700) {
-            doc.addPage();
-            doc.y = 36;
-          }
-          doc.fillColor(colors.primary).font("Helvetica").fontSize(9).text(String(sub.diagnosticSkills), 36, doc.y, { width: 540 });
-        }
-      }
-      if (sub.surgicalExperience) {
-        drawSectionHeader("Surgical Experience");
-        try {
-          const exp = typeof sub.surgicalExperience === "string" ? JSON.parse(sub.surgicalExperience) : sub.surgicalExperience;
-          Object.entries(exp).forEach(([cat, val]) => {
-            if (doc.y > 700) {
-              doc.addPage();
-              doc.y = 36;
-            }
-            const currentY = doc.y;
-            doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(8.5).text(cat.toUpperCase(), 36, currentY, { width: 180, lineGap: 1 });
-            const catEndY = doc.y;
-            doc.fillColor(colors.secondary).font("Helvetica").fontSize(8.5).text(`Supervision: ${val.supervision || 0} | Independent: ${val.independent || 0}`, 220, currentY, { width: 350, lineGap: 1 });
-            const valEndY = doc.y;
-            doc.y = Math.max(catEndY, valEndY) + 4;
-          });
-        } catch {
-          if (doc.y > 700) {
-            doc.addPage();
-            doc.y = 36;
-          }
-          doc.fillColor(colors.primary).font("Helvetica").fontSize(9).text(String(sub.surgicalExperience), 36, doc.y, { width: 540 });
-        }
-      }
-      drawSectionHeader("References & Documents");
-      renderGeneralRow("Reference 1 (LOR)", `${sub.lor1RefName || "\u2014"} (${sub.lor1RefContact || "No contact"})`);
-      renderGeneralRow("Reference 2 (LOR)", `${sub.lor2RefName || "\u2014"} (${sub.lor2RefContact || "No contact"})`);
-      const docList = [];
-      if (sub.lor1Url) docList.push("LOR 1");
-      if (sub.lor2Url) docList.push("LOR 2");
-      if (sub.photoUrl) docList.push("Photo");
-      if (sub.paymentUrl) docList.push("Payment Receipt");
-      renderGeneralRow("Uploaded Files", docList.length > 0 ? docList.join(", ") : "No documents uploaded");
-      drawSectionHeader("Declaration & Fee Submission");
-      renderGeneralRow("Payment Reference ID", sub.paymentId || "\u2014");
-      renderGeneralRow("Payment Mode", sub.paymentMode?.toUpperCase() || "\u2014");
-      renderGeneralRow("Fee Status", sub.paymentId ? "Verified & Paid" : "Pending");
-      if (doc.y > 670) {
-        doc.addPage();
-        doc.y = 36;
-      }
-      doc.moveDown(0.5);
-      doc.fillColor(colors.secondary).font("Helvetica-Oblique").fontSize(8).text(
-        "Declaration: I hereby declare that the information provided above is true and authentic to the best of my knowledge and belief.",
-        36,
-        doc.y,
-        { width: 540, lineGap: 1 }
-      );
-      doc.moveDown(1.5);
-      const signY = doc.y;
-      if (signY < 720) {
-        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(36, signY + 30).lineTo(180, signY + 30).stroke();
-        doc.fillColor(colors.secondary).font("Helvetica").fontSize(7.5).text("Candidate Signature", 36, signY + 34, { width: 144, align: "center" });
-        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(234, signY + 30).lineTo(378, signY + 30).stroke();
-        doc.fillColor(colors.secondary).font("Helvetica").fontSize(7.5).text("Reviewer Seal & Signature", 234, signY + 34, { width: 144, align: "center" });
-        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(432, signY + 30).lineTo(576, signY + 30).stroke();
-        doc.fillColor(colors.secondary).font("Helvetica").fontSize(7.5).text("Date of Verification", 432, signY + 34, { width: 144, align: "center" });
-      }
-      const range2 = doc.bufferedPageRange();
-      for (let i2 = range2.start; i2 < range2.start + range2.count; i2++) {
-        doc.switchToPage(i2);
-        doc.fillColor(colors.muted).fontSize(7.5).text(
-          `Page ${i2 + 1} of ${range2.count} | Letter Format | Sankara Academy of Vision Admissions Portal`,
-          36,
-          doc.page.height - 24,
-          { width: 540, align: "center" }
-        );
-      }
-      doc.end();
-    } catch (e2) {
-      console.error("[pdf-gen] error:", e2);
-      if (!res.headersSent) res.status(500).json({ error: "Failed to generate PDF" });
-    }
-  }
-);
-router20.get(
-  "/application-forms",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
-  async (_req, res) => {
-    const rawForms = await db.select().from(applicationFormsTable).orderBy(desc(applicationFormsTable.createdAt));
-    const forms = rawForms.filter((f3) => f3.token !== "JULY2026" && !/july\s*2026/i.test(f3.title || ""));
-    const programs = await db.select().from(programsTable);
-    const submissions = await db.select().from(applicationSubmissionsTable);
-    const out = forms.map((f3) => {
-      const prog = programs.find((p) => p.id === f3.programId);
-      const subs = submissions.filter((s2) => s2.formId === f3.id);
-      return {
-        ...f3,
-        programName: prog?.name ?? null,
-        submissionCount: subs.length,
-        pendingCount: subs.filter((s2) => s2.status === "pending").length
-      };
-    });
-    res.json(out);
-  }
-);
-router20.post(
-  "/application-forms",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
-  async (req, res) => {
-    const { programId, title, description, deadline, sectionsConfig } = req.body;
-    if (!programId || !title) return res.status(400).json({ error: "programId and title required" });
-    const { customFields, loadDefaults, customToken } = req.body;
-    let token = generateToken();
-    if (customToken) {
-      const formattedToken = customToken.replace(/[^a-zA-Z0-9-]/g, "").toUpperCase();
-      const existing = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, formattedToken));
-      if (existing.length > 0) return res.status(400).json({ error: "Link code already in use" });
-      token = formattedToken;
-    }
-    let finalSectionsConfig = sectionsConfig ?? [];
-    if (loadDefaults && finalSectionsConfig.length === 0) {
-      finalSectionsConfig = DEFAULT_SECTIONS;
-    }
-    const [form] = await db.insert(applicationFormsTable).values({
-      token,
-      programId,
-      title,
-      description: description ?? null,
-      deadline: deadline ? new Date(deadline) : null,
-      isActive: true,
-      createdBy: req.user.userId,
-      customFields: customFields ?? [],
-      sectionsConfig: finalSectionsConfig
-    }).returning();
-    res.status(201).json(form);
-  }
-);
-router20.patch(
-  "/application-forms/:id",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
-  async (req, res) => {
-    const id = Number(req.params.id);
-    const { isActive, deadline, title, description, customFields, sectionsConfig } = req.body;
-    const updates = {};
-    if (isActive !== void 0) updates.isActive = isActive;
-    if (title !== void 0) updates.title = title;
-    if (description !== void 0) updates.description = description;
-    if (deadline !== void 0) updates.deadline = deadline ? new Date(deadline) : null;
-    if (customFields !== void 0) updates.customFields = customFields;
-    if (sectionsConfig !== void 0) updates.sectionsConfig = sectionsConfig;
-    const [updated] = await db.update(applicationFormsTable).set(updates).where(eq(applicationFormsTable.id, id)).returning();
-    if (!updated) return res.status(404).json({ error: "Form not found" });
-    res.json(updated);
-  }
-);
-router20.delete(
-  "/application-forms/:id",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
-  async (req, res) => {
-    const id = Number(req.params.id);
-    await db.delete(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.formId, id));
-    await db.delete(applicationFormsTable).where(eq(applicationFormsTable.id, id));
-    res.json({ success: true });
-  }
-);
-router20.get(
-  "/application-forms/:id/payment-settings",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
-  async (req, res) => {
-    const id = Number(req.params.id);
-    const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, id));
-    if (!form) return res.status(404).json({ error: "Form not found" });
-    const programId = form.programId;
-    const all = await db.select().from(paymentSettingsTable);
-    const specific = programId ? all.find((s2) => s2.programId === programId) : null;
-    const global2 = all.find((s2) => s2.programId === null);
-    const setting = specific ?? global2 ?? null;
-    res.json({
-      id: setting?.id ?? null,
-      programId: programId ?? null,
-      razorpayKeyId: setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "",
-      razorpayKeySecret: setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || "",
-      amountRs: setting ? setting.amount / 100 : 2750,
-      currency: setting?.currency || "INR",
-      description: setting?.description || "Fellowship Application Fee",
-      mode: setting?.mode || "live",
-      upiId: setting?.upiId || "sankaraeye@hdfcbank",
-      isActive: setting ? setting.isActive : true
-    });
-  }
-);
-router20.put(
-  "/application-forms/:id/payment-settings",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
-  async (req, res) => {
-    const id = Number(req.params.id);
-    const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, id));
-    if (!form) return res.status(404).json({ error: "Form not found" });
-    const { razorpayKeyId, razorpayKeySecret, amountRs, currency, description, mode, upiId, isActive } = req.body;
-    const programId = form.programId;
-    const LIVE_KEY_ID = "rzp_live_ddDz3Yp0860GqG";
-    const LIVE_SECRET = "LGVG9K6XjOwpHnfjfGMmgwxZ";
-    const [existing] = await db.select().from(paymentSettingsTable).where(eq(paymentSettingsTable.programId, programId));
-    let settingRecord;
-    const resolveKey = (incoming, existingVal) => {
-      if (incoming !== void 0 && incoming.trim() !== "" && incoming !== "[SENSITIVE]") return incoming.trim();
-      if (existingVal && existingVal.trim() !== "" && !existingVal.startsWith("rzp_test") && existingVal !== "[SENSITIVE]") return existingVal;
-      return LIVE_KEY_ID;
-    };
-    const resolveSecret = (incoming, existingVal) => {
-      if (incoming !== void 0 && incoming.trim() !== "" && incoming !== "[SENSITIVE]") return incoming.trim();
-      if (existingVal && existingVal.trim() !== "" && !existingVal.startsWith("test_") && existingVal !== "[SENSITIVE]") return existingVal;
-      return LIVE_SECRET;
-    };
-    const finalKeyId = resolveKey(razorpayKeyId, existing?.razorpayKeyId ?? null);
-    const finalSecret = resolveSecret(razorpayKeySecret, existing?.razorpayKeySecret ?? null);
-    if (existing) {
-      [settingRecord] = await db.update(paymentSettingsTable).set({
-        razorpayKeyId: finalKeyId,
-        razorpayKeySecret: finalSecret,
-        amount: amountRs !== void 0 ? Math.round(Number(amountRs) * 100) : existing.amount,
-        currency: currency ?? existing.currency,
-        description: description ?? existing.description,
-        mode: "live",
-        upiId: upiId !== void 0 ? upiId : existing.upiId,
-        isActive: isActive !== void 0 ? Boolean(isActive) : existing.isActive
-      }).where(eq(paymentSettingsTable.id, existing.id)).returning();
-    } else {
-      [settingRecord] = await db.insert(paymentSettingsTable).values({
-        programId,
-        razorpayKeyId: finalKeyId,
-        razorpayKeySecret: finalSecret,
-        amount: Math.round((Number(amountRs) || 2750) * 100),
-        currency: currency || "INR",
-        description: description || "Fellowship Application Fee January 2027",
-        mode: "live",
-        upiId: upiId || "sankaraeye@hdfcbank",
-        isActive: isActive !== void 0 ? Boolean(isActive) : true
-      }).returning();
-    }
-    if (programId) {
-      const progUpdates = {};
-      if (amountRs !== void 0) progUpdates.feeAmount = Math.round(Number(amountRs));
-      if (isActive !== void 0) progUpdates.requiresPayment = Boolean(isActive);
-      if (Object.keys(progUpdates).length > 0) {
-        await db.update(programsTable).set(progUpdates).where(eq(programsTable.id, programId));
-      }
-    }
-    res.json({
-      ...settingRecord,
-      amountRs: settingRecord.amount / 100
-    });
-  }
-);
-router20.get(
-  "/application-forms/:id/submissions",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
-  async (req, res) => {
-    const formId = Number(req.params.id);
-    const subs = await db.select({
-      submission: applicationSubmissionsTable,
-      candidateId: candidatesTable.id,
-      candidateCode: candidatesTable.candidateCode,
-      candidateStatus: candidatesTable.status,
-      candidateUnitId: candidatesTable.unitId
-    }).from(applicationSubmissionsTable).leftJoin(
-      candidatesTable,
-      or(
-        eq(candidatesTable.id, applicationSubmissionsTable.candidateId),
-        eq(candidatesTable.email, applicationSubmissionsTable.email)
-      )
-    ).where(and(eq(applicationSubmissionsTable.formId, formId), eq(applicationSubmissionsTable.isMock, req.isMockMode))).orderBy(desc(applicationSubmissionsTable.submittedAt));
-    res.json(subs.map((s2) => ({
-      ...s2.submission,
-      candidateId: s2.candidateId || s2.submission.candidateId || null,
-      candidateCode: s2.candidateCode || s2.submission.candidateCode || null,
-      candidateStatus: s2.candidateStatus || null,
-      candidateUnitId: s2.candidateUnitId || null
-    })));
-  }
-);
-router20.get(
-  "/application-forms/:id/student-list-pdf",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "unit_coordinator"),
-  async (req, res) => {
-    try {
-      const formId = Number(req.params.id);
-      const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, formId));
-      if (!form) return res.status(404).json({ error: "Application form not found" });
-      const [program] = await db.select().from(programsTable).where(eq(programsTable.id, form.programId));
-      const units = await db.select().from(unitsTable);
-      const subs = await db.select({
-        sub: applicationSubmissionsTable,
-        cand: candidatesTable
-      }).from(applicationSubmissionsTable).leftJoin(
-        candidatesTable,
-        or(
-          eq(candidatesTable.id, applicationSubmissionsTable.candidateId),
-          eq(candidatesTable.email, applicationSubmissionsTable.email)
-        )
-      ).where(eq(applicationSubmissionsTable.formId, formId)).orderBy(desc(applicationSubmissionsTable.submittedAt));
-      const candidatesList = subs.map((row, idx) => {
-        const s2 = row.sub;
-        const c = row.cand;
-        const specs = parseSpecializationString(s2.specialization);
-        const specStr = specs.length > 0 ? specs.join(", ") : s2.specialization || "Ophthalmology Fellowship";
-        let unitName = "";
-        if (c?.unitId) {
-          const u = units.find((unit) => unit.id === c.unitId);
-          if (u) unitName = u.name;
-        } else if (s2.centerPreference) {
-          unitName = String(s2.centerPreference).replace(/[{}"[\]]/g, "").trim();
-        }
-        const candidateCode = c?.candidateCode || s2.candidateCode || `APP-${String(s2.id).padStart(4, "0")}`;
-        const qualParts = [s2.degree, s2.pgQualifications, s2.medicalCouncilNumber ? `Reg: ${s2.medicalCouncilNumber}` : null].filter(Boolean);
-        const qualification = qualParts.join(" \xB7 ");
-        let effectiveStatus = s2.status || "pending";
-        if (c?.status === "allocated") {
-          effectiveStatus = "allocated";
-        }
-        return {
-          slNo: idx + 1,
-          candidateCode,
-          candidateName: s2.fullName,
-          email: s2.email,
-          phone: s2.phone,
-          qualification: qualification || "MBBS / MS / DNB",
-          college: s2.medicalCollege,
-          specialization: specStr,
-          status: effectiveStatus,
-          unitName: unitName || "\u2014",
-          submittedAt: s2.submittedAt ? new Date(s2.submittedAt).toISOString() : null
-        };
-      });
-      const pdfBuffer = await generateStudentDirectoryPdf({
-        programName: program?.name || form.title || "Fellowship Program December 2026",
-        academicSession: program?.academicYear || "December 2026",
-        candidates: candidatesList
-      });
-      const filename = `Student_List_December_2026_${form.token || formId}.pdf`;
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
-      res.send(pdfBuffer);
-    } catch (err) {
-      console.error("[student-list-pdf] Error:", err);
-      res.status(500).json({ error: err.message || "Failed to generate student list PDF" });
-    }
-  }
-);
-router20.get(
-  "/application-forms/submissions/:id/call-letter-pdf",
-  requireAuth,
-  async (req, res) => {
-    try {
-      const subId = Number(req.params.id);
-      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, subId));
-      if (!sub) return res.status(404).json({ error: "Submission not found" });
-      const [cand] = await db.select().from(candidatesTable).where(
-        or(
-          eq(candidatesTable.id, sub.candidateId || -1),
-          eq(candidatesTable.email, sub.email)
-        )
-      );
-      const candidateCode = cand?.candidateCode || sub.candidateCode || `APP-${String(sub.id).padStart(4, "0")}`;
-      const specs = parseSpecializationString(sub.specialization);
-      const spec = specs.length > 0 ? specs.join(", ") : sub.specialization || "Ophthalmology Fellowship";
-      const isRetina = isRetinaSpecialty(spec);
-      const defaultInterviewDate = isRetina ? "07.12.2026, Monday" : "08.12.2026, Tuesday";
-      const pdfBuffer = await generateCallLetterPdf({
-        candidateName: sub.fullName,
-        candidateCode,
-        specialization: spec,
-        email: sub.email,
-        phone: sub.phone,
-        address: sub.permanentAddress || sub.mailingAddress || cand?.address,
-        applicationId: sub.id,
-        interviewDate: req.query.interviewDate || defaultInterviewDate,
-        reportingTime: req.query.reportingTime || "8:00 AM Sharp",
-        venue: req.query.venue || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bengaluru \u2013 560037"
-      });
-      const filename = `Interview_Call_Letter_${candidateCode}.pdf`;
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
-      res.send(pdfBuffer);
-    } catch (err) {
-      console.error("[submission call-letter-pdf] Error:", err);
-      res.status(500).json({ error: err.message || "Failed to generate call letter" });
-    }
-  }
-);
-router20.post(
-  "/application-forms/submissions/:id/send-call-letter",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator"),
-  async (req, res) => {
-    try {
-      const subId = Number(req.params.id);
-      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, subId));
-      if (!sub) return res.status(404).json({ error: "Submission not found" });
-      const [cand] = await db.select().from(candidatesTable).where(
-        or(
-          eq(candidatesTable.id, sub.candidateId || -1),
-          eq(candidatesTable.email, sub.email)
-        )
-      );
-      const candidateCode = cand?.candidateCode || sub.candidateCode || `APP-${String(sub.id).padStart(4, "0")}`;
-      const specs = parseSpecializationString(sub.specialization);
-      const spec = req.body.specialization || (specs.length > 0 ? specs.join(", ") : sub.specialization || "Ophthalmology Fellowship");
-      const isRetina = isRetinaSpecialty(spec);
-      const interviewDate = req.body.interviewDate || (isRetina ? "07.12.2026, Monday" : "08.12.2026, Tuesday");
-      const reportingTime = req.body.reportingTime || "8:00 AM Sharp";
-      const venue = req.body.venue || "Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bengaluru \u2013 560037";
-      const pdfBuffer = await generateCallLetterPdf({
-        candidateName: sub.fullName,
-        candidateCode,
-        specialization: spec,
-        email: sub.email,
-        phone: sub.phone,
-        address: sub.permanentAddress || sub.mailingAddress || cand?.address,
-        applicationId: sub.id,
-        interviewDate,
-        reportingTime,
-        venue
-      });
-      const fileName = `Interview_Call_Letter_${candidateCode}.pdf`;
-      const emailResult = await sendCallLetterWithAttachment({
-        toEmail: sub.email,
-        toName: sub.fullName,
-        pdfBuffer,
-        fileName,
-        interviewDate,
-        reportingTime,
-        venue,
-        specialization: spec
-      });
-      await db.update(applicationSubmissionsTable).set({
-        reviewNotes: sub.reviewNotes ? `${sub.reviewNotes} | Call Letter Issued` : "Call Letter Issued"
-      }).where(eq(applicationSubmissionsTable.id, subId));
-      res.json({
-        success: true,
-        fileName,
-        emailSent: emailResult.sent,
-        message: emailResult.sent ? "Call letter dispatched by email and ready for download." : "Call letter PDF generated successfully. (Note: Email was not sent because SMTP is not configured. Download PDF directly)."
-      });
-    } catch (err) {
-      console.error("[submission send-call-letter] Error:", err);
-      res.status(500).json({ error: err.message || "Failed to generate call letter" });
-    }
-  }
-);
-router20.get(
-  "/application-forms/submissions/:id/offer-letter-pdf",
-  requireAuth,
-  async (req, res) => {
-    try {
-      const subId = Number(req.params.id);
-      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, subId));
-      if (!sub) return res.status(404).json({ error: "Submission not found" });
-      const [cand] = await db.select().from(candidatesTable).where(
-        or(
-          eq(candidatesTable.id, sub.candidateId || -1),
-          eq(candidatesTable.email, sub.email)
-        )
-      );
-      const candidateCode = cand?.candidateCode || sub.candidateCode || `APP-${String(sub.id).padStart(4, "0")}`;
-      const units = await db.select().from(unitsTable);
-      let unitName = req.query.unitName || "";
-      if (!unitName && cand?.unitId) {
-        const u = units.find((x2) => x2.id === cand.unitId);
-        if (u) unitName = u.name;
-      }
-      if (!unitName && sub.centerPreference) {
-        unitName = String(sub.centerPreference).replace(/[{}"[\]]/g, "").trim().split(",")[0] || "Bangalore";
-      }
-      if (!unitName) unitName = "Bangalore";
-      const specs = parseSpecializationString(sub.specialization);
-      const specialization = req.query.specialization || (specs[0] || "Cataract & IOL");
-      const duration3 = req.query.duration ? Number(req.query.duration) : isRetinaSpecialty(specialization) ? 24 : 18;
-      const effectiveDate = req.query.effectiveDate || "6th January 2027";
-      const interviewDate = req.query.interviewDate || (isRetinaSpecialty(specialization) ? "7th December 2026" : "8th December 2026");
-      const pdfBuffer = await generateOfferLetterPdf({
-        candidateName: sub.fullName,
-        candidateCode,
-        specialization,
-        unitName,
-        cmoName: req.query.cmoName,
-        address: sub.permanentAddress || sub.mailingAddress || cand?.address,
-        durationMonths: duration3,
-        effectiveDate,
-        interviewDate,
-        stipendAmount: req.query.stipend || "Rs 40,000"
-      });
-      const filename = `Fellowship_Offer_Letter_${candidateCode}.pdf`;
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
-      res.send(pdfBuffer);
-    } catch (err) {
-      console.error("[submission offer-letter-pdf] Error:", err);
-      res.status(500).json({ error: err.message || "Failed to generate offer letter" });
-    }
-  }
-);
-router20.post(
-  "/application-forms/submissions/:id/send-offer-letter",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator"),
-  async (req, res) => {
-    try {
-      const subId = Number(req.params.id);
-      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, subId));
-      if (!sub) return res.status(404).json({ error: "Submission not found" });
-      const [cand] = await db.select().from(candidatesTable).where(
-        or(
-          eq(candidatesTable.id, sub.candidateId || -1),
-          eq(candidatesTable.email, sub.email)
-        )
-      );
-      const candidateCode = cand?.candidateCode || sub.candidateCode || `APP-${String(sub.id).padStart(4, "0")}`;
-      const units = await db.select().from(unitsTable);
-      let unitName = req.body.unitName || "";
-      if (!unitName && cand?.unitId) {
-        const u = units.find((x2) => x2.id === cand.unitId);
-        if (u) unitName = u.name;
-      }
-      if (!unitName && sub.centerPreference) {
-        unitName = String(sub.centerPreference).replace(/[{}"[\]]/g, "").trim().split(",")[0] || "Bangalore";
-      }
-      if (!unitName) unitName = "Bangalore";
-      const specs = parseSpecializationString(sub.specialization);
-      const specialization = req.body.specialization || (specs[0] || "Cataract & IOL");
-      const duration3 = req.body.duration ? Number(req.body.duration) : isRetinaSpecialty(specialization) ? 24 : 18;
-      const effectiveDate = req.body.effectiveDate || "6th January 2027";
-      const interviewDate = req.body.interviewDate || (isRetinaSpecialty(specialization) ? "7th December 2026" : "8th December 2026");
-      const pdfBuffer = await generateOfferLetterPdf({
-        candidateName: sub.fullName,
-        candidateCode,
-        specialization,
-        unitName,
-        cmoName: req.body.cmoName,
-        address: sub.permanentAddress || sub.mailingAddress || cand?.address,
-        durationMonths: duration3,
-        effectiveDate,
-        interviewDate,
-        stipendAmount: req.body.stipend || "Rs 40,000"
-      });
-      const fileName = `Fellowship_Offer_Letter_${candidateCode}.pdf`;
-      await sendOfferLetterWithAttachment({
-        toEmail: sub.email,
-        toName: sub.fullName,
-        pdfBuffer,
-        fileName,
-        unitName,
-        specialization,
-        effectiveDate
-      });
-      res.json({ success: true, fileName });
-    } catch (err) {
-      console.error("[submission send-offer-letter] Error:", err);
-      res.status(500).json({ error: err.message || "Failed to send offer letter" });
-    }
-  }
-);
-router20.get(
-  "/application-forms/:id/export",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
-  async (req, res) => {
-    const formId = Number(req.params.id);
-    const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, formId));
-    const subs = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.formId, formId)).orderBy(desc(applicationSubmissionsTable.submittedAt));
-    const rows = subs.map((s2) => {
-      const specParsed = parseSpecializationString(s2.specialization);
-      const specString = specParsed.join(", ");
-      const getFormattedSpecialityPrefs = (specializationStr, centerPreferenceStr, formData, customAnswers, sectionsConfig) => {
-        const specs = parseSpecializationString(specializationStr);
-        if (specs.length === 0) return [];
-        const prefs = {};
-        if (centerPreferenceStr) {
-          try {
-            const parsed = JSON.parse(centerPreferenceStr);
-            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-              Object.entries(parsed).forEach(([k, v]) => {
-                prefs[k] = Array.isArray(v) ? v.join(", ") : String(v);
-              });
-            }
-          } catch {
-          }
-        }
-        const extractUnitFields = (obj) => {
-          if (obj && typeof obj === "object") {
-            Object.entries(obj).forEach(([key, val]) => {
-              if (key.startsWith("unit_") && val) {
-                let label = key.replace("unit_", "").replace(/_/g, " ").toUpperCase();
-                if (sectionsConfig) {
-                  sectionsConfig.forEach((sec) => {
-                    sec.fields?.forEach((f3) => {
-                      if (f3.id === key && f3.label) {
-                        label = f3.label.replace(" Preferred Center", "");
-                      }
-                    });
-                  });
-                }
-                prefs[label] = Array.isArray(val) ? val.join(", ") : String(val);
-              }
-            });
-          }
-        };
-        extractUnitFields(formData);
-        extractUnitFields(customAnswers);
-        if (formData && formData.formData) {
-          extractUnitFields(formData.formData);
-        }
-        const normalize2 = (str) => {
-          return str.toLowerCase().replace(/[^a-z0-9]/g, "");
-        };
-        const normalizedPrefs = {};
-        Object.entries(prefs).forEach(([k, v]) => {
-          normalizedPrefs[normalize2(k)] = v;
-          if (k.startsWith("unit_")) {
-            normalizedPrefs[normalize2(k.substring(5))] = v;
-          }
-        });
-        const result = [];
-        specs.forEach((spec) => {
-          const normSpec = normalize2(spec);
-          let loc = normalizedPrefs[normSpec];
-          if (!loc) {
-            const key = Object.keys(normalizedPrefs).find((k) => k.includes(normSpec) || normSpec.includes(k));
-            if (key) {
-              loc = normalizedPrefs[key];
-            }
-          }
-          if (!loc && centerPreferenceStr) {
-            const trimmedCp = centerPreferenceStr.trim();
-            if (!trimmedCp.startsWith("{") && !trimmedCp.startsWith("[") && trimmedCp !== "0" && trimmedCp.toLowerCase() !== "not applicable") {
-              loc = trimmedCp;
-            }
-          }
-          if (loc && (loc.toLowerCase().trim() === "not applicable" || loc.toLowerCase().trim() === "not_applicable")) {
-            loc = "";
-          }
-          result.push({
-            spec,
-            location: loc ? loc.trim() : null
-          });
-        });
-        return result;
-      };
-      const caParsed = {
-        ...s2.formData || {},
-        ...s2.customAnswers || {}
-      };
-      const specPrefs = getFormattedSpecialityPrefs(s2.specialization, s2.centerPreference, caParsed, s2.customAnswers, form?.sectionsConfig ?? void 0);
-      const specWithCentersList = specPrefs.map(({ spec, location }) => location ? `${spec}: ${location}` : spec);
-      const specWithCentersString = specWithCentersList.length > 0 ? specWithCentersList.join("; ") : specString;
-      const cpParsed = {};
-      specPrefs.forEach(({ spec, location }) => {
-        if (location) {
-          cpParsed[spec] = location;
-        }
-      });
-      const segments = specParsed.map((spec) => {
-        const sName = spec.trim().toLowerCase();
-        if (sName.includes("retina")) {
-          return "Retina";
-        }
-        return "Anterior";
-      });
-      const segmentString = [...new Set(segments)].join(", ");
-      const baseRow = {
-        "Submission ID": s2.id,
-        "Date": formatToDDMMYYYY(s2.submittedAt),
-        "Specialities": specWithCentersString,
-        "Retina/Anterior": segmentString || "Anterior",
-        "Timestamp": formatToLocalDateTime(s2.submittedAt),
-        "Name in Full (First Name, Middle Name, Last/Family Name)": s2.fullName,
-        "E-mail (this would be the ID all communication would be shared on)": s2.email,
-        "Mobile Number (only 10 digits)": s2.phone ?? "",
-        "Date of Birth": formatDOBToStandard(s2.dateOfBirth),
-        "Marital Status": s2.maritalStatus ?? "",
-        "Permanent Address (including postal pin code)": s2.permanentAddress ?? "",
-        "Select 1 option from the dropbox": specWithCentersString,
-        "Cornea - Choose the preferred center": cpParsed["Cornea"] ? Array.isArray(cpParsed["Cornea"]) ? cpParsed["Cornea"].join(", ") : cpParsed["Cornea"] : "Not Applicable",
-        "Glaucoma - Choose the preferred center": cpParsed["Glaucoma"] ? Array.isArray(cpParsed["Glaucoma"]) ? cpParsed["Glaucoma"].join(", ") : cpParsed["Glaucoma"] : "Not Applicable",
-        "IOL - Choose the preferred center": cpParsed["IOL"] ? Array.isArray(cpParsed["IOL"]) ? cpParsed["IOL"].join(", ") : cpParsed["IOL"] : "Not Applicable",
-        "Medical Retina - Choose the preferred center": cpParsed["Medical Retina"] ? Array.isArray(cpParsed["Medical Retina"]) ? cpParsed["Medical Retina"].join(", ") : cpParsed["Medical Retina"] : "Not Applicable",
-        "Oculoplasty - Choose the preferred center": cpParsed["Oculoplasty"] ? Array.isArray(cpParsed["Oculoplasty"]) ? cpParsed["Oculoplasty"].join(", ") : cpParsed["Oculoplasty"] : "Not Applicable",
-        "Pediatric Ophthalmology - Choose the preferred center": cpParsed["Pediatric Ophthalmology"] ? Array.isArray(cpParsed["Pediatric Ophthalmology"]) ? cpParsed["Pediatric Ophthalmology"].join(", ") : cpParsed["Pediatric Ophthalmology"] : "Not Applicable",
-        "Phaco Refractive - Choose the preferred center": cpParsed["Phaco Refractive"] ? Array.isArray(cpParsed["Phaco Refractive"]) ? cpParsed["Phaco Refractive"].join(", ") : cpParsed["Phaco Refractive"] : "Not Applicable",
-        "Vitreo Retina - Choose the preferred center": cpParsed["Vitreo Retina"] ? Array.isArray(cpParsed["Vitreo Retina"]) ? cpParsed["Vitreo Retina"].join(", ") : cpParsed["Vitreo Retina"] : "Not Applicable"
-      };
-      for (const [key, val] of Object.entries(cpParsed)) {
-        if (!["Cornea", "Glaucoma", "IOL", "Medical Retina", "Oculoplasty", "Pediatric Ophthalmology", "Phaco Refractive", "Vitreo Retina"].includes(key)) {
-          const valString = Array.isArray(val) ? val.join(", ") : val;
-          baseRow[`${key} - Choose the preferred center`] = valString;
-        }
-      }
-      baseRow["Where did you hear about this Fellowship?"] = s2.referralSource ?? "";
-      baseRow["Mention the name of referred Faculty/Existing Trainee from Sankara"] = s2.referredByName ?? "";
-      baseRow["Degrees & Other Qualifications (Mention University name, passing month/year)"] = s2.degree ?? "";
-      baseRow["Medical College Qualified From"] = s2.medicalCollege ?? "";
-      baseRow["University from which Medical College is affiliated"] = s2.university ?? "";
-      baseRow["Postgraduate Qualifications"] = s2.pgQualifications ?? "";
-      baseRow["Qualification [DO (Diploma Ophthlmology)]"] = s2.doQualification ? "Yes" : "No";
-      baseRow["If DO then College & University Qualified from and year of Qualification"] = s2.doDetails ?? "";
-      baseRow["Qualification [MS/MD ( Masters in Ophthalmology)]"] = s2.msMdQualification ? "Yes" : "No";
-      baseRow["If MS then College & University Qualified from and year of Qualification"] = s2.msMdDetails ?? "";
-      baseRow["Qualification [DNB]"] = s2.dnbQualification ? "Yes" : "No";
-      baseRow["If DNB then institution completed from and year of Qualification"] = s2.dnbDetails ?? "";
-      baseRow["Any Other Training / Certification undertaken"] = s2.otherTraining ?? "";
-      baseRow["Medical Council Registration Number (MCI)"] = s2.medicalCouncilNumber ?? "";
-      let diagnosticParsed = {};
-      try {
-        diagnosticParsed = JSON.parse(s2.diagnosticSkills ?? "{}");
-      } catch {
-      }
-      for (const [k, v] of Object.entries(diagnosticParsed)) {
-        baseRow[`Perform & Interpret Diagnostics [${k}]`] = v;
-      }
-      let surgicalParsed = {};
-      try {
-        surgicalParsed = JSON.parse(s2.surgicalExperience ?? "{}");
-      } catch {
-      }
-      for (const [k, v] of Object.entries(surgicalParsed)) {
-        baseRow[`Approximate No of ${k} (Under Supervision)`] = v?.supervision ?? "";
-        baseRow[`Approximate No of ${k} (Independently)`] = v?.independent ?? "";
-      }
-      baseRow["Total No of Surgeries performed till date"] = s2.totalSurgeries ?? "";
-      baseRow["Publications"] = s2.publications ?? "";
-      baseRow["Presentations"] = s2.presentations ?? "";
-      baseRow["Letter of recommendation 1"] = s2.lor1Url ?? "";
-      baseRow["LOR 1 Name & Designation"] = s2.lor1RefName ?? "";
-      baseRow["LOR 1 Contact"] = s2.lor1RefContact ?? "";
-      baseRow["LOR 1 Email"] = s2.lor1RefEmail ?? "";
-      baseRow["Letter of recommendation 2"] = s2.lor2Url ?? "";
-      baseRow["LOR 2 Name & Designation"] = s2.lor2RefName ?? "";
-      baseRow["LOR 2 Contact"] = s2.lor2RefContact ?? "";
-      baseRow["LOR 2 Email"] = s2.lor2RefEmail ?? "";
-      baseRow["If Married Spouse Details(Name & Profession)"] = s2.spouseDetails ?? "";
-      baseRow["Medical Conditions Declaration"] = s2.healthDeclaration ?? "";
-      baseRow["Other pertinent information"] = s2.otherInformation ?? "";
-      baseRow["Passport size photograph"] = s2.photoUrl ?? "";
-      baseRow["Transaction ID/ UTR No"] = s2.paymentUrl ?? "";
-      baseRow["Status"] = s2.status;
-      baseRow["Source"] = s2.source ?? "internal";
-      baseRow["Review Notes"] = s2.reviewNotes ?? "";
-      for (const [key, val] of Object.entries(caParsed)) {
-        const valString = Array.isArray(val) ? val.join(", ") : val;
-        baseRow[key] = valString;
-      }
-      return baseRow;
-    });
-    const wb = XLSX5.utils.book_new();
-    const addAutoFilter = (ws) => {
-      if (!ws["!ref"]) return;
-      try {
-        const range2 = XLSX5.utils.decode_range(ws["!ref"]);
-        ws["!autofilter"] = {
-          ref: XLSX5.utils.encode_range({
-            s: { c: 0, r: 0 },
-            e: { c: range2.e.c, r: range2.e.r }
-          })
-        };
-      } catch (err) {
-        console.error("Failed to add autofilter:", err);
-      }
-    };
-    const wsGeneral = XLSX5.utils.json_to_sheet(rows);
-    const colWidths = Object.keys(rows[0] ?? {}).map((k) => ({ wch: Math.max(k.length + 2, 22) }));
-    wsGeneral["!cols"] = colWidths;
-    wsGeneral["!rows"] = [{ hpt: 35 }];
-    addAutoFilter(wsGeneral);
-    XLSX5.utils.book_append_sheet(wb, wsGeneral, "General");
-    const specialitiesConfig = [
-      { dbName: "Cornea", sheetName: "Cornea" },
-      { dbName: "Glaucoma", sheetName: "Glaucoma" },
-      { dbName: "IOL", sheetName: "IOL Fellowship" },
-      { dbName: "Medical Retina", sheetName: "Medical Retina" },
-      { dbName: "Oculoplasty", sheetName: "Oculoplasty" },
-      { dbName: "Pediatric Ophthalmology", sheetName: "Pediatric Ophthalmology" },
-      { dbName: "Phaco Refractive", sheetName: "Phaco Refractive" },
-      { dbName: "Vitreo Retina", sheetName: "Vitreo Retina" }
-    ];
-    const matchRowToSpeciality = (row, dbName) => {
-      const specsStr = String(row["Specialities"] ?? "").toLowerCase();
-      const name2 = dbName.toLowerCase();
-      if (name2 === "iol") {
-        return specsStr.includes("iol");
-      }
-      if (name2 === "pediatric ophthalmology") {
-        return specsStr.includes("pediatric");
-      }
-      return specsStr.includes(name2);
-    };
-    const headers = Object.keys(rows[0] ?? {});
-    specialitiesConfig.forEach((config2) => {
-      const specRows = rows.filter((r2) => matchRowToSpeciality(r2, config2.dbName));
-      let wsSpec;
-      if (specRows.length > 0) {
-        wsSpec = XLSX5.utils.json_to_sheet(specRows);
-      } else {
-        wsSpec = XLSX5.utils.json_to_sheet([], { header: headers });
-      }
-      wsSpec["!cols"] = colWidths;
-      wsSpec["!rows"] = [{ hpt: 30 }];
-      addAutoFilter(wsSpec);
-      XLSX5.utils.book_append_sheet(wb, wsSpec, config2.sheetName);
-    });
-    const safeName = (form?.title ?? `form-${formId}`).replace(/[^a-zA-Z0-9-_]/g, "_").slice(0, 40);
-    const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-    const filename = `SAV_${safeName}_Admissions_${today}.xlsx`;
-    const buffer = XLSX5.write(wb, { type: "buffer", bookType: "xlsx" });
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.send(buffer);
-  }
-);
-router20.patch(
-  "/application-forms/submissions/:id",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
-  async (req, res) => {
-    const id = Number(req.params.id);
-    const body = req.body;
-    const updates = {};
-    const possibleFields = [
-      "status",
-      "reviewNotes",
-      "formData",
-      "fullName",
-      "email",
-      "phone",
-      "permanentAddress",
-      "mailingAddress",
-      "dateOfBirth",
-      "maritalStatus",
-      "spouseDetails",
-      "degree",
-      "medicalCollege",
-      "university",
-      "medicalCouncilNumber",
-      "diagnosticSkills",
-      "surgicalExperience",
-      "totalSurgeries",
-      "specialization",
-      "centerPreference",
-      "customAnswers",
-      "readyForReview",
-      "gender",
-      "pgQualifications",
-      "doQualification",
-      "doDetails",
-      "msMdQualification",
-      "msMdDetails",
-      "dnbQualification",
-      "dnbDetails",
-      "otherTraining",
-      "publications",
-      "presentations",
-      "otherInformation",
-      "lor1Url",
-      "lor2Url",
-      "photoUrl"
-    ];
-    possibleFields.forEach((field) => {
-      if (body[field] !== void 0) {
-        if (field === "formData" || field === "customAnswers") {
-          updates[field] = body[field];
-        } else {
-          updates[field] = body[field];
-        }
-      }
-    });
-    updates.reviewedAt = /* @__PURE__ */ new Date();
-    const [oldSub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, id));
-    if (!oldSub) return res.status(404).json({ error: "Submission not found" });
-    const fileFields = ["lor1Url", "lor2Url", "photoUrl", "paymentUrl"];
-    for (const field of fileFields) {
-      const oldValue = oldSub[field];
-      const newValue = updates[field];
-      if (newValue !== void 0 && newValue !== oldValue) {
-        if (oldValue && typeof oldValue === "string" && oldValue.startsWith("/objects/uploads/")) {
-          const isReplit = !!process.env.REPL_ID;
-          if (!isReplit) {
-            try {
-              const fsPromises = await import("fs/promises");
-              const localPath = path7.join(process.cwd(), "uploads", oldValue.replace("/objects/uploads/", ""));
-              await fsPromises.unlink(localPath);
-              req.log?.info?.({ localPath }, `Successfully deleted replaced file from disk`);
-            } catch (err) {
-              req.log?.warn?.({ err, path: oldValue }, `Failed to delete replaced file from disk (might not exist)`);
-            }
-          } else {
-            try {
-              const { ObjectStorageService: ObjectStorageService2 } = await Promise.resolve().then(() => (init_objectStorage(), objectStorage_exports));
-              const objectStorageService2 = new ObjectStorageService2();
-              const objectFile = await objectStorageService2.getObjectEntityFile(oldValue);
-              await objectFile.delete();
-              req.log?.info?.({ objectPath: oldValue }, `Successfully deleted replaced file from object storage`);
-            } catch (err) {
-              req.log?.warn?.({ err, path: oldValue }, `Failed to delete replaced file from object storage`);
-            }
-          }
-        }
-      }
-    }
-    const [updated] = await db.update(applicationSubmissionsTable).set(updates).where(eq(applicationSubmissionsTable.id, id)).returning();
-    if (!updated) return res.status(404).json({ error: "Submission not found" });
-    const existingCandidate = await db.select().from(candidatesTable).where(eq(candidatesTable.email, updated.email));
-    if (existingCandidate.length > 0) {
-      await syncSubmissionToCandidateAndDocuments(existingCandidate[0].id, updated);
-    }
-    if (updates.status === "approved" || updates.status === "reviewed") {
-      const existing = await db.select().from(candidatesTable).where(eq(candidatesTable.email, updated.email));
-      let candidateId;
-      if (existing.length === 0) {
-        const year = (/* @__PURE__ */ new Date()).getFullYear();
-        const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
-        const code = `SAV-${year}-${rand}`;
-        const [candidate] = await db.insert(candidatesTable).values({
-          candidateCode: code,
-          fullName: updated.fullName,
-          email: updated.email,
-          phone: updated.phone ?? null,
-          dateOfBirth: updated.dateOfBirth ?? null,
-          gender: null,
-          address: updated.permanentAddress ?? null,
-          qualification: updated.degree ?? null,
-          collegeName: updated.medicalCollege ?? null,
-          status: "approved"
-        }).returning();
-        candidateId = candidate.id;
-        if (updated.specialization && candidate) {
-          const specList = parseSpecializationString(updated.specialization);
-          if (Array.isArray(specList) && specList.length > 0) {
-            const specs = await db.select().from(specialitiesTable);
-            let order = 1;
-            for (const specName of specList) {
-              const spec = specs.find((s2) => s2.name.toLowerCase() === specName.toLowerCase());
-              if (spec) {
-                await db.insert(candidatePreferencesTable).values({
-                  candidateId: candidate.id,
-                  specialityId: spec.id,
-                  preferenceOrder: order++
-                }).onConflictDoNothing();
-              }
-            }
-          }
-        }
-      } else {
-        candidateId = existing[0].id;
-      }
-      if (updated.specialization) {
-        const specList = parseSpecializationString(updated.specialization);
-        if (Array.isArray(specList) && specList.length > 0) {
-          const specs = await db.select().from(specialitiesTable);
-          for (const specName of specList) {
-            const spec = specs.find((s2) => s2.name.toLowerCase() === specName.toLowerCase());
-            if (spec) {
-              const existingApp = await db.select().from(applicationsTable).where(
-                and(
-                  eq(applicationsTable.candidateId, candidateId),
-                  eq(applicationsTable.specialityId, spec.id)
-                )
-              );
-              if (existingApp.length === 0) {
-                const prefix = spec.code ? spec.code.toUpperCase() : "GEN";
-                const year = 2026;
-                const countResult = await db.execute(sql`
-                  SELECT COUNT(*)::int as count FROM applications WHERE speciality_id = ${spec.id} AND hall_ticket_number IS NOT NULL
-                `);
-                const seq = Number(countResult.rows[0]?.count ?? 0) + 1;
-                const hallTicketNumber = `${prefix}-${year}-${String(seq).padStart(3, "0")}`;
-                await db.insert(applicationsTable).values({
-                  candidateId,
-                  specialityId: spec.id,
-                  hallTicketNumber,
-                  status: "approved"
-                });
-              }
-            }
-          }
-        }
-      }
-    }
-    res.json(updated);
-  }
-);
-router20.post(
-  "/application-submissions/merge",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator"),
-  async (req, res) => {
-    try {
-      const { primaryId, secondaryId, deleteSecondary } = req.body;
-      if (!primaryId || !secondaryId || Number(primaryId) === Number(secondaryId)) {
-        return res.status(400).json({ error: "Please select two distinct applications to merge." });
-      }
-      const [prim] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, Number(primaryId)));
-      const [sec] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, Number(secondaryId)));
-      if (!prim || !sec) {
-        return res.status(404).json({ error: "One or both applications could not be found." });
-      }
-      const primSpecs = parseSpecializationString(prim.specialization);
-      const secSpecs = parseSpecializationString(sec.specialization);
-      const combinedSpecs = Array.from(/* @__PURE__ */ new Set([...primSpecs, ...secSpecs]));
-      const parseCenterPrefs = (cp) => {
-        if (!cp) return {};
-        if (typeof cp === "object" && !Array.isArray(cp)) return cp;
-        try {
-          return JSON.parse(cp);
-        } catch {
-          return {};
-        }
-      };
-      const primPrefs = parseCenterPrefs(prim.centerPreference);
-      const secPrefs = parseCenterPrefs(sec.centerPreference);
-      const combinedPrefs = { ...secPrefs, ...primPrefs };
-      const primFormData = prim.formData || {};
-      const secFormData = sec.formData || {};
-      const combinedFormData = { ...secFormData, ...primFormData };
-      const primCustomAnswers = prim.customAnswers || {};
-      const secCustomAnswers = sec.customAnswers || {};
-      const combinedCustomAnswers = { ...secCustomAnswers, ...primCustomAnswers };
-      const mergedFields = {
-        specialization: JSON.stringify(combinedSpecs),
-        centerPreference: JSON.stringify(combinedPrefs),
-        formData: combinedFormData,
-        customAnswers: combinedCustomAnswers,
-        phone: prim.phone || sec.phone,
-        dateOfBirth: prim.dateOfBirth || sec.dateOfBirth,
-        gender: prim.gender || sec.gender,
-        maritalStatus: prim.maritalStatus || sec.maritalStatus,
-        spouseDetails: prim.spouseDetails || sec.spouseDetails,
-        permanentAddress: prim.permanentAddress || sec.permanentAddress,
-        mailingAddress: prim.mailingAddress || sec.mailingAddress,
-        degree: prim.degree || sec.degree,
-        medicalCollege: prim.medicalCollege || sec.medicalCollege,
-        university: prim.university || sec.university,
-        medicalCouncilNumber: prim.medicalCouncilNumber || sec.medicalCouncilNumber,
-        pgQualifications: prim.pgQualifications || sec.pgQualifications,
-        diagnosticSkills: prim.diagnosticSkills || sec.diagnosticSkills,
-        surgicalExperience: prim.surgicalExperience || sec.surgicalExperience,
-        totalSurgeries: prim.totalSurgeries || sec.totalSurgeries,
-        publications: prim.publications || sec.publications,
-        presentations: prim.presentations || sec.presentations,
-        photoUrl: prim.photoUrl || sec.photoUrl,
-        lor1Url: prim.lor1Url || sec.lor1Url,
-        lor1RefName: prim.lor1RefName || sec.lor1RefName,
-        lor1RefContact: prim.lor1RefContact || sec.lor1RefContact,
-        lor1RefEmail: prim.lor1RefEmail || sec.lor1RefEmail,
-        lor2Url: prim.lor2Url || sec.lor2Url,
-        lor2RefName: prim.lor2RefName || sec.lor2RefName,
-        lor2RefContact: prim.lor2RefContact || sec.lor2RefContact,
-        lor2RefEmail: prim.lor2RefEmail || sec.lor2RefEmail,
-        paymentId: prim.paymentId || sec.paymentId,
-        paymentMode: prim.paymentMode || sec.paymentMode,
-        paymentUrl: prim.paymentUrl || sec.paymentUrl,
-        paidAmount: Math.round(Number(prim.paidAmount || 0) + Number(sec.paidAmount || 0)) || Math.round(Number(prim.paidAmount || 0)) || 0,
-        reviewNotes: [prim.reviewNotes, `[Merged with #APP-${sec.id}]: ${sec.reviewNotes || ""}`].filter(Boolean).join(" | "),
-        reviewedAt: /* @__PURE__ */ new Date()
-      };
-      const [updatedPrim] = await db.update(applicationSubmissionsTable).set(mergedFields).where(eq(applicationSubmissionsTable.id, prim.id)).returning();
-      const primCandidate = prim.candidateId ? (await db.select().from(candidatesTable).where(eq(candidatesTable.id, prim.candidateId)))[0] : (await db.select().from(candidatesTable).where(eq(candidatesTable.email, prim.email.toLowerCase().trim())))[0];
-      const secCandidate = sec.candidateId ? (await db.select().from(candidatesTable).where(eq(candidatesTable.id, sec.candidateId)))[0] : (await db.select().from(candidatesTable).where(eq(candidatesTable.email, sec.email.toLowerCase().trim())))[0];
-      if (primCandidate && secCandidate && primCandidate.id !== secCandidate.id) {
-        await db.update(documentsTable).set({ candidateId: primCandidate.id }).where(eq(documentsTable.candidateId, secCandidate.id)).catch(() => {
-        });
-        await db.update(interviewScoresTable).set({ candidateId: primCandidate.id }).where(eq(interviewScoresTable.candidateId, secCandidate.id)).catch(() => {
-        });
-        await db.update(examAttemptsTable).set({ candidateId: primCandidate.id }).where(eq(examAttemptsTable.candidateId, secCandidate.id)).catch(() => {
-        });
-        await db.update(candidateExamAssignmentsTable).set({ candidateId: primCandidate.id }).where(eq(candidateExamAssignmentsTable.candidateId, secCandidate.id)).catch(() => {
-        });
-        await db.update(batchCandidatesTable).set({ candidateId: primCandidate.id }).where(eq(batchCandidatesTable.candidateId, secCandidate.id)).catch(() => {
-        });
-        await db.update(doctorAssignmentsTable).set({ candidateId: primCandidate.id }).where(eq(doctorAssignmentsTable.candidateId, secCandidate.id)).catch(() => {
-        });
-        const secApps = await db.select().from(applicationsTable).where(eq(applicationsTable.candidateId, secCandidate.id));
-        for (const sapp of secApps) {
-          const existingPrimApp = await db.select().from(applicationsTable).where(
-            and(
-              eq(applicationsTable.candidateId, primCandidate.id),
-              eq(applicationsTable.specialityId, sapp.specialityId)
-            )
-          );
-          if (existingPrimApp.length > 0) {
-            await db.delete(applicationsTable).where(eq(applicationsTable.id, sapp.id)).catch(() => {
-            });
-          } else {
-            await db.update(applicationsTable).set({ candidateId: primCandidate.id }).where(eq(applicationsTable.id, sapp.id)).catch(() => {
-            });
-          }
-        }
-        await db.delete(candidatePreferencesTable).where(eq(candidatePreferencesTable.candidateId, secCandidate.id)).catch(() => {
-        });
-        const specs = await db.select().from(specialitiesTable);
-        let order = 1;
-        for (const specName of combinedSpecs) {
-          const spec = specs.find((s2) => s2.name.toLowerCase() === specName.toLowerCase());
-          if (spec) {
-            await db.insert(candidatePreferencesTable).values({
-              candidateId: primCandidate.id,
-              specialityId: spec.id,
-              preferenceOrder: order++
-            }).onConflictDoNothing().catch(() => {
-            });
-          }
-        }
-        await db.update(candidatesTable).set({
-          qualification: primCandidate.qualification || secCandidate.qualification || updatedPrim.degree,
-          collegeName: primCandidate.collegeName || secCandidate.collegeName || updatedPrim.medicalCollege,
-          address: primCandidate.address || secCandidate.address || updatedPrim.permanentAddress,
-          phone: primCandidate.phone || secCandidate.phone || updatedPrim.phone,
-          status: "approved"
-        }).where(eq(candidatesTable.id, primCandidate.id)).catch(() => {
-        });
-        await db.update(applicationSubmissionsTable).set({ candidateId: primCandidate.id }).where(eq(applicationSubmissionsTable.candidateId, secCandidate.id)).catch(() => {
-        });
-        await db.update(applicationSubmissionsTable).set({ candidateId: primCandidate.id }).where(eq(applicationSubmissionsTable.id, prim.id)).catch(() => {
-        });
-        await db.delete(candidatesTable).where(eq(candidatesTable.id, secCandidate.id)).catch(() => {
-        });
-      } else if (primCandidate) {
-        const specs = await db.select().from(specialitiesTable);
-        let order = 1;
-        for (const specName of combinedSpecs) {
-          const spec = specs.find((s2) => s2.name.toLowerCase() === specName.toLowerCase());
-          if (spec) {
-            await db.insert(candidatePreferencesTable).values({
-              candidateId: primCandidate.id,
-              specialityId: spec.id,
-              preferenceOrder: order++
-            }).onConflictDoNothing().catch(() => {
-            });
-          }
-        }
-        await db.update(candidatesTable).set({
-          qualification: primCandidate.qualification || updatedPrim.degree,
-          collegeName: primCandidate.collegeName || updatedPrim.medicalCollege,
-          address: primCandidate.address || updatedPrim.permanentAddress,
-          phone: primCandidate.phone || updatedPrim.phone,
-          status: "approved"
-        }).where(eq(candidatesTable.id, primCandidate.id)).catch(() => {
-        });
-        await db.update(applicationSubmissionsTable).set({ candidateId: primCandidate.id }).where(eq(applicationSubmissionsTable.id, prim.id)).catch(() => {
-        });
-      } else if (secCandidate) {
-        await db.update(candidatesTable).set({
-          email: updatedPrim.email,
-          fullName: updatedPrim.fullName,
-          qualification: secCandidate.qualification || updatedPrim.degree,
-          collegeName: secCandidate.collegeName || updatedPrim.medicalCollege,
-          address: secCandidate.address || updatedPrim.permanentAddress,
-          phone: secCandidate.phone || updatedPrim.phone,
-          status: "approved"
-        }).where(eq(candidatesTable.id, secCandidate.id)).catch(() => {
-        });
-        const specs = await db.select().from(specialitiesTable);
-        let order = 1;
-        for (const specName of combinedSpecs) {
-          const spec = specs.find((s2) => s2.name.toLowerCase() === specName.toLowerCase());
-          if (spec) {
-            await db.insert(candidatePreferencesTable).values({
-              candidateId: secCandidate.id,
-              specialityId: spec.id,
-              preferenceOrder: order++
-            }).onConflictDoNothing().catch(() => {
-            });
-          }
-        }
-        await db.update(applicationSubmissionsTable).set({ candidateId: secCandidate.id }).where(eq(applicationSubmissionsTable.id, prim.id)).catch(() => {
-        });
-      }
-      await db.delete(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, sec.id));
-      return res.json({
-        success: true,
-        message: `Successfully merged Application #APP-${sec.id} into #APP-${prim.id}`,
-        primarySubmission: updatedPrim
-      });
-    } catch (err) {
-      console.error("[merge-application] error:", err);
-      return res.status(500).json({ error: "Failed to merge applications", details: err.message });
-    }
-  }
-);
-router20.post(
-  "/application-forms/submissions/:id/approve",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
-  async (req, res) => {
-    const id = Number(req.params.id);
-    const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, id));
-    if (!sub) return res.status(404).json({ error: "Submission not found" });
-    const form = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
-    const programId = form[0]?.programId ?? 1;
-    const subEmail = sub.email.toLowerCase().trim();
-    const existing = await db.select().from(candidatesTable).where(eq(candidatesTable.email, subEmail));
-    if (existing.length > 0) {
-      const candidateId = existing[0].id;
-      await db.update(applicationSubmissionsTable).set({ status: "approved", candidateId, reviewedAt: /* @__PURE__ */ new Date() }).where(eq(applicationSubmissionsTable.id, id));
-      await syncSubmissionToCandidateAndDocuments(candidateId, sub);
-      if (sub.specialization) {
-        const specList = parseSpecializationString(sub.specialization);
-        if (Array.isArray(specList) && specList.length > 0) {
-          const specs = await db.select().from(specialitiesTable);
-          let order = 1;
-          for (const specName of specList) {
-            const spec = specs.find((s2) => s2.name.toLowerCase() === specName.toLowerCase());
-            if (spec) {
-              const existingPref = await db.select().from(candidatePreferencesTable).where(
-                and(
-                  eq(candidatePreferencesTable.candidateId, candidateId),
-                  eq(candidatePreferencesTable.specialityId, spec.id)
-                )
-              );
-              if (existingPref.length === 0) {
-                await db.insert(candidatePreferencesTable).values({
-                  candidateId,
-                  specialityId: spec.id,
-                  preferenceOrder: order
-                });
-              }
-              const existingApp = await db.select().from(applicationsTable).where(
-                and(
-                  eq(applicationsTable.candidateId, candidateId),
-                  eq(applicationsTable.specialityId, spec.id)
-                )
-              );
-              if (existingApp.length === 0) {
-                const prefix = spec.code ? spec.code.toUpperCase() : "GEN";
-                const year2 = 2026;
-                const countResult = await db.execute(sql`
-                  SELECT COUNT(*)::int as count FROM applications WHERE speciality_id = ${spec.id} AND hall_ticket_number IS NOT NULL
-                `);
-                const seq = Number(countResult.rows[0]?.count ?? 0) + 1;
-                const hallTicketNumber = `${prefix}-${year2}-${String(seq).padStart(3, "0")}`;
-                await db.insert(applicationsTable).values({
-                  candidateId,
-                  specialityId: spec.id,
-                  hallTicketNumber,
-                  status: "approved"
-                });
-              }
-              order++;
-            }
-          }
-        }
-      }
-      return res.json({ message: "Candidate already exists", candidateId });
-    }
-    const year = (/* @__PURE__ */ new Date()).getFullYear();
-    const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const code = `SAV-${year}-${rand}`;
-    const [candidate] = await db.insert(candidatesTable).values({
-      candidateCode: code,
-      fullName: sub.fullName,
-      email: subEmail,
-      phone: sub.phone ?? null,
-      dateOfBirth: sub.dateOfBirth ?? null,
-      gender: sub.gender ?? null,
-      address: sub.permanentAddress ?? null,
-      qualification: sub.degree ?? null,
-      collegeName: sub.medicalCollege ?? null,
-      status: "approved"
-    }).returning();
-    if (!candidate) {
-      return res.status(500).json({ error: "Failed to create candidate" });
-    }
-    if (sub.specialization) {
-      const specList = parseSpecializationString(sub.specialization);
-      if (Array.isArray(specList) && specList.length > 0) {
-        const specs = await db.select().from(specialitiesTable);
-        let order = 1;
-        for (const specName of specList) {
-          const spec = specs.find((s2) => s2.name.toLowerCase() === specName.toLowerCase());
-          if (spec) {
-            await db.insert(candidatePreferencesTable).values({
-              candidateId: candidate.id,
-              specialityId: spec.id,
-              preferenceOrder: order++
-            });
-            const existingApp = await db.select().from(applicationsTable).where(
-              and(
-                eq(applicationsTable.candidateId, candidate.id),
-                eq(applicationsTable.specialityId, spec.id)
-              )
-            );
-            if (existingApp.length === 0) {
-              const prefix = spec.code ? spec.code.toUpperCase() : "GEN";
-              const year2 = 2026;
-              const countResult = await db.execute(sql`
-                SELECT COUNT(*)::int as count FROM applications WHERE speciality_id = ${spec.id} AND hall_ticket_number IS NOT NULL
-              `);
-              const seq = Number(countResult.rows[0]?.count ?? 0) + 1;
-              const hallTicketNumber = `${prefix}-${year2}-${String(seq).padStart(3, "0")}`;
-              await db.insert(applicationsTable).values({
-                candidateId: candidate.id,
-                specialityId: spec.id,
-                hallTicketNumber,
-                status: "approved"
-              });
-            }
-          }
-        }
-      }
-    }
-    await syncSubmissionToCandidateAndDocuments(candidate.id, sub);
-    await db.update(applicationSubmissionsTable).set({ status: "approved", candidateId: candidate.id, reviewedAt: /* @__PURE__ */ new Date() }).where(eq(applicationSubmissionsTable.id, id));
-    const prog = await db.select().from(programsTable).where(eq(programsTable.id, programId));
-    sendApplicationApprovalEmail({
-      toEmail: subEmail,
-      toName: sub.fullName,
-      candidateCode: candidate.candidateCode,
-      programName: prog[0]?.name ?? "Fellowship Program",
-      formTitle: form[0]?.title ?? "Application"
-    }).catch((e2) => console.warn("[email] failed:", e2.message));
-    res.json({ message: "Candidate created", candidateId: candidate.id });
-  }
-);
-router20.post(
-  "/application-forms/:formId/submissions/bulk-action",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
-  async (req, res) => {
-    const formId = Number(req.params.formId);
-    const { action, ids } = req.body;
-    if (!action || !Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json({ error: "action and ids required" });
-    }
-    if (action === "reject") {
-      const result = await db.update(applicationSubmissionsTable).set({ status: "rejected", reviewedAt: /* @__PURE__ */ new Date() }).where(and(
-        inArray(applicationSubmissionsTable.id, ids),
-        eq(applicationSubmissionsTable.formId, formId)
-      )).returning({ id: applicationSubmissionsTable.id });
-      return res.json({ success: true, processed: result.length });
-    }
-    if (action === "approve") {
-      let approved = 0;
-      for (const id of ids) {
-        try {
-          const [sub] = await db.select().from(applicationSubmissionsTable).where(and(eq(applicationSubmissionsTable.id, id), eq(applicationSubmissionsTable.formId, formId)));
-          if (!sub || sub.status === "approved") continue;
-          const form = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
-          const programId = form[0]?.programId ?? 1;
-          const subEmail = sub.email.toLowerCase().trim();
-          const existing = await db.select().from(candidatesTable).where(eq(candidatesTable.email, subEmail));
-          if (existing.length > 0) {
-            const candidateId = existing[0].id;
-            await db.update(applicationSubmissionsTable).set({ status: "approved", candidateId, reviewedAt: /* @__PURE__ */ new Date() }).where(eq(applicationSubmissionsTable.id, id));
-            await syncSubmissionToCandidateAndDocuments(candidateId, sub);
-            if (sub.specialization) {
-              const specList = parseSpecializationString(sub.specialization);
-              if (Array.isArray(specList) && specList.length > 0) {
-                const specs = await db.select().from(specialitiesTable);
-                let order = 1;
-                for (const specName of specList) {
-                  const spec = specs.find((s2) => s2.name.toLowerCase() === specName.toLowerCase());
-                  if (spec) {
-                    const existingPref = await db.select().from(candidatePreferencesTable).where(
-                      and(
-                        eq(candidatePreferencesTable.candidateId, candidateId),
-                        eq(candidatePreferencesTable.specialityId, spec.id)
-                      )
-                    );
-                    if (existingPref.length === 0) {
-                      await db.insert(candidatePreferencesTable).values({
-                        candidateId,
-                        specialityId: spec.id,
-                        preferenceOrder: order
-                      });
-                    }
-                    const existingApp = await db.select().from(applicationsTable).where(
-                      and(
-                        eq(applicationsTable.candidateId, candidateId),
-                        eq(applicationsTable.specialityId, spec.id)
-                      )
-                    );
-                    if (existingApp.length === 0) {
-                      const prefix = spec.code ? spec.code.toUpperCase() : "GEN";
-                      const year2 = 2026;
-                      const countResult = await db.execute(sql`
-                        SELECT COUNT(*)::int as count FROM applications WHERE speciality_id = ${spec.id} AND hall_ticket_number IS NOT NULL
-                      `);
-                      const seq = Number(countResult.rows[0]?.count ?? 0) + 1;
-                      const hallTicketNumber = `${prefix}-${year2}-${String(seq).padStart(3, "0")}`;
-                      await db.insert(applicationsTable).values({
-                        candidateId,
-                        specialityId: spec.id,
-                        hallTicketNumber,
-                        status: "approved"
-                      });
-                    }
-                    order++;
-                  }
-                }
-              }
-            }
-            approved++;
-            continue;
-          }
-          const year = (/* @__PURE__ */ new Date()).getFullYear();
-          const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
-          const code = `SAV-${year}-${rand}`;
-          const [candidate] = await db.insert(candidatesTable).values({
-            candidateCode: code,
-            fullName: sub.fullName,
-            email: subEmail,
-            phone: sub.phone ?? null,
-            dateOfBirth: sub.dateOfBirth ?? null,
-            gender: sub.gender ?? null,
-            address: sub.permanentAddress ?? null,
-            qualification: sub.degree ?? null,
-            collegeName: sub.medicalCollege ?? null,
-            status: "approved"
-          }).returning();
-          if (!candidate) continue;
-          if (sub.specialization) {
-            const specList = parseSpecializationString(sub.specialization);
-            if (Array.isArray(specList) && specList.length > 0) {
-              const specs = await db.select().from(specialitiesTable);
-              let order = 1;
-              for (const specName of specList) {
-                const spec = specs.find((s2) => s2.name.toLowerCase() === specName.toLowerCase());
-                if (spec) {
-                  await db.insert(candidatePreferencesTable).values({
-                    candidateId: candidate.id,
-                    specialityId: spec.id,
-                    preferenceOrder: order++
-                  }).onConflictDoNothing();
-                  const existingApp = await db.select().from(applicationsTable).where(
-                    and(
-                      eq(applicationsTable.candidateId, candidate.id),
-                      eq(applicationsTable.specialityId, spec.id)
-                    )
-                  );
-                  if (existingApp.length === 0) {
-                    const prefix = spec.code ? spec.code.toUpperCase() : "GEN";
-                    const year2 = 2026;
-                    const countResult = await db.execute(sql`
-                      SELECT COUNT(*)::int as count FROM applications WHERE speciality_id = ${spec.id} AND hall_ticket_number IS NOT NULL
-                    `);
-                    const seq = Number(countResult.rows[0]?.count ?? 0) + 1;
-                    const hallTicketNumber = `${prefix}-${year2}-${String(seq).padStart(3, "0")}`;
-                    await db.insert(applicationsTable).values({
-                      candidateId: candidate.id,
-                      specialityId: spec.id,
-                      hallTicketNumber,
-                      status: "approved"
-                    });
-                  }
-                }
-              }
-            }
-          }
-          await syncSubmissionToCandidateAndDocuments(candidate.id, sub);
-          await db.update(applicationSubmissionsTable).set({ status: "approved", candidateId: candidate.id, reviewedAt: /* @__PURE__ */ new Date() }).where(eq(applicationSubmissionsTable.id, id));
-          const prog = await db.select().from(programsTable).where(eq(programsTable.id, programId));
-          sendApplicationApprovalEmail({
-            toEmail: subEmail,
-            toName: sub.fullName,
-            candidateCode: candidate.candidateCode,
-            programName: prog[0]?.name ?? "Fellowship Program",
-            formTitle: form[0]?.title ?? "Application"
-          }).catch(() => {
-          });
-          approved++;
-        } catch (e2) {
-          console.warn(`[bulk-approve] id=${id} failed:`, e2);
-        }
-      }
-      return res.json({ success: true, processed: approved });
-    }
-    return res.status(400).json({ error: "Invalid action" });
-  }
-);
-router20.get(
-  "/application-forms/:id/google-forms-config",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
-  async (req, res) => {
-    const id = Number(req.params.id);
-    const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, id));
-    if (!form) return res.status(404).json({ error: "Form not found" });
-    const cfg = form.googleFormsConfig;
-    res.json({
-      googleFormId: cfg?.formId ?? "",
-      hasServiceAccount: !!cfg?.serviceAccountJson
-    });
-  }
-);
-router20.put(
-  "/application-forms/:id/google-forms-config",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
-  async (req, res) => {
-    const id = Number(req.params.id);
-    const { googleFormId, serviceAccountJson } = req.body;
-    let parsedJson;
-    if (serviceAccountJson && serviceAccountJson.trim()) {
-      try {
-        parsedJson = typeof serviceAccountJson === "string" ? JSON.parse(serviceAccountJson) : serviceAccountJson;
-      } catch {
-        return res.status(400).json({ error: "Invalid service account JSON" });
-      }
-    }
-    const [existing] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, id));
-    if (!existing) return res.status(404).json({ error: "Form not found" });
-    const existingCfg = existing.googleFormsConfig;
-    const newConfig = {
-      formId: googleFormId,
-      serviceAccountJson: parsedJson ?? existingCfg?.serviceAccountJson ?? void 0
-    };
-    await db.update(applicationFormsTable).set({ googleFormsConfig: newConfig }).where(eq(applicationFormsTable.id, id));
-    res.json({ success: true });
-  }
-);
-router20.post(
-  "/application-forms/:id/sync-google-forms",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
-  async (req, res) => {
-    const id = Number(req.params.id);
-    const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, id));
-    if (!form) return res.status(404).json({ error: "Form not found" });
-    const cfg = form.googleFormsConfig;
-    if (!cfg?.formId || !cfg?.serviceAccountJson) {
-      return res.status(400).json({ error: "Google Forms integration not configured. Please enter a Form ID and Service Account JSON." });
-    }
-    try {
-      const auth = new import_googleapis2.google.auth.GoogleAuth({
-        credentials: cfg.serviceAccountJson,
-        scopes: ["https://www.googleapis.com/auth/forms.responses.readonly"]
-      });
-      const formsApi = import_googleapis2.google.forms({ version: "v1", auth });
-      const responsesResp = await formsApi.forms.responses.list({ formId: cfg.formId });
-      const responses = responsesResp.data.responses ?? [];
-      const existingResult = await db.execute(sql`
-        SELECT google_forms_response_id FROM application_submissions
-        WHERE form_id = ${id} AND google_forms_response_id IS NOT NULL
-      `);
-      const existingIds = new Set(
-        existingResult.rows.flatMap((r2) => r2.google_forms_response_id.split(",").map((id2) => id2.trim()))
-      );
-      const formMetaResp = await formsApi.forms.get({ formId: cfg.formId });
-      const items = formMetaResp.data.items ?? [];
-      const questionMap = /* @__PURE__ */ new Map();
-      for (const item of items) {
-        if (item.questionItem?.question?.questionId && item.title) {
-          questionMap.set(item.questionItem.question.questionId, item.title.toLowerCase());
-        }
-      }
-      const emailGroups = /* @__PURE__ */ new Map();
-      for (const resp of responses) {
-        if (!resp.responseId || existingIds.has(resp.responseId)) continue;
-        const answers = resp.answers ?? {};
-        const makeExtract = (ans) => (keywords) => {
-          for (const [qId, answer] of Object.entries(ans)) {
-            const title = questionMap.get(qId) ?? "";
-            if (keywords.some((k) => new RegExp(k, "i").test(title))) {
-              return (answer.textAnswers?.answers ?? []).map((a) => a.value ?? "").join(", ").trim();
-            }
-          }
-          return "";
-        };
-        const extract = makeExtract(answers);
-        const fullName = extract(["name in full", "full name", "your name"]);
-        const rawEmail = extract(["e-mail", "email"]);
-        if (!fullName || !rawEmail) continue;
-        const emailKey = rawEmail.toLowerCase().replace(/\s+/g, "");
-        const spec = extract(["applying for", "subspecialt", "special"]);
-        const centerPref = extract(["cornea.*center", "glaucoma.*center", "iol.*center", "oculoplasty.*center", "pediatric.*center", "phaco.*center"]) || extract(["center", "location", "unit", "prefer"]);
-        if (!emailGroups.has(emailKey)) {
-          emailGroups.set(emailKey, {
-            email: rawEmail.trim(),
-            fullName,
-            latestTs: resp.lastSubmittedTime ?? "",
-            specializations: [],
-            responseIds: [],
-            masterExtract: extract,
-            masterAnswers: answers
-          });
-        }
-        const group = emailGroups.get(emailKey);
-        group.responseIds.push(resp.responseId);
-        if (spec && !group.specializations.find((s2) => s2.name === spec)) {
-          group.specializations.push({ name: spec, centerPref: centerPref || "" });
-        }
-        if ((resp.lastSubmittedTime ?? "") >= group.latestTs) {
-          group.latestTs = resp.lastSubmittedTime ?? "";
-          group.masterExtract = extract;
-          group.masterAnswers = answers;
-        }
-      }
-      let imported = 0;
-      let merged = 0;
-      for (const [emailKey, group] of emailGroups) {
-        const ex = group.masterExtract;
-        const specializationJson = JSON.stringify(
-          group.specializations.length > 0 ? group.specializations.map((s2) => s2.name) : []
-        );
-        const centerPrefJson = group.specializations.length > 0 ? JSON.stringify(Object.fromEntries(group.specializations.map((s2) => [s2.name, s2.centerPref]))) : null;
-        const allResponseIds = group.responseIds.join(",");
-        const phone = ex(["mobile number", "phone number", "mobile", "phone", "contact number"]);
-        const degree = ex(["degrees & other", "degree", "qualification", "mbbs"]);
-        const medicalCollege = ex(["medical college qualified", "medical college", "college"]);
-        const university = ex(["university from which", "university"]);
-        const pgQualifications = ex(["postgraduate qual", "pg qual"]);
-        const medicalCouncilNumber = ex(["medical council registration", "council registration", "registration number"]);
-        const publications = ex(["journal.*publication", "publications"]);
-        const presentations = ex(["presentations.*conference", "presentations"]);
-        const referralSource = ex(["where did you hear", "hear about"]);
-        const referredByName = ex(["referred.*faculty", "faculty.*trainee", "referred by"]);
-        const permanentAddress = ex(["permanent address"]);
-        const dateOfBirth = ex(["date of birth"]);
-        const maritalStatus = ex(["marital status"]);
-        const healthDeclaration = ex(["medical condition", "ailments", "suffering"]);
-        const lor1Url = ex(["lor 1", "letter of recommendation 1"]);
-        const lor1RefName = ex(["name.*designation.*reference", "designation of reference"]);
-        const lor1RefContact = ex(["contact number of reference"]);
-        const lor1RefEmail = ex(["email id of reference", "email.*reference"]);
-        const lor2Url = ex(["lor 2", "letter of recommendation 2"]);
-        const paymentUrl = ex(["screenshot.*transaction", "payment.*screenshot", "transaction id", "utr"]);
-        const photoUrl = ex(["passport size photograph", "passport photo", "photograph"]);
-        const existingSubResult = await db.execute(sql`
-          SELECT id, specialization, center_preference FROM application_submissions
-          WHERE form_id = ${id} AND LOWER(email) = ${emailKey}
-          LIMIT 1
-        `);
-        const existingSub = existingSubResult.rows[0];
-        if (existingSub) {
-          const existingSpecs = parseSpecializationString(existingSub.specialization);
-          const newSpecs = group.specializations.map((s2) => s2.name);
-          const mergedSpecs = [.../* @__PURE__ */ new Set([...existingSpecs, ...newSpecs])];
-          let existingCenterPrefs = {};
-          try {
-            existingCenterPrefs = JSON.parse(existingSub.center_preference ?? "{}");
-          } catch {
-          }
-          const newCenterPrefs = Object.fromEntries(group.specializations.map((s2) => [s2.name, s2.centerPref]));
-          const mergedCenterPrefs = { ...existingCenterPrefs, ...newCenterPrefs };
-          await db.execute(sql`
-            UPDATE application_submissions SET
-              specialization = ${JSON.stringify(mergedSpecs)},
-              center_preference = ${JSON.stringify(mergedCenterPrefs)},
-              google_forms_response_id = ${allResponseIds},
-              updated_at = NOW()
-            WHERE id = ${existingSub.id}
-          `);
-          merged++;
-        } else {
-          const subData = {
-            formId: id,
-            status: "pending",
-            source: "google_forms",
-            googleFormsResponseId: allResponseIds,
-            fullName: group.fullName,
-            email: group.email,
-            phone: phone || null,
-            specialization: specializationJson,
-            centerPreference: centerPrefJson,
-            degree: degree || null,
-            medicalCollege: medicalCollege || null,
-            university: university || null,
-            pgQualifications: pgQualifications || null,
-            medicalCouncilNumber: medicalCouncilNumber || null,
-            publications: publications || null,
-            presentations: presentations || null,
-            referralSource: referralSource || null,
-            referredByName: referredByName || null,
-            permanentAddress: permanentAddress || null,
-            dateOfBirth: dateOfBirth || null,
-            maritalStatus: maritalStatus || null,
-            healthDeclaration: healthDeclaration || null,
-            lor1Url: lor1Url || null,
-            lor1RefName: lor1RefName || null,
-            lor1RefContact: lor1RefContact || null,
-            lor1RefEmail: lor1RefEmail || null,
-            lor2Url: lor2Url || null,
-            paymentUrl: paymentUrl || null,
-            photoUrl: photoUrl || null,
-            declarationAccepted: true,
-            customAnswers: {}
-          };
-          const isComplete = checkCompleteness(subData);
-          await db.insert(applicationSubmissionsTable).values({ ...subData, readyForReview: isComplete });
-          imported++;
-        }
-      }
-      res.json({ success: true, imported, merged, total: responses.length, uniqueApplicants: emailGroups.size });
-    } catch (e2) {
-      console.error("[google-forms-sync] error:", e2);
-      const msg = e2 instanceof Error ? e2.message : "Unknown error";
-      res.status(500).json({ error: `Google Forms sync failed: ${msg}` });
-    }
-  }
-);
-router20.get(
-  "/application-forms/:id/google-sheets-config",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
-  async (req, res) => {
-    const id = Number(req.params.id);
-    const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, id));
-    if (!form) return res.status(404).json({ error: "Form not found" });
-    const cfg = form.googleSheetsConfig;
-    res.json({
-      spreadsheetId: cfg?.spreadsheetId ?? "",
-      sheetName: cfg?.sheetName ?? "Form Responses 1",
-      hasServiceAccount: !!cfg?.serviceAccountJson
-    });
-  }
-);
-router20.put(
-  "/application-forms/:id/google-sheets-config",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
-  async (req, res) => {
-    const id = Number(req.params.id);
-    const { spreadsheetId, sheetName, serviceAccountJson } = req.body;
-    let parsedJson;
-    if (serviceAccountJson && serviceAccountJson.trim()) {
-      try {
-        parsedJson = typeof serviceAccountJson === "string" ? JSON.parse(serviceAccountJson) : serviceAccountJson;
-      } catch {
-        return res.status(400).json({ error: "Invalid service account JSON" });
-      }
-    }
-    const [existing] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, id));
-    if (!existing) return res.status(404).json({ error: "Form not found" });
-    const existingCfg = existing.googleSheetsConfig;
-    const newConfig = {
-      spreadsheetId,
-      sheetName,
-      serviceAccountJson: parsedJson ?? existingCfg?.serviceAccountJson ?? void 0
-    };
-    await db.update(applicationFormsTable).set({ googleSheetsConfig: newConfig }).where(eq(applicationFormsTable.id, id));
-    res.json({ success: true });
-  }
-);
-router20.post(
-  "/application-forms/:id/sync-google-sheets",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
-  async (req, res) => {
-    const id = Number(req.params.id);
-    const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, id));
-    if (!form) return res.status(404).json({ error: "Form not found" });
-    const cfg = form.googleSheetsConfig;
-    if (!cfg?.spreadsheetId || !cfg?.serviceAccountJson) {
-      return res.status(400).json({ error: "Google Sheets integration not configured. Please enter a Spreadsheet ID and Service Account JSON." });
-    }
-    try {
-      const auth = new import_googleapis2.google.auth.GoogleAuth({
-        credentials: cfg.serviceAccountJson,
-        scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"]
-      });
-      const sheets = import_googleapis2.google.sheets({ version: "v4", auth });
-      let sheetName = cfg.sheetName || "Form Responses 1";
-      let rows = null;
-      try {
-        const response = await sheets.spreadsheets.values.get({
-          spreadsheetId: cfg.spreadsheetId,
-          range: `'${sheetName}'!A1:ZZ`
-        });
-        rows = response.data.values;
-      } catch (e2) {
-        console.warn(`[google-sheets-sync] Could not find sheet "${sheetName}", attempting auto-discovery...`, e2.message);
-        const spreadsheet = await sheets.spreadsheets.get({
-          spreadsheetId: cfg.spreadsheetId
-        });
-        const sheetTitles = spreadsheet.data.sheets?.map((s2) => s2.properties?.title).filter(Boolean);
-        if (!sheetTitles || sheetTitles.length === 0) {
-          throw new Error("No sheets found in this spreadsheet.");
-        }
-        const bestMatch = sheetTitles.find((t2) => t2.toLowerCase().includes("responses")) || sheetTitles.find((t2) => t2.toLowerCase().includes("form")) || sheetTitles[0];
-        console.info(`[google-sheets-sync] Auto-discovered sheet: "${bestMatch}"`);
-        sheetName = bestMatch;
-        const response = await sheets.spreadsheets.values.get({
-          spreadsheetId: cfg.spreadsheetId,
-          range: `'${sheetName}'!A1:ZZ`
-        });
-        rows = response.data.values;
-      }
-      if (!rows || rows.length <= 1) {
-        return res.json({ success: true, imported: 0, message: `No data found in sheet "${sheetName}"` });
-      }
-      const headers = rows[0].map((h2) => h2.trim());
-      const dataRows = rows.slice(1);
-      const spreadsheetRowIds = /* @__PURE__ */ new Set();
-      const existingResult = await db.execute(sql`
-        SELECT google_sheets_row_id, email FROM application_submissions
-        WHERE form_id = ${id} AND google_sheets_row_id IS NOT NULL
-      `);
-      const existingIds = new Set(existingResult.rows.map((r2) => r2.google_sheets_row_id));
-      let imported = 0;
-      let merged = 0;
-      const rowsByEmail = /* @__PURE__ */ new Map();
-      for (const row of dataRows) {
-        const rowData = {};
-        headers.forEach((header, index3) => {
-          rowData[header] = row[index3] || "";
-        });
-        const timestamp2 = rowData["Timestamp"];
-        const email3 = rowData["E-mail (this would be the ID all communication would be shared on)"] || rowData["E-mail"] || rowData["Email"] || "";
-        const rowId = `${timestamp2}_${email3}`.toLowerCase().replace(/\s+/g, "");
-        spreadsheetRowIds.add(rowId);
-        const key = email3.toLowerCase().trim();
-        if (!key) continue;
-        if (!rowsByEmail.has(key)) {
-          rowsByEmail.set(key, []);
-        }
-        rowsByEmail.get(key).push({ rowData, rowId, email: email3 });
-      }
-      const existingByEmailResult = await db.execute(sql`
-        SELECT id, email, google_sheets_row_id FROM application_submissions
-        WHERE form_id = ${id} AND google_sheets_row_id IS NOT NULL
-      `);
-      const existingByEmail = /* @__PURE__ */ new Map();
-      for (const r2 of existingByEmailResult.rows) {
-        if (r2.email) {
-          const key = r2.email.toLowerCase().trim();
-          if (!existingByEmail.has(key)) {
-            existingByEmail.set(key, []);
-          }
-          existingByEmail.get(key).push(r2);
-        }
-      }
-      for (const [emailKey, group] of rowsByEmail.entries()) {
-        const mergedSubData = {};
-        let combinedRowIds = [];
-        let combinedSpecializations = [];
-        for (const item of group) {
-          const { rowData, rowId, email: email3 } = item;
-          combinedRowIds.push(rowId);
-          const specialization = rowData["Select 1 option from the dropbox"];
-          if (specialization && !combinedSpecializations.includes(specialization)) {
-            combinedSpecializations.push(specialization);
-          }
-          const centerPrefHeaders = [
-            "Cornea",
-            "Glaucoma",
-            "IOL",
-            "Medical Retina",
-            "Oculoplasty",
-            "Pediatric",
-            "Phaco Refractive",
-            "Vitreo Retina"
-          ];
-          let centerPreference = "";
-          for (const h2 of headers) {
-            if (centerPrefHeaders.some((cp) => h2.startsWith(cp)) && h2.toLowerCase().includes("choose the preferred center")) {
-              if (rowData[h2] && rowData[h2] !== "Not Applicable") {
-                centerPreference = rowData[h2];
-                break;
-              }
-            }
-          }
-          const diagnosticSkills = {};
-          headers.forEach((h2) => {
-            if (h2.startsWith("Perform & Interpret Diagnostics")) {
-              const match2 = h2.match(/\[(.*?)\]/);
-              if (match2 && match2[1]) {
-                diagnosticSkills[match2[1]] = rowData[h2];
-              }
-            }
-          });
-          const surgicalExperience = {};
-          const surgicalCategories = ["ECCE", "SICS", "PHACO", "TRABECULECTOMY", "RETINA LASERS", "DCR"];
-          surgicalCategories.forEach((cat) => {
-            const supKey = headers.find((h2) => h2.includes(`Approximate No of ${cat}`) && h2.includes("(Under Supervision)"));
-            const indKey = headers.find((h2) => h2.includes(`Approximate No of ${cat}`) && h2.includes("(Independently)"));
-            surgicalExperience[cat] = {
-              supervision: supKey ? rowData[supKey] : "0",
-              independent: indKey ? rowData[indKey] : "0"
-            };
-          });
-          const subData = {
-            formId: id,
-            status: "pending",
-            source: "google_sheets",
-            fullName: rowData["Name in Full (First Name, Middle Name, Last/Family Name)"] || rowData["Name in Full"] || "",
-            email: email3 || "",
-            phone: rowData["Mobile Number (only 10 digits)"] || rowData["Mobile Number"] || "",
-            centerPreference,
-            referralSource: rowData["Where did you hear about this Fellowship?"],
-            referredByName: rowData["Mention the name of referred Faculty/Existing Trainee from Sankara"],
-            mediaSource: rowData["Mention the Media Source"],
-            permanentAddress: rowData["Permanent Address (including postal pin code)"],
-            mailingAddress: rowData["Preferred Mailing Address (if different from the Permanent Address then fill if same as permanent put N/A)"],
-            dateOfBirth: rowData["Date of Birth"] || rowData["Date of Birth "],
-            maritalStatus: rowData["Marital Status"] || rowData["Marital Status "],
-            spouseDetails: rowData["If Married Spouse Details(Name & Profession)"] || rowData["If Married Spouse Details(Name & Profession) "],
-            previousApplicationMonthYear: rowData["If you have responded yes, month & year"],
-            medicalConditions: rowData["Kindly declare if you are suffering any of the following ailments and are on medications."] || rowData["Kindly declare if you are suffering any of the following ailments and are on medications. "],
-            degree: rowData["Degree"],
-            medicalCollege: rowData["Medical College Qualified From ( College, City , State, Country)"],
-            university: rowData["University from which MBBS Degree Awarded"],
-            pgQualifications: rowData["Postgraduate Qualifications"] || rowData["Postgraduate Qualifications "],
-            doQualification: rowData["Qualification [DO (Diploma Ophthlmology)]"] === "Yes",
-            doDetails: rowData["If DO then College & University Qualified from and year of Qualification"] || rowData["If DO then College & University Qualified from and year of Qualification "],
-            msMdQualification: rowData["Qualification [MS/MD ( Masters in Ophthalmology)]"] === "Yes",
-            msMdDetails: rowData["If MS then College & University Qualified from and year of Qualification"],
-            dnbQualification: rowData["Qualification [DNB]"] === "Yes",
-            dnbDetails: rowData["If DNB then institution completed from and year of Qualification"],
-            otherTraining: rowData["Any Other Training / Certification undertaken"] || rowData["Any Other Training / Certification undertaken "],
-            medicalCouncilNumber: rowData["Medical Council Registration Number ( indicate complete number and state of registration)"],
-            diagnosticSkills: JSON.stringify(diagnosticSkills),
-            surgicalExperience: JSON.stringify(surgicalExperience),
-            totalSurgeries: rowData["7. Total No of Surgeries performed till date"] || rowData["7. Total No of Surgeries performed till date "],
-            publications: rowData["Journal - List of all publications in the format of - Journal, Date, Title, Co - Authors"],
-            presentations: rowData["Presentations  - List of presentations at Conferences in the format of - Journal, Date, Title, Co - Authors"],
-            lor1Url: rowData["LOR 1,  Issue Date and Signature are mandatory on the Letter"] || rowData["LOR 1,  Issue Date and Signature are mandatory on the Letter "],
-            lor1RefName: rowData["Name & Designation of Reference:"],
-            lor1RefContact: rowData["Contact number of Reference:"],
-            lor1RefEmail: rowData["Email ID of Reference"],
-            lor2Url: rowData["LOR 2,  Issue Date and Signature are mandatory on the Letter"],
-            lor2RefName: rowData["Name & Designation of Reference"],
-            lor2RefContact: rowData["Contact number of Reference:"],
-            lor2RefEmail: rowData["Email id of Reference:"],
-            otherInformation: rowData["If there is any other information you deem pertinent for us to consider as part of your application please share that here."],
-            declarationAccepted: rowData["Declaration"] === "Yes" || rowData["Declaration"] === "I Accept",
-            paymentUrl: rowData["Upload the screenshot with Transaction ID/UTR details of the payment of Rs.2750/-  (Fee including Tax)"] || rowData["Upload the screenshot with Transaction ID/UTR details of the payment of Rs.2750/-  (Fee including Tax) "],
-            photoUrl: rowData["Please upload your latest passport size photograph"] || rowData["Please upload your latest passport size photograph "],
-            customAnswers: {}
-          };
-          for (const [k, v] of Object.entries(subData)) {
-            if (v !== void 0 && v !== null && v !== "" && v !== "{}" && v !== '{"ECCE":{"supervision":"0","independent":"0"},"SICS":{"supervision":"0","independent":"0"},"PHACO":{"supervision":"0","independent":"0"},"TRABECULECTOMY":{"supervision":"0","independent":"0"},"RETINA LASERS":{"supervision":"0","independent":"0"},"DCR":{"supervision":"0","independent":"0"}}') {
-              if (!mergedSubData[k] || mergedSubData[k] === "{}" || typeof mergedSubData[k] === "string" && mergedSubData[k].startsWith('{"ECCE"')) {
-                mergedSubData[k] = v;
-              }
-            }
-          }
-        }
-        mergedSubData.specialization = combinedSpecializations;
-        mergedSubData.googleSheetsRowId = combinedRowIds.join(",");
-        const isComplete = Boolean(
-          mergedSubData.fullName && mergedSubData.email && mergedSubData.phone && mergedSubData.specialization && mergedSubData.specialization.length > 0
-        );
-        mergedSubData.readyForReview = isComplete;
-        const existingList = existingByEmail.get(emailKey) || [];
-        if (existingList.length > 0) {
-          const primary = existingList[0];
-          if (existingList.length > 1) {
-            const extraIds = existingList.slice(1).map((r2) => r2.id);
-            await db.delete(applicationSubmissionsTable).where(inArray(applicationSubmissionsTable.id, extraIds));
-          }
-          if (primary.google_sheets_row_id !== mergedSubData.googleSheetsRowId) {
-            await db.update(applicationSubmissionsTable).set(mergedSubData).where(eq(applicationSubmissionsTable.id, primary.id));
-            merged++;
-          }
-        } else {
-          await db.insert(applicationSubmissionsTable).values(mergedSubData);
-          imported++;
-        }
-      }
-      let deletedCount = 0;
-      const idsToDelete = [];
-      const emailsToDelete = [];
-      for (const rowId of existingIds) {
-        const subIds = rowId.split(",");
-        const anyExist = subIds.some((id2) => spreadsheetRowIds.has(id2));
-        if (!anyExist) {
-          const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.googleSheetsRowId, rowId));
-          if (sub) {
-            idsToDelete.push(rowId);
-            emailsToDelete.push(sub.email);
-          }
-        }
-      }
-      if (idsToDelete.length > 0) {
-        for (const email3 of emailsToDelete) {
-          await db.delete(candidatesTable).where(eq(candidatesTable.email, email3));
-        }
-        await db.delete(applicationSubmissionsTable).where(and(
-          eq(applicationSubmissionsTable.formId, id),
-          inArray(applicationSubmissionsTable.googleSheetsRowId, idsToDelete)
-        ));
-        deletedCount = idsToDelete.length;
-      }
-      res.json({ success: true, imported, merged, deleted: deletedCount, total: dataRows.length });
-    } catch (e2) {
-      console.error("[google-sheets-sync] error:", e2);
-      const msg = e2 instanceof Error ? e2.message : "Unknown error";
-      res.status(500).json({ error: `Google Sheets sync failed: ${msg}` });
-    }
-  }
-);
-function normalizeToken(t2) {
-  if (!t2) return "";
-  const trimmed = t2.trim();
-  if (trimmed === "JAN2027" || trimmed === "jan2027" || trimmed === "january2027" || trimmed === "JAN2026" || trimmed === "jan2026" || trimmed === "january2026") {
-    return "JAN2027";
-  }
-  if (trimmed === "DEC2026" || trimmed === "dec2026" || trimmed === "december2026") return "DECEMBER2026";
-  return trimmed;
-}
-async function resolveFormByToken(rawToken) {
-  const token = normalizeToken(rawToken);
-  if (token.toUpperCase() === "JULY2026") {
-    return null;
-  }
-  if (!token || token.toLowerCase() === "active") {
-    const [activeForm] = await db.select().from(applicationFormsTable).where(and(eq(applicationFormsTable.isActive, true), ne(applicationFormsTable.token, "JULY2026"))).orderBy(sql`${applicationFormsTable.createdAt} DESC`).limit(1);
-    return activeForm || null;
-  }
-  let [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, token));
-  if (form) return form;
-  if (token === "JAN2026") {
-    [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, "JAN2027"));
-    if (form) return form;
-  }
-  if (token === "JAN2027") {
-    [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.token, "JAN2026"));
-    if (form) return form;
-  }
-  const [ciForm] = await db.select().from(applicationFormsTable).where(ilike(applicationFormsTable.token, token));
-  return ciForm || null;
-}
-router20.post("/apply/:token/request-upload-url", async (req, res) => {
-  const form = await resolveFormByToken(req.params.token);
-  if (!form) return res.status(404).json({ error: "Form not found" });
-  const token = form.token;
-  if (!form.isActive) return res.status(410).json({ error: "This form is no longer accepting submissions" });
-  if (form.deadline && /* @__PURE__ */ new Date() > form.deadline) {
-    return res.status(410).json({ error: "The deadline for this form has passed" });
-  }
-  const { name: name2, contentType, size, candidateName, fieldName } = req.body ?? {};
-  if (!name2 || typeof name2 !== "string" || !name2.trim()) {
-    return res.status(400).json({ error: "Missing required field: name" });
-  }
-  const cleanContentType = contentType && typeof contentType === "string" ? contentType : "application/octet-stream";
-  try {
-    const isReplit = !!process.env.REPL_ID;
-    if (!isReplit) {
-      const objectId = Math.random().toString(36).substring(2, 10);
-      const ext2 = name2.split(".").pop() ?? "bin";
-      const sanitizedName = name2.split(".")[0].replace(/[^a-zA-Z0-9]/g, "_");
-      let folderName = candidateName ? candidateName.trim().replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_") : "Unknown_Candidate";
-      const filename = `${sanitizedName}_${objectId}.${ext2}`;
-      const uploadURL2 = `/api/apply/${token}/local-upload/${folderName}/${filename}`;
-      const objectPath2 = `/objects/uploads/${folderName}/${filename}`;
-      return res.json({ uploadURL: uploadURL2, objectPath: objectPath2, metadata: { name: name2.trim(), size, contentType: cleanContentType } });
-    }
-    const { ObjectStorageService: ObjectStorageService2 } = await Promise.resolve().then(() => (init_objectStorage(), objectStorage_exports));
-    const objectStorageService2 = new ObjectStorageService2();
-    const uploadURL = await objectStorageService2.getObjectEntityUploadURL();
-    const objectPath = objectStorageService2.normalizeObjectEntityPath(uploadURL);
-    return res.json({ uploadURL, objectPath, metadata: { name: name2.trim(), size, contentType: cleanContentType } });
-  } catch (error40) {
-    console.error("UPLOAD ENDPOINT ERROR:", error40);
-    return res.status(500).json({ error: "Failed to generate upload URL", details: error40 instanceof Error ? error40.message : String(error40) });
-  }
-});
-router20.put("/apply/:token/local-upload/:folderName/:filename", async (req, res) => {
-  try {
-    const chunks = [];
-    req.on("data", (chunk) => {
-      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
-    });
-    req.on("end", async () => {
-      try {
-        const buffer = Buffer.concat(chunks);
-        const folderName = req.params.folderName;
-        const filename = req.params.filename;
-        const objectPath = `/objects/uploads/${folderName}/${filename}`;
-        const contentType = req.headers["content-type"] || "application/octet-stream";
-        try {
-          const tmpUploadDir = path7.join(os2.tmpdir(), "uploads", folderName);
-          await fs9.mkdir(tmpUploadDir, { recursive: true });
-          await fs9.writeFile(path7.join(tmpUploadDir, filename), buffer);
-        } catch (_) {
-        }
-        try {
-          const localUploadDir = path7.join(process.cwd(), "uploads", folderName);
-          await fs9.mkdir(localUploadDir, { recursive: true });
-          await fs9.writeFile(path7.join(localUploadDir, filename), buffer);
-        } catch (_) {
-        }
-        await db.execute(sql`
-          INSERT INTO uploaded_files (file_path, file_name, content_type, file_data, file_size)
-          VALUES (${objectPath}, ${filename}, ${contentType}, ${buffer}, ${buffer.length})
-          ON CONFLICT (file_path) DO UPDATE SET
-            file_data = EXCLUDED.file_data,
-            file_size = EXCLUDED.file_size,
-            content_type = EXCLUDED.content_type,
-            created_at = NOW()
-        `);
-        res.json({ success: true, path: objectPath });
-      } catch (saveErr) {
-        console.error("Failed to save uploaded file:", saveErr);
-        res.status(500).json({ error: saveErr.message || "Failed to save file" });
-      }
-    });
-    req.on("error", (err) => {
-      console.error("Upload stream error:", err);
-      if (!res.headersSent) res.status(500).json({ error: "Upload stream failed" });
-    });
-  } catch (error40) {
-    console.error("Local upload catch error:", error40);
-    if (!res.headersSent) res.status(500).json({ error: "Failed to process upload" });
-  }
-});
-router20.get("/apply/:token", async (req, res) => {
-  const form = await resolveFormByToken(req.params.token);
-  if (!form) return res.status(404).json({ error: "Form not found" });
-  if (!form.isActive) return res.status(410).json({ error: "This form is no longer accepting submissions" });
-  if (form.deadline && /* @__PURE__ */ new Date() > form.deadline) {
-    return res.status(410).json({ error: "The deadline for this form has passed" });
-  }
-  const [program] = await db.select().from(programsTable).where(eq(programsTable.id, form.programId));
-  const CANONICAL_SPECIALITIES = [
-    "Cornea",
-    "Glaucoma",
-    "IOL Fellowship",
-    "Medical Retina",
-    "Oculoplasty",
-    "Pediatric Ophthalmology",
-    "Phaco Refractive",
-    "Vitreo Retina"
-  ];
-  const CANONICAL_UNITS = [
-    "Anand",
-    "Bangalore",
-    "Coimbatore",
-    "Guntur",
-    "Hyderabad",
-    "Indore",
-    "Jaipur",
-    "Kanpur",
-    "Krishnankoil",
-    "Ludhiana",
-    "Panvel",
-    "Shimoga",
-    "Varanasi"
-  ];
-  const specResult = await db.execute(sql`
-    SELECT DISTINCT speciality FROM seat_matrix_entries
-    WHERE speciality !~ '^[0-9]' AND speciality != 'Date'
-    ORDER BY speciality
-  `);
-  const dbSpecs = specResult.rows.map((r2) => r2.speciality);
-  const specialities = dbSpecs.length > 0 ? dbSpecs : CANONICAL_SPECIALITIES;
-  const unitResult = await db.execute(sql`
-    SELECT DISTINCT unit_name FROM seat_matrix_entries
-    WHERE unit_name !~ '^[0-9]'
-    ORDER BY unit_name
-  `);
-  const dbUnits = unitResult.rows.map((r2) => r2.unit_name);
-  const units = dbUnits.length > 0 ? dbUnits : CANONICAL_UNITS;
-  let sectionsConfig = form.sectionsConfig ?? [];
-  if (Array.isArray(sectionsConfig) && form.programId) {
-    try {
-      const matrixResult = await db.execute(sql`
-        SELECT speciality, unit_name, total_seats
-        FROM seat_matrix_entries
-        WHERE program_id = ${form.programId} AND total_seats > 0
-        ORDER BY unit_name
-      `);
-      const matrixRows = matrixResult.rows;
-      const specToUnits = /* @__PURE__ */ new Map();
-      for (const row of matrixRows) {
-        const normSpec = row.speciality.toLowerCase().trim();
-        const list = specToUnits.get(normSpec) || [];
-        if (!list.includes(row.unit_name)) list.push(row.unit_name);
-        specToUnits.set(normSpec, list);
-      }
-      sectionsConfig = sectionsConfig.map((sec) => ({
-        ...sec,
-        fields: sec.fields?.map((f3) => {
-          if (f3.id && f3.id.startsWith("unit_") && f3.visibleIf?.contains) {
-            const specCondition = f3.visibleIf.contains.toLowerCase().trim();
-            for (const [sKey, uList] of specToUnits.entries()) {
-              if (sKey === specCondition || sKey.includes(specCondition) || specCondition.includes(sKey) || specCondition === "iol" && sKey.includes("iol") || specCondition.includes("medical retina") && sKey.includes("medical retina") || specCondition.includes("pediatric") && sKey.includes("pediatric")) {
-                if (uList.length > 0) {
-                  const existingOpts = Array.isArray(f3.options) ? f3.options : [];
-                  const merged = Array.from(/* @__PURE__ */ new Set([...existingOpts, ...uList]));
-                  return { ...f3, options: merged };
-                }
-              }
-            }
-          }
-          return f3;
-        })
-      }));
-    } catch (_) {
-    }
-  }
-  res.json({
-    ...form,
-    programName: program?.name ?? null,
-    specialities,
-    units,
-    customFields: form.customFields ?? [],
-    sectionsConfig
-  });
-});
-router20.get("/apply/:token/payment-config", async (req, res) => {
-  const form = await resolveFormByToken(req.params.token);
-  const programId = form?.programId ?? null;
-  const all = await db.select().from(paymentSettingsTable).where(eq(paymentSettingsTable.isActive, true));
-  const specific = programId ? all.find((s2) => s2.programId === programId) : null;
-  const global2 = all.find((s2) => s2.programId === null);
-  const setting = specific ?? global2 ?? null;
-  const LIVE_KEY_ID = "rzp_live_ddDz3Yp0860GqG";
-  const LIVE_SECRET = "LGVG9K6XjOwpHnfjfGMmgwxZ";
-  let keyId = setting?.razorpayKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || LIVE_KEY_ID;
-  if (!keyId || keyId.startsWith("rzp_test") || keyId === "[SENSITIVE]") {
-    keyId = LIVE_KEY_ID;
-  }
-  let keySecret = setting?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || LIVE_SECRET;
-  if (!keySecret || keySecret.startsWith("test_") || keySecret === "[SENSITIVE]") {
-    keySecret = LIVE_SECRET;
-  }
-  res.json({
-    mock: false,
-    keyId,
-    amount: setting?.amount || 275e3,
-    currency: setting?.currency || "INR",
-    description: setting?.description || "Fellowship Application Fee January 2027",
-    mode: "live",
-    bankDetails: {
-      accountName: "Sankara Academy of Vision",
-      accountNumber: "50100004642084",
-      bankName: "HDFC Bank",
-      branch: "Saravanampatti Branch, Coimbatore",
-      ifscCode: "HDFC0002231",
-      upiId: setting?.upiId || "sankaraeye@hdfcbank"
-    }
-  });
-});
-async function saveBase64FileIfPresent(dataUrl, candidateName, fieldName) {
-  if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:")) return dataUrl;
-  try {
-    const matches = dataUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) return dataUrl;
-    const contentType = matches[1];
-    const buffer = Buffer.from(matches[2], "base64");
-    const ext2 = contentType.includes("pdf") ? "pdf" : contentType.includes("png") ? "png" : "jpg";
-    const folderName = candidateName ? candidateName.trim().replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_") : "candidate";
-    const filename = `${fieldName}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext2}`;
-    const objectPath = `/objects/uploads/${folderName}/${filename}`;
-    try {
-      const localDir = path7.join(process.cwd(), "uploads", folderName);
-      await fs9.mkdir(localDir, { recursive: true });
-      await fs9.writeFile(path7.join(localDir, filename), buffer);
-    } catch (_) {
-    }
-    try {
-      const tmpDir = path7.join(os2.tmpdir(), "uploads", folderName);
-      await fs9.mkdir(tmpDir, { recursive: true });
-      await fs9.writeFile(path7.join(tmpDir, filename), buffer);
-    } catch (_) {
-    }
-    await db.execute(sql`
-      INSERT INTO uploaded_files (file_path, file_name, content_type, file_data, file_size)
-      VALUES (${objectPath}, ${filename}, ${contentType}, ${buffer}, ${buffer.length})
-      ON CONFLICT (file_path) DO UPDATE SET
-        file_data = EXCLUDED.file_data,
-        file_size = EXCLUDED.file_size,
-        content_type = EXCLUDED.content_type,
-        created_at = NOW()
-    `);
-    return objectPath;
-  } catch (err) {
-    console.error("Failed to convert base64 upload:", err);
-    return dataUrl;
-  }
-}
-router20.post("/apply/:token", async (req, res) => {
-  try {
-    const form = await resolveFormByToken(req.params.token);
-    if (!form) return res.status(404).json({ error: "Form not found" });
-    if (!form.isActive) return res.status(410).json({ error: "This form is no longer accepting submissions" });
-    if (form.deadline && /* @__PURE__ */ new Date() > form.deadline) {
-      return res.status(410).json({ error: "The deadline for this form has passed" });
-    }
-    const body = req.body;
-    const sections = form.sectionsConfig || [];
-    const subData = {
-      formId: form.id,
-      status: body.saveAsDraft ? "draft" : "pending",
-      saveAsDraft: body.saveAsDraft ?? false,
-      source: "internal",
-      customAnswers: {},
-      submittedAt: /* @__PURE__ */ new Date()
-    };
-    const centerPrefs = {};
-    sections.forEach((sec) => {
-      if (!sec.enabled) return;
-      sec.fields.forEach((f3) => {
-        let val = body[f3.id];
-        if (val === void 0) return;
-        if (f3.id.startsWith("unit_") && val) {
-          const specName = f3.label.replace(" Preferred Center", "");
-          centerPrefs[specName] = Array.isArray(val) ? val.join(", ") : String(val);
-        }
-        if (f3.isStandard && f3.mapping) {
-          if (["specialization", "medicalConditions", "diagnosticSkills", "surgicalExperience", "qualificationMatrix"].includes(f3.mapping)) {
-            if (val && typeof val !== "string") val = JSON.stringify(val);
-          }
-          subData[f3.mapping] = val;
-        } else {
-          subData.customAnswers[f3.id] = val;
-        }
-      });
-    });
-    if (Object.keys(centerPrefs).length > 0 && !subData.centerPreference) {
-      subData.centerPreference = JSON.stringify(centerPrefs);
-    }
-    if (!subData.fullName && body.fullName) subData.fullName = body.fullName;
-    if (!subData.email && body.email) subData.email = body.email;
-    if (!subData.fullName || !subData.email) {
-      return res.status(400).json({ error: "Full name and email are required" });
-    }
-    const fileFields = ["lor1Url", "lor2Url", "photoUrl", "paymentUrl"];
-    for (const f3 of fileFields) {
-      const val = subData[f3] || body[f3];
-      if (val && !subData[f3]) subData[f3] = val;
-    }
-    const candidateName = subData.fullName || "candidate";
-    if (subData.lor1Url && subData.lor1Url.startsWith("data:")) {
-      subData.lor1Url = await saveBase64FileIfPresent(subData.lor1Url, candidateName, "lor1");
-    }
-    if (subData.lor2Url && subData.lor2Url.startsWith("data:")) {
-      subData.lor2Url = await saveBase64FileIfPresent(subData.lor2Url, candidateName, "lor2");
-    }
-    if (subData.photoUrl && subData.photoUrl.startsWith("data:")) {
-      subData.photoUrl = await saveBase64FileIfPresent(subData.photoUrl, candidateName, "photo");
-    }
-    if (subData.paymentUrl && subData.paymentUrl.startsWith("data:")) {
-      subData.paymentUrl = await saveBase64FileIfPresent(subData.paymentUrl, candidateName, "payment_proof");
-    }
-    const razorpayId = body.paymentId || body.payment_id || body.paymentUTR;
-    if (razorpayId) {
-      let specCount = 1;
-      try {
-        if (subData.specialization) {
-          const parsed = JSON.parse(subData.specialization);
-          if (Array.isArray(parsed)) {
-            specCount = parsed.length;
-          }
-        }
-      } catch (e2) {
-      }
-      const isDirectBankTransfer = body.paymentMode === "Direct Bank Transfer / UPI" || body.paymentMode === "bank_transfer" || !!body.paymentUTR;
-      const isManualOffline = body.paymentMode === "Manual Offline";
-      if (isDirectBankTransfer) {
-        subData.paymentId = razorpayId;
-        subData.paymentMode = "Direct Bank Transfer / UPI";
-        subData.paymentUrl = subData.paymentUrl || body.paymentUrl || `direct_transfer:${razorpayId}`;
-        subData.paidAmount = body.paidAmount ? body.paidAmount > 1e5 ? Math.round(body.paidAmount / 100) : Number(body.paidAmount) : 2750 * specCount;
-      } else if (isManualOffline) {
-        subData.paymentId = razorpayId;
-        subData.paymentMode = "Manual Offline";
-        subData.paidAmount = body.paidAmount ? Number(body.paidAmount) : 0;
-      } else {
-        subData.paymentId = razorpayId;
-        subData.paymentUrl = subData.paymentUrl || `razorpay:${razorpayId}`;
-        subData.paymentMode = "Razorpay";
-        subData.paidAmount = body.paidAmount ? body.paidAmount > 1e5 ? Math.round(body.paidAmount / 100) : Number(body.paidAmount) : 2750 * specCount;
-      }
-      const existingSub = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.paymentId, razorpayId));
-      if (existingSub.length > 0) {
-        const isComplete2 = checkCompleteness(subData);
-        await db.update(applicationSubmissionsTable).set({ ...subData, readyForReview: isComplete2 }).where(eq(applicationSubmissionsTable.id, existingSub[0].id));
-        return res.status(200).json({ success: true, submissionId: existingSub[0].id });
-      }
-    }
-    const isComplete = checkCompleteness(subData);
-    const [sub] = await db.insert(applicationSubmissionsTable).values({
-      ...subData,
-      readyForReview: isComplete
-    }).returning();
-    if (sub && subData.email) {
-      (async () => {
-        try {
-          const formRecord = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
-          const programRecord = formRecord[0]?.programId ? await db.select().from(programsTable).where(eq(programsTable.id, formRecord[0].programId)) : [];
-          await sendApplicationSubmissionConfirmationEmail({
-            toEmail: subData.email,
-            toName: subData.fullName || "Applicant",
-            submissionId: sub.id,
-            programName: programRecord[0]?.name ?? "Sankara Fellowship Examination Program",
-            formTitle: formRecord[0]?.title ?? "Fellowship Application",
-            specialization: subData.specialization,
-            paymentId: subData.paymentId,
-            paymentMode: subData.paymentMode,
-            paidAmount: subData.paidAmount
-          });
-        } catch (err) {
-          console.warn("[email] Failed to send submission confirmation email:", err.message);
-        }
-      })();
-    }
-    res.status(201).json({ success: true, submissionId: sub.id });
-  } catch (err) {
-    console.error("[POST /apply/:token fatal error]:", err);
-    res.status(500).json({
-      error: err.message || "Failed to process application submission. Please contact admissions with your Payment ID."
-    });
-  }
-});
-router20.post(
-  "/application-forms/reconcile-payment",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator"),
-  async (req, res) => {
-    try {
-      const { paymentId, fullName, email: email3, phone, specialization, formToken = "JAN2027", notes } = req.body;
-      if (!paymentId || !String(paymentId).trim()) {
-        return res.status(400).json({ error: "Payment ID is required" });
-      }
-      const cleanPaymentId = String(paymentId).trim();
-      const existing = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.paymentId, cleanPaymentId));
-      if (existing.length > 0) {
-        return res.json({
-          success: true,
-          message: "Payment is already linked to submission ID #" + existing[0].id,
-          submission: existing[0]
-        });
-      }
-      let form = await resolveFormByToken(formToken);
-      if (!form) {
-        [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.isActive, true)).limit(1);
-      }
-      if (!form) return res.status(404).json({ error: "Active application form not found" });
-      const [newSub] = await db.insert(applicationSubmissionsTable).values({
-        formId: form.id,
-        status: "pending",
-        fullName: fullName || "Applicant (" + cleanPaymentId + ")",
-        email: email3 || `recovered_${cleanPaymentId.replace(/[^a-zA-Z0-9]/g, "")}@sankaraeye.com`,
-        phone: phone || null,
-        specialization: specialization ? Array.isArray(specialization) ? JSON.stringify(specialization) : String(specialization) : '["IOL"]',
-        paymentId: cleanPaymentId,
-        paymentMode: "Razorpay (Reconciled)",
-        paidAmount: 2750,
-        source: "reconciliation",
-        readyForReview: true,
-        reviewNotes: notes || "Payment reconciled by administrator",
-        submittedAt: /* @__PURE__ */ new Date()
-      }).returning();
-      return res.status(201).json({
-        success: true,
-        message: "Application submission successfully recovered and linked to Payment ID " + cleanPaymentId,
-        submissionId: newSub.id
-      });
-    } catch (err) {
-      console.error("[reconcile-payment error]:", err);
-      return res.status(500).json({ error: err.message || "Failed to reconcile payment" });
-    }
-  }
-);
-router20.get(["/apply/:token/receipt/:submissionId", "/apply/receipt/:submissionId"], async (req, res) => {
-  try {
-    let numberToWordsINR2 = function(amount) {
-      const ones = [
-        "",
-        "One",
-        "Two",
-        "Three",
-        "Four",
-        "Five",
-        "Six",
-        "Seven",
-        "Eight",
-        "Nine",
-        "Ten",
-        "Eleven",
-        "Twelve",
-        "Thirteen",
-        "Fourteen",
-        "Fifteen",
-        "Sixteen",
-        "Seventeen",
-        "Eighteen",
-        "Nineteen"
-      ];
-      const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
-      function numToWords(n) {
-        if (n === 0) return "";
-        if (n < 20) return ones[n] + " ";
-        if (n < 100) return tens[Math.floor(n / 10)] + " " + (n % 10 ? ones[n % 10] + " " : "");
-        if (n < 1e3) return ones[Math.floor(n / 100)] + " Hundred " + (n % 100 ? "and " + numToWords(n % 100) : "");
-        if (n < 1e5) return numToWords(Math.floor(n / 1e3)) + "Thousand " + (n % 1e3 ? numToWords(n % 1e3) : "");
-        if (n < 1e7) return numToWords(Math.floor(n / 1e5)) + "Lakh " + (n % 1e5 ? numToWords(n % 1e5) : "");
-        return numToWords(Math.floor(n / 1e7)) + "Crore " + (n % 1e7 ? numToWords(n % 1e7) : "");
-      }
-      const rounded = Math.round(amount);
-      if (rounded <= 0) return "Zero Rupees Only";
-      const words = numToWords(rounded).trim().replace(/\s+/g, " ");
-      return `${words} Rupees Only`;
-    };
-    var numberToWordsINR = numberToWordsINR2;
-    const subId = Number(req.params.submissionId);
-    if (isNaN(subId)) return res.status(400).json({ error: "Invalid submission ID" });
-    const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, subId));
-    if (!sub) return res.status(404).json({ error: "Application submission not found" });
-    if (req.params.token) {
-      const form2 = await resolveFormByToken(String(req.params.token));
-      if (form2 && sub.formId !== form2.id) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-    }
-    const subAny = sub;
-    const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
-    const [program] = form?.programId ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
-    const cleanName = cleanDoctorName(sub.fullName);
-    const doc = new import_pdfkit3.default({
-      margin: 36,
-      size: "LETTER",
-      bufferPages: true,
-      info: {
-        Title: `Payment Receipt & Admission Summary - Dr. ${cleanName}`,
-        Author: "Sankara Academy of Vision"
-      }
-    });
-    const filename = `SAV_Invoice_Receipt_${sub.id}_${cleanName.replace(/\s+/g, "_")}.pdf`;
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
-    doc.pipe(res);
-    const colors = {
-      navy: "#000066",
-      darkNavy: "#00003b",
-      accentNavy: "#1e3a8a",
-      primary: "#0f172a",
-      secondary: "#475569",
-      muted: "#64748b",
-      border: "#cbd5e1",
-      borderStrong: "#94a3b8",
-      bgLight: "#f8fafc",
-      bgCard: "#f1f5f9",
-      emeraldBg: "#f0fdf4",
-      emeraldBorder: "#86efac",
-      emeraldText: "#15803d",
-      emeraldDark: "#166534",
-      amberBg: "#fffbeb",
-      amberBorder: "#fcd34d",
-      amberDark: "#92400e"
-    };
-    doc.rect(36, 36, 540, 56).fill(colors.navy);
-    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(14).text("SANKARA ACADEMY OF VISION", 48, 44);
-    doc.fillColor("#93c5fd").font("Helvetica").fontSize(8).text("A Unit of Sri Kanchi Kamakoti Medical Trust", 48, 60);
-    doc.fillColor("#cbd5e1").font("Helvetica").fontSize(7.5).text("Bangalore Campus: Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore \u2013 560037", 48, 73);
-    doc.fillColor("#93c5fd").font("Helvetica-Bold").fontSize(8.5).text("OFFICIAL TAX INVOICE & RECEIPT", 320, 44, { width: 246, align: "right" });
-    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(10).text(`APP REF: #APP-${sub.id}`, 320, 58, { width: 246, align: "right" });
-    doc.fillColor("#cbd5e1").font("Helvetica").fontSize(7.5).text("radhika@sankaraeye.com | +91 9666677505", 320, 73, { width: 246, align: "right" });
-    const billCardY = 98;
-    const billCardHeight = 84;
-    doc.rect(36, billCardY, 540, billCardHeight).fill(colors.emeraldBg);
-    doc.strokeColor(colors.emeraldBorder).lineWidth(1.2).rect(36, billCardY, 540, billCardHeight).stroke();
-    doc.rect(48, billCardY + 8, 320, 16).fill("#dcfce7");
-    doc.strokeColor(colors.emeraldBorder).lineWidth(0.6).rect(48, billCardY + 8, 320, 16).stroke();
-    doc.fillColor(colors.emeraldDark).font("Helvetica-Bold").fontSize(7.5).text("[OFFICIAL] AUTOMATED COMPUTER-GENERATED BILL & PAYMENT RECEIPT", 52, billCardY + 12, { width: 312, align: "center" });
-    const invoiceNo = `SAV-INV-${sub.id}-${(sub.paymentId || "RZP").replace(/[^a-zA-Z0-9]/g, "").slice(-8).toUpperCase()}`;
-    const formattedDate = formatToLocalDateTime(sub.submittedAt || /* @__PURE__ */ new Date());
-    const drawMetaRow = (label, val, yPos) => {
-      doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.5).text(label, 48, yPos);
-      doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(8).text(val, 150, yPos);
-    };
-    drawMetaRow("INVOICE / BILL NO:", invoiceNo, billCardY + 28);
-    drawMetaRow("INVOICE DATE & TIME:", `${formattedDate} IST`, billCardY + 41);
-    drawMetaRow("RAZORPAY PAYMENT ID:", sub.paymentId || "Verified via Razorpay Gateway", billCardY + 54);
-    drawMetaRow("PAYMENT STATUS:", "PAID & VERIFIED (RAZORPAY ONLINE GATEWAY)", billCardY + 67);
-    doc.rect(385, billCardY + 8, 180, 68).fill("#ffffff");
-    doc.strokeColor(colors.emeraldBorder).lineWidth(0.8).rect(385, billCardY + 8, 180, 68).stroke();
-    doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.5).text("TOTAL AMOUNT PAID", 390, billCardY + 14, { width: 170, align: "center" });
-    const specs = parseSpecializationString(sub.specialization);
-    const specCount = Math.max(1, specs.length);
-    const displayAmount = sub.paidAmount && sub.paidAmount > 0 ? sub.paidAmount > 1e5 ? Math.round(sub.paidAmount / 100) : sub.paidAmount : 2750 * specCount;
-    doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(16).text(`INR ${displayAmount.toLocaleString("en-IN")}`, 390, billCardY + 26, { width: 170, align: "center" });
-    doc.fillColor(colors.emeraldDark).font("Helvetica-Bold").fontSize(7).text("TRANSACTION RECONCILED & CONFIRMED", 390, billCardY + 46, { width: 170, align: "center" });
-    doc.fillColor(colors.muted).font("Helvetica-Oblique").fontSize(6.5).text(numberToWordsINR2(displayAmount), 390, billCardY + 57, { width: 170, align: "center" });
-    const billedToY = 188;
-    const billedToH = 46;
-    doc.rect(36, billedToY, 540, billedToH).fill(colors.bgLight);
-    doc.strokeColor(colors.border).lineWidth(0.8).rect(36, billedToY, 540, billedToH).stroke();
-    doc.rect(36, billedToY, 540, 14).fill(colors.bgCard);
-    doc.strokeColor(colors.border).lineWidth(0.5).moveTo(36, billedToY + 14).lineTo(576, billedToY + 14).stroke();
-    doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(7.5).text("BILLED TO / CANDIDATE IDENTIFICATION", 44, billedToY + 3.5);
-    doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.5).text("Candidate Name:", 44, billedToY + 18);
-    doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(8).text(`Dr. ${cleanName}`, 120, billedToY + 18);
-    doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.5).text("Email Address:", 260, billedToY + 18);
-    doc.fillColor(colors.primary).font("Helvetica").fontSize(8).text(sub.email, 330, billedToY + 18);
-    doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.5).text("Contact Phone:", 44, billedToY + 30);
-    doc.fillColor(colors.primary).font("Helvetica").fontSize(8).text(sub.phone || "\u2014", 120, billedToY + 30);
-    doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.5).text("Address on File:", 260, billedToY + 30);
-    doc.fillColor(colors.primary).font("Helvetica").fontSize(7.5).text((sub.permanentAddress || "On file").replace(/\n/g, " "), 330, billedToY + 30, { width: 236, ellipsis: true });
-    const tableY = 240;
-    doc.rect(36, tableY, 540, 18).fill(colors.navy);
-    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(7.5);
-    doc.text("SL", 42, tableY + 5, { width: 20 });
-    doc.text("SERVICE / PROGRAM DESCRIPTION", 66, tableY + 5, { width: 250 });
-    doc.text("SAC CODE", 320, tableY + 5, { width: 50, align: "center" });
-    doc.text("QTY", 375, tableY + 5, { width: 35, align: "center" });
-    doc.text("RATE (INR)", 415, tableY + 5, { width: 65, align: "right" });
-    doc.text("AMOUNT (INR)", 485, tableY + 5, { width: 85, align: "right" });
-    const row1Y = tableY + 18;
-    const row1H = 34;
-    doc.rect(36, row1Y, 540, row1H).fill("#ffffff");
-    doc.strokeColor(colors.border).lineWidth(0.5).rect(36, row1Y, 540, row1H).stroke();
-    doc.fillColor(colors.primary).font("Helvetica").fontSize(8).text("1", 42, row1Y + 6);
-    doc.font("Helvetica-Bold").text("Fellowship Entrance Examination & Application Processing Fee", 66, row1Y + 5, { width: 250 });
-    doc.font("Helvetica").fontSize(7).fillColor(colors.secondary).text(`Session: ${program?.name || "Fellowship Program January 2027"} | Subspecialties: ${specs.length ? specs.join(", ") : "Ophthalmology Fellowship"}`, 66, row1Y + 17, { width: 250 });
-    doc.fillColor(colors.primary).font("Helvetica").fontSize(8);
-    doc.text("9992", 320, row1Y + 11, { width: 50, align: "center" });
-    doc.text(`${specCount}`, 375, row1Y + 11, { width: 35, align: "center" });
-    doc.text("2,750.00", 415, row1Y + 11, { width: 65, align: "right" });
-    doc.font("Helvetica-Bold").text(`${displayAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, 485, row1Y + 11, { width: 85, align: "right" });
-    const sumY = row1Y + row1H;
-    const drawSummaryRow = (lbl, val, isBold = false, isGreen = false) => {
-      const cy = doc.y;
-      doc.rect(36, cy, 540, 15).fill(isBold ? colors.bgCard : "#ffffff");
-      doc.strokeColor(colors.border).lineWidth(0.5).rect(36, cy, 540, 15).stroke();
-      doc.fillColor(isBold ? colors.navy : colors.secondary).font(isBold ? "Helvetica-Bold" : "Helvetica").fontSize(7.5).text(lbl, 48, cy + 3.5, { width: 360, align: "right" });
-      doc.fillColor(isGreen ? colors.emeraldDark : isBold ? colors.navy : colors.primary).font(isBold ? "Helvetica-Bold" : "Helvetica").fontSize(isBold ? 8 : 7.5).text(val, 485, cy + 3.5, { width: 85, align: "right" });
-      doc.y = cy + 15;
-    };
-    doc.y = sumY;
-    drawSummaryRow("Subtotal (Entrance Examination Fee):", `INR ${displayAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`);
-    drawSummaryRow("Central & State GST (Exempt under SAC 9992 Educational Admissions):", "INR 0.00");
-    drawSummaryRow("Grand Total Paid via Razorpay:", `INR ${displayAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, true, true);
-    drawSummaryRow("Balance Due:", "INR 0.00 (Fully Paid)", false, true);
-    const noteY = doc.y + 4;
-    doc.fillColor(colors.muted).font("Helvetica-Oblique").fontSize(6.8).text(
-      "* This document is an automated computer-generated electronic bill and official receipt. It serves as verified proof of application fee payment.",
-      36,
-      noteY,
-      { width: 540, align: "center" }
-    );
-    const drawSectionHeader = (title, topY) => {
-      if (topY) doc.y = topY;
-      if (doc.y > 690) {
-        doc.addPage();
-        doc.y = 36;
-      }
-      doc.moveDown(0.3);
-      const y = doc.y;
-      doc.rect(36, y, 540, 16).fill(colors.bgCard);
-      doc.strokeColor(colors.border).lineWidth(0.6).rect(36, y, 540, 16).stroke();
-      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(8.5).text(title.toUpperCase(), 44, y + 4, { width: 520 });
-      doc.y = y + 19;
-    };
-    const renderRow = (label, value) => {
-      const valText = value === null || value === void 0 || value === "null" || value === "" ? "\u2014" : String(value);
-      if (doc.y > 720) {
-        doc.addPage();
-        doc.y = 36;
-      }
-      const currentY = doc.y;
-      doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.5).text(label.toUpperCase(), 44, currentY, { width: 155, lineGap: 1 });
-      const labelEndY = doc.y;
-      doc.fillColor(colors.primary).font("Helvetica").fontSize(8).text(`: ${valText}`, 204, currentY, { width: 366, lineGap: 1 });
-      const valueEndY = doc.y;
-      doc.y = Math.max(labelEndY, valueEndY) + 2.5;
-    };
-    drawSectionHeader("1. Fellowship Application & Unit Preferences", noteY + 14);
-    renderRow("Fellowship Program", program?.name || "Fellowship Program January 2027");
-    renderRow("Subspecialties Applied", specs.length > 0 ? specs.join(", ") : sub.specialization || "\u2014");
-    let centerStr = "\u2014";
-    if (sub.centerPreference) {
-      try {
-        const parsed = JSON.parse(sub.centerPreference);
-        if (typeof parsed === "object") {
-          centerStr = Object.entries(parsed).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join("   |   ");
-        } else {
-          centerStr = String(parsed);
-        }
-      } catch {
-        centerStr = String(sub.centerPreference);
-      }
-    }
-    renderRow("Preferred Hospital Units", centerStr);
-    drawSectionHeader("2. Candidate Qualifications & Licensing");
-    renderRow("Medical Council Reg No", subAny.medicalCouncilNumber || subAny.medicalCouncilRegNumber || "On Record");
-    renderRow("State Medical Council", subAny.stateMedicalCouncil || "State Medical Council on Record");
-    renderRow("Post-Graduate Degree", `${subAny.degree || "MS/MD/DNB/DO"}${subAny.medicalCollege ? " - " + subAny.medicalCollege : ""} (${subAny.postGraduationPassingYear || "Completed"})`);
-    renderRow("MBBS Degree & Institution", `${subAny.mbbsCollege || subAny.university || "Medical College"} (${subAny.mbbsPassingYear || "Completed"})`);
-    if (sub.diagnosticSkills || sub.surgicalExperience) {
-      const skillsSummary = [];
-      if (sub.diagnosticSkills) {
-        try {
-          const ds = JSON.parse(sub.diagnosticSkills);
-          skillsSummary.push(`Diagnostic Competencies: ${Object.keys(ds).length} listed`);
-        } catch {
-          skillsSummary.push("Diagnostic Competencies recorded");
-        }
-      }
-      if (sub.surgicalExperience) {
-        try {
-          const se = JSON.parse(sub.surgicalExperience);
-          skillsSummary.push(`Surgical Experience: ${Object.keys(se).length} listed`);
-        } catch {
-          skillsSummary.push("Surgical Experience recorded");
-        }
-      }
-      renderRow("Clinical Profile", skillsSummary.join("   |   "));
-    }
-    doc.addPage();
-    doc.y = 36;
-    doc.rect(36, 36, 540, 24).fill(colors.navy);
-    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(8.5).text("SANKARA ACADEMY OF VISION \u2014 ADMISSION DOSSIER", 48, 43);
-    doc.fillColor("#cbd5e1").font("Helvetica").fontSize(8).text(`Candidate: Dr. ${cleanName}   |   Ref: #APP-${sub.id}`, 350, 43, { width: 216, align: "right" });
-    const lorHeaderY = 68;
-    doc.rect(36, lorHeaderY, 540, 16).fill(colors.bgCard);
-    doc.strokeColor(colors.border).lineWidth(0.6).rect(36, lorHeaderY, 540, 16).stroke();
-    doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(8.5).text("3. LETTERS OF RECOMMENDATION (LOR) VERIFICATION STATUS", 44, lorHeaderY + 4);
-    const drawLorCard = (lorNum, refName, refContact, refEmail, url3, yPos) => {
-      const cardH = 60;
-      const isUploaded = !!url3 && url3.trim().length > 0;
-      doc.rect(36, yPos, 540, cardH).fill(isUploaded ? "#f0fdf4" : "#fffbeb");
-      doc.strokeColor(isUploaded ? colors.emeraldBorder : colors.amberBorder).lineWidth(0.8).rect(36, yPos, 540, cardH).stroke();
-      doc.rect(36, yPos, 540, 16).fill(isUploaded ? "#dcfce7" : "#fef3c7");
-      doc.strokeColor(isUploaded ? colors.emeraldBorder : colors.amberBorder).lineWidth(0.5).moveTo(36, yPos + 16).lineTo(576, yPos + 16).stroke();
-      doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(7.5).text(`RECOMMENDATION #${lorNum} (LOR ${lorNum})`, 44, yPos + 4);
-      if (isUploaded) {
-        doc.fillColor(colors.emeraldDark).font("Helvetica-Bold").fontSize(7.2).text("[UPLOADED & ATTACHED] (DOCUMENT ON FILE)", 320, yPos + 4, { width: 246, align: "right" });
-      } else {
-        doc.fillColor(colors.amberDark).font("Helvetica-Bold").fontSize(7.2).text("[PENDING UPLOAD / NOT RECEIVED]", 320, yPos + 4, { width: 246, align: "right" });
-      }
-      const refY = yPos + 19;
-      doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.2).text("Referee Name & Title:", 44, refY);
-      doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(7.8).text(refName || "Not Specified", 150, refY);
-      doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.2).text("Designation / Institution:", 44, refY + 11);
-      doc.fillColor(colors.primary).font("Helvetica").fontSize(7.5).text(refContact || "Not Specified", 150, refY + 11);
-      doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.2).text("Official Email Address:", 44, refY + 22);
-      doc.fillColor(colors.primary).font("Helvetica").fontSize(7.5).text(refEmail || "Not Specified", 150, refY + 22);
-      doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(7.2).text("File Attachment Status:", 44, refY + 33);
-      if (isUploaded) {
-        const cleanFile = url3.split("/").pop()?.split("?")[0] || `LOR_${lorNum}_Dossier.pdf`;
-        doc.fillColor(colors.emeraldDark).font("Helvetica-Bold").fontSize(7.2).text(`[VERIFIED] Document Attached: ${cleanFile} (On Candidate Dossier)`, 150, refY + 33);
-      } else {
-        doc.fillColor(colors.amberDark).font("Helvetica").fontSize(7.2).text("Document file not uploaded. Pending receipt before interview.", 150, refY + 33);
-      }
-    };
-    drawLorCard(1, sub.lor1RefName || "", sub.lor1RefContact || "", sub.lor1RefEmail || "", sub.lor1Url, 88);
-    drawLorCard(2, sub.lor2RefName || "", sub.lor2RefContact || "", sub.lor2RefEmail || "", sub.lor2Url, 152);
-    const checkHeaderY = 220;
-    doc.rect(36, checkHeaderY, 540, 16).fill(colors.bgCard);
-    doc.strokeColor(colors.border).lineWidth(0.6).rect(36, checkHeaderY, 540, 16).stroke();
-    doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(8.5).text("4. CANDIDATE UPLOADED DOSSIER & DOCUMENT CHECKLIST", 44, checkHeaderY + 4);
-    const chkTblY = checkHeaderY + 18;
-    doc.rect(36, chkTblY, 540, 16).fill(colors.navy);
-    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(7.5);
-    doc.text("NO.", 42, chkTblY + 4.5, { width: 22 });
-    doc.text("DOCUMENT / CREDENTIAL ITEM", 68, chkTblY + 4.5, { width: 175 });
-    doc.text("DETAILS / IDENTIFIER", 248, chkTblY + 4.5, { width: 180 });
-    doc.text("STATUS", 432, chkTblY + 4.5, { width: 68, align: "center" });
-    doc.text("VERIFICATION", 502, chkTblY + 4.5, { width: 68, align: "center" });
-    const checklistItems = [
-      {
-        no: "1",
-        name: "Candidate Passport Photograph",
-        details: sub.photoUrl ? "Formal Colour Passport Photo for Admit Card & ID" : "Photograph required for Admit Card",
-        uploaded: !!sub.photoUrl,
-        statusText: sub.photoUrl ? "UPLOADED" : "PENDING",
-        verification: sub.photoUrl ? "Verified on File" : "Pending Upload"
-      },
-      {
-        no: "2",
-        name: "Letter of Recommendation #1 (LOR)",
-        details: sub.lor1RefName ? `${sub.lor1RefName}
-(${sub.lor1RefEmail || "Email on file"})` : "Referee details pending",
-        uploaded: !!sub.lor1Url,
-        statusText: sub.lor1Url ? "UPLOADED" : "PENDING",
-        verification: sub.lor1Url ? "Attached & Verified" : "Pending Receipt"
-      },
-      {
-        no: "3",
-        name: "Letter of Recommendation #2 (LOR)",
-        details: sub.lor2RefName ? `${sub.lor2RefName}
-(${sub.lor2RefEmail || "Email on file"})` : "Referee details pending",
-        uploaded: !!sub.lor2Url,
-        statusText: sub.lor2Url ? "UPLOADED" : "PENDING",
-        verification: sub.lor2Url ? "Attached & Verified" : "Pending Receipt"
-      },
-      {
-        no: "4",
-        name: "Application Fee Payment Proof",
-        details: `Razorpay Online Gateway Ref:
-${sub.paymentId || "Confirmed"}`,
-        uploaded: true,
-        statusText: "VERIFIED",
-        verification: "Razorpay Confirmed"
-      },
-      {
-        no: "5",
-        name: "Medical Council Registration",
-        details: `Reg No: ${subAny.medicalCouncilNumber || subAny.medicalCouncilRegNumber || "On Record"}
-(${subAny.stateMedicalCouncil || "State Council"})`,
-        uploaded: true,
-        statusText: "ON RECORD",
-        verification: "Record Verified"
-      },
-      {
-        no: "6",
-        name: "Postgraduate Medical Qualification",
-        details: `${subAny.degree || "MS/MD/DNB/DO"}${subAny.medicalCollege ? " - " + (subAny.medicalCollege.length > 25 ? subAny.medicalCollege.slice(0, 24) + "..." : subAny.medicalCollege) : ""}
-Status: ${subAny.postGraduationPassingYear ? "Passed " + subAny.postGraduationPassingYear : "Completed"}`,
-        uploaded: true,
-        statusText: "ON RECORD",
-        verification: "Qualifying Degree"
-      },
-      {
-        no: "7",
-        name: "Primary Medical Degree (MBBS)",
-        details: `${subAny.mbbsCollege || subAny.university || "Medical College"}
-(${subAny.mbbsPassingYear || "Completed"})`,
-        uploaded: true,
-        statusText: "ON RECORD",
-        verification: "MBBS Degree"
-      },
-      {
-        no: "8",
-        name: "Candidate Legal Declaration",
-        details: `Affirmed on ${formattedDate} IST
-Electronic Acceptance on File`,
-        uploaded: true,
-        statusText: "ACCEPTED",
-        verification: "Digital Affirmation"
-      }
-    ];
-    if (sub.customAnswers && typeof sub.customAnswers === "object") {
-      let customIdx = 9;
-      for (const [key, val] of Object.entries(sub.customAnswers)) {
-        if (typeof val === "string" && (val.includes("/uploads/") || val.endsWith(".pdf") || val.endsWith(".jpg") || val.endsWith(".png") || val.startsWith("http"))) {
-          const cleanKey = key.replace(/([A-Z])/g, " $1").replace(/_/g, " ").replace(/^./, (str) => str.toUpperCase());
-          checklistItems.push({
-            no: String(customIdx++),
-            name: `Uploaded Document: ${cleanKey}`,
-            details: val.split("/").pop() || "Candidate Attached File",
-            uploaded: true,
-            statusText: "UPLOADED",
-            verification: "Attached to File"
-          });
-        }
-      }
-    }
-    let chkCurrentY = chkTblY + 16;
-    checklistItems.slice(0, 8).forEach((item, idx) => {
-      const rowBg = idx % 2 === 0 ? "#ffffff" : colors.bgLight;
-      const rowH = 24;
-      doc.rect(36, chkCurrentY, 540, rowH).fill(rowBg);
-      doc.strokeColor(colors.border).lineWidth(0.4).rect(36, chkCurrentY, 540, rowH).stroke();
-      doc.fillColor(colors.primary).font("Helvetica").fontSize(7.5).text(item.no, 42, chkCurrentY + 7, { width: 22 });
-      doc.font("Helvetica-Bold").fontSize(7.5).text(item.name, 68, chkCurrentY + 4, { width: 175 });
-      doc.font("Helvetica").fontSize(6.8).fillColor(colors.secondary).text(item.details, 248, chkCurrentY + 3.5, { width: 180, lineGap: 1 });
-      doc.fillColor(item.uploaded ? colors.emeraldDark : colors.amberDark).font("Helvetica-Bold").fontSize(7).text(item.statusText, 432, chkCurrentY + 8, { width: 68, align: "center" });
-      doc.fillColor(colors.primary).font("Helvetica").fontSize(7).text(item.verification, 502, chkCurrentY + 8, { width: 68, align: "center" });
-      chkCurrentY += rowH;
-    });
-    const certBlockY = chkCurrentY + 14;
-    const certBlockH = 118;
-    doc.rect(36, certBlockY, 540, certBlockH).fill("#f8fafc");
-    doc.strokeColor(colors.navy).lineWidth(1).rect(36, certBlockY, 540, certBlockH).stroke();
-    doc.rect(36, certBlockY, 540, 18).fill(colors.navy);
-    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(8.5).text("OFFICIAL ELECTRONIC ADMISSION CERTIFICATION", 46, certBlockY + 5);
-    doc.fillColor("#93c5fd").font("Helvetica").fontSize(7.5).text("AUTOMATED COMPUTER-GENERATED OFFICIAL RECORD", 320, certBlockY + 5, { width: 246, align: "right" });
-    const certText = "This document is an electronically generated official application fee payment receipt and candidate admission summary issued by Sankara Academy of Vision. Payment has been verified via Razorpay. No physical signature is required.\nPlease retain this copy for your admission interview, written test, and original document verification.";
-    doc.fillColor(colors.primary).font("Helvetica").fontSize(7.5).text(certText, 46, certBlockY + 23, { width: 375, lineGap: 2.2 });
-    const contactY = certBlockY + 70;
-    doc.strokeColor(colors.border).lineWidth(0.5).moveTo(46, contactY - 4).lineTo(566, contactY - 4).stroke();
-    doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(7.5).text("Admissions Office:", 46, contactY);
-    doc.fillColor(colors.primary).font("Helvetica").fontSize(7.5).text("radhika@sankaraeye.com", 125, contactY);
-    doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(7.5).text("SAV Coordinator Desk:", 240, contactY);
-    doc.fillColor(colors.primary).font("Helvetica").fontSize(7.5).text("+91 9666677505", 345, contactY);
-    doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(7.5).text("Bangalore Desk:", 425, contactY);
-    doc.fillColor(colors.primary).font("Helvetica").fontSize(7.5).text("+91 80 2854 2727", 495, contactY);
-    doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(7.5).text("Bangalore Unit:", 46, contactY + 13);
-    doc.fillColor(colors.secondary).font("Helvetica").fontSize(7.2).text("Sankara Eye Hospital, Varthur Main Road, Kundalahalli Gate, Bangalore - 560037, Karnataka, India", 125, contactY + 13, { width: 440 });
-    doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(7.5).text("Central Desk:", 46, contactY + 26);
-    doc.fillColor(colors.secondary).font("Helvetica").fontSize(7.2).text("+91 422 4234500   |   Website: www.sankaraeye.com", 125, contactY + 26);
-    const sealX = 432;
-    const sealY = certBlockY + 23;
-    const sealW = 134;
-    const sealH = 34;
-    doc.rect(sealX, sealY, sealW, sealH).fill("#ffffff");
-    doc.strokeColor(colors.navy).lineWidth(0.8).rect(sealX, sealY, sealW, sealH).stroke();
-    doc.fillColor(colors.navy).font("Helvetica-Bold").fontSize(6.5).text("SANKARA ACADEMY OF VISION", sealX + 2, sealY + 4, { width: sealW - 4, align: "center" });
-    doc.fillColor(colors.emeraldDark).font("Helvetica-Bold").fontSize(6.5).text("DIGITALLY AUTHENTICATED", sealX + 2, sealY + 13, { width: sealW - 4, align: "center" });
-    doc.fillColor(colors.muted).font("Helvetica").fontSize(5.8).text(`AUTOGEN AUDIT REF: SAV-${sub.id}`, sealX + 2, sealY + 22, { width: sealW - 4, align: "center" });
-    const range2 = doc.bufferedPageRange();
-    for (let i2 = range2.start; i2 < range2.start + range2.count; i2++) {
-      doc.switchToPage(i2);
-      doc.fillColor(colors.muted).font("Helvetica").fontSize(7.2).text(
-        `Page ${i2 + 1} of ${range2.count}   |   Sankara Academy of Vision \u2014 Bangalore Unit   |   Automated Electronic Tax Invoice & Receipt`,
-        36,
-        760,
-        { width: 540, align: "center" }
-      );
-    }
-    doc.end();
-  } catch (err) {
-    console.error("Receipt generation error:", err);
-    if (!res.headersSent) {
-      res.status(500).json({ error: "Failed to generate payment receipt: " + err.message });
-    }
-  }
-});
-router20.post(
-  "/application-submissions",
-  requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
-  async (req, res) => {
-    try {
-      const body = req.body;
-      const required2 = ["fullName", "email", "formId", "paymentId", "paidAmount", "paymentMode"];
-      for (const field of required2) {
-        if (!body[field]) {
-          return res.status(400).json({ error: `${field} is required for manual submission` });
-        }
-      }
-      const subData = {
-        ...body,
-        submittedAt: /* @__PURE__ */ new Date(),
-        source: "admin_manual",
-        status: body.status || "pending",
-        readyForReview: true,
-        paymentUrl: body.paymentId ? `razorpay:${body.paymentId}` : null
-      };
-      const jsonFields = ["specialization", "centerPreference", "customAnswers", "diagnosticSkills", "surgicalExperience", "qualificationMatrix", "medicalConditions"];
-      jsonFields.forEach((field) => {
-        if (subData[field] && typeof subData[field] === "object") {
-          subData[field] = JSON.stringify(subData[field]);
-        }
-      });
-      const [sub] = await db.insert(applicationSubmissionsTable).values(subData).returning();
-      res.status(201).json(sub);
-    } catch (error40) {
-      console.error("[manual_submission] error:", error40);
-      res.status(500).json({ error: error40.message });
-    }
-  }
-);
-router20.delete(
-  "/application-submissions/:id",
-  requireAuth,
-  requireRole("super_admin", "program_admin"),
-  async (req, res) => {
-    const id = Number(req.params.id);
-    const deleted = await db.delete(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.id, id)).returning();
-    if (deleted.length === 0) return res.status(404).json({ error: "Submission not found" });
-    res.json({ message: "Submission deleted" });
-  }
-);
-router20.post(
-  "/application-submissions/bulk-delete",
-  requireAuth,
-  requireRole("super_admin", "program_admin"),
-  async (req, res) => {
-    const { ids } = req.body;
-    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: "No IDs provided" });
-    await db.delete(applicationSubmissionsTable).where(sql`${applicationSubmissionsTable.id} IN (${sql.join(ids, sql`, `)})`);
-    res.json({ message: `${ids.length} submissions deleted` });
-  }
-);
-router20.get("/application-forms/default-sections", requireAuth, requireRole("super_admin", "program_admin"), (req, res) => {
-  res.json(DEFAULT_SECTIONS);
-});
-var application_forms_default = router20;
+// src/routes/index.ts
+init_application_forms2();
 
 // src/routes/seat-matrix.ts
 var import_express21 = __toESM(require_express2(), 1);
@@ -1139289,6 +1139577,7 @@ init_src();
 init_drizzle_orm();
 init_auth2();
 init_auth();
+init_default_sections();
 var router27 = (0, import_express27.Router)();
 async function runSeed() {
   const hp = await hashPassword("admin123");
@@ -1141441,6 +1141730,7 @@ init_utils5();
 init_src();
 init_drizzle_orm();
 init_utils5();
+init_default_sections();
 var SARAVANAN_PASSWORD_HASH = "$2b$10$tzKB/Dj.bn.MPCUj5GJQz.V6.ijFrypzqkwSjMW458ni7dCAx0MuS";
 var PRABHANJAN_PASSWORD_HASH = "$2b$10$tvyctohFaAUQNOxzKEl41OJTpdw6oQkfP.ifNrrDHvN1QNUbuNnMq";
 var RADHIKA_PASSWORD_HASH = "$2b$10$b3rGkezYF6rCQHuAUnzWrOa6Q9N9sPAKaABpRyI.QYhZfJWY4ZtqG";
