@@ -133,21 +133,31 @@ export function CandidateExamDialog({
         }
       }
 
-      const specialityScores = Object.entries(specialityMarks)
-        .filter(([_, data]) => data.score.trim() !== "" || (data.remarks && data.remarks.trim() !== ""))
-        .map(([specIdStr, data]) => {
-          const specId = Number(specIdStr);
-          const scoreVal = data.score.trim() !== "" ? parseFloat(data.score) : null;
-          return {
-            specialityId: specId,
-            score: scoreVal !== null && !isNaN(scoreVal) ? scoreVal : null,
-            remarks: data.remarks.trim() || undefined,
-          };
-        });
+      // Isolate marks payload by panel mode so multi-speciality panels never overwrite each other or Mind Matter
+      const specialityScores = isMindMatterPanel
+        ? []
+        : Object.entries(specialityMarks)
+            .filter(([specIdStr, data]) => {
+              if (panelSpecialityId && Number(specIdStr) !== panelSpecialityId) return false;
+              return data.score.trim() !== "" || (data.remarks && data.remarks.trim() !== "");
+            })
+            .map(([specIdStr, data]) => {
+              const specId = Number(specIdStr);
+              const scoreVal = data.score.trim() !== "" ? parseFloat(data.score) : null;
+              return {
+                specialityId: specId,
+                score: scoreVal !== null && !isNaN(scoreVal) ? scoreVal : null,
+                remarks: data.remarks.trim() || undefined,
+              };
+            });
+
+      const isSpecPanel = Boolean(panelSpecialityId && !isMindMatterPanel);
 
       return api.post(`/candidates/${candidateId}/doctor-marks`, {
-        psychometricScore: psychoNum,
+        psychometricScore: isSpecPanel ? undefined : psychoNum,
         specialityScores,
+        specialityId: panelSpecialityId ?? undefined,
+        isMindMatterPanel,
         status: decisionStatus,
         unitId: selectedUnitId,
         reviewNotes: overallRemarks ? overallRemarks : undefined,
@@ -1520,7 +1530,33 @@ export function CandidateExamDialog({
                       ) : (
                         appliedList.map((spec, idx) => {
                           const current = specialityMarks[spec.specialityId] || { score: "", remarks: "" };
-                          const isAssignedSpec = panelSpecialityId && spec.specialityId === panelSpecialityId;
+                          const isAssignedSpec = Boolean(panelSpecialityId && spec.specialityId === panelSpecialityId);
+                          const isOtherSpecialityPanel = Boolean(panelSpecialityId && !isMindMatterPanel && spec.specialityId !== panelSpecialityId);
+
+                          if (isOtherSpecialityPanel) {
+                            return (
+                              <div
+                                key={spec.specialityId || idx}
+                                className="px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/70 flex items-center justify-between gap-2"
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="h-5 w-5 rounded-full bg-slate-400 text-white font-black text-[10px] flex items-center justify-center shrink-0">
+                                    {idx + 1}
+                                  </span>
+                                  <div className="min-w-0">
+                                    <span className="font-bold text-xs text-slate-700 block truncate">{spec.specialityName}</span>
+                                    <span className="text-[10px] text-slate-500">
+                                      Preference {spec.preferenceOrder || idx + 1} · Evaluated separately by {spec.specialityName} panel
+                                    </span>
+                                  </div>
+                                </div>
+                                <Badge variant="outline" className="text-[10px] font-bold border-slate-300 text-slate-600 bg-white shrink-0">
+                                  {current.score !== "" ? `Viva: ${current.score}/50` : "Separate Panel"}
+                                </Badge>
+                              </div>
+                            );
+                          }
+
                           return (
                             <div
                               key={spec.specialityId || idx}

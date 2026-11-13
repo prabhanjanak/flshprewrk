@@ -31,19 +31,17 @@ import emailSettingsRouter from "./email-settings";
 import hallTicketsRouter from "./hall-tickets";
 import globalSettingsRouter from "./global-settings";
 import reportsRouter from "./reports";
-import { db, applicationSubmissionsTable, applicationFormsTable, programsTable } from "@workspace/db";
+import { db, applicationSubmissionsTable, applicationFormsTable, programsTable, candidatesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import PDFDocument from "pdfkit";
-import path from "path";
-import fs from "fs/promises";
 import { requireAuth, requireRole } from "../middleware/auth";
-import { parseSpecializationString, formatDOBToStandard } from "../lib/utils";
+import { parseSpecializationString, formatDOBToStandard, parseDiagnosticSkills, parseSurgicalExperience } from "../lib/utils";
+import { generateApplicationPdfBuffer, resolveCandidatePhotoBuffer } from "../lib/application-pdf";
 
 const router: IRouter = Router();
 
 router.get("/ping", (req, res) => res.send("pong"));
 
-// Global Print Application Route (Moved here for maximum reliability - TOP PRIORITY)
+// Global Print Application Route (Moved here for maximum reliability - TOP PRIORITY, US Letter + SEF/SAV Logos)
 router.get(
   "/print-application/:id",
   requireAuth,
@@ -57,181 +55,19 @@ router.get(
 
       const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
       const [program] = form ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
+      let candidate = null;
+      if (sub.email) {
+        const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.email, sub.email));
+        candidate = c || null;
+      }
 
-      const doc = new PDFDocument({ 
-        margin: 50, 
-        size: 'A4',
-        info: { Title: `Application - ${sub.fullName}`, Author: 'Sankara Academy of Vision' }
-      });
-      
-      const filename = `Application_${sub.fullName.replace(/\s+/g, '_')}_${id}.pdf`;
+      const pdfBuffer = await generateApplicationPdfBuffer({ sub, form, program, candidate });
+      const filename = `Application_${(sub.fullName || "Candidate").replace(/[^a-zA-Z0-9_-]/g, "_")}_${id}.pdf`;
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `inline; filename=${filename}`);
+      res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
       res.setHeader("Content-Security-Policy", "default-src 'self' 'unsafe-inline' blob: data:; img-src 'self' data: blob:;");
-      doc.pipe(res);
-
-      const colors = { primary: '#0f172a', secondary: '#475569', accent: '#2563eb', muted: '#94a3b8', border: '#e2e8f0' };
-
-      const drawSectionHeader = (title: string) => {
-        if (doc.y > 680) {
-          doc.addPage();
-          doc.y = 50;
-        }
-        doc.moveDown(1);
-        const y = doc.y;
-        doc.rect(50, y, 500, 24).fill('#f1f5f9');
-        doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(12.5).text(title.toUpperCase(), 60, y + 6, { width: 480 });
-        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(50, y + 24).lineTo(550, y + 24).stroke();
-        doc.y = y + 32;
-      };
-
-      const renderApplicationRecordRow = (label: string, value: any) => {
-        const valText = (value === null || value === undefined || value === "null" || value === "") ? "—" : String(value);
-        const startY = doc.y;
-        doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(10.5).text(label.toUpperCase(), 50, startY, { width: 120, lineGap: 2 });
-        const labelEndY = doc.y;
-        doc.fillColor(colors.primary).font('Helvetica').fontSize(11.5).text(`: ${valText}`, 180, startY, { width: 250, lineGap: 2 });
-        const valueEndY = doc.y;
-        doc.y = Math.max(labelEndY, valueEndY) + 5;
-      };
-
-      const renderGeneralRow = (label: string, value: any) => {
-        const valText = (value === null || value === undefined || value === "null" || value === "") ? "—" : String(value);
-        if (doc.y > 720) {
-          doc.addPage();
-          doc.y = 50;
-        }
-        const currentY = doc.y;
-        doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(10.5).text(label.toUpperCase(), 50, currentY, { width: 160, lineGap: 2 });
-        const labelEndY = doc.y;
-        doc.fillColor(colors.primary).font('Helvetica').fontSize(11.5).text(`: ${valText}`, 220, currentY, { width: 330, lineGap: 2 });
-        const valueEndY = doc.y;
-        doc.y = Math.max(labelEndY, valueEndY) + 6;
-      };
-
-      const parseSpecializations = (spec: string | null | undefined): string[] => {
-        return parseSpecializationString(spec);
-      };
-
-      const parseCenterPreferences = (cp: string | null | undefined, customAnswers?: any, sections?: any[]): Record<string, string> => {
-        if (cp) {
-          try {
-            const parsed = JSON.parse(cp);
-            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
-          } catch { }
-        }
-        if (customAnswers && typeof customAnswers === "object") {
-          const prefs: Record<string, string> = {};
-          Object.entries(customAnswers).forEach(([key, val]) => {
-            if (key.startsWith("unit_") && val) {
-              let label = key.replace("unit_", "").replace(/_/g, " ").toUpperCase();
-              if (sections) {
-                sections.forEach((sec: any) => {
-                  sec.fields?.forEach((f: any) => {
-                    if (f.id === key) label = f.label.replace(" Preferred Center", "");
-                  });
-                });
-              }
-              prefs[label] = Array.isArray(val) ? val.join(", ") : String(val);
-            }
-          });
-          return prefs;
-        }
-        return {};
-      };
-
-      // Header
-      doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(24).text('SANKARA ACADEMY OF VISION', 50, 50, { width: 500, align: 'left' });
-      doc.fillColor(colors.primary).font('Helvetica').fontSize(11).text('Educational unit of Sankara Eye Foundation, India', 50, 75, { width: 500, align: 'left' });
-      doc.moveDown(0.2);
-      doc.fillColor(colors.muted).font('Helvetica-Bold').fontSize(10).text('FELLOWSHIP PROGRAM ADMISSIONS', 50, 90, { width: 500, align: 'left' });
-      doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, 105).lineTo(550, 105).stroke();
-
-      // Photo on the right
-      const photoUrl = sub.photoUrl;
-      const photoX = 450;
-      const photoY = 120;
-      const photoW = 100;
-      const photoH = 120;
-
-      if (photoUrl && photoUrl.startsWith("/objects/")) {
-        const localPath = path.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
-        try {
-          doc.image(localPath, photoX, photoY, { width: photoW, height: photoH });
-          doc.rect(photoX, photoY, photoW, photoH).strokeColor(colors.border).lineWidth(1).stroke();
-        } catch (e) {
-          doc.rect(photoX, photoY, photoW, photoH).fill('#f1f5f9');
-          doc.fillColor(colors.muted).font('Helvetica').fontSize(8.5).text('PHOTO NOT AVAILABLE', photoX, photoY + 50, { width: photoW, align: 'center' });
-        }
-      } else {
-        doc.rect(photoX, photoY, photoW, photoH).fill('#f1f5f9');
-        doc.fillColor(colors.muted).font('Helvetica').fontSize(8.5).text('NO PHOTO UPLOADED', photoX, photoY + 50, { width: photoW, align: 'center' });
-      }
-
-      doc.y = 120;
-      doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(14).text('APPLICATION RECORD', 50, 120, { width: 380 });
-      doc.y = 145; // Give standard padding from title
-
-      renderApplicationRecordRow('Application ID', id);
-      renderApplicationRecordRow('Program', program?.name || 'Fellowship Program');
-      renderApplicationRecordRow('Submission Date', sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
-      // renderApplicationRecordRow('Status', sub.status.toUpperCase());
-      
-      // Ensure vertical cursor is below the photo height before starting section headers to prevent overlapping
-      if (doc.y < 250) {
-        doc.y = 250;
-      }
-
-      drawSectionHeader('Personal Details');
-      renderGeneralRow('Full Name', sub.fullName);
-      renderGeneralRow('Email Address', sub.email);
-      renderGeneralRow('Phone Number', sub.phone);
-      renderGeneralRow('Date of Birth', formatDOBToStandard(sub.dateOfBirth));
-      renderGeneralRow('Permanent Address', sub.permanentAddress);
-
-      drawSectionHeader('Qualifications');
-      renderGeneralRow('Degree', sub.degree);
-      renderGeneralRow('College', sub.medicalCollege);
-      renderGeneralRow('University', sub.university);
-      renderGeneralRow('Reg No', sub.medicalCouncilNumber);
-
-      drawSectionHeader('Specialization & Centers');
-      const specs = parseSpecializations(sub.specialization);
-      const centerPrefs = parseCenterPreferences(sub.centerPreference, sub.customAnswers, form?.sectionsConfig ?? undefined);
-      specs.forEach((sp, idx) => {
-        if (doc.y > 720) {
-          doc.addPage();
-          doc.y = 50;
-        }
-        const currentY = doc.y;
-        doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(10.5).text(`${idx + 1}. ${sp}`, 50, currentY, { width: 180, lineGap: 2 });
-        const spEndY = doc.y;
-        doc.fillColor(colors.secondary).font('Helvetica').fontSize(10).text(` - Center: ${centerPrefs[sp] || 'No preference'}`, 230, currentY, { width: 320, lineGap: 2 });
-        const centerEndY = doc.y;
-        doc.y = Math.max(spEndY, centerEndY) + 6;
-      });
-
-      drawSectionHeader('Declaration');
-      renderGeneralRow('Payment ID', sub.paymentId || '—');
-      
-      if (doc.y > 720) {
-        doc.addPage();
-        doc.y = 50;
-      }
-      doc.moveDown(0.5);
-      doc.fillColor(colors.secondary).font('Helvetica-Oblique').fontSize(8.5).text(
-        'Declaration: I hereby declare that the information provided above is true to the best of my knowledge and belief.',
-        50, doc.y, { width: 500, lineGap: 2 }
-      );
-
-      const range = doc.bufferedPageRange();
-      for (let i = range.start; i < range.start + range.count; i++) {
-        doc.switchToPage(i);
-        doc.fillColor(colors.muted).fontSize(8).text(`Page ${i + 1} of ${range.count} | Generated by SAV Admissions Portal`, 50, 780, { align: 'center' });
-      }
-
-      doc.end();
-    } catch (e) {
+      res.send(pdfBuffer);
+    } catch (e: any) {
       console.error("[print-gen] error:", e);
       if (!res.headersSent) res.status(500).json({ error: "Failed to generate PDF" });
     }
@@ -255,16 +91,11 @@ router.get(
 
       const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
 
-      // Embed photo as base64 so it renders in sandboxed iframe
+      // Embed photo as base64 using universal disk + Postgres + remote resolver
       let photoDataUrl = "";
-      if (sub.photoUrl && sub.photoUrl.startsWith("/objects/")) {
-        try {
-          const localPath = path.join(process.cwd(), "uploads", sub.photoUrl.replace("/objects/", ""));
-          const buf = await fs.readFile(localPath);
-          const ext = localPath.split(".").pop()?.toLowerCase() || "jpg";
-          const mime = ext === "png" ? "image/png" : "image/jpeg";
-          photoDataUrl = `data:${mime};base64,${buf.toString("base64")}`;
-        } catch { /* photo not found — render placeholder */ }
+      const photoBuf = await resolveCandidatePhotoBuffer(sub.photoUrl);
+      if (photoBuf) {
+        photoDataUrl = `data:image/jpeg;base64,${photoBuf.toString("base64")}`;
       }
 
       const parseSpecs = (s: string | null | undefined): string[] => parseSpecializationString(s);
@@ -286,12 +117,17 @@ router.get(
         }
       }
 
+      const spouseClean =
+        sub.spouseDetails && sub.spouseDetails !== "0" && sub.spouseDetails.toLowerCase() !== "na"
+          ? sub.spouseDetails
+          : null;
+
       // 1. Personal Details Card
       const personalRows: [string, any][] = [
         ["Date of Birth", formatDOBToStandard(sub.dateOfBirth)],
         ["Gender", sub.gender],
         ["Marital Status", sub.maritalStatus],
-        ["Spouse / Family Details", sub.spouseDetails],
+        ["Spouse / Family Details", spouseClean],
         ["Mailing Address", sub.mailingAddress],
         ["Permanent Address", sub.permanentAddress],
       ];
@@ -309,12 +145,9 @@ router.get(
         ["Other Training", sub.otherTraining],
       ];
 
-      // 3. Clinical Profile Card
-      const clinicalRows: [string, any][] = [
-        ["Diagnostic Skills", sub.diagnosticSkills],
-        ["Surgical Experience", sub.surgicalExperience],
-        ["Total Surgeries Done", sub.totalSurgeries],
-      ];
+      // 3. Formatted Diagnostic Skills & Surgical Log HTML Card (No Raw JSON)
+      const parsedSkills = parseDiagnosticSkills(sub.diagnosticSkills);
+      const parsedSurgeries = parseSurgicalExperience(sub.surgicalExperience);
 
       // 4. Research Card
       const researchRows: [string, any][] = [
@@ -351,9 +184,70 @@ router.get(
         `;
       };
 
+      const escHtml = (v: string) =>
+        v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+      const buildClinicalCardHtml = () => {
+        if (parsedSkills.length === 0 && parsedSurgeries.length === 0 && !sub.totalSurgeries) return "";
+        const skillPills = parsedSkills.map((sk) => {
+          const isExpert = sk.level.toLowerCase().includes("expert");
+          const isInterm = sk.level.toLowerCase().includes("inter");
+          const badgeStyle = isExpert
+            ? "background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;"
+            : isInterm
+            ? "background:#eff6ff;color:#0369a1;border:1px solid #bfdbfe;"
+            : "background:#fffbeb;color:#b45309;border:1px solid #fde68a;";
+          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border:1px solid #f1f5f9;border-radius:8px;background:#f8fafc;">
+            <span style="font-size:11.5px;font-weight:700;color:#0f172a;">${escHtml(sk.name)}</span>
+            <span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;${badgeStyle}">${escHtml(sk.level)}</span>
+          </div>`;
+        }).join("");
+
+        const totalSup = parsedSurgeries.reduce((a, s) => a + s.supervision, 0);
+        const totalInd = parsedSurgeries.reduce((a, s) => a + s.independent, 0);
+        const surgeryRows = parsedSurgeries.map((s) => `
+          <tr>
+            <td style="padding:8px 12px;font-size:12px;font-weight:700;color:#0f172a;border-bottom:1px solid #f1f5f9;">${escHtml(s.procedure)}</td>
+            <td style="padding:8px 12px;font-size:12px;color:#334155;text-align:right;border-bottom:1px solid #f1f5f9;">${s.supervision}</td>
+            <td style="padding:8px 12px;font-size:12px;color:#334155;text-align:right;border-bottom:1px solid #f1f5f9;">${s.independent}</td>
+            <td style="padding:8px 12px;font-size:12px;font-weight:800;color:#0b3a6e;text-align:right;border-bottom:1px solid #f1f5f9;">${s.total}</td>
+          </tr>
+        `).join("");
+
+        return `
+          <div style="margin-bottom:20px;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+            <div style="background:#f8fafc;padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.1em;color:#334155;">Clinical Skills &amp; Surgical Profile</span>
+              ${sub.totalSurgeries ? `<span style="font-size:11px;font-weight:800;background:#fffbeb;color:#b45309;border:1px solid #fde68a;padding:3px 10px;border-radius:999px;">Total Surgeries: ${escHtml(String(sub.totalSurgeries))}</span>` : ""}
+            </div>
+            <div style="padding:14px 16px;">
+              ${parsedSkills.length > 0 ? `<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#64748b;letter-spacing:0.06em;margin-bottom:8px;">Diagnostic &amp; Clinical Proficiencies</div>
+              <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:16px;">${skillPills}</div>` : ""}
+              ${parsedSurgeries.length > 0 ? `<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#64748b;letter-spacing:0.06em;margin-bottom:8px;">Surgical Operative Log</div>
+              <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+                <thead><tr style="background:#f1f5f9;">
+                  <th style="padding:8px 12px;font-size:10px;font-weight:800;color:#475569;text-align:left;text-transform:uppercase;">Procedure</th>
+                  <th style="padding:8px 12px;font-size:10px;font-weight:800;color:#475569;text-align:right;text-transform:uppercase;">Supervision</th>
+                  <th style="padding:8px 12px;font-size:10px;font-weight:800;color:#475569;text-align:right;text-transform:uppercase;">Independent</th>
+                  <th style="padding:8px 12px;font-size:10px;font-weight:800;color:#475569;text-align:right;text-transform:uppercase;">Total</th>
+                </tr></thead>
+                <tbody>${surgeryRows}
+                  <tr style="background:#f8fafc;">
+                    <td style="padding:8px 12px;font-size:11px;font-weight:900;color:#0f172a;">CUMULATIVE LOG TOTAL</td>
+                    <td style="padding:8px 12px;font-size:11px;font-weight:800;color:#0f172a;text-align:right;">${totalSup}</td>
+                    <td style="padding:8px 12px;font-size:11px;font-weight:800;color:#0f172a;text-align:right;">${totalInd}</td>
+                    <td style="padding:8px 12px;font-size:11px;font-weight:900;color:#0b3a6e;text-align:right;">${totalSup + totalInd}</td>
+                  </tr>
+                </tbody>
+              </table>` : ""}
+            </div>
+          </div>
+        `;
+      };
+
       const personalCard = createCardHtml("Personal Details", personalRows);
       const qualificationsCard = createCardHtml("Academic Qualifications", qualificationsRows);
-      const clinicalCard = createCardHtml("Clinical Skills & Surgical Profile", clinicalRows);
+      const clinicalCard = buildClinicalCardHtml();
       const researchCard = createCardHtml("Research & Academic Achievements", researchRows);
       const referralCard = createCardHtml("Referral & Additional Profile Details", referralRows);
 

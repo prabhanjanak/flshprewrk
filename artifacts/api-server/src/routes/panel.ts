@@ -902,7 +902,7 @@ router.patch("/panel/status/:doctorId", requireAuth, requireRole("central_exam_c
   res.json({ doctorId, isEngaged: (row as Record<string, unknown>)["is_engaged"], currentCandidateId: (row as Record<string, unknown>)["current_candidate_id"], currentCandidateName: (row as Record<string, unknown>)["candidate_name"] });
 });
 
-router.patch("/panel/status", requireAuth, requireRole("doctor"), async (req, res) => {
+router.patch("/panel/status", requireAuth, requireRole("doctor", "super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   const doctorId = req.user!.userId;
   const { isEngaged, candidateId } = req.body as { isEngaged: boolean; candidateId?: number | null };
   await db.execute(sql`INSERT INTO doctor_panel_status (doctor_id) VALUES (${doctorId}) ON CONFLICT (doctor_id) DO NOTHING`);
@@ -925,36 +925,70 @@ router.patch("/panel/status", requireAuth, requireRole("doctor"), async (req, re
   res.json({ doctorId, isEngaged: (row as Record<string, unknown>)["is_engaged"], currentCandidateId: (row as Record<string, unknown>)["current_candidate_id"], currentCandidateName: (row as Record<string, unknown>)["candidate_name"] });
 });
 
-router.get("/panel/my-status", requireAuth, requireRole("doctor"), async (req, res) => {
+router.get("/panel/my-status", requireAuth, requireRole("doctor", "super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   const doctorId = req.user!.userId;
+  const userRole = req.user!.role;
+  const isMockMode = Boolean((req as any).isMockMode);
   await db.execute(sql`INSERT INTO doctor_panel_status (doctor_id) VALUES (${doctorId}) ON CONFLICT (doctor_id) DO NOTHING`);
-  const [row] = (await db.execute(sql`
-    SELECT dps.*, c.full_name as candidate_name, c.candidate_code,
-           ip.id as panel_id, ip.name as panel_name, ip.room_number, ip.speciality_id,
-           ip.is_mind_matter, s.name as speciality_name, ipm.is_main as is_main_doctor,
-           ipm.marks_entry_enabled
+
+  const [dpsRow] = (await db.execute(sql`
+    SELECT dps.*, c.full_name as candidate_name, c.candidate_code
     FROM doctor_panel_status dps
     LEFT JOIN candidates c ON c.id = dps.current_candidate_id
-    LEFT JOIN interview_panel_members ipm ON ipm.doctor_id = ${doctorId}
-    LEFT JOIN interview_panels ip ON ip.id = ipm.panel_id
-    LEFT JOIN specialities s ON s.id = ip.speciality_id
     WHERE dps.doctor_id = ${doctorId}
-    ORDER BY ip.is_active DESC, ip.is_mind_matter DESC, ip.id DESC
     LIMIT 1
-  `)).rows;
+  `)).rows as Array<Record<string, unknown>>;
+
+  const panelRows = userRole === "doctor"
+    ? (await db.execute(sql`
+        SELECT ip.id as panel_id, ip.name as panel_name, ip.room_number, ip.speciality_id,
+               ip.is_mind_matter, s.name as speciality_name, ipm.is_main as is_main_doctor,
+               ipm.marks_entry_enabled
+        FROM interview_panel_members ipm
+        JOIN interview_panels ip ON ip.id = ipm.panel_id AND ip.is_active = TRUE AND ip.is_mock = ${isMockMode}
+        LEFT JOIN specialities s ON s.id = ip.speciality_id
+        WHERE ipm.doctor_id = ${doctorId}
+        ORDER BY ip.is_mind_matter DESC, ip.id ASC
+      `)).rows as Array<Record<string, unknown>>
+    : (await db.execute(sql`
+        SELECT ip.id as panel_id, ip.name as panel_name, ip.room_number, ip.speciality_id,
+               ip.is_mind_matter, s.name as speciality_name, TRUE as is_main_doctor,
+               TRUE as marks_entry_enabled
+        FROM interview_panels ip
+        LEFT JOIN specialities s ON s.id = ip.speciality_id
+        WHERE ip.is_active = TRUE AND ip.is_mock = ${isMockMode}
+        ORDER BY ip.is_mind_matter DESC, ip.id ASC
+      `)).rows as Array<Record<string, unknown>>;
+
+  const requestedPanelId = req.query["panelId"] ? Number(req.query["panelId"]) : null;
+  const activePanel = (requestedPanelId ? panelRows.find((r) => Number(r["panel_id"]) === requestedPanelId) : undefined) ?? panelRows[0] ?? {};
+  const panels = panelRows
+    .filter((r) => r["panel_id"] != null)
+    .map((r) => ({
+      panelId: Number(r["panel_id"]),
+      panelName: String(r["panel_name"] ?? ""),
+      roomNumber: r["room_number"] ?? null,
+      specialityId: r["speciality_id"] != null ? Number(r["speciality_id"]) : null,
+      specialityName: r["speciality_name"] ?? null,
+      isMindMatter: r["is_mind_matter"] === true || r["is_mind_matter"] === 1,
+      isMain: r["is_main_doctor"] === true,
+      marksEntryEnabled: userRole === "super_admin" ? true : (r["marks_entry_enabled"] === true),
+    }));
+
   res.json({
-    isEngaged: (row as Record<string, unknown>)["is_engaged"] ?? false,
-    currentCandidateId: (row as Record<string, unknown>)["current_candidate_id"],
-    currentCandidateName: (row as Record<string, unknown>)["candidate_name"],
-    currentCandidateCode: (row as Record<string, unknown>)["candidate_code"],
-    panelId: (row as Record<string, unknown>)["panel_id"] ?? null,
-    panelName: (row as Record<string, unknown>)["panel_name"],
-    roomNumber: (row as Record<string, unknown>)["room_number"],
-    specialityId: (row as Record<string, unknown>)["speciality_id"],
-    specialityName: (row as Record<string, unknown>)["speciality_name"],
-    isMindMatter: (row as Record<string, unknown>)["is_mind_matter"] === true || (row as Record<string, unknown>)["is_mind_matter"] === 1,
-    isMain: (row as Record<string, unknown>)["is_main_doctor"] === true,
-    marksEntryEnabled: (row as Record<string, unknown>)["marks_entry_enabled"] === true,
+    isEngaged: dpsRow?.["is_engaged"] ?? false,
+    currentCandidateId: dpsRow?.["current_candidate_id"] ?? null,
+    currentCandidateName: dpsRow?.["candidate_name"] ?? null,
+    currentCandidateCode: dpsRow?.["candidate_code"] ?? null,
+    panelId: activePanel["panel_id"] ?? null,
+    panelName: activePanel["panel_name"] ?? null,
+    roomNumber: activePanel["room_number"] ?? null,
+    specialityId: activePanel["speciality_id"] ?? null,
+    specialityName: activePanel["speciality_name"] ?? null,
+    isMindMatter: activePanel["is_mind_matter"] === true || activePanel["is_mind_matter"] === 1,
+    isMain: activePanel["is_main_doctor"] === true,
+    marksEntryEnabled: userRole === "super_admin" ? true : (activePanel["marks_entry_enabled"] === true),
+    panels,
   });
 });
 

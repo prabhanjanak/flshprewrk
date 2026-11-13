@@ -1568,6 +1568,27 @@ export default function ApplicationFormsPage() {
     }
   };
 
+  const downloadSubmissionPdf = async (submissionId: number, fullName?: string | null) => {
+    try {
+      const token = localStorage.getItem("fellowship_token");
+      const res = await fetch(`/api/application-forms/submissions/${submissionId}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to generate application PDF");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const cleanName = (fullName || "Candidate").replace(/[^a-zA-Z0-9_-]/g, "_");
+      a.href = url;
+      a.download = `Application_${cleanName}_${submissionId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "PDF Downloaded", description: `US Letter application dossier for ${fullName || "Candidate"} saved.` });
+    } catch (e: any) {
+      toast({ title: "PDF Download Failed", description: e.message || "Failed to download", variant: "destructive" });
+    }
+  };
+
   const sendCallLetterEmail = async (submissionId: number, candidateName: string) => {
     setSendingEmailId(submissionId);
     try {
@@ -1856,8 +1877,8 @@ export default function ApplicationFormsPage() {
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
             @page { 
-              size: A4 portrait; 
-              margin: 7mm 9mm; 
+              size: letter portrait; 
+              margin: 6mm 8mm; 
             }
 
             body, html, #root { 
@@ -1952,6 +1973,9 @@ export default function ApplicationFormsPage() {
             </div>
             
             <div className="flex items-center gap-3">
+               <Button variant="outline" size="sm" onClick={() => downloadSubmissionPdf(viewedSub.id, viewedSub.fullName)} className="rounded-xl border-blue-200 text-blue-700 hover:bg-blue-50 transition-all font-bold px-4">
+                  <Download className="w-4 h-4 mr-2" /> Download PDF
+               </Button>
                <Button variant="outline" size="sm" onClick={() => window.print()} className="rounded-xl border-slate-200 hover:bg-slate-50 transition-all font-bold px-4">
                   <Printer className="w-4 h-4 mr-2" /> Print PDF
                </Button>
@@ -2291,30 +2315,42 @@ export default function ApplicationFormsPage() {
             {/* ═══════════════════════════════════════════════════════════════════════ */}
             <div className="hidden print:block font-sans text-slate-900 leading-tight">
                {/* ────────────────── PAGE 1: DEMOGRAPHICS, CREDENTIALS & FITNESS ────────────────── */}
-               <div className="space-y-3">
-                  {/* Header */}
-                  <div className="flex items-start justify-between border-b-2 border-[#0b4a8f] pb-3">
-                     <div className="space-y-0.5">
-                        <h1 className="text-2xl font-black uppercase tracking-tight text-[#0b4a8f] leading-none">
+               <div className="space-y-2">
+                  {/* Header with Dual Institutional Logos */}
+                  <div className="flex items-center justify-between gap-3 border-b-2 border-[#0b4a8f] pb-2.5">
+                     <img
+                       src="/assets/sankara_eye_foundation_logo.png"
+                       alt="Sankara Eye Foundation"
+                       className="h-10 w-auto object-contain shrink-0"
+                     />
+                     <div className="space-y-0.5 text-center flex-1">
+                        <h1 className="text-xl font-black uppercase tracking-tight text-[#0b4a8f] leading-none">
                            Sankara Academy of Vision
                         </h1>
-                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                        <p className="text-[8.5px] font-bold uppercase tracking-wider text-slate-500">
                            Educational Unit of Sankara Eye Foundation, India · Sri Kanchi Kamakoti Medical Trust
                         </p>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-700 pt-0.5">
-                           Official Fellowship Application Record — Academic Session 2027
+                        <p className="text-[9.5px] font-black uppercase tracking-widest text-amber-700 pt-0.5">
+                           Official Fellowship Application Record — US Letter
                         </p>
                      </div>
-                     <div className="text-right space-y-0.5">
-                        <p className="text-[8.5px] font-black uppercase tracking-widest text-[#0b4a8f]">
-                           Application Ref: <span className="font-mono text-slate-900">#APP-{viewedSub.id}</span>
-                        </p>
-                        <p className="text-[8px] font-bold text-slate-500">
-                           Submitted: {viewedSub.submittedAt ? new Date(viewedSub.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
-                        </p>
-                        <p className="text-[8px] font-bold text-slate-500">
-                           Printed: {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                        </p>
+                     <div className="flex items-center gap-2.5 shrink-0">
+                        <div className="text-right space-y-0.5">
+                           <p className="text-[8.5px] font-black uppercase tracking-widest text-[#0b4a8f]">
+                              Ref: <span className="font-mono text-slate-900">#APP-{viewedSub.id}</span>
+                           </p>
+                           <p className="text-[8px] font-bold text-slate-500">
+                              Submitted: {viewedSub.submittedAt ? new Date(viewedSub.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                           </p>
+                           <p className="text-[8px] font-bold text-slate-500">
+                              Printed: {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                           </p>
+                        </div>
+                        <img
+                          src="/assets/sankara_academy_vision_logo.png"
+                          alt="Sankara Academy of Vision"
+                          className="h-10 w-auto object-contain shrink-0"
+                        />
                      </div>
                   </div>
 
@@ -2548,24 +2584,38 @@ export default function ApplicationFormsPage() {
                <div className="print-page-break" />
 
                {/* ────────────────── PAGE 2: SURGICAL, DIAGNOSTICS, LORS & SIGN-OFF ────────────────── */}
-               <div className="space-y-3 pt-2">
+               <div className="space-y-2 pt-1">
                   {/* Page 2 Running Header */}
-                  <div className="flex items-center justify-between border-b-2 border-[#0b4a8f] pb-2">
-                     <div>
-                        <h3 className="text-xs font-black uppercase text-[#0b4a8f] tracking-tight leading-none">
-                           Sankara Academy of Vision — Fellowship Application Record
-                        </h3>
-                        <p className="text-[8.5px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">
-                           Clinical Log, Referees & Verification Endorsement
-                        </p>
+                  <div className="flex items-center justify-between gap-2 border-b-2 border-[#0b4a8f] pb-1.5">
+                     <div className="flex items-center gap-2">
+                        <img
+                          src="/assets/sankara_eye_foundation_logo.png"
+                          alt="SEF"
+                          className="h-7 w-auto object-contain shrink-0"
+                        />
+                        <div>
+                           <h3 className="text-xs font-black uppercase text-[#0b4a8f] tracking-tight leading-none">
+                              Sankara Academy of Vision — Fellowship Application Record
+                           </h3>
+                           <p className="text-[8.5px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">
+                              Clinical Log, Referees & Verification Endorsement
+                           </p>
+                        </div>
                      </div>
-                     <div className="text-right">
-                        <p className="text-[9px] font-black text-slate-900 font-mono">
-                           Dr. {viewedSub.fullName} ({viewedSub.candidateCode || `#APP-${viewedSub.id}`})
-                        </p>
-                        <p className="text-[7.5px] font-bold uppercase tracking-widest text-[#0b4a8f]">
-                           CONFIDENTIAL APPLICANT DOSSIER
-                        </p>
+                     <div className="flex items-center gap-2">
+                        <div className="text-right">
+                           <p className="text-[9px] font-black text-slate-900 font-mono">
+                              Dr. {viewedSub.fullName} ({viewedSub.candidateCode || `#APP-${viewedSub.id}`})
+                           </p>
+                           <p className="text-[7.5px] font-bold uppercase tracking-widest text-[#0b4a8f]">
+                              CONFIDENTIAL APPLICANT DOSSIER
+                           </p>
+                        </div>
+                        <img
+                          src="/assets/sankara_academy_vision_logo.png"
+                          alt="SAV"
+                          className="h-7 w-auto object-contain shrink-0"
+                        />
                      </div>
                   </div>
 
@@ -2989,6 +3039,19 @@ export default function ApplicationFormsPage() {
             >
               {downloadingDirectoryPdf ? <Loader2 className="w-4 h-4 mr-2 animate-spin text-indigo-600" /> : <Printer className="w-4 h-4 mr-2 text-indigo-600" />}
               Download Student List (PDF)
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl border-orange-200 bg-orange-50/80 hover:bg-orange-100 text-orange-900 font-bold px-4 shadow-sm"
+              onClick={() => {
+                const token = localStorage.getItem("fellowship_token");
+                window.open(`/api/candidates/attendance-sheet-pdf?status=all&token=${token}`, "_blank");
+              }}
+              disabled={submissions.length === 0}
+            >
+              <Printer className="w-4 h-4 mr-2 text-orange-600" />
+              Attendance Sheet (Speciality PDF)
             </Button>
             <Button variant="outline" size="sm" className="rounded-xl border-slate-200 font-bold px-4"
                onClick={() => syncGoogleSheets.mutate(viewFormId)}
@@ -3566,14 +3629,25 @@ export default function ApplicationFormsPage() {
                             <p className="text-[10px] font-medium text-slate-400">{fmtTime(s.submittedAt)}</p>
                         </td>
                         <td className="px-6 py-5 text-right">
-                           <Button 
-                             variant="ghost" 
-                             size="sm" 
-                             onClick={() => setViewSubId(s.id)}
-                             className="rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-900 hover:text-white"
-                           >
-                              View Detail
-                           </Button>
+                           <div className="flex items-center justify-end gap-1.5">
+                             <Button
+                               variant="ghost"
+                               size="sm"
+                               onClick={() => downloadSubmissionPdf(s.id, s.fullName)}
+                               title="Download Official US Letter PDF"
+                               className="rounded-xl font-black text-[10px] uppercase tracking-widest text-blue-700 hover:bg-blue-50"
+                             >
+                               <Download className="w-3.5 h-3.5 mr-1" /> PDF
+                             </Button>
+                             <Button 
+                               variant="ghost" 
+                               size="sm" 
+                               onClick={() => setViewSubId(s.id)}
+                               className="rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-900 hover:text-white"
+                             >
+                                View Detail
+                             </Button>
+                           </div>
                          </td>
                       </tr>
                     ))}

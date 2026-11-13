@@ -24,15 +24,17 @@ import {
 import { requireAuth, requireRole } from "../middleware/auth";
 import { sendOfferLetterEmail, sendOfferLetterWithAttachment, sendCallLetterWithAttachment } from "../lib/email";
 import { processGoogleDocTemplate } from "../lib/google-docs";
-import { emailSettingsTable, applicationFormsTable, batchesTable, batchCandidatesTable } from "@workspace/db";
+import { emailSettingsTable, applicationFormsTable, batchesTable, batchCandidatesTable, interviewPanelsTable, interviewPanelMembersTable, panelQueueTable } from "@workspace/db";
 import PDFDocument from "pdfkit";
 import path from "path";
 import fs from "fs/promises";
 import { parseSpecializationString, formatDOBToStandard, formatToLocalDateTime } from "../lib/utils";
 import { generateCallLetterPdf, generateOfferLetterPdf, isRetinaSpecialty } from "../lib/letters";
+import { generateAttendanceSheetPdf, generateAttendanceSheetExcel, type SpecialityAttendanceGroup } from "../lib/attendance-and-ranks";
 import * as XLSX from "xlsx";
 import * as archiverPkg from "archiver";
 import { generateSubmissionPdfBuffer } from "./application-forms";
+import { generateApplicationPdfBuffer, appendApplicationToPdfDoc, stampLetterPageFooters } from "../lib/application-pdf";
 
 const archiver: any = (archiverPkg as any)?.default || archiverPkg;
 
@@ -49,6 +51,23 @@ async function fullCandidate(c: typeof candidatesTable.$inferSelect) {
   const exams = await db.select().from(examsTable);
   const interviews = await db.select().from(interviewScoresTable).where(eq(interviewScoresTable.candidateId, c.id));
   const apps = await db.select().from(applicationsTable).where(eq(applicationsTable.candidateId, c.id));
+  const batchMarks = await db.select().from(batchCandidatesTable).where(eq(batchCandidatesTable.candidateId, c.id));
+  const mmPanelMembers = await db
+    .select({ doctorId: interviewPanelMembersTable.doctorId })
+    .from(interviewPanelMembersTable)
+    .innerJoin(interviewPanelsTable, eq(interviewPanelMembersTable.panelId, interviewPanelsTable.id))
+    .where(eq(interviewPanelsTable.isMindMatter, true));
+  const mmDoctorIds = new Set(mmPanelMembers.map((m) => m.doctorId));
+
+  const isMindMatterEntry = (i: { specialityId: number | null; doctorId: number }) =>
+    i.specialityId === null || mmDoctorIds.has(i.doctorId);
+
+  const mmInterviews = interviews
+    .filter(isMindMatterEntry)
+    .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+  const vivaInterviews = interviews
+    .filter((i) => !isMindMatterEntry(i) && i.specialityId !== null)
+    .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
 
   // Find linked submission by candidateId or email
   const [sub] = await db.select().from(applicationSubmissionsTable).where(
@@ -60,20 +79,38 @@ async function fullCandidate(c: typeof candidatesTable.$inferSelect) {
 
   const mcqAttempts = attempts.filter((a) => {
     const e = exams.find((x) => x.id === a.examId);
-    return e?.kind === "mcq";
+    return e?.kind === "mcq" && a.score != null;
   });
   const psychoAttempts = attempts.filter((a) => {
     const e = exams.find((x) => x.id === a.examId);
-    return e?.kind?.startsWith("psychometric");
+    return e?.kind?.startsWith("psychometric") && a.score != null;
   });
-  const mcqScore = mcqAttempts.length > 0
-    ? mcqAttempts.reduce((s, a) => s + (a.score ?? 0), 0) / mcqAttempts.length
-    : (c.mcqScore ? parseFloat(c.mcqScore) : null);
-  const psychometricScore = psychoAttempts.length > 0
-    ? psychoAttempts.reduce((s, a) => s + (a.score ?? 0), 0) / psychoAttempts.length
-    : (c.psychometricScore ? parseFloat(c.psychometricScore) : null);
-  const interviewScore = interviews.length > 0
-    ? interviews.reduce((s, i) => s + i.score, 0) / interviews.length
+  const batchMcq = batchMarks.find((b) => b.mcqScore != null)?.mcqScore ?? null;
+  const batchPsycho = batchMarks.find((b) => b.psychometricScore != null)?.psychometricScore ?? null;
+
+  const mcqScore = c.mcqScore != null && c.mcqScore !== ""
+    ? parseFloat(c.mcqScore)
+    : mcqAttempts.length > 0
+      ? mcqAttempts.reduce((s, a) => s + (a.score ?? 0), 0) / mcqAttempts.length
+      : batchMcq;
+
+  const psychometricScore = mmInterviews.length > 0
+    ? mmInterviews[0]!.score
+    : c.psychometricScore != null && c.psychometricScore !== ""
+      ? parseFloat(c.psychometricScore)
+      : psychoAttempts.length > 0
+        ? psychoAttempts.reduce((s, a) => s + (a.score ?? 0), 0) / psychoAttempts.length
+        : batchPsycho;
+
+  const vivaBySpec = new Map<number, number>();
+  for (const vi of vivaInterviews) {
+    if (vi.specialityId != null && !vivaBySpec.has(vi.specialityId)) {
+      vivaBySpec.set(vi.specialityId, vi.score);
+    }
+  }
+  const specVivaValues = [...vivaBySpec.values()];
+  const interviewScore = specVivaValues.length > 0
+    ? specVivaValues.reduce((s, v) => s + v, 0) / specVivaValues.length
     : null;
 
   const totalScore = (mcqScore != null || psychometricScore != null || interviewScore != null)
@@ -151,9 +188,9 @@ async function fullCandidate(c: typeof candidatesTable.$inferSelect) {
     }
   }
 
-  // Map applied specialities with existing interview scores
+  // Map applied specialities with existing interview scores (excluding Mind Matter entries)
   const appliedSpecialities = resolvedPrefs.map((p) => {
-    const scoreEntry = interviews.find((i) => i.specialityId === p.specialityId);
+    const scoreEntry = vivaInterviews.find((i) => i.specialityId === p.specialityId);
     return {
       specialityId: p.specialityId,
       specialityName: p.specialityName,
@@ -336,6 +373,10 @@ router.get("/candidates", requireAuth, async (req, res) => {
   let allSubmissions: any[] = [];
   let allApplications: any[] = [];
   let allScores: any[] = [];
+  let allAttempts: any[] = [];
+  let allExams: any[] = [];
+  let allBatchMarks: any[] = [];
+  let mmDoctorIds = new Set<number>();
 
   if (candidates.length > 0) {
     const candidateIds = candidates.map((c) => c.id);
@@ -355,10 +396,20 @@ router.get("/candidates", requireAuth, async (req, res) => {
       : await readDb.select().from(applicationSubmissionsTable).where(inArray(applicationSubmissionsTable.candidateId, candidateIds));
     allApplications = await readDb.select().from(applicationsTable).where(inArray(applicationsTable.candidateId, candidateIds));
     allScores = await readDb.select().from(interviewScoresTable).where(inArray(interviewScoresTable.candidateId, candidateIds));
+    allAttempts = await readDb.select().from(examAttemptsTable).where(inArray(examAttemptsTable.candidateId, candidateIds));
+    allExams = await readDb.select().from(examsTable);
+    allBatchMarks = await readDb.select().from(batchCandidatesTable).where(inArray(batchCandidatesTable.candidateId, candidateIds));
+    const mmMembers = await readDb
+      .select({ doctorId: interviewPanelMembersTable.doctorId })
+      .from(interviewPanelMembersTable)
+      .innerJoin(interviewPanelsTable, eq(interviewPanelMembersTable.panelId, interviewPanelsTable.id))
+      .where(eq(interviewPanelsTable.isMindMatter, true));
+    mmDoctorIds = new Set(mmMembers.map((m) => m.doctorId));
   }
 
   const unitsMap = new Map(units.map(u => [u.id, u]));
   const specsMap = new Map(allSpecs.map(s => [s.id, s]));
+  const examsMap = new Map(allExams.map(e => [e.id, e]));
 
   const prefsByCandidate = new Map<number, typeof allPrefs>();
   for (const p of allPrefs) {
@@ -385,6 +436,18 @@ router.get("/candidates", requireAuth, async (req, res) => {
     scoresByCandidate.get(s.candidateId)!.push(s);
   }
 
+  const attemptsByCandidate = new Map<number, typeof allAttempts>();
+  for (const a of allAttempts) {
+    if (!attemptsByCandidate.has(a.candidateId)) attemptsByCandidate.set(a.candidateId, []);
+    attemptsByCandidate.get(a.candidateId)!.push(a);
+  }
+
+  const batchByCandidate = new Map<number, typeof allBatchMarks>();
+  for (const b of allBatchMarks) {
+    if (!batchByCandidate.has(b.candidateId)) batchByCandidate.set(b.candidateId, []);
+    batchByCandidate.get(b.candidateId)!.push(b);
+  }
+
   const out = candidates.map((c) => {
     const unit = c.unitId ? unitsMap.get(c.unitId) : null;
     const prefs = (prefsByCandidate.get(c.id) || [])
@@ -400,8 +463,48 @@ router.get("/candidates", requireAuth, async (req, res) => {
     }
     const documents = (docsByCandidate.get(c.id) || [])
       .map((d) => ({ id: d.id, docType: d.docType, fileName: d.fileName, fileUrl: d.fileUrl }));
-    const candScores = scoresByCandidate.get(c.id) || [];
+    const candScores = [...(scoresByCandidate.get(c.id) || [])]
+      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+    const candAttempts = attemptsByCandidate.get(c.id) || [];
+    const candBatch = batchByCandidate.get(c.id) || [];
     const sub = submissionsByCandidate.get(c.id) || (c.email ? submissionsByEmail.get(c.email.toLowerCase().trim()) : null);
+
+    const isMM = (s: { specialityId: number | null; doctorId: number }) =>
+      s.specialityId === null || mmDoctorIds.has(s.doctorId);
+
+    const mmScores = candScores.filter(isMM);
+    const vivaScores = candScores.filter((s) => !isMM(s) && s.specialityId !== null);
+
+    const mcqAttempts = candAttempts.filter((a) => examsMap.get(a.examId)?.kind === "mcq" && a.score != null);
+    const psychoAttempts = candAttempts.filter((a) => examsMap.get(a.examId)?.kind?.startsWith("psychometric") && a.score != null);
+    const batchMcq = candBatch.find((b) => b.mcqScore != null)?.mcqScore ?? null;
+    const batchPsycho = candBatch.find((b) => b.psychometricScore != null)?.psychometricScore ?? null;
+
+    const mcqVal = c.mcqScore != null && c.mcqScore !== ""
+      ? parseFloat(c.mcqScore)
+      : mcqAttempts.length > 0
+        ? mcqAttempts.reduce((acc, a) => acc + (a.score ?? 0), 0) / mcqAttempts.length
+        : batchMcq;
+
+    const psyVal = mmScores.length > 0
+      ? mmScores[0]!.score
+      : c.psychometricScore != null && c.psychometricScore !== ""
+        ? parseFloat(c.psychometricScore)
+        : psychoAttempts.length > 0
+          ? psychoAttempts.reduce((acc, a) => acc + (a.score ?? 0), 0) / psychoAttempts.length
+          : batchPsycho;
+
+    // One consensus score per speciality (latest submission)
+    const specialityScores: Record<number, number> = {};
+    for (const vs of vivaScores) {
+      if (vs.specialityId != null && specialityScores[vs.specialityId] === undefined) {
+        specialityScores[vs.specialityId] = vs.score;
+      }
+    }
+    const specScoreVals = Object.values(specialityScores);
+    const vivaVal = specScoreVals.length > 0
+      ? specScoreVals.reduce((acc, v) => acc + v, 0) / specScoreVals.length
+      : null;
 
     return {
       id: c.id,
@@ -419,15 +522,13 @@ router.get("/candidates", requireAuth, async (req, res) => {
         preferenceOrder: p.preferenceOrder
       })),
       documents,
-      mcqScore: c.mcqScore ? parseFloat(c.mcqScore) : null,
-      psychometricScore: c.psychometricScore ? parseFloat(c.psychometricScore) : null,
-      interviewScore: candScores.length > 0 ? candScores.reduce((acc: number, s: any) => acc + s.score, 0) / candScores.length : null,
-      totalScore: (() => {
-        const mcq = c.mcqScore ? parseFloat(c.mcqScore) : null;
-        const psy = c.psychometricScore ? parseFloat(c.psychometricScore) : null;
-        const intv = candScores.length > 0 ? candScores.reduce((acc: number, s: any) => acc + s.score, 0) / candScores.length : null;
-        return (mcq !== null || psy !== null || intv !== null) ? (mcq ?? 0) + (psy ?? 0) + (intv ?? 0) : null;
-      })(),
+      mcqScore: mcqVal,
+      psychometricScore: psyVal,
+      specialityScores,
+      interviewScore: vivaVal,
+      totalScore: (mcqVal !== null || psyVal !== null || vivaVal !== null)
+        ? (mcqVal ?? 0) + (psyVal ?? 0) + (vivaVal ?? 0)
+        : null,
       rank: null,
       createdAt: c.createdAt.toISOString(),
       dateOfBirth: formatDOBToStandard(c.dateOfBirth),
@@ -981,13 +1082,25 @@ export async function recalculateCandidateStatus(candidateId: number): Promise<v
   if (cand.status === "allocated" || cand.status === "waitlisted" || cand.status === "rejected") return;
 
   const apps = await db.select().from(applicationsTable).where(eq(applicationsTable.candidateId, candidateId));
-  if (apps.length === 0) return;
-
   const scores = await db.select().from(interviewScoresTable).where(eq(interviewScoresTable.candidateId, candidateId));
+  const mmMembers = await db
+    .select({ doctorId: interviewPanelMembersTable.doctorId })
+    .from(interviewPanelMembersTable)
+    .innerJoin(interviewPanelsTable, eq(interviewPanelMembersTable.panelId, interviewPanelsTable.id))
+    .where(eq(interviewPanelsTable.isMindMatter, true));
+  const mmDoctorIds = new Set(mmMembers.map((m) => m.doctorId));
+  const vivaScores = scores.filter((s) => s.specialityId !== null && !mmDoctorIds.has(s.doctorId));
+
+  if (apps.length === 0) {
+    if (vivaScores.length > 0) {
+      await db.update(candidatesTable).set({ status: "interview_completed" }).where(eq(candidatesTable.id, candidateId));
+    }
+    return;
+  }
 
   let allSpecialtiesCompleted = true;
   for (const app of apps) {
-    const hasScore = scores.some(s => s.specialityId === app.specialityId);
+    const hasScore = vivaScores.some((s) => s.specialityId === app.specialityId);
     if (!hasScore) {
       allSpecialtiesCompleted = false;
       // Mark individual specialization application status
@@ -1001,8 +1114,8 @@ export async function recalculateCandidateStatus(candidateId: number): Promise<v
     }
   }
 
-  // Completed if specialties have interview evaluations recorded
-  const overallCompleted = allSpecialtiesCompleted || scores.length > 0;
+  // Only complete candidate overall interview status when all applied specialities have speciality viva scores (Mind Matter alone does not complete Viva)
+  const overallCompleted = allSpecialtiesCompleted;
 
   if (overallCompleted) {
     await db.update(candidatesTable).set({ status: "interview_completed" }).where(eq(candidatesTable.id, candidateId));
@@ -1079,6 +1192,28 @@ router.patch("/candidates/:candidateId/marks", requireAuth, requireRole("super_a
         details: `Updated Mind Mapping Score for candidate ${candBefore.fullName} (${candBefore.candidateCode}) from ${candBefore.psychometricScore ?? "N/A"} to ${psychometricScore ?? "N/A"}`,
         ipAddress,
       });
+    }
+
+    // Keep Mind Matter interviewScoresTable rows in sync with candidatesTable.psychometricScore
+    if (psychometricScore !== undefined) {
+      const existingMmRows = await db.select().from(interviewScoresTable).where(
+        and(
+          eq(interviewScoresTable.candidateId, id),
+          sql`(speciality_id IS NULL OR doctor_id IN (SELECT doctor_id FROM interview_panel_members WHERE panel_id IN (SELECT id FROM interview_panels WHERE is_mind_matter = TRUE)))`
+        )
+      );
+      if (psychometricScore === null) {
+        if (existingMmRows.length > 0) {
+          await db.delete(interviewScoresTable).where(inArray(interviewScoresTable.id, existingMmRows.map((r) => r.id)));
+        }
+      } else if (existingMmRows.length > 0) {
+        await db.update(interviewScoresTable).set({
+          score: psychometricScore,
+          submittedAt: new Date(),
+          lastModifiedBy: req.user!.userId,
+          lastModifiedAt: new Date(),
+        }).where(eq(interviewScoresTable.id, existingMmRows[0]!.id));
+      }
     }
 
     // Update or insert direct VIVA score if provided
@@ -1217,12 +1352,14 @@ router.patch("/candidates/:candidateId/marks", requireAuth, requireRole("super_a
 router.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "doctor"), async (req, res) => {
   try {
     const candidateId = Number(req.params["candidateId"]);
-    const { psychometricScore, specialityScores, status, unitId, reviewNotes } = req.body as {
+    const { psychometricScore, specialityScores, status, unitId, reviewNotes, specialityId: bodySpecId, isMindMatterPanel } = req.body as {
       psychometricScore?: number | null;
       specialityScores?: Array<{ specialityId: number; score?: number | null; remarks?: string }>;
       status?: string;
       unitId?: number | null;
       reviewNotes?: string;
+      specialityId?: number;
+      isMindMatterPanel?: boolean;
     };
 
     const [cand] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, candidateId));
@@ -1231,7 +1368,18 @@ router.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("s
     }
 
     const userId = req.user!.userId;
+    const isDoctorRole = req.user!.role === "doctor";
     const now = new Date();
+    let updatedMindMatter = false;
+    const scoredSpecIds: number[] = [];
+
+    // Resolve Mind Matter doctors to keep Speciality Viva queries isolated from MM evaluations
+    const mmMembers = await db
+      .select({ doctorId: interviewPanelMembersTable.doctorId })
+      .from(interviewPanelMembersTable)
+      .innerJoin(interviewPanelsTable, eq(interviewPanelMembersTable.panelId, interviewPanelsTable.id))
+      .where(eq(interviewPanelsTable.isMindMatter, true));
+    const mmDoctorIds = new Set(mmMembers.map((m) => m.doctorId));
 
     // 1. Optional Psychometry / Mind Matter Score (if provided, max 10)
     if (psychometricScore !== undefined) {
@@ -1243,6 +1391,7 @@ router.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("s
         .where(eq(candidatesTable.id, candidateId));
 
       if (psychometricScore !== null) {
+        updatedMindMatter = true;
         const existingMm = await db.select().from(interviewScoresTable).where(
           and(
             eq(interviewScoresTable.candidateId, candidateId),
@@ -1274,24 +1423,38 @@ router.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("s
       }
     }
 
-    // 2. Speciality Assessment & Remarks (scores optional, max 50)
+    // 2. Speciality Assessment & Remarks (one consensus panel score per speciality, max 50)
     if (Array.isArray(specialityScores) && specialityScores.length > 0) {
       for (const item of specialityScores) {
+        if (bodySpecId && item.specialityId !== bodySpecId) continue;
         const hasScore = typeof item.score === "number" && !isNaN(item.score);
-        const scoreVal = hasScore ? Math.max(0, Math.min(50, item.score!)) : 0;
-
-        const existing = await db.select().from(interviewScoresTable).where(
+        const existingAll = await db.select().from(interviewScoresTable).where(
           and(
             eq(interviewScoresTable.candidateId, candidateId),
             eq(interviewScoresTable.specialityId, item.specialityId)
           )
         );
+        const existing = existingAll.filter((s) => !mmDoctorIds.has(s.doctorId));
+
+        if (!hasScore) {
+          // Only update remarks if an evaluation row already exists; never insert a synthetic 0 score
+          if (existing.length > 0 && item.remarks !== undefined) {
+            await db.update(interviewScoresTable).set({
+              remarks: item.remarks,
+              lastModifiedBy: userId,
+              lastModifiedAt: now,
+            }).where(eq(interviewScoresTable.id, existing[0]!.id));
+          }
+          continue;
+        }
+
+        const scoreVal = Math.max(0, Math.min(50, item.score!));
+        scoredSpecIds.push(item.specialityId);
 
         if (existing.length > 0) {
           const oldScore = existing[0]!.score;
-          const finalScore = hasScore ? scoreVal : oldScore;
           await db.update(interviewScoresTable).set({
-            score: finalScore,
+            score: scoreVal,
             remarks: item.remarks !== undefined ? item.remarks : existing[0]!.remarks,
             doctorId: userId,
             submittedAt: now,
@@ -1303,7 +1466,7 @@ router.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("s
           try {
             await db.execute(sql`
               INSERT INTO interview_scores_audit (candidate_id, speciality_id, doctor_id, old_score, new_score, remarks, action, changed_by_user_id)
-              VALUES (${candidateId}, ${item.specialityId}, ${userId}, ${oldScore}, ${finalScore}, ${item.remarks ?? null}, 'UPDATE', ${userId})
+              VALUES (${candidateId}, ${item.specialityId}, ${userId}, ${oldScore}, ${scoreVal}, ${item.remarks ?? null}, 'UPDATE', ${userId})
             `);
           } catch (_) {}
         } else {
@@ -1328,18 +1491,47 @@ router.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("s
             `);
           } catch (_) {}
         }
+
+        // Mark individual speciality application as completed & active queue entries as done
+        await db.update(applicationsTable)
+          .set({ status: "completed" })
+          .where(and(
+            eq(applicationsTable.candidateId, candidateId),
+            eq(applicationsTable.specialityId, item.specialityId)
+          ));
+
+        await db.execute(sql`
+          UPDATE panel_queue pq
+          SET status = 'done'
+          FROM interview_panels ip
+          WHERE pq.panel_id = ip.id
+            AND pq.candidate_id = ${candidateId}
+            AND ip.speciality_id = ${item.specialityId}
+        `);
       }
     }
 
+    if (updatedMindMatter && (isMindMatterPanel || !scoredSpecIds.length)) {
+      await db.execute(sql`
+        UPDATE panel_queue pq
+        SET status = 'done'
+        FROM interview_panels ip
+        WHERE pq.panel_id = ip.id
+          AND pq.candidate_id = ${candidateId}
+          AND ip.is_mind_matter = TRUE
+      `);
+    }
+
     // 3. Selection / Interview Outcome & Unit Allocation
-    if (status) {
+    const explicitDecision = status && !isDoctorRole && status !== cand.status && ["allocated", "waitlisted", "rejected", "interview_completed"].includes(status);
+    if (status && !isDoctorRole) {
       const allowedStatuses = ["approved", "interview_completed", "waitlisted", "allocated", "rejected"];
       if (allowedStatuses.includes(status)) {
         const candUpdate: Record<string, any> = { status };
         if (unitId !== undefined) candUpdate.unitId = unitId;
         await db.update(candidatesTable).set(candUpdate).where(eq(candidatesTable.id, candidateId));
       }
-    } else if (unitId !== undefined) {
+    } else if (unitId !== undefined && !isDoctorRole) {
       await db.update(candidatesTable).set({ unitId }).where(eq(candidatesTable.id, candidateId));
     }
 
@@ -1350,7 +1542,7 @@ router.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("s
         .where(eq(applicationSubmissionsTable.email, cand.email));
     }
 
-    if (!status) {
+    if (!explicitDecision) {
       await recalculateCandidateStatus(candidateId);
     }
 
@@ -1363,90 +1555,22 @@ router.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("s
 });
 
 async function createCandidateDossierPdfBuffer(c: any): Promise<Buffer> {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const full = await fullCandidate(c);
-      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
-      const doc = new PDFDocument({ margin: 50, size: 'A4' });
-      const buffers: Buffer[] = [];
-      doc.on('data', (chunk) => buffers.push(chunk));
-      doc.on('end', () => resolve(Buffer.concat(buffers)));
-      doc.on('error', reject);
-
-      const colors = {
-        primary: '#0f172a',
-        secondary: '#475569',
-        accent: '#f97316',
-        muted: '#94a3b8',
-        border: '#e2e8f0',
-        bgOrange: '#fff7ed'
-      };
-
-      const logoPath = path.join(process.cwd(), 'artifacts', 'fellowship-exam', 'src', 'assets', 'seh_sav_logo_1777703794142.jpg');
-      try {
-        doc.image(logoPath, 50, 40, { width: 130, height: 65 });
-      } catch (e) {
-        doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(14).text("SANKARA ACADEMY OF VISION", 50, 50);
-      }
-
-      doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(16).text("CANDIDATE DOSSIER", 0, 45, { align: 'right', width: 545 });
-      doc.fillColor(colors.secondary).font('Helvetica').fontSize(9).text("Sankara Academy of Vision — Fellowship Admissions", 0, 65, { align: 'right', width: 545 });
-      doc.fillColor(colors.secondary).font('Helvetica').fontSize(9).text(`Protocol ID: ${c.candidateCode}`, 0, 78, { align: 'right', width: 545 });
-      doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, 112).lineTo(550, 112).stroke();
-
-      const photoUrl = sub?.photoUrl;
-      if (photoUrl && photoUrl.startsWith("/objects/")) {
-        const localPath = path.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
-        try {
-          doc.image(localPath, 460, 120, { width: 85, height: 105 });
-          doc.rect(460, 120, 85, 105).strokeColor(colors.border).lineWidth(1).stroke();
-        } catch (_) {}
-      }
-
-      doc.y = 122;
-      doc.moveDown(2);
-
-      doc.rect(50, doc.y, 500, 30).fill(colors.bgOrange);
-      doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(12).text("ACADEMIC IDENTITY & PROFILE", 65, doc.y - 22);
-      doc.moveDown(0.5);
-
-      const leftCol = 70;
-      const rightCol = 320;
-      let currY = doc.y;
-
-      const renderField = (label: string, value: any, x: number, y: number) => {
-        doc.fillColor(colors.muted).font('Helvetica-Bold').fontSize(8).text(label.toUpperCase(), x, y);
-        doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(11).text(String(value || "—"), x, y + 12);
-      };
-
-      renderField("Full Name", full.fullName, leftCol, currY);
-      renderField("Contact Identity", full.email, rightCol, currY);
-      currY += 40;
-      renderField("Contact Phone", full.phone || "—", leftCol, currY);
-      renderField("Date of Birth", formatDOBToStandard(full.dateOfBirth), rightCol, currY);
-      currY += 40;
-      renderField("MBBS Institution", full.collegeName || "—", leftCol, currY);
-      renderField("Qualifying MBBS", full.qualification || "—", rightCol, currY);
-      currY += 40;
-
-      if (sub?.pgQualifications) {
-        doc.rect(50, currY, 500, 24).fill('#f8fafc');
-        doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(10).text("POST-GRADUATE QUALIFICATIONS", 65, currY + 6);
-        currY += 32;
-        doc.fillColor(colors.secondary).font('Helvetica').fontSize(10).text(sub.pgQualifications, 65, currY, { width: 470 });
-        currY = doc.y + 16;
-      }
-
-      const bottom = 750;
-      doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, bottom).lineTo(550, bottom).stroke();
-      doc.fillColor(colors.muted).font('Helvetica').fontSize(8).text("CONFIDENTIAL DOCUMENT - FOR INTERNAL USE ONLY", 50, bottom + 10);
-      doc.text("SANKARA ACADEMY OF VISION - FELLOWSHIP ADMISSIONS HUB", 50, bottom + 22);
-      doc.text(`Generated on ${formatToLocalDateTime(new Date())}`, 350, bottom + 10, { align: 'right' });
-
-      doc.end();
-    } catch (err) {
-      reject(err);
-    }
+  const full = await fullCandidate(c);
+  const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
+  const [form] = sub ? await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId)) : [null];
+  const [program] = form ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
+  return generateApplicationPdfBuffer({
+    sub,
+    form,
+    program,
+    candidate: c,
+    includeScores: true,
+    scores: {
+      mcq: full.mcqScore,
+      psychometric: full.psychometricScore,
+      specialityTotal: full.interviewScore,
+      total110: full.totalScore,
+    },
   });
 }
 
@@ -1511,113 +1635,287 @@ router.get("/candidates/export-zip", requireAuth, requireRole("super_admin", "pr
   }
 });
 
-// GET /candidates/bulk-dossier-pdf — Download combined single PDF book containing all candidate dossiers
+// GET /candidates/bulk-dossier-pdf — Download combined single Letter-size PDF book containing all candidate dossiers
 router.get("/candidates/bulk-dossier-pdf", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   try {
     const candidates = await db.select().from(candidatesTable)
       .where(eq(candidatesTable.isMock, (req as any).isMockMode))
       .orderBy(desc(candidatesTable.createdAt));
 
-    const doc = new PDFDocument({ margin: 50, size: 'A4', autoFirstPage: false });
+    const doc = new PDFDocument({
+      margin: 36,
+      size: "LETTER",
+      bufferPages: true,
+      autoFirstPage: false,
+      info: { Title: "Cohort Application Dossier Compilation", Author: "Sankara Academy of Vision" },
+    });
     const filename = `Cohort_Dossier_Compilation_${Date.now()}.pdf`;
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
     doc.pipe(res);
 
-    const colors = {
-      primary: '#0f172a',
-      secondary: '#475569',
-      accent: '#f97316',
-      muted: '#94a3b8',
-      border: '#e2e8f0',
-      bgOrange: '#fff7ed'
-    };
-
-    const logoPath = path.join(process.cwd(), 'artifacts', 'fellowship-exam', 'src', 'assets', 'seh_sav_logo_1777703794142.jpg');
-
     for (let i = 0; i < candidates.length; i++) {
       const c = candidates[i]!;
       const full = await fullCandidate(c);
       const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
+      const [form] = sub ? await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId)) : [null];
+      const [program] = form ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
 
-      doc.addPage();
-
-      // Background accents
-      doc.save();
-      doc.fillColor(colors.bgOrange).opacity(0.1);
-      doc.circle(550, 50, 150).fill();
-      doc.circle(50, 750, 100).fill();
-      doc.restore();
-
-      // Header
-      try {
-        doc.image(logoPath, 50, 40, { width: 130, height: 65 });
-      } catch (e) {
-        doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(14).text("SANKARA ACADEMY OF VISION", 50, 50);
-      }
-
-      doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(16).text("CANDIDATE DOSSIER", 0, 45, { align: 'right', width: 545 });
-      doc.fillColor(colors.secondary).font('Helvetica').fontSize(9).text("Sankara Academy of Vision — Fellowship Admissions", 0, 65, { align: 'right', width: 545 });
-      doc.fillColor(colors.secondary).font('Helvetica').fontSize(9).text(`Protocol ID: ${c.candidateCode} (Page ${i+1}/${candidates.length})`, 0, 78, { align: 'right', width: 545 });
-      doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, 112).lineTo(550, 112).stroke();
-
-      const photoUrl = sub?.photoUrl;
-      if (photoUrl && photoUrl.startsWith("/objects/")) {
-        const localPath = path.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
-        try {
-          doc.image(localPath, 460, 120, { width: 85, height: 105 });
-          doc.rect(460, 120, 85, 105).strokeColor(colors.border).lineWidth(1).stroke();
-        } catch (_) {}
-      }
-
-      doc.y = 122;
-      doc.moveDown(2);
-
-      doc.rect(50, doc.y, 500, 30).fill(colors.bgOrange);
-      doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(12).text("ACADEMIC IDENTITY & PROFILE", 65, doc.y - 22);
-      doc.moveDown(0.5);
-
-      const leftCol = 70;
-      const rightCol = 320;
-      let currY = doc.y;
-
-      const renderField = (label: string, value: any, x: number, y: number) => {
-        doc.fillColor(colors.muted).font('Helvetica-Bold').fontSize(8).text(label.toUpperCase(), x, y);
-        doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(11).text(String(value || "—"), x, y + 12);
-      };
-
-      renderField("Full Name", full.fullName, leftCol, currY);
-      renderField("Contact Identity", full.email, rightCol, currY);
-      currY += 40;
-      renderField("Contact Phone", full.phone || "—", leftCol, currY);
-      renderField("Date of Birth", formatDOBToStandard(full.dateOfBirth), rightCol, currY);
-      currY += 40;
-      renderField("MBBS Institution", full.collegeName || "—", leftCol, currY);
-      renderField("Qualifying MBBS", full.qualification || "—", rightCol, currY);
-      currY += 40;
-
-      if (sub?.pgQualifications) {
-        doc.rect(50, currY, 500, 24).fill('#f8fafc');
-        doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(10).text("POST-GRADUATE QUALIFICATIONS", 65, currY + 6);
-        currY += 32;
-        doc.fillColor(colors.secondary).font('Helvetica').fontSize(10).text(sub.pgQualifications, 65, currY, { width: 470 });
-        currY = doc.y + 16;
-      }
-
-      const bottom = 750;
-      doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, bottom).lineTo(550, bottom).stroke();
-      doc.fillColor(colors.muted).font('Helvetica').fontSize(8).text("CONFIDENTIAL DOCUMENT - FOR INTERNAL USE ONLY", 50, bottom + 10);
-      doc.text("SANKARA ACADEMY OF VISION - FELLOWSHIP ADMISSIONS HUB", 50, bottom + 22);
-      doc.text(`Candidate ${i+1} of ${candidates.length} · Generated on ${formatToLocalDateTime(new Date())}`, 350, bottom + 10, { align: 'right' });
+      doc.addPage({ size: "LETTER", margins: { top: 30, bottom: 34, left: 36, right: 36 } });
+      await appendApplicationToPdfDoc(doc, {
+        sub,
+        form,
+        program,
+        candidate: c,
+        includeScores: true,
+        scores: {
+          mcq: full.mcqScore,
+          psychometric: full.psychometricScore,
+          specialityTotal: full.interviewScore,
+          total110: full.totalScore,
+        },
+      });
     }
 
+    if (candidates.length === 0) {
+      doc.addPage({ size: "LETTER", margins: { top: 36, bottom: 36, left: 36, right: 36 } });
+      doc.font("Helvetica-Bold").fontSize(12).text("No candidate dossiers found for the current cohort.", 36, 120, { align: "center", width: 540 });
+    }
+
+    stampLetterPageFooters(doc, "CONFIDENTIAL — SANKARA ACADEMY OF VISION · COHORT APPLICATION DOSSIERS");
     doc.end();
   } catch (err: any) {
     console.error("[bulk-dossier-pdf] error:", err);
     if (!res.headersSent) res.status(500).json({ error: err.message || "Failed to generate bulk PDF compilation." });
   }
 });
+
+async function buildSpecialityAttendanceGroups(req: any): Promise<{
+  programName: string;
+  academicSession: string;
+  groups: SpecialityAttendanceGroup[];
+}> {
+  const specialityIdParam = req.query["specialityId"] ? Number(req.query["specialityId"]) : null;
+  const programIdParam = req.query["programId"] ? Number(req.query["programId"]) : null;
+  const statusParam = String(req.query["status"] || "eligible").toLowerCase();
+
+  const [allPrograms, allSpecs, rawCandidates] = await Promise.all([
+    readDb.select().from(programsTable),
+    readDb.select().from(specialitiesTable),
+    readDb.select().from(candidatesTable).where(eq(candidatesTable.isMock, Boolean(req.isMockMode))),
+  ]);
+
+  const targetProgram = programIdParam
+    ? allPrograms.find((p) => p.id === programIdParam)
+    : allPrograms[0];
+
+  let targetSpecs = programIdParam
+    ? allSpecs.filter((s) => s.programId === programIdParam)
+    : allSpecs;
+  if (specialityIdParam && !isNaN(specialityIdParam)) {
+    targetSpecs = targetSpecs.filter((s) => s.id === specialityIdParam);
+  }
+  targetSpecs = [...targetSpecs].sort((a, b) => a.name.localeCompare(b.name));
+
+  const eligibleStatuses = new Set(["approved", "interview_completed", "allocated", "waitlisted"]);
+  const filteredCandidates = rawCandidates
+    .filter((c) => {
+      if (statusParam === "all") return c.status !== "rejected";
+      return eligibleStatuses.has(c.status);
+    })
+    .sort((a, b) => a.fullName.localeCompare(b.fullName));
+
+  if (filteredCandidates.length === 0 || targetSpecs.length === 0) {
+    return {
+      programName: targetProgram?.name || "Fellowship Program",
+      academicSession: targetProgram?.academicYear || "2026",
+      groups: targetSpecs.map((sp) => ({
+        specialityId: sp.id,
+        specialityName: sp.name,
+        specialityCode: sp.code,
+        rows: [],
+      })),
+    };
+  }
+
+  const candIds = filteredCandidates.map((c) => c.id);
+  const emails = filteredCandidates.map((c) => c.email.toLowerCase().trim()).filter(Boolean);
+
+  const [allPrefs, allApps, allSubs, allScores, allAttempts, allExams, allBatchMarks, mmMembers] = await Promise.all([
+    readDb.select().from(candidatePreferencesTable).where(inArray(candidatePreferencesTable.candidateId, candIds)),
+    readDb.select().from(applicationsTable).where(inArray(applicationsTable.candidateId, candIds)),
+    emails.length > 0
+      ? readDb.select().from(applicationSubmissionsTable).where(
+          or(
+            inArray(applicationSubmissionsTable.candidateId, candIds),
+            inArray(sql`LOWER(email)`, emails)
+          )
+        )
+      : readDb.select().from(applicationSubmissionsTable).where(inArray(applicationSubmissionsTable.candidateId, candIds)),
+    readDb.select().from(interviewScoresTable).where(inArray(interviewScoresTable.candidateId, candIds)),
+    readDb.select().from(examAttemptsTable).where(inArray(examAttemptsTable.candidateId, candIds)),
+    readDb.select().from(examsTable),
+    readDb.select().from(batchCandidatesTable).where(inArray(batchCandidatesTable.candidateId, candIds)),
+    readDb
+      .select({ doctorId: interviewPanelMembersTable.doctorId })
+      .from(interviewPanelMembersTable)
+      .innerJoin(interviewPanelsTable, eq(interviewPanelMembersTable.panelId, interviewPanelsTable.id))
+      .where(eq(interviewPanelsTable.isMindMatter, true)),
+  ]);
+
+  const mmDoctorIds = new Set(mmMembers.map((m) => m.doctorId));
+  const examsMap = new Map(allExams.map((e) => [e.id, e]));
+  const specsById = new Map(allSpecs.map((s) => [s.id, s]));
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  const subByCandId = new Map<number, typeof allSubs[0]>();
+  const subByEmail = new Map<string, typeof allSubs[0]>();
+  for (const s of allSubs) {
+    if (s.candidateId) subByCandId.set(s.candidateId, s);
+    if (s.email) subByEmail.set(s.email.toLowerCase().trim(), s);
+  }
+
+  const groupMap = new Map<number, SpecialityAttendanceGroup>();
+  for (const sp of targetSpecs) {
+    groupMap.set(sp.id, {
+      specialityId: sp.id,
+      specialityName: sp.name,
+      specialityCode: sp.code,
+      rows: [],
+    });
+  }
+
+  for (const c of filteredCandidates) {
+    const sub = subByCandId.get(c.id) || (c.email ? subByEmail.get(c.email.toLowerCase().trim()) : undefined);
+    const prefs = allPrefs.filter((p) => p.candidateId === c.id).sort((a, b) => a.preferenceOrder - b.preferenceOrder);
+    const apps = allApps.filter((a) => a.candidateId === c.id);
+    const scores = allScores
+      .filter((s) => s.candidateId === c.id)
+      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+    const attempts = allAttempts.filter((a) => a.candidateId === c.id);
+    const batches = allBatchMarks.filter((b) => b.candidateId === c.id);
+
+    const isMM = (s: { specialityId: number | null; doctorId: number }) =>
+      s.specialityId === null || mmDoctorIds.has(s.doctorId);
+
+    const mmScores = scores.filter(isMM);
+    const vivaScores = scores.filter((s) => !isMM(s) && s.specialityId !== null);
+
+    const mcqAttempts = attempts.filter((a) => examsMap.get(a.examId)?.kind === "mcq" && a.score != null);
+    const psychoAttempts = attempts.filter((a) => examsMap.get(a.examId)?.kind?.startsWith("psychometric") && a.score != null);
+    const batchMcq = batches.find((b) => b.mcqScore != null)?.mcqScore ?? null;
+    const batchPsycho = batches.find((b) => b.psychometricScore != null)?.psychometricScore ?? null;
+
+    const mcqScore = c.mcqScore != null && c.mcqScore !== ""
+      ? parseFloat(c.mcqScore)
+      : mcqAttempts.length > 0
+        ? mcqAttempts.reduce((acc, a) => acc + (a.score ?? 0), 0) / mcqAttempts.length
+        : batchMcq;
+
+    const psychometricScore = mmScores.length > 0
+      ? mmScores[0]!.score
+      : c.psychometricScore != null && c.psychometricScore !== ""
+        ? parseFloat(c.psychometricScore)
+        : psychoAttempts.length > 0
+          ? psychoAttempts.reduce((acc, a) => acc + (a.score ?? 0), 0) / psychoAttempts.length
+          : batchPsycho;
+
+    // Collect all specialities this candidate belongs to (apps + prefs + submission fallback)
+    const specOrderMap = new Map<number, number | null>();
+    prefs.forEach((p) => {
+      if (!specOrderMap.has(p.specialityId)) specOrderMap.set(p.specialityId, p.preferenceOrder);
+    });
+    apps.forEach((a) => {
+      if (!specOrderMap.has(a.specialityId)) specOrderMap.set(a.specialityId, null);
+    });
+    if (specOrderMap.size === 0 && sub?.specialization) {
+      parseSpecializationString(sub.specialization).forEach((spName, idx) => {
+        const matched = allSpecs.find(
+          (sp) => norm(sp.name) === norm(spName) || norm(sp.code) === norm(spName)
+        );
+        if (matched && !specOrderMap.has(matched.id)) {
+          specOrderMap.set(matched.id, idx + 1);
+        }
+      });
+    }
+
+    const allSpecialities = [...specOrderMap.keys()]
+      .map((id) => specsById.get(id)?.name)
+      .filter((n): n is string => Boolean(n));
+
+    const qualStr = [sub?.pgQualifications || c.qualification, sub?.degree].filter(Boolean).join(" · ");
+
+    for (const [specId, prefOrder] of specOrderMap.entries()) {
+      const grp = groupMap.get(specId);
+      if (!grp) continue;
+      const app = apps.find((a) => a.specialityId === specId);
+      const specViva = vivaScores.find((v) => v.specialityId === specId);
+      grp.rows.push({
+        candidateId: c.id,
+        candidateCode: c.candidateCode,
+        hallTicketNumber: app?.hallTicketNumber ?? null,
+        fullName: c.fullName,
+        email: c.email,
+        phone: c.phone,
+        qualification: qualStr || null,
+        college: sub?.medicalCollege || c.collegeName || null,
+        preferenceOrder: prefOrder,
+        allSpecialities: allSpecialities.length > 0 ? allSpecialities : [grp.specialityName],
+        mcqScore,
+        psychometricScore,
+        vivaScore: specViva ? specViva.score : null,
+        status: app?.status || c.status,
+      });
+    }
+  }
+
+  return {
+    programName: targetProgram?.name || "Fellowship Selection",
+    academicSession: targetProgram?.academicYear || "2026",
+    groups: [...groupMap.values()],
+  };
+}
+
+router.get(
+  "/candidates/attendance-sheet-pdf",
+  requireAuth,
+  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "unit_coordinator"),
+  async (req, res) => {
+    try {
+      const { programName, academicSession, groups } = await buildSpecialityAttendanceGroups(req);
+      const pdfBuffer = await generateAttendanceSheetPdf({ programName, academicSession, groups });
+      const specIdParam = req.query["specialityId"];
+      const singleName = specIdParam && groups.length === 1 ? `_${groups[0]!.specialityCode}` : "_All_Specialities";
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="Final_Attendance_Sheet${singleName}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (err: any) {
+      console.error("[attendance-sheet-pdf] Error:", err);
+      res.status(500).json({ error: err.message || "Failed to generate attendance sheet PDF" });
+    }
+  }
+);
+
+router.get(
+  "/candidates/attendance-sheet-excel",
+  requireAuth,
+  requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "unit_coordinator"),
+  async (req, res) => {
+    try {
+      const { groups } = await buildSpecialityAttendanceGroups(req);
+      const buffer = generateAttendanceSheetExcel({ groups });
+      const specIdParam = req.query["specialityId"];
+      const singleName = specIdParam && groups.length === 1 ? `_${groups[0]!.specialityCode}` : "_All_Specialities";
+      res.setHeader("Content-Disposition", `attachment; filename="Final_Attendance_Sheet${singleName}.xlsx"`);
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.send(buffer);
+    } catch (err: any) {
+      console.error("[attendance-sheet-excel] Error:", err);
+      res.status(500).json({ error: err.message || "Failed to generate attendance sheet Excel" });
+    }
+  }
+);
 
 router.get("/candidates/:candidateId", requireAuth, async (req, res, next) => {
   const id = Number(req.params["candidateId"]);
@@ -2229,7 +2527,7 @@ router.post("/candidates/:id/send-offer-letter", requireAuth, requireRole("super
   }
 });
 
-// GET /candidates/:id/summary-pdf & /candidates/:id/application-pdf — Full Application Dossier PDF
+// GET /candidates/:id/summary-pdf & /candidates/:id/application-pdf — Full Application Dossier PDF (US Letter + Dual Logos)
 router.get(["/candidates/:id/summary-pdf", "/candidates/:id/application-pdf", "/candidates/:id/pdf"], requireAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -2238,182 +2536,31 @@ router.get(["/candidates/:id/summary-pdf", "/candidates/:id/application-pdf", "/
 
     const full = await fullCandidate(c);
     const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
-    
-    // Get Batch info
-    const [bc] = await db.select().from(batchCandidatesTable).where(eq(batchCandidatesTable.candidateId, c.id));
-    let batch = null;
-    if (bc) {
-      [batch] = await db.select().from(batchesTable).where(eq(batchesTable.id, bc.batchId));
-    }
+    const [form] = sub ? await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId)) : [null];
+    const [program] = form ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
 
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
-    const filename = `Dossier_${c.fullName.replace(/\s+/g, '_')}.pdf`;
+    const pdfBuffer = await generateApplicationPdfBuffer({
+      sub,
+      form,
+      program,
+      candidate: c,
+      includeScores: true,
+      scores: {
+        mcq: full.mcqScore,
+        psychometric: full.psychometricScore,
+        specialityTotal: full.interviewScore,
+        total110: full.totalScore,
+      },
+    });
+
+    const cleanName = (c.fullName || "Candidate").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const filename = `Application_${cleanName}_${c.candidateCode || id}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `inline; filename=${filename}`);
-    doc.pipe(res);
-
-    const colors = {
-      primary: '#0f172a',
-      secondary: '#475569',
-      accent: '#f97316', // Orange
-      muted: '#94a3b8',
-      border: '#e2e8f0',
-      bgOrange: '#fff7ed'
-    };
-
-    // --- Background Accents ---
-    doc.save();
-    doc.fillColor(colors.bgOrange).opacity(0.1);
-    doc.circle(550, 50, 150).fill();
-    doc.circle(50, 750, 100).fill();
-    doc.restore();
-
-    // --- Header ---
-    const logoPath = path.join(process.cwd(), 'artifacts', 'fellowship-exam', 'src', 'assets', 'seh_sav_logo_1777703794142.jpg');
-    let logoLoaded = false;
-    try {
-      doc.image(logoPath, 50, 40, { width: 130, height: 65 });
-      logoLoaded = true;
-    } catch (e) {
-      // Logo not found - render text fallback
-      doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(14).text("SANKARA ACADEMY OF VISION", 50, 50);
-    }
-
-    // Header text - Institution info on right side
-    doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(16).text("CANDIDATE DOSSIER", 0, 45, { align: 'right', width: 545 });
-    doc.fillColor(colors.secondary).font('Helvetica').fontSize(9).text("Sankara Academy of Vision — Fellowship Admissions", 0, 65, { align: 'right', width: 545 });
-    doc.fillColor(colors.secondary).font('Helvetica').fontSize(9).text(`Protocol ID: ${c.candidateCode}`, 0, 78, { align: 'right', width: 545 });
-
-    // Header rule
-    doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, 112).lineTo(550, 112).stroke();
-
-    // --- Photo ---
-    const photoUrl = sub?.photoUrl;
-    if (photoUrl && photoUrl.startsWith("/objects/")) {
-      const localPath = path.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
-      try {
-        doc.image(localPath, 460, 120, { width: 85, height: 105 });
-        doc.rect(460, 120, 85, 105).strokeColor(colors.border).lineWidth(1).stroke();
-      } catch (e) {
-        // Skip if photo file missing
-      }
-    }
-
-    doc.y = 122;
-    doc.moveDown(2);
-
-    // --- Section: Primary Profile ---
-    doc.rect(50, doc.y, 500, 30).fill(colors.bgOrange);
-    doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(12).text("ACADEMIC IDENTITY & PROFILE", 65, doc.y - 22);
-    doc.moveDown(0.5);
-
-    const leftCol = 70;
-    const rightCol = 320;
-    let currY = doc.y;
-
-    const renderField = (label: string, value: any, x: number, y: number) => {
-      doc.fillColor(colors.muted).font('Helvetica-Bold').fontSize(8).text(label.toUpperCase(), x, y);
-      doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(11).text(String(value || "—"), x, y + 12);
-    };
-
-    renderField("Full Name", full.fullName, leftCol, currY);
-    renderField("Contact Identity", full.email, rightCol, currY);
-    currY += 40;
-    renderField("Mobile Registry", full.phone, leftCol, currY);
-    renderField("Academic Year", batch?.name || "DECEMBER 2026 CYCLE", rightCol, currY);
-    currY += 40;
-    renderField("Clinical Segment", (sub?.reviewNotes ?? "").replace("Allocated to ", "") || "Fellowship Track", leftCol, currY);
-    renderField("Reporting Unit", full.unitName || "Pending Allocation", rightCol, currY);
-    doc.moveDown(4);
-
-    // --- Section: Academic & Professional Credentials ---
-    doc.rect(50, doc.y, 500, 20).fill(colors.bgOrange);
-    doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(10).text("CLINICAL & SURGICAL PEDIGREE", 65, doc.y - 15);
-    doc.moveDown(0.5);
-
-    currY = doc.y;
-    renderField("Degree / Qualification", sub?.degree || c.qualification, leftCol, currY);
-    renderField("Medical College", sub?.medicalCollege || c.collegeName, rightCol, currY);
-    currY += 40;
-    renderField("Medical Council No.", sub?.medicalCouncilNumber, leftCol, currY);
-    renderField("Surgical Experience", sub?.surgicalExperience || "Standard Residency", rightCol, currY);
-    currY += 40;
-    renderField("Total Surgeries", sub?.totalSurgeries, leftCol, currY);
-    renderField("Research / Publications", (sub?.publications ? "PRESENT" : "NONE LISTED"), rightCol, currY);
-    doc.moveDown(5);
-
-    // --- Section: Merit Marksheet ---
-    doc.rect(50, doc.y, 500, 25).fill(colors.primary);
-    doc.fillColor('white').font('Helvetica-Bold').fontSize(10).text("MERIT PERFORMANCE MATRIX", 65, doc.y - 18);
-    doc.moveDown(1);
-
-    const marksTableY = doc.y;
-    doc.fillColor(colors.muted).font('Helvetica-Bold').fontSize(9);
-    doc.text("EVALUATION STAGE", 70, marksTableY);
-    doc.text("MAXIMUM", 350, marksTableY);
-    doc.text("OBTAINED", 450, marksTableY);
-    doc.moveDown(0.5);
-    doc.strokeColor(colors.border).lineWidth(1).moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-    doc.moveDown(0.5);
-
-    const renderMarkRow = (label: string, max: number, obtained: any) => {
-      const y = doc.y;
-      doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(10).text(label, 70, y);
-      doc.fillColor(colors.secondary).font('Helvetica').fontSize(10).text(String(max), 350, y);
-      doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(11).text(obtained != null ? Number(obtained).toFixed(2) : "—", 450, y);
-      doc.moveDown(0.8);
-      doc.strokeColor(colors.border).lineWidth(0.5).moveTo(70, doc.y).lineTo(530, doc.y).stroke();
-      doc.moveDown(0.5);
-    };
-
-    renderMarkRow("MCQ Assessment", batch?.mcqTotalMarks || 50, full.mcqScore);
-    renderMarkRow("Psychometry Profile", batch?.psychometricTotalMarks || 50, full.psychometricScore);
-    renderMarkRow("Clinical Interview", batch?.interviewTotalMarks || 100, full.interviewScore);
-    
-    doc.moveDown(1);
-    doc.rect(400, doc.y, 130, 30).fill(colors.bgOrange);
-    doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(10).text("AGGREGATE", 410, doc.y - 20);
-    doc.fillColor(colors.accent).font('Helvetica-Bold').fontSize(14).text(full.totalScore != null ? full.totalScore.toFixed(2) : "—", 480, doc.y - 23);
-
-    doc.moveDown(4);
-
-    // --- Section: Preferences & LORs ---
-    doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(11).text("STRATEGIC PREFERENCES", 50, doc.y);
-    doc.moveDown(0.5);
-    
-    if (full.preferences.length > 0) {
-      full.preferences.forEach((p: any, i: number) => {
-        doc.fillColor(colors.primary).font('Helvetica').fontSize(10).text(`${i+1}. ${p.specialityName}`, { indent: 20 });
-      });
-    } else {
-      doc.fillColor(colors.muted).font('Helvetica').fontSize(10).text("Institutional Choice", { indent: 20 });
-    }
-
-    doc.moveDown(2);
-    doc.fillColor(colors.secondary).font('Helvetica-Bold').fontSize(11).text("PROFESSIONAL REFERENCES (LOR)", 50, doc.y);
-    doc.moveDown(0.5);
-    
-    const renderLOR = (num: number, name: string, contact: string, email: string, status: boolean) => {
-      doc.fillColor(colors.primary).font('Helvetica-Bold').fontSize(9).text(`LOR ${num}: ${name || "—"}`, { indent: 20 });
-      doc.fillColor(colors.secondary).font('Helvetica').fontSize(8).text(`Contact: ${contact || "—"} | Email: ${email || "—"}`, { indent: 35 });
-      doc.fillColor(status ? '#10b981' : colors.muted).font('Helvetica-Bold').fontSize(8).text(`STATUS: ${status ? "PROCESSED & VERIFIED" : "PENDING"}`, { indent: 35 });
-      doc.moveDown(0.5);
-    };
-
-    renderLOR(1, sub?.lor1RefName || "", sub?.lor1RefContact || "", sub?.lor1RefEmail || "", !!sub?.lor1Url);
-    renderLOR(2, sub?.lor2RefName || "", sub?.lor2RefContact || "", sub?.lor2RefEmail || "", !!sub?.lor2Url);
-
-    // --- Footer ---
-    const bottom = 750;
-    doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, bottom).lineTo(550, bottom).stroke();
-    doc.fillColor(colors.muted).font('Helvetica').fontSize(8).text("CONFIDENTIAL DOCUMENT - FOR INTERNAL USE ONLY", 50, bottom + 10);
-    doc.text("SANKARA ACADEMY OF VISION - FELLOWSHIP ADMISSIONS HUB", 50, bottom + 22);
-    doc.text(`Generated on ${formatToLocalDateTime(new Date())}`, 350, bottom + 10, { align: 'right' });
-
-    doc.end();
+    res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+    res.send(pdfBuffer);
   } catch (e: any) {
     console.error("[summary-pdf] failed", e);
-    res.status(500).json({ error: e.message || "Failed to generate summary PDF." });
+    if (!res.headersSent) res.status(500).json({ error: e.message || "Failed to generate summary PDF." });
   }
 });
 

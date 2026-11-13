@@ -965,6 +965,13 @@ export default function CandidatesPage() {
                 >
                   <Download className="h-3.5 w-3.5" /> ZIP
                 </Button>
+                <Button 
+                  onClick={() => window.open(`/api/candidates/attendance-sheet-pdf?token=${localStorage.getItem("fellowship_token")}`, "_blank")}
+                  className="bg-indigo-600/90 hover:bg-indigo-700 text-white transition-all shadow-sm gap-2 border-none rounded-xl h-10 px-4 font-bold text-xs"
+                  title="Download speciality-wise Final Examination & Interview Attendance Sheet PDF"
+                >
+                  <Printer className="h-3.5 w-3.5" /> Attendance Sheet
+                </Button>
               </>
             )}
             {canManage && (

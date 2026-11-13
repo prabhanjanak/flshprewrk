@@ -117,20 +117,36 @@ export default function ReportsPage() {
     }
   };
 
-  const downloadDailyReport = async () => {
+  const downloadBlobFile = async (endpoint: string, filename: string) => {
     try {
-      const blob = await api.getBlob("/reports/daily-report");
+      const blob = await api.getBlob(endpoint);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `Daily_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+      link.setAttribute("download", filename);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Daily Report download failed:", error);
+      console.error(`Report download failed (${endpoint}):`, error);
     }
+  };
+
+  const downloadDailyReport = async () => {
+    await downloadBlobFile("/reports/daily-report", `Daily_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const downloadAttendancePdf = async () => {
+    await downloadBlobFile("/candidates/attendance-sheet-pdf?status=eligible", `Final_Attendance_Sheet_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
+  const downloadAttendanceExcel = async () => {
+    await downloadBlobFile("/candidates/attendance-sheet-excel?status=eligible", `Final_Attendance_Sheet_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const downloadRankSheetPdf = async () => {
+    await downloadBlobFile("/rankings/export-pdf", `Merit_Rank_Sheet_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   if (isLoading) {
@@ -179,7 +195,25 @@ export default function ReportsPage() {
             Real-time insights, academic scores, entrance performance metrics, and seat allocations.
           </p>
         </div>
-        <div className="flex gap-3 items-center flex-wrap">
+        <div className="flex gap-2.5 items-center flex-wrap">
+          <button
+            onClick={downloadAttendancePdf}
+            className="inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 disabled:pointer-events-none disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] border border-emerald-200 min-h-9 px-4 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-black uppercase tracking-widest text-[11px] shadow-sm"
+          >
+            <FileText className="h-4 w-4 text-emerald-600" /> Final Attendance Sheet (PDF)
+          </button>
+          <button
+            onClick={downloadAttendanceExcel}
+            className="inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 disabled:pointer-events-none disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] border border-teal-200 min-h-9 px-4 py-2.5 rounded-xl bg-white hover:bg-teal-50 text-teal-800 font-black uppercase tracking-widest text-[11px] shadow-sm"
+          >
+            <FileText className="h-4 w-4 text-teal-600" /> Attendance (Excel)
+          </button>
+          <button
+            onClick={downloadRankSheetPdf}
+            className="inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:pointer-events-none disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] border border-indigo-200 min-h-9 px-4 py-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-black uppercase tracking-widest text-[11px] shadow-sm"
+          >
+            <Award className="h-4 w-4 text-indigo-600" /> Merit Rank Sheet (PDF)
+          </button>
           <button
             onClick={downloadCycleReport}
             className="inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 disabled:pointer-events-none disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] border-none min-h-9 px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-black uppercase tracking-widest text-[11px] shadow-lg shadow-orange-500/20"

@@ -1,4 +1,5 @@
-import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
+import { useState } from "react";
+import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "./components/ui/toaster";
 import { TooltipProvider } from "./components/ui/tooltip";
@@ -18,7 +19,7 @@ import ExamsPage from "./pages/ExamsPage";
 import ExamDashboardPage from "./pages/ExamDashboardPage";
 import ProgramsPage from "./pages/ProgramsPage";
 import UsersPage from "./pages/UsersPage";
-import InterviewsPage from "./pages/InterviewsPage";
+import InterviewsPage, { DoctorPortalView } from "./pages/InterviewsPage";
 import RankingsPage from "./pages/RankingsPage";
 import ProfilePage from "./pages/ProfilePage";
 import ResultsPage from "./pages/ResultsPage";
@@ -44,6 +45,62 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+function DoctorSuperView() {
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
+  const [tab, setTab] = useState<"evaluate" | "overview">("evaluate");
+  const isAdminPreview = user?.role !== "doctor";
+
+  return (
+    <div className="space-y-4">
+      {isAdminPreview && (
+        <div className="mx-6 mt-6 mb-0 p-4 rounded-2xl bg-slate-900 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center rounded-md bg-orange-500 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
+                Super Admin · Doctor View
+              </span>
+              <span className="text-xs text-slate-300 font-medium">
+                Live panel-doctor perspective: switch between Mind Matter &amp; Speciality panels, review dossiers, and verify consensus marks.
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <div className="flex bg-white/10 p-1 rounded-xl border border-white/15">
+              <button
+                type="button"
+                onClick={() => setTab("evaluate")}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${tab === "evaluate" ? "bg-white text-slate-900 shadow-xs" : "text-white/80 hover:text-white"}`}
+              >
+                Live Examination
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab("overview")}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${tab === "overview" ? "bg-white text-slate-900 shadow-xs" : "text-white/80 hover:text-white"}`}
+              >
+                Doctor Dashboard
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLocation("/interviews")}
+              className="px-3 py-1.5 rounded-xl border border-white/25 bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all"
+            >
+              Panel Setup &amp; Queues
+            </button>
+          </div>
+        </div>
+      )}
+      {tab === "overview" && isAdminPreview ? (
+        <DoctorDashboardPage onOpenExamination={() => setTab("evaluate")} />
+      ) : (
+        <DoctorPortalView />
+      )}
+    </div>
+  );
+}
 
 function AppRouter() {
   const { user, loading } = useAuth();
@@ -78,6 +135,7 @@ function AppRouter() {
             <Route path="/exams" component={ExamsPage} />
             <Route path="/exams/:id" component={ExamDashboardPage} />
             <Route path="/interviews" component={InterviewsPage} />
+            <Route path="/doctor" component={DoctorSuperView} />
             <Route path="/rankings" component={RankingsPage} />
             <Route path="/application-forms" component={ApplicationFormsPage} />
             <Route path="/application-forms/:token/manual-entry">

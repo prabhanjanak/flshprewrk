@@ -15,8 +15,20 @@ import { SeatMatrixModal } from "../components/SeatMatrixModal";
 import { Grid3x3 } from "lucide-react";
 
 interface DoctorStats {
+  panelId?: number | null;
   panelName: string | null;
+  specialityId?: number | null;
   specialityName: string | null;
+  isMindMatterPanel?: boolean;
+  marksEntryEnabled?: boolean;
+  panels?: Array<{
+    panelId: number;
+    panelName: string;
+    specialityId: number | null;
+    specialityName: string | null;
+    isMindMatter: boolean;
+    marksEntryEnabled: boolean;
+  }>;
   totalAssigned: number;
   totalCompleted: number;
   remaining: number;
@@ -31,18 +43,30 @@ interface DoctorStats {
   }>;
 }
 
-export default function DoctorDashboardPage() {
+export default function DoctorDashboardPage({ onOpenExamination }: { onOpenExamination?: () => void } = {}) {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [selectedCandidateId, setSelectedCandidateId] = useState<number | null>(null);
+  const [selectedPanelId, setSelectedPanelId] = useState<number | null>(null);
   const [seatMatrixOpen, setSeatMatrixOpen] = useState(false);
 
   const { data: stats, isLoading, refetch, isFetching } = useQuery<DoctorStats>({
-    queryKey: ["doctor-stats"],
-    queryFn: () => api.get<DoctorStats>("/dashboard/doctor-stats"),
+    queryKey: ["doctor-stats", selectedPanelId],
+    queryFn: () =>
+      api.get<DoctorStats>(
+        selectedPanelId ? `/dashboard/doctor-stats?panelId=${selectedPanelId}` : "/dashboard/doctor-stats"
+      ),
     refetchInterval: 30000,
     retry: false,
   });
+
+  const handleOpenExamination = () => {
+    if (onOpenExamination) {
+      onOpenExamination();
+    } else {
+      setLocation(user?.role === "doctor" ? "/interviews" : "/doctor");
+    }
+  };
 
   const completionPct = stats && stats.totalAssigned > 0
     ? Math.round((stats.totalCompleted / stats.totalAssigned) * 100)
@@ -71,12 +95,33 @@ export default function DoctorDashboardPage() {
               Your personal candidate examination and interview dashboard. Access candidate application dossiers, enter psychometry marks and applied specialization scores.
             </p>
             {stats?.panelName && (
-              <div className="flex items-center gap-2 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-xl px-4 py-2 w-fit">
-                <LayoutDashboard className="h-4 w-4" />
-                <span className="text-xs font-bold uppercase tracking-wider">
-                  Panel: {stats.panelName}
-                  {stats.specialityName && <span className="ml-2 text-indigo-500">— {stats.specialityName}</span>}
-                </span>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-xl px-4 py-2 w-fit">
+                  <LayoutDashboard className="h-4 w-4" />
+                  <span className="text-xs font-bold uppercase tracking-wider">
+                    Panel: {stats.panelName}
+                    {stats.specialityName && <span className="ml-2 text-indigo-500">— {stats.specialityName}</span>}
+                  </span>
+                </div>
+                {stats.panels && stats.panels.length > 1 && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Switch Panel:</span>
+                    {stats.panels.map((p) => (
+                      <button
+                        key={p.panelId}
+                        type="button"
+                        onClick={() => setSelectedPanelId(p.panelId)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all ${
+                          stats.panelId === p.panelId
+                            ? "bg-indigo-600 text-white border-indigo-700"
+                            : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                        }`}
+                      >
+                        {p.panelName}{p.isMindMatter ? " (MM)" : p.specialityName ? ` (${p.specialityName})` : ""}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -93,7 +138,7 @@ export default function DoctorDashboardPage() {
             </Button>
             <Button
               size="sm"
-              onClick={() => setLocation("/interviews")}
+              onClick={handleOpenExamination}
               className="h-11 px-6 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black text-xs uppercase tracking-wider gap-2 shadow-sm shrink-0"
             >
               <Stethoscope className="h-4 w-4" />
@@ -313,7 +358,7 @@ export default function DoctorDashboardPage() {
                 </div>
               </div>
               <Button
-                onClick={() => setLocation("/interviews")}
+                onClick={handleOpenExamination}
                 className="bg-orange-600 hover:bg-orange-700 text-white font-black text-xs uppercase tracking-wider px-5 h-10 rounded-xl shrink-0 gap-2"
               >
                 Go to Examination List
@@ -326,6 +371,10 @@ export default function DoctorDashboardPage() {
             candidateId={selectedCandidateId}
             open={!!selectedCandidateId}
             onClose={() => setSelectedCandidateId(null)}
+            panelSpecialityId={stats?.specialityId ?? null}
+            panelSpecialityName={stats?.specialityName ?? null}
+            isMindMatterPanel={stats?.isMindMatterPanel ?? false}
+            marksEntryEnabled={stats?.marksEntryEnabled ?? true}
             onSaved={() => refetch()}
           />
 

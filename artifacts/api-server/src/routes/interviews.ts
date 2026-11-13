@@ -12,7 +12,11 @@ import {
   specialitiesTable,
   batchCandidatesTable,
   batchesTable,
-  auditLogsTable
+  auditLogsTable,
+  candidatePreferencesTable,
+  examAttemptsTable,
+  examsTable,
+  vivaScoreOverridesTable,
 } from "@workspace/db";
 import { requireAuth, requireRole } from "../middleware/auth";
 import * as XLSX from "xlsx";
@@ -22,17 +26,31 @@ const router: Router = Router();
 // Doctor / Admin: get assigned candidates
 router.get("/interviews/assignments", requireAuth, requireRole("doctor", "super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   const userId = req.user!.userId;
+  const userRole = req.user!.role;
+  const requestedPanelId = req.query["panelId"] ? Number(req.query["panelId"]) : null;
+  const isMockMode = Boolean((req as any).isMockMode);
 
-  // 1. Identify active panel and its speciality
-  const panelQuery = await db.execute(sql`
-    SELECT ip.id as panel_id, ip.speciality_id, s.name as speciality_name, ip.name as panel_name, ip.is_mind_matter
-    FROM interview_panel_members ipm
-    JOIN interview_panels ip ON ip.id = ipm.panel_id
-    LEFT JOIN specialities s ON s.id = ip.speciality_id
-    WHERE ipm.doctor_id = ${userId} AND ip.is_active = TRUE
-    LIMIT 1
-  `);
-  const activePanel = panelQuery.rows[0] as { panel_id: number; speciality_id: number | null; speciality_name: string | null; panel_name: string; is_mind_matter?: boolean } | undefined;
+  // 1. Identify active panel(s) for this doctor, or all active panels for super_admin / oversight roles
+  const panelQuery = userRole === "doctor"
+    ? await db.execute(sql`
+        SELECT ip.id as panel_id, ip.speciality_id, s.name as speciality_name, ip.name as panel_name, ip.is_mind_matter
+        FROM interview_panel_members ipm
+        JOIN interview_panels ip ON ip.id = ipm.panel_id
+        LEFT JOIN specialities s ON s.id = ip.speciality_id
+        WHERE ipm.doctor_id = ${userId} AND ip.is_active = TRUE AND ip.is_mock = ${isMockMode}
+        ORDER BY ip.is_mind_matter DESC, ip.id ASC
+      `)
+    : await db.execute(sql`
+        SELECT ip.id as panel_id, ip.speciality_id, s.name as speciality_name, ip.name as panel_name, ip.is_mind_matter
+        FROM interview_panels ip
+        LEFT JOIN specialities s ON s.id = ip.speciality_id
+        WHERE ip.is_active = TRUE AND ip.is_mock = ${isMockMode}
+        ORDER BY ip.is_mind_matter DESC, ip.id ASC
+      `);
+  const activePanels = panelQuery.rows as Array<{ panel_id: number; speciality_id: number | null; speciality_name: string | null; panel_name: string; is_mind_matter?: boolean }>;
+  const activePanel = (requestedPanelId
+    ? activePanels.find((p) => Number(p.panel_id) === requestedPanelId)
+    : undefined) ?? activePanels[0];
   
   const specialityId = activePanel?.speciality_id ?? null;
   const panelId = activePanel?.panel_id ?? null;
@@ -41,12 +59,13 @@ router.get("/interviews/assignments", requireAuth, requireRole("doctor", "super_
   let queueEntries: Array<Record<string, unknown>> = [];
 
   if (activePanel?.is_mind_matter) {
-    // 🧠 Mind Matter Panel: Return ALL registered/approved candidates across the entire cohort.
-    // There is no pre-filtered list because candidates arrive randomly as they finish other stations.
+    // Mind Matter Panel: All non-rejected candidates evaluated ONCE across entire cohort
     queueEntries = (await db.execute(sql`
       SELECT c.id as candidate_id, c.id as queue_id,
              CASE 
-               WHEN (c.psychometric_score IS NOT NULL AND c.psychometric_score != '') THEN 'completed'
+               WHEN (c.psychometric_score IS NOT NULL AND c.psychometric_score != '')
+                 OR EXISTS (SELECT 1 FROM interview_scores ist WHERE ist.candidate_id = c.id AND ist.speciality_id IS NULL)
+               THEN 'completed'
                ELSE 'pending'
              END as queue_status,
              c.full_name, c.candidate_code, c.email, c.phone, c.qualification, c.college_name, c.status as candidate_status,
@@ -54,11 +73,11 @@ router.get("/interviews/assignments", requireAuth, requireRole("doctor", "super_
              sub.id as submission_id, sub.pg_qualifications, sub.specialization, sub.photo_url
       FROM candidates c
       LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
-      WHERE c.status != 'rejected'
+      WHERE c.status != 'rejected' AND c.is_mock = ${isMockMode}
       ORDER BY c.full_name ASC
     `)).rows as Array<Record<string, unknown>>;
   } else if (specialityId) {
-    // 🔬 Specialty Panel: Merge queue entries with all candidates who selected this speciality
+    // Speciality Panel: Merge panel_queue with all applicants who selected/applied for this speciality
     let qRows: Array<Record<string, unknown>> = [];
     if (panelId) {
       qRows = (await db.execute(sql`
@@ -69,7 +88,7 @@ router.get("/interviews/assignments", requireAuth, requireRole("doctor", "super_
         FROM panel_queue pq
         JOIN candidates c ON c.id = pq.candidate_id
         LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
-        WHERE pq.panel_id = ${panelId} AND c.status != 'rejected'
+        WHERE pq.panel_id = ${panelId} AND c.status != 'rejected' AND c.is_mock = ${isMockMode}
         ORDER BY pq.queue_position ASC, pq.created_at ASC
       `)).rows as Array<Record<string, unknown>>;
     }
@@ -80,9 +99,12 @@ router.get("/interviews/assignments", requireAuth, requireRole("doctor", "super_
              c.psychometric_score,
              sub.id as submission_id, sub.pg_qualifications, sub.specialization, sub.photo_url
       FROM candidates c
-      JOIN candidate_preferences cp ON cp.candidate_id = c.id
       LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
-      WHERE cp.speciality_id = ${specialityId} AND c.status != 'rejected'
+      WHERE c.status != 'rejected' AND c.is_mock = ${isMockMode}
+        AND (
+          EXISTS (SELECT 1 FROM candidate_preferences cp WHERE cp.candidate_id = c.id AND cp.speciality_id = ${specialityId})
+          OR EXISTS (SELECT 1 FROM applications a WHERE a.candidate_id = c.id AND a.speciality_id = ${specialityId})
+        )
       ORDER BY c.full_name ASC
     `)).rows as Array<Record<string, unknown>>;
 
@@ -104,14 +126,22 @@ router.get("/interviews/assignments", requireAuth, requireRole("doctor", "super_
              sub.id as submission_id, sub.pg_qualifications, sub.specialization, sub.photo_url, c.created_at
       FROM candidates c
       LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
-      WHERE c.status IN ('approved', 'interview_completed', 'allocated', 'pending')
+      WHERE c.status IN ('approved', 'interview_completed', 'allocated', 'pending') AND c.is_mock = ${isMockMode}
       ORDER BY c.created_at DESC
       LIMIT 100
     `)).rows as Array<Record<string, unknown>>;
   }
 
-  // Load all scores once to accurately link single panel scores
-  const allScores = await db.select().from(interviewScoresTable);
+  // Load all scores and Mind Matter doctor IDs so Viva never collides with Mind Matter scores
+  const [allScores, mmPanelDocs] = await Promise.all([
+    db.select().from(interviewScoresTable),
+    db.execute(sql`
+      SELECT ipm.doctor_id FROM interview_panel_members ipm
+      JOIN interview_panels ip ON ip.id = ipm.panel_id
+      WHERE ip.is_mind_matter = TRUE
+    `),
+  ]);
+  const mmDoctorIds = new Set((mmPanelDocs.rows as Array<{ doctor_id: number }>).map((r) => Number(r.doctor_id)));
 
   res.json(queueEntries.map((q) => {
     const candidateId = Number(q["candidate_id"]);
@@ -137,8 +167,10 @@ router.get("/interviews/assignments", requireAuth, requireRole("doctor", "super_
         };
       }
     } else if (specialityId) {
-      // Speciality Interview: single panel score entered by ANY doctor on this panel
-      const specScore = allScores.find((s) => s.candidateId === candidateId && s.specialityId === specialityId);
+      // Speciality Interview: single panel score entered by ANY doctor on this speciality panel
+      const specScore = allScores.find(
+        (s) => s.candidateId === candidateId && s.specialityId === specialityId && !mmDoctorIds.has(s.doctorId)
+      );
       if (specScore) {
         sc = { 
           id: specScore.id, 
@@ -187,36 +219,50 @@ router.get("/interviews/assignments", requireAuth, requireRole("doctor", "super_
 
 // Admin: get all interview scores with candidate/doctor names
 router.get("/interviews/scores", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+  const isMockMode = Boolean((req as any).isMockMode);
   const scores = await db.select().from(interviewScoresTable);
-  const candidates = await db.select().from(candidatesTable);
+  const candidates = await db.select().from(candidatesTable).where(eq(candidatesTable.isMock, isMockMode));
   const users = await db.select().from(usersTable);
+  const allSpecs = await db.select().from(specialitiesTable);
+  const mmDocs = (await db.execute(sql`
+    SELECT ipm.doctor_id FROM interview_panel_members ipm
+    JOIN interview_panels ip ON ip.id = ipm.panel_id
+    WHERE ip.is_mind_matter = TRUE
+  `)).rows as Array<{ doctor_id: number }>;
+  const mmDocSet = new Set(mmDocs.map((d) => Number(d.doctor_id)));
+  const candMap = new Map(candidates.map((c) => [c.id, c]));
   
   // Also get batches to find total marks
-  const { db: workspaceDb, batchesTable } = await import("@workspace/db");
+  const { batchesTable } = await import("@workspace/db");
   const batches = await db.select().from(batchesTable);
 
-  res.json(scores.map((s) => {
-    const cand = candidates.find((c) => c.id === s.candidateId);
-    const doc = users.find((u) => u.id === s.doctorId);
-    
-    // Find batch for this candidate to get total marks
-    // (This is an approximation based on the program)
-    const batch = batches[0] ?? null; // Use first available batch for total marks
+  res.json(
+    scores
+      .filter((s) => candMap.has(s.candidateId))
+      .map((s) => {
+        const cand = candMap.get(s.candidateId);
+        const doc = users.find((u) => u.id === s.doctorId);
+        const spec = s.specialityId ? allSpecs.find((sp) => sp.id === s.specialityId) : null;
+        const isMM = s.specialityId === null || s.specialityId === undefined || mmDocSet.has(s.doctorId);
+        const batch = batches[0] ?? null;
 
-    return {
-      id: s.id,
-      candidateId: s.candidateId,
-      candidateName: cand?.fullName ?? `#${s.candidateId}`,
-      candidateCode: cand?.candidateCode ?? "",
-      doctorId: s.doctorId,
-      doctorName: doc?.fullName ?? `#${s.doctorId}`,
-      score: s.score,
-      specialityId: s.specialityId,
-      totalMarks: batch?.interviewTotalMarks ?? 100,
-      remarks: s.remarks,
-      submittedAt: s.submittedAt.toISOString(),
-    };
-  }));
+        return {
+          id: s.id,
+          candidateId: s.candidateId,
+          candidateName: cand?.fullName ?? `#${s.candidateId}`,
+          candidateCode: cand?.candidateCode ?? "",
+          doctorId: s.doctorId,
+          doctorName: doc?.fullName ?? `#${s.doctorId}`,
+          score: s.score,
+          specialityId: s.specialityId,
+          specialityName: isMM ? "Mind Matter" : (spec?.name ?? "Speciality Viva"),
+          isMindMatter: isMM,
+          totalMarks: batch?.interviewTotalMarks ?? 100,
+          remarks: s.remarks,
+          submittedAt: s.submittedAt.toISOString(),
+        };
+      })
+  );
 });
 
 // Admin: update an individual score entry
@@ -235,8 +281,8 @@ router.patch("/interviews/scores/:scoreId", requireAuth, requireRole("super_admi
       return;
     }
 
-    let maxScore = 50;
-    if (existingScore.specialityId) {
+    let isMindMatter = existingScore.specialityId === null;
+    if (!isMindMatter && existingScore.specialityId) {
       const panelQuery = await db.execute(sql`
         SELECT ip.is_mind_matter
         FROM interview_panel_members ipm
@@ -244,9 +290,9 @@ router.patch("/interviews/scores/:scoreId", requireAuth, requireRole("super_admi
         WHERE ipm.doctor_id = ${existingScore.doctorId} AND ip.speciality_id = ${existingScore.specialityId}
         LIMIT 1
       `);
-      const isMindMatter = (panelQuery.rows[0] as { is_mind_matter: boolean } | undefined)?.is_mind_matter;
-      if (isMindMatter) maxScore = 10;
+      isMindMatter = Boolean((panelQuery.rows[0] as { is_mind_matter: boolean } | undefined)?.is_mind_matter);
     }
+    const maxScore = isMindMatter ? 10 : 50;
 
     if (score < 0 || score > maxScore) {
       res.status(400).json({ error: `Score must be between 0 and ${maxScore}` });
@@ -257,6 +303,12 @@ router.patch("/interviews/scores/:scoreId", requireAuth, requireRole("super_admi
       .set({ score, remarks: remarks ?? null, submittedAt: new Date() })
       .where(eq(interviewScoresTable.id, scoreId))
       .returning();
+
+    if (isMindMatter) {
+      await db.update(candidatesTable)
+        .set({ psychometricScore: String(score) })
+        .where(eq(candidatesTable.id, existingScore.candidateId));
+    }
 
     const { recalculateCandidateStatus } = await import("./candidates");
     await recalculateCandidateStatus(existingScore.candidateId);
@@ -278,6 +330,17 @@ router.delete("/interviews/scores/:scoreId", requireAuth, requireRole("super_adm
     }
 
     await db.delete(interviewScoresTable).where(eq(interviewScoresTable.id, scoreId));
+
+    if (existingScore.specialityId === null) {
+      const remainingMm = await db.select().from(interviewScoresTable).where(
+        and(eq(interviewScoresTable.candidateId, existingScore.candidateId), sql`speciality_id IS NULL`)
+      );
+      if (remainingMm.length === 0) {
+        await db.update(candidatesTable)
+          .set({ psychometricScore: null })
+          .where(eq(candidatesTable.id, existingScore.candidateId));
+      }
+    }
 
     const { recalculateCandidateStatus } = await import("./candidates");
     await recalculateCandidateStatus(existingScore.candidateId);
@@ -380,29 +443,47 @@ router.delete("/interviews/assign/:assignmentId", requireAuth, requireRole("supe
   res.json({ success: true });
 });
 
-// Doctor: submit score
-router.post("/interviews/scores", requireAuth, requireRole("doctor"), async (req, res) => {
+// Doctor / Super Admin: submit consensus panel score
+router.post("/interviews/scores", requireAuth, requireRole("doctor", "super_admin"), async (req, res) => {
   const userId = req.user!.userId;
-  const { candidateId, score, remarks } = req.body as { candidateId: number; score: number; remarks?: string };
+  const userRole = req.user!.role;
+  const isMockMode = Boolean((req as any).isMockMode);
+  const { candidateId, score, remarks, panelId: bodyPanelId, specialityId: bodySpecId } = req.body as {
+    candidateId: number;
+    score: number;
+    remarks?: string;
+    panelId?: number;
+    specialityId?: number;
+  };
   if (!candidateId || score == null) { res.status(400).json({ error: "Missing fields" }); return; }
 
-  // 1. Identify active panel and its speciality
-  const panelQuery = await db.execute(sql`
-    SELECT ip.speciality_id, ip.id as panel_id, ip.is_mind_matter, ipm.marks_entry_enabled
-    FROM interview_panel_members ipm
-    JOIN interview_panels ip ON ip.id = ipm.panel_id
-    WHERE ipm.doctor_id = ${userId} AND ip.is_active = TRUE
-    LIMIT 1
-  `);
-  const activePanel = panelQuery.rows[0] as { speciality_id: number | null; panel_id: number; is_mind_matter: boolean; marks_entry_enabled: boolean } | undefined;
+  // 1. Identify active panel(s) for this doctor (or all active panels for super_admin)
+  const panelQuery = userRole === "doctor"
+    ? await db.execute(sql`
+        SELECT ip.speciality_id, ip.id as panel_id, ip.is_mind_matter, ipm.marks_entry_enabled
+        FROM interview_panel_members ipm
+        JOIN interview_panels ip ON ip.id = ipm.panel_id
+        WHERE ipm.doctor_id = ${userId} AND ip.is_active = TRUE AND ip.is_mock = ${isMockMode}
+        ORDER BY ip.is_mind_matter DESC, ip.id ASC
+      `)
+    : await db.execute(sql`
+        SELECT ip.speciality_id, ip.id as panel_id, ip.is_mind_matter, TRUE as marks_entry_enabled
+        FROM interview_panels ip
+        WHERE ip.is_active = TRUE AND ip.is_mock = ${isMockMode}
+        ORDER BY ip.is_mind_matter DESC, ip.id ASC
+      `);
+  const activePanels = panelQuery.rows as Array<{ speciality_id: number | null; panel_id: number; is_mind_matter: boolean; marks_entry_enabled: boolean }>;
+  const activePanel = (bodyPanelId ? activePanels.find((p) => Number(p.panel_id) === Number(bodyPanelId)) : undefined)
+    ?? (bodySpecId !== undefined ? activePanels.find((p) => Number(p.speciality_id) === Number(bodySpecId)) : undefined)
+    ?? activePanels[0];
   if (!activePanel) {
-    return res.status(403).json({ error: "Access denied. Doctor is not currently active in any panel." });
+    return res.status(403).json({ error: "Access denied. No active interview panel selected." });
   }
   const specialityId = activePanel.speciality_id;
   const panelId = activePanel.panel_id;
 
-  // 2. STRICT ACCESS CONTROL: Doctor must have marks_entry_enabled = TRUE
-  if (!activePanel.marks_entry_enabled) {
+  // 2. STRICT ACCESS CONTROL: Doctor must have marks_entry_enabled = TRUE (super_admin bypasses)
+  if (userRole !== "super_admin" && !activePanel.marks_entry_enabled) {
     return res.status(403).json({
       error: "Access denied. You do not have marks entry enabled for this panel."
     });
@@ -458,7 +539,7 @@ router.post("/interviews/scores", requireAuth, requireRole("doctor"), async (req
   }
   if (!row) { res.status(500).json({ error: "Failed to submit score" }); return; }
 
-  // Update applicationsTable status for this specialization to completed
+  // Update applicationsTable status & panel queue to completed/done
   if (specialityId) {
     await db.update(applicationsTable).set({ status: "completed" })
       .where(and(
@@ -466,18 +547,30 @@ router.post("/interviews/scores", requireAuth, requireRole("doctor"), async (req
         eq(applicationsTable.specialityId, specialityId)
       ));
   }
+  if (panelId) {
+    await db.execute(sql`
+      UPDATE panel_queue SET status = 'done'
+      WHERE panel_id = ${panelId} AND candidate_id = ${candidateId}
+    `);
+  }
 
-  // Multi-specialty completion matrix check:
-  // Candidate is interview_completed if they have a Mind Mapping score AND all applied specialities have at least one score
+  // Multi-specialty completion matrix check (Viva scores only; Mind Matter alone does not mark Viva completed)
   const [cand] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, candidateId));
   if (cand) {
-    if (cand.status !== "allocated") {
+    if (cand.status !== "allocated" && cand.status !== "waitlisted" && cand.status !== "rejected") {
       const apps = await db.select().from(applicationsTable).where(eq(applicationsTable.candidateId, candidateId));
       const scores = await db.select().from(interviewScoresTable).where(eq(interviewScoresTable.candidateId, candidateId));
+      const mmDocs = (await db.execute(sql`
+        SELECT ipm.doctor_id FROM interview_panel_members ipm
+        JOIN interview_panels ip ON ip.id = ipm.panel_id
+        WHERE ip.is_mind_matter = TRUE
+      `)).rows as Array<{ doctor_id: number }>;
+      const mmDocSet = new Set(mmDocs.map((d) => Number(d.doctor_id)));
+      const vivaOnlyScores = scores.filter((s) => s.specialityId !== null && !mmDocSet.has(s.doctorId));
 
-      let allSpecialtiesCompleted = true;
+      let allSpecialtiesCompleted = apps.length > 0;
       for (const app of apps) {
-        const hasScore = scores.some(s => s.specialityId === app.specialityId);
+        const hasScore = vivaOnlyScores.some(s => s.specialityId === app.specialityId);
         if (!hasScore) {
           allSpecialtiesCompleted = false;
           if (app.status === "completed") {
@@ -490,7 +583,7 @@ router.post("/interviews/scores", requireAuth, requireRole("doctor"), async (req
         }
       }
 
-      if (allSpecialtiesCompleted || scores.length > 0) {
+      if (allSpecialtiesCompleted) {
         await db.update(candidatesTable).set({ status: "interview_completed" }).where(eq(candidatesTable.id, candidateId));
       } else {
         if (cand.status === "interview_completed") {
@@ -727,13 +820,19 @@ router.get("/interviews/scores/export", requireAuth, requireRole("super_admin", 
   try {
     const specId = req.query["specialityId"] ? Number(req.query["specialityId"]) : undefined;
     
-    const candidates = await db.select().from(candidatesTable).where(eq(candidatesTable.isMock, (req as any).isMockMode));
+    const candidates = await db.select().from(candidatesTable).where(eq(candidatesTable.isMock, Boolean((req as any).isMockMode)));
     const allSpecs = await db.select().from(specialitiesTable);
     const allSubmissions = await db.select().from(applicationSubmissionsTable);
     const allBatchCand = await db.select().from(batchCandidatesTable);
     const allScores = await db.select().from(interviewScoresTable);
     const allDoctors = await db.select().from(usersTable).where(eq(usersTable.role, "doctor"));
-    const allApps = await db.select().from(applicationsTable);    const panelQuery = await db.execute(sql`
+    const allApps = await db.select().from(applicationsTable);
+    const allPrefs = await db.select().from(candidatePreferencesTable);
+    const allAttempts = await db.select().from(examAttemptsTable);
+    const allExams = await db.select().from(examsTable);
+    const allOverrides = await db.select().from(vivaScoreOverridesTable);
+    const examsMap = new Map(allExams.map((e) => [e.id, e]));
+    const panelQuery = await db.execute(sql`
       SELECT ip.id, ip.name, ip.room_number, ip.speciality_id, ip.is_mind_matter, ipm.doctor_id
       FROM interview_panels ip
       LEFT JOIN interview_panel_members ipm ON ip.id = ipm.panel_id
@@ -741,6 +840,7 @@ router.get("/interviews/scores/export", requireAuth, requireRole("super_admin", 
     const allPanels = panelQuery.rows as Array<Record<string, any>>;
 
     const isMindMatterScore = (s: { doctorId: number; specialityId: number | null }) => {
+      if (s.specialityId === null || s.specialityId === undefined) return true;
       return allPanels.some(p => 
         p.speciality_id === s.specialityId && 
         p.doctor_id === s.doctorId && 
@@ -762,10 +862,20 @@ router.get("/interviews/scores/export", requireAuth, requireRole("super_admin", 
     
     const rawRows: any[] = [];
     for (const c of filteredCandidates) {
-      const sub = allSubmissions.find((s) => s.email.toLowerCase() === c.email.toLowerCase());
+      const sub = allSubmissions.find((s) => s.candidateId === c.id || s.email.toLowerCase() === c.email.toLowerCase());
       const candidateApps = allApps.filter(app => app.candidateId === c.id);
-      
-      let candidateSpecs = candidateApps.map(app => allSpecs.find(sp => sp.id === app.specialityId)).filter(Boolean) as any[];
+      const candidatePrefs = allPrefs.filter(p => p.candidateId === c.id).sort((a, b) => a.preferenceOrder - b.preferenceOrder);
+
+      const seenSpecIds = new Set<number>();
+      let candidateSpecs: any[] = [];
+      for (const p of candidatePrefs) {
+        const sp = allSpecs.find(x => x.id === p.specialityId);
+        if (sp && !seenSpecIds.has(sp.id)) { seenSpecIds.add(sp.id); candidateSpecs.push(sp); }
+      }
+      for (const app of candidateApps) {
+        const sp = allSpecs.find(x => x.id === app.specialityId);
+        if (sp && !seenSpecIds.has(sp.id)) { seenSpecIds.add(sp.id); candidateSpecs.push(sp); }
+      }
       if (candidateSpecs.length === 0 && sub?.specialization) {
         const parsedNames = parseSpecializationString(sub.specialization);
         candidateSpecs = allSpecs.filter(sp => parsedNames.some(pn => pn.toLowerCase() === sp.name.toLowerCase()));
@@ -778,40 +888,43 @@ router.get("/interviews/scores/export", requireAuth, requireRole("super_admin", 
         candidateSpecs = candidateSpecs.filter(sp => sp.id === specId);
       }
 
+      const candAttempts = allAttempts.filter(a => a.candidateId === c.id && a.submittedAt != null);
+      const mcqAtts = candAttempts.filter(a => examsMap.get(a.examId)?.kind === "mcq" && a.score != null);
+      const psyAtts = candAttempts.filter(a => examsMap.get(a.examId)?.kind?.startsWith("psychometric") && a.score != null);
+      const candidateBatchCands = allBatchCand.filter((bc) => bc.candidateId === c.id);
+      const bcRow = candidateBatchCands[0];
+
+      const mcqScore = c.mcqScore != null && c.mcqScore !== ""
+        ? Number(c.mcqScore)
+        : mcqAtts.length > 0
+          ? mcqAtts.reduce((sum, a) => sum + (a.score ?? 0), 0) / mcqAtts.length
+          : (bcRow?.mcqScore ?? null);
+
+      const allCandScores = allScores
+        .filter(s => s.candidateId === c.id)
+        .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+      const mmScores = allCandScores.filter(s => isMindMatterScore(s));
+
+      const psychometricScore = mmScores.length > 0
+        ? mmScores[0]!.score
+        : (c.psychometricScore != null && c.psychometricScore !== ""
+          ? Number(c.psychometricScore)
+          : (psyAtts.length > 0 && psyAtts[0]!.score != null ? psyAtts[0]!.score : (bcRow?.psychometricScore ?? null)));
+
       for (const spec of candidateSpecs) {
-        const candScores = allScores.filter(s => s.candidateId === c.id && (spec.id ? s.specialityId === spec.id : true));
-        const vivaScores = candScores.filter(s => !isMindMatterScore(s));
-        const mmScores = candScores.filter(s => isMindMatterScore(s));
-        
-        const sortedVivaScores = [...vivaScores].sort((a, b) => a.doctorId - b.doctorId);
-        
-        const doc1 = sortedVivaScores[0]?.score ?? "—";
-        const doc2 = sortedVivaScores[1]?.score ?? "—";
-        const doc3 = sortedVivaScores[2]?.score ?? "—";
-        const doc4 = sortedVivaScores[3]?.score ?? "—";
+        const vivaScores = allCandScores.filter(s => !isMindMatterScore(s) && (spec.id ? s.specialityId === spec.id : true));
+        const override = spec.id ? allOverrides.find(o => o.candidateId === c.id && o.specialityId === spec.id) : undefined;
+        // Single consensus panel score (override takes precedence, else latest entered viva score)
+        const consensusViva = override
+          ? override.overrideScore
+          : (vivaScores.length > 0 ? vivaScores[0]!.score : null);
 
-        const avgVivaScore = vivaScores.length > 0 
-          ? vivaScores.reduce((acc, val) => acc + val.score, 0) / vivaScores.length
-          : null;
-
-        const candidateBatchCands = allBatchCand.filter((bc) => bc.candidateId === c.id);
-        const bcRow = candidateBatchCands[0];
-        const rawMcq = bcRow?.mcqScore ?? (c.mcqScore ? Number(c.mcqScore) : null);
-        const mcqScore = rawMcq != null ? Number(rawMcq) : null;
-        
-        const avgMindMatter = mmScores.length > 0
-          ? mmScores.reduce((acc, val) => acc + val.score, 0) / mmScores.length
-          : null;
-
-        const psychometricScore = avgMindMatter !== null
-          ? avgMindMatter
-          : (bcRow?.psychometricScore ?? (c.psychometricScore ? Number(c.psychometricScore) : null));
-
-        const totalScore = (mcqScore != null || avgVivaScore != null || psychometricScore != null)
-          ? (mcqScore ?? 0) + (avgVivaScore ?? 0) + (psychometricScore ?? 0)
+        const totalScore = (mcqScore != null || consensusViva != null || psychometricScore != null)
+          ? (mcqScore ?? 0) + (consensusViva ?? 0) + (psychometricScore ?? 0)
           : null;
 
         const appForSpec = allApps.find(app => app.candidateId === c.id && app.specialityId === spec.id);
+        const prefForSpec = candidatePrefs.find(p => p.specialityId === spec.id);
         const status = appForSpec?.status ?? c.status;
 
         const panel = allPanels.find(p => {
@@ -820,23 +933,23 @@ router.get("/interviews/scores/export", requireAuth, requireRole("super_admin", 
         });
         const panelName = panel ? `${panel["name"]} (Room ${panel["room_number"] || panel["roomNumber"]})` : "General";
 
-        const evaluators = candScores.map(s => allDoctors.find(d => d.id === s.doctorId)?.fullName).filter(Boolean).join(", ") || "None";
+        const vivaEvaluators = [...new Set(vivaScores.map(s => allDoctors.find(d => d.id === s.doctorId)?.fullName).filter(Boolean))].join(", ") || "Pending";
+        const mmEvaluator = mmScores[0] ? (allDoctors.find(d => d.id === mmScores[0]!.doctorId)?.fullName || "Mind Matter Panel") : "Pending";
 
         rawRows.push({
           "Candidate Name": c.fullName,
+          "Candidate Code": c.candidateCode,
           "Specialty": spec.name,
-          "MCQ Marks": mcqScore != null ? mcqScore : "—",
-          "Mind Mapping Marks": psychometricScore != null ? psychometricScore : "—",
-          "Doctor 1 Marks": doc1,
-          "Doctor 2 Marks": doc2,
-          "Doctor 3 Marks": doc3,
-          "Doctor 4 Marks": doc4,
-          "Average Viva": avgVivaScore != null ? Number(avgVivaScore.toFixed(2)) : "—",
-          "Final Score": totalScore,
+          "Preference #": prefForSpec?.preferenceOrder ?? "—",
+          "MCQ Marks (/50)": mcqScore != null ? Number(mcqScore.toFixed(1)) : "—",
+          "Mind Matter (/10)": psychometricScore != null ? Number(psychometricScore.toFixed(1)) : "—",
+          "Doctor Viva (/50)": consensusViva != null ? Number(consensusViva.toFixed(1)) : "Pending",
+          "Final Score": totalScore != null ? Number(totalScore.toFixed(2)) : null,
           "Rank": 0, // Will be filled after sorting
           "Status": status,
           "Panel": panelName,
-          "Evaluators": evaluators
+          "Speciality Panel Doctor": vivaEvaluators,
+          "Mind Matter Evaluator": mmEvaluator,
         });
       }
     }
@@ -897,13 +1010,17 @@ router.get("/interviews/scores/export", requireAuth, requireRole("super_admin", 
 // Admin: Specialty-wise marks breakdown export (3-sheet workbook)
 router.get("/interviews/scores/specialty-export", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   try {
-    const candidates = await db.select().from(candidatesTable).where(eq(candidatesTable.isMock, (req as any).isMockMode));
+    const candidates = await db.select().from(candidatesTable).where(eq(candidatesTable.isMock, Boolean((req as any).isMockMode)));
     const allSpecs = await db.select().from(specialitiesTable);
     const allScores = await db.select().from(interviewScoresTable);
     const allDoctors = await db.select().from(usersTable).where(eq(usersTable.role, "doctor" as any));
     const allApps = await db.select().from(applicationsTable);
+    const allBatchCand = await db.select().from(batchCandidatesTable);
+    const allAttempts = await db.select().from(examAttemptsTable);
+    const allExams = await db.select().from(examsTable);
+    const allOverrides = await db.select().from(vivaScoreOverridesTable);
+    const examsMap = new Map(allExams.map((e) => [e.id, e]));
 
-    const { candidatePreferencesTable } = await import("@workspace/db");
     const allPrefs = await db.select().from(candidatePreferencesTable);
     const allSubmissions = await db.select().from(applicationSubmissionsTable);
 
@@ -915,6 +1032,7 @@ router.get("/interviews/scores/specialty-export", requireAuth, requireRole("supe
     const allPanels = panelQuery.rows as Array<Record<string, any>>;
 
     const isMindMatterScore = (s: { doctorId: number; specialityId: number | null }) => {
+      if (s.specialityId === null || s.specialityId === undefined) return true;
       return allPanels.some(p => 
         p.speciality_id === s.specialityId && 
         p.doctor_id === s.doctorId && 
@@ -930,46 +1048,53 @@ router.get("/interviews/scores/specialty-export", requireAuth, requireRole("supe
       } catch {}
     };
 
+    const getMcqScore = (c: typeof candidates[0]): number | null => {
+      if (c.mcqScore != null && c.mcqScore !== "") return Number(c.mcqScore);
+      const mcqAtts = allAttempts.filter(a => a.candidateId === c.id && a.submittedAt != null && examsMap.get(a.examId)?.kind === "mcq" && a.score != null);
+      if (mcqAtts.length > 0) return mcqAtts.reduce((s, a) => s + (a.score ?? 0), 0) / mcqAtts.length;
+      const bc = allBatchCand.find(b => b.candidateId === c.id && b.mcqScore != null);
+      return bc?.mcqScore ?? null;
+    };
+
+    const getMindMatterScore = (c: typeof candidates[0]): number | null => {
+      // Mind Matter is entered ONCE per applicant (specialityId IS NULL or MM panel doctor) — NEVER filter by spec.id
+      const candMmScores = allScores
+        .filter(s => s.candidateId === c.id && isMindMatterScore(s))
+        .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+      if (candMmScores.length > 0) return candMmScores[0]!.score;
+      if (c.psychometricScore != null && c.psychometricScore !== "") return Number(c.psychometricScore);
+      const psyAtts = allAttempts.filter(a => a.candidateId === c.id && a.submittedAt != null && examsMap.get(a.examId)?.kind?.startsWith("psychometric") && a.score != null);
+      if (psyAtts.length > 0) return psyAtts[0]!.score ?? null;
+      const bc = allBatchCand.find(b => b.candidateId === c.id && b.psychometricScore != null);
+      return bc?.psychometricScore ?? null;
+    };
+
+    const getSpecViva = (candidateId: number, specId: number): number | null => {
+      const ov = allOverrides.find(o => o.candidateId === candidateId && o.specialityId === specId);
+      if (ov) return ov.overrideScore;
+      const vs = allScores
+        .filter(s => s.candidateId === candidateId && s.specialityId === specId && !isMindMatterScore(s))
+        .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+      return vs.length > 0 ? vs[0]!.score : null;
+    };
+
     // ── SHEET 1: Summary by Specialty ──────────────────────────────────────
     const summaryRows = allSpecs.map(spec => {
-      // Candidates for this specialty
       const specCandIds = new Set<number>();
       allApps.filter(a => a.specialityId === spec.id).forEach(a => specCandIds.add(a.candidateId));
       allPrefs.filter(p => p.specialityId === spec.id).forEach(p => specCandIds.add(p.candidateId));
 
       const specCandidates = candidates.filter(c => specCandIds.has(c.id));
-      const specScores = allScores.filter(s => s.specialityId === spec.id);
-      
-      const specVivaScores = specScores.filter(s => !isMindMatterScore(s));
-      const specMmScores = specScores.filter(s => isMindMatterScore(s));
-
-      const mcqScores = specCandidates.map(c => c.mcqScore ? Number(c.mcqScore) : null).filter(v => v !== null) as number[];
-      
-      const mindScores = specCandidates.map(c => {
-        const candMmScores = specMmScores.filter(s => s.candidateId === c.id);
-        if (candMmScores.length > 0) {
-          return candMmScores.reduce((acc, s) => acc + s.score, 0) / candMmScores.length;
-        }
-        return c.psychometricScore ? Number(c.psychometricScore) : null;
-      }).filter(v => v !== null) as number[];
-
-      const vivaScores = specVivaScores.map(s => s.score);
+      const mcqScores = specCandidates.map(getMcqScore).filter((v): v is number => v !== null);
+      const mindScores = specCandidates.map(getMindMatterScore).filter((v): v is number => v !== null);
+      const vivaScores = specCandidates.map(c => getSpecViva(c.id, spec.id)).filter((v): v is number => v !== null);
 
       const avg = (arr: number[]) => arr.length > 0 ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : null;
 
-      const vivaByCandidate = specCandidates.map(c => {
-        const cs = specVivaScores.filter(s => s.candidateId === c.id);
-        return cs.length > 0 ? cs.reduce((a, s) => a + s.score, 0) / cs.length : null;
-      }).filter(v => v !== null) as number[];
-
       const avgTotal = specCandidates.map(c => {
-        const mcq = c.mcqScore ? Number(c.mcqScore) : 0;
-        const candMmScores = specMmScores.filter(s => s.candidateId === c.id);
-        const mm = candMmScores.length > 0 
-          ? candMmScores.reduce((acc, s) => acc + s.score, 0) / candMmScores.length 
-          : (c.psychometricScore ? Number(c.psychometricScore) : 0);
-        const cs = specVivaScores.filter(s => s.candidateId === c.id);
-        const viva = cs.length > 0 ? cs.reduce((a, s) => a + s.score, 0) / cs.length : 0;
+        const mcq = getMcqScore(c) ?? 0;
+        const mm = getMindMatterScore(c) ?? 0;
+        const viva = getSpecViva(c.id, spec.id) ?? 0;
         return mcq + mm + viva;
       });
 
@@ -977,7 +1102,7 @@ router.get("/interviews/scores/specialty-export", requireAuth, requireRole("supe
         "Specialty": spec.name,
         "Code": spec.code,
         "Total Candidates": specCandidates.length,
-        "VIVA Evaluated": new Set(specVivaScores.map(s => s.candidateId)).size,
+        "VIVA Evaluated": vivaScores.length,
         "Avg MCQ (Max 50)": avg(mcqScores) ?? "—",
         "Avg VIVA (Max 50)": avg(vivaScores) ?? "—",
         "Avg Mind Matter (Max 10)": avg(mindScores) ?? "—",
@@ -992,44 +1117,28 @@ router.get("/interviews/scores/specialty-export", requireAuth, requireRole("supe
       allApps.filter(a => a.specialityId === spec.id).forEach(a => specCandIds.add(a.candidateId));
       allPrefs.filter(p => p.specialityId === spec.id).forEach(p => specCandIds.add(p.candidateId));
       const specCandidates = candidates.filter(c => specCandIds.has(c.id));
-      const specScores = allScores.filter(s => s.specialityId === spec.id);
-      
-      const specVivaScores = specScores.filter(s => !isMindMatterScore(s));
-      const specMmScores = specScores.filter(s => isMindMatterScore(s));
-
-      // Get unique doctors who scored VIVA for this specialty, up to 4
-      const doctorIdsForSpec = [...new Set(specVivaScores.map(s => s.doctorId))].slice(0, 4);
 
       for (const c of specCandidates) {
-        const candScores = specVivaScores.filter(s => s.candidateId === c.id);
-        const avgViva = candScores.length > 0 ? candScores.reduce((a, s) => a + s.score, 0) / candScores.length : null;
-        
-        const candMmScores = specMmScores.filter(s => s.candidateId === c.id);
-        const mm = candMmScores.length > 0 
-          ? candMmScores.reduce((acc, s) => acc + s.score, 0) / candMmScores.length 
-          : (c.psychometricScore ? Number(c.psychometricScore) : null);
-          
-        const mcq = c.mcqScore ? Number(c.mcqScore) : null;
-        const total = (mcq ?? 0) + (avgViva ?? 0) + (mm ?? 0);
+        const mcq = getMcqScore(c);
+        const mm = getMindMatterScore(c);
+        const viva = getSpecViva(c.id, spec.id);
+        const latestVivaRow = allScores
+          .filter(s => s.candidateId === c.id && s.specialityId === spec.id && !isMindMatterScore(s))
+          .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())[0];
+        const evaluatorName = latestVivaRow ? (allDoctors.find(d => d.id === latestVivaRow.doctorId)?.fullName ?? "Panel") : "—";
+        const total = (mcq ?? 0) + (viva ?? 0) + (mm ?? 0);
 
         const row: Record<string, any> = {
           "Specialty": spec.name,
           "Candidate Name": c.fullName,
           "Candidate Code": c.candidateCode,
-          "MCQ (Max 50)": mcq ?? "—",
-          "Mind Matter (Max 10)": mm ?? "—",
+          "MCQ (Max 50)": mcq != null ? Number(mcq.toFixed(1)) : "—",
+          "Mind Matter (Max 10)": mm != null ? Number(mm.toFixed(1)) : "—",
+          "Doctor Viva (Max 50)": viva != null ? Number(viva.toFixed(1)) : "Pending",
+          "Panel Doctor": evaluatorName,
+          "Total (Max 110)": (mcq !== null || viva !== null || mm !== null) ? Math.round(total * 10) / 10 : "—",
+          "Status": c.status,
         };
-
-        for (let di = 0; di < 4; di++) {
-          const docId = doctorIdsForSpec[di];
-          const doc = docId ? allDoctors.find(d => d.id === docId) : undefined;
-          const sc = docId ? candScores.find(s => s.doctorId === docId) : undefined;
-          row[`Doctor ${di + 1}${doc ? ` (${doc.fullName.split(" ")[0]})` : ""} VIVA`] = sc ? sc.score : "—";
-        }
-
-        row["Avg VIVA (Max 50)"] = avgViva !== null ? Math.round(avgViva * 10) / 10 : "—";
-        row["Total (Max 110)"] = (mcq !== null || avgViva !== null || mm !== null) ? Math.round(total * 10) / 10 : "—";
-        row["Status"] = c.status;
         detailRows.push(row);
       }
     }

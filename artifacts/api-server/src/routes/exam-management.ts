@@ -94,6 +94,20 @@ router.patch("/batches/:id/marks", requireAuth, requireRole("super_admin", "prog
           status: "completed"
         })
         .where(and(eq(batchCandidatesTable.batchId, batchId), eq(batchCandidatesTable.candidateId, u.candidateId)));
+
+      // Keep candidatesTable synced so Mark Sheet, Rank Sheet & Attendance views immediately reflect batch marks
+      const candSync: Record<string, unknown> = {};
+      if (u.mcqScore !== undefined) {
+        candSync["mcqScore"] = u.mcqScore != null ? String(u.mcqScore) : null;
+      }
+      if (u.psychometricScore !== undefined) {
+        candSync["psychometricScore"] = u.psychometricScore != null ? String(u.psychometricScore) : null;
+      }
+      if (Object.keys(candSync).length > 0) {
+        await db.update(candidatesTable)
+          .set(candSync)
+          .where(eq(candidatesTable.id, u.candidateId));
+      }
     }
     res.json({ success: true });
   } catch (e) {

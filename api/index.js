@@ -17714,7 +17714,7 @@ var require_stringify = __commonJS({
   "../../node_modules/.pnpm/qs@6.15.0/node_modules/qs/lib/stringify.js"(exports, module) {
     "use strict";
     var getSideChannel = require_side_channel();
-    var utils8 = require_utils2();
+    var utils9 = require_utils2();
     var formats = require_formats();
     var has = Object.prototype.hasOwnProperty;
     var arrayPrefixGenerators = {
@@ -17747,7 +17747,7 @@ var require_stringify = __commonJS({
       delimiter: "&",
       encode: true,
       encodeDotInKeys: false,
-      encoder: utils8.encode,
+      encoder: utils9.encode,
       encodeValuesOnly: false,
       filter: void 0,
       format: defaultFormat,
@@ -17788,7 +17788,7 @@ var require_stringify = __commonJS({
       } else if (obj instanceof Date) {
         obj = serializeDate(obj);
       } else if (generateArrayPrefix === "comma" && isArray(obj)) {
-        obj = utils8.maybeMap(obj, function(value2) {
+        obj = utils9.maybeMap(obj, function(value2) {
           if (value2 instanceof Date) {
             return serializeDate(value2);
           }
@@ -17801,7 +17801,7 @@ var require_stringify = __commonJS({
         }
         obj = "";
       }
-      if (isNonNullishPrimitive(obj) || utils8.isBuffer(obj)) {
+      if (isNonNullishPrimitive(obj) || utils9.isBuffer(obj)) {
         if (encoder) {
           var keyValue = encodeValuesOnly ? prefix : encoder(prefix, defaults3.encoder, charset, "key", format);
           return [formatter(keyValue) + "=" + formatter(encoder(obj, defaults3.encoder, charset, "value", format))];
@@ -17815,7 +17815,7 @@ var require_stringify = __commonJS({
       var objKeys;
       if (generateArrayPrefix === "comma" && isArray(obj)) {
         if (encodeValuesOnly && encoder) {
-          obj = utils8.maybeMap(obj, encoder);
+          obj = utils9.maybeMap(obj, encoder);
         }
         objKeys = [{ value: obj.length > 0 ? obj.join(",") || null : void 0 }];
       } else if (isArray(filter2)) {
@@ -17996,7 +17996,7 @@ var require_stringify = __commonJS({
 var require_parse = __commonJS({
   "../../node_modules/.pnpm/qs@6.15.0/node_modules/qs/lib/parse.js"(exports, module) {
     "use strict";
-    var utils8 = require_utils2();
+    var utils9 = require_utils2();
     var has = Object.prototype.hasOwnProperty;
     var isArray = Array.isArray;
     var defaults3 = {
@@ -18009,7 +18009,7 @@ var require_parse = __commonJS({
       charsetSentinel: false,
       comma: false,
       decodeDotInKeys: false,
-      decoder: utils8.decode,
+      decoder: utils9.decode,
       delimiter: "&",
       depth: 5,
       duplicates: "combine",
@@ -18082,7 +18082,7 @@ var require_parse = __commonJS({
         } else {
           key = options.decoder(part.slice(0, pos), defaults3.decoder, charset, "key");
           if (key !== null) {
-            val = utils8.maybeMap(
+            val = utils9.maybeMap(
               parseArrayValue(
                 part.slice(pos + 1),
                 options,
@@ -18104,12 +18104,12 @@ var require_parse = __commonJS({
           if (options.throwOnLimitExceeded) {
             throw new RangeError("Array limit exceeded. Only " + options.arrayLimit + " element" + (options.arrayLimit === 1 ? "" : "s") + " allowed in an array.");
           }
-          val = utils8.combine([], val, options.arrayLimit, options.plainObjects);
+          val = utils9.combine([], val, options.arrayLimit, options.plainObjects);
         }
         if (key !== null) {
           var existing = has.call(obj, key);
           if (existing && (options.duplicates === "combine" || part.indexOf("[]=") > -1)) {
-            obj[key] = utils8.combine(
+            obj[key] = utils9.combine(
               obj[key],
               val,
               options.arrayLimit,
@@ -18133,10 +18133,10 @@ var require_parse = __commonJS({
         var obj;
         var root = chain[i2];
         if (root === "[]" && options.parseArrays) {
-          if (utils8.isOverflow(leaf)) {
+          if (utils9.isOverflow(leaf)) {
             obj = leaf;
           } else {
-            obj = options.allowEmptyArrays && (leaf === "" || options.strictNullHandling && leaf === null) ? [] : utils8.combine(
+            obj = options.allowEmptyArrays && (leaf === "" || options.strictNullHandling && leaf === null) ? [] : utils9.combine(
               [],
               leaf,
               options.arrayLimit,
@@ -18158,7 +18158,7 @@ var require_parse = __commonJS({
             throw new RangeError("Array limit exceeded. Only " + options.arrayLimit + " element" + (options.arrayLimit === 1 ? "" : "s") + " allowed in an array.");
           } else if (isValidArrayIndex) {
             obj[index3] = leaf;
-            utils8.markOverflow(obj, index3);
+            utils9.markOverflow(obj, index3);
           } else if (decodedRoot !== "__proto__") {
             obj[decodedRoot] = leaf;
           }
@@ -18255,7 +18255,7 @@ var require_parse = __commonJS({
         comma: typeof opts.comma === "boolean" ? opts.comma : defaults3.comma,
         decodeDotInKeys: typeof opts.decodeDotInKeys === "boolean" ? opts.decodeDotInKeys : defaults3.decodeDotInKeys,
         decoder: typeof opts.decoder === "function" ? opts.decoder : defaults3.decoder,
-        delimiter: typeof opts.delimiter === "string" || utils8.isRegExp(opts.delimiter) ? opts.delimiter : defaults3.delimiter,
+        delimiter: typeof opts.delimiter === "string" || utils9.isRegExp(opts.delimiter) ? opts.delimiter : defaults3.delimiter,
         // eslint-disable-next-line no-implicit-coercion, no-extra-parens
         depth: typeof opts.depth === "number" || opts.depth === false ? +opts.depth : defaults3.depth,
         duplicates,
@@ -18281,12 +18281,12 @@ var require_parse = __commonJS({
       for (var i2 = 0; i2 < keys.length; ++i2) {
         var key = keys[i2];
         var newObj = parseKeys(key, tempObj[key], options, typeof str === "string");
-        obj = utils8.merge(obj, newObj, options);
+        obj = utils9.merge(obj, newObj, options);
       }
       if (options.allowSparse === true) {
         return obj;
       }
-      return utils8.compact(obj);
+      return utils9.compact(obj);
     };
   }
 });
@@ -18688,7 +18688,7 @@ var require_finalhandler = __commonJS({
       return status;
     }
     function send(req, res, status, headers, message) {
-      function write6() {
+      function write7() {
         var body = createHtmlDocument(message);
         res.statusCode = status;
         if (req.httpVersionMajor < 2) {
@@ -18711,11 +18711,11 @@ var require_finalhandler = __commonJS({
         res.end(body, "utf8");
       }
       if (isFinished(req)) {
-        write6();
+        write7();
         return;
       }
       req.unpipe();
-      onFinished(req, write6);
+      onFinished(req, write7);
       req.resume();
     }
   }
@@ -18727,7 +18727,7 @@ var require_view = __commonJS({
     "use strict";
     var debug = require_src()("express:view");
     var path15 = __require("node:path");
-    var fs16 = __require("node:fs");
+    var fs17 = __require("node:fs");
     var dirname2 = path15.dirname;
     var basename3 = path15.basename;
     var extname = path15.extname;
@@ -18807,7 +18807,7 @@ var require_view = __commonJS({
     function tryStat(path16) {
       debug('stat "%s"', path16);
       try {
-        return fs16.statSync(path16);
+        return fs17.statSync(path16);
       } catch (e2) {
         return void 0;
       }
@@ -22433,7 +22433,7 @@ var require_send = __commonJS({
     var escapeHtml = require_escape_html();
     var etag = require_etag();
     var fresh = require_fresh();
-    var fs16 = __require("fs");
+    var fs17 = __require("fs");
     var mime3 = require_mime_types();
     var ms = require_ms();
     var onFinished = require_on_finished();
@@ -22715,7 +22715,7 @@ var require_send = __commonJS({
       var i2 = 0;
       var self2 = this;
       debug('stat "%s"', path16);
-      fs16.stat(path16, function onstat(err, stat3) {
+      fs17.stat(path16, function onstat(err, stat3) {
         var pathEndsWithSep = path16[path16.length - 1] === sep2;
         if (err && err.code === "ENOENT" && !extname(path16) && !pathEndsWithSep) {
           return next(err);
@@ -22732,7 +22732,7 @@ var require_send = __commonJS({
         }
         var p = path16 + "." + self2._extensions[i2++];
         debug('stat "%s"', p);
-        fs16.stat(p, function(err2, stat3) {
+        fs17.stat(p, function(err2, stat3) {
           if (err2) return next(err2);
           if (stat3.isDirectory()) return next();
           self2.emit("file", p, stat3);
@@ -22750,7 +22750,7 @@ var require_send = __commonJS({
         }
         var p = join2(path16, self2._index[i2]);
         debug('stat "%s"', p);
-        fs16.stat(p, function(err2, stat3) {
+        fs17.stat(p, function(err2, stat3) {
           if (err2) return next(err2);
           if (stat3.isDirectory()) return next();
           self2.emit("file", p, stat3);
@@ -22762,7 +22762,7 @@ var require_send = __commonJS({
     SendStream.prototype.stream = function stream2(path16, options) {
       var self2 = this;
       var res = this.res;
-      var stream3 = fs16.createReadStream(path16, options);
+      var stream3 = fs17.createReadStream(path16, options);
       this.emit("stream", stream3);
       stream3.pipe(res);
       function cleanup() {
@@ -25054,7 +25054,7 @@ var require_atomic_sleep = __commonJS({
 var require_sonic_boom = __commonJS({
   "../../node_modules/.pnpm/sonic-boom@4.2.1/node_modules/sonic-boom/index.js"(exports, module) {
     "use strict";
-    var fs16 = __require("fs");
+    var fs17 = __require("fs");
     var EventEmitter3 = __require("events");
     var inherits = __require("util").inherits;
     var path15 = __require("path");
@@ -25111,20 +25111,20 @@ var require_sonic_boom = __commonJS({
       const mode = sonic.mode;
       if (sonic.sync) {
         try {
-          if (sonic.mkdir) fs16.mkdirSync(path15.dirname(file2), { recursive: true });
-          const fd = fs16.openSync(file2, flags, mode);
+          if (sonic.mkdir) fs17.mkdirSync(path15.dirname(file2), { recursive: true });
+          const fd = fs17.openSync(file2, flags, mode);
           fileOpened(null, fd);
         } catch (err) {
           fileOpened(err);
           throw err;
         }
       } else if (sonic.mkdir) {
-        fs16.mkdir(path15.dirname(file2), { recursive: true }, (err) => {
+        fs17.mkdir(path15.dirname(file2), { recursive: true }, (err) => {
           if (err) return fileOpened(err);
-          fs16.open(file2, flags, mode, fileOpened);
+          fs17.open(file2, flags, mode, fileOpened);
         });
       } else {
-        fs16.open(file2, flags, mode, fileOpened);
+        fs17.open(file2, flags, mode, fileOpened);
       }
     }
     function SonicBoom(opts) {
@@ -25165,25 +25165,25 @@ var require_sonic_boom = __commonJS({
         this.flush = flushBuffer;
         this.flushSync = flushBufferSync;
         this._actualWrite = actualWriteBuffer;
-        fsWriteSync = () => fs16.writeSync(this.fd, this._writingBuf);
-        fsWrite = () => fs16.write(this.fd, this._writingBuf, this.release);
+        fsWriteSync = () => fs17.writeSync(this.fd, this._writingBuf);
+        fsWrite = () => fs17.write(this.fd, this._writingBuf, this.release);
       } else if (contentMode === void 0 || contentMode === kContentModeUtf8) {
         this._writingBuf = "";
-        this.write = write6;
+        this.write = write7;
         this.flush = flush;
         this.flushSync = flushSync;
         this._actualWrite = actualWrite;
         fsWriteSync = () => {
           if (Buffer.isBuffer(this._writingBuf)) {
-            return fs16.writeSync(this.fd, this._writingBuf);
+            return fs17.writeSync(this.fd, this._writingBuf);
           }
-          return fs16.writeSync(this.fd, this._writingBuf, "utf8");
+          return fs17.writeSync(this.fd, this._writingBuf, "utf8");
         };
         fsWrite = () => {
           if (Buffer.isBuffer(this._writingBuf)) {
-            return fs16.write(this.fd, this._writingBuf, this.release);
+            return fs17.write(this.fd, this._writingBuf, this.release);
           }
-          return fs16.write(this.fd, this._writingBuf, "utf8", this.release);
+          return fs17.write(this.fd, this._writingBuf, "utf8", this.release);
         };
       } else {
         throw new Error(`SonicBoom supports "${kContentModeUtf8}" and "${kContentModeBuffer}", but passed ${contentMode}`);
@@ -25240,7 +25240,7 @@ var require_sonic_boom = __commonJS({
           }
         }
         if (this._fsync) {
-          fs16.fsyncSync(this.fd);
+          fs17.fsyncSync(this.fd);
         }
         const len = this._len;
         if (this._reopening) {
@@ -25302,7 +25302,7 @@ var require_sonic_boom = __commonJS({
       }
       return Buffer.concat(bufs, len);
     }
-    function write6(data) {
+    function write7(data) {
       if (this.destroyed) {
         throw new Error("SonicBoom destroyed");
       }
@@ -25354,7 +25354,7 @@ var require_sonic_boom = __commonJS({
       const onDrain = () => {
         if (!this._fsync) {
           try {
-            fs16.fsync(this.fd, (err) => {
+            fs17.fsync(this.fd, (err) => {
               this._flushPending = false;
               cb(err);
             });
@@ -25456,7 +25456,7 @@ var require_sonic_boom = __commonJS({
       const fd = this.fd;
       this.once("ready", () => {
         if (fd !== this.fd) {
-          fs16.close(fd, (err) => {
+          fs17.close(fd, (err) => {
             if (err) {
               return this.emit("error", err);
             }
@@ -25505,7 +25505,7 @@ var require_sonic_boom = __commonJS({
           buf = this._bufs[0];
         }
         try {
-          const n = Buffer.isBuffer(buf) ? fs16.writeSync(this.fd, buf) : fs16.writeSync(this.fd, buf, "utf8");
+          const n = Buffer.isBuffer(buf) ? fs17.writeSync(this.fd, buf) : fs17.writeSync(this.fd, buf, "utf8");
           const releasedBufObj = releaseWritingBuf(buf, this._len, n);
           buf = releasedBufObj.writingBuf;
           this._len = releasedBufObj.len;
@@ -25521,7 +25521,7 @@ var require_sonic_boom = __commonJS({
         }
       }
       try {
-        fs16.fsyncSync(this.fd);
+        fs17.fsyncSync(this.fd);
       } catch {
       }
     }
@@ -25542,7 +25542,7 @@ var require_sonic_boom = __commonJS({
           buf = mergeBuf(this._bufs[0], this._lens[0]);
         }
         try {
-          const n = fs16.writeSync(this.fd, buf);
+          const n = fs17.writeSync(this.fd, buf);
           buf = buf.subarray(n);
           this._len = Math.max(this._len - n, 0);
           if (buf.length <= 0) {
@@ -25570,13 +25570,13 @@ var require_sonic_boom = __commonJS({
       this._writingBuf = this._writingBuf.length ? this._writingBuf : this._bufs.shift() || "";
       if (this.sync) {
         try {
-          const written = Buffer.isBuffer(this._writingBuf) ? fs16.writeSync(this.fd, this._writingBuf) : fs16.writeSync(this.fd, this._writingBuf, "utf8");
+          const written = Buffer.isBuffer(this._writingBuf) ? fs17.writeSync(this.fd, this._writingBuf) : fs17.writeSync(this.fd, this._writingBuf, "utf8");
           release(null, written);
         } catch (err) {
           release(err);
         }
       } else {
-        fs16.write(this.fd, this._writingBuf, release);
+        fs17.write(this.fd, this._writingBuf, release);
       }
     }
     function actualWriteBuffer() {
@@ -25585,7 +25585,7 @@ var require_sonic_boom = __commonJS({
       this._writingBuf = this._writingBuf.length ? this._writingBuf : mergeBuf(this._bufs.shift(), this._lens.shift());
       if (this.sync) {
         try {
-          const written = fs16.writeSync(this.fd, this._writingBuf);
+          const written = fs17.writeSync(this.fd, this._writingBuf);
           release(null, written);
         } catch (err) {
           release(err);
@@ -25594,7 +25594,7 @@ var require_sonic_boom = __commonJS({
         if (kCopyBuffer) {
           this._writingBuf = Buffer.from(this._writingBuf);
         }
-        fs16.write(this.fd, this._writingBuf, release);
+        fs17.write(this.fd, this._writingBuf, release);
       }
     }
     function actualClose(sonic) {
@@ -25610,12 +25610,12 @@ var require_sonic_boom = __commonJS({
       sonic._lens = [];
       assert2(typeof sonic.fd === "number", `sonic.fd must be a number, got ${typeof sonic.fd}`);
       try {
-        fs16.fsync(sonic.fd, closeWrapped);
+        fs17.fsync(sonic.fd, closeWrapped);
       } catch {
       }
       function closeWrapped() {
         if (sonic.fd !== 1 && sonic.fd !== 2) {
-          fs16.close(sonic.fd, done);
+          fs17.close(sonic.fd, done);
         } else {
           done();
         }
@@ -25954,7 +25954,7 @@ var require_thread_stream = __commonJS({
         let toWriteBytes = Buffer.byteLength(toWrite);
         if (toWriteBytes <= leftover) {
           stream2[kImpl].buf = stream2[kImpl].buf.slice(leftover);
-          write6(stream2, toWrite, nextFlush.bind(null, stream2));
+          write7(stream2, toWrite, nextFlush.bind(null, stream2));
         } else {
           stream2.flush(() => {
             if (stream2.destroyed) {
@@ -25968,7 +25968,7 @@ var require_thread_stream = __commonJS({
               toWriteBytes = Buffer.byteLength(toWrite);
             }
             stream2[kImpl].buf = stream2[kImpl].buf.slice(leftover);
-            write6(stream2, toWrite, nextFlush.bind(null, stream2));
+            write7(stream2, toWrite, nextFlush.bind(null, stream2));
           });
         }
       } else if (leftover === 0) {
@@ -26184,7 +26184,7 @@ var require_thread_stream = __commonJS({
         });
       }
     }
-    function write6(stream2, data, cb) {
+    function write7(stream2, data, cb) {
       const current = Atomics.load(stream2[kImpl].state, WRITE_INDEX);
       const length = Buffer.byteLength(data);
       stream2[kImpl].data.write(data, current);
@@ -26248,7 +26248,7 @@ var require_thread_stream = __commonJS({
         let toWriteBytes = Buffer.byteLength(toWrite);
         if (toWriteBytes <= leftover) {
           stream2[kImpl].buf = stream2[kImpl].buf.slice(leftover);
-          write6(stream2, toWrite, cb);
+          write7(stream2, toWrite, cb);
         } else {
           flushSync(stream2);
           Atomics.store(stream2[kImpl].state, READ_INDEX, 0);
@@ -26259,7 +26259,7 @@ var require_thread_stream = __commonJS({
             toWriteBytes = Buffer.byteLength(toWrite);
           }
           stream2[kImpl].buf = stream2[kImpl].buf.slice(leftover);
-          write6(stream2, toWrite, cb);
+          write7(stream2, toWrite, cb);
         }
       }
     }
@@ -27060,7 +27060,7 @@ var require_proto = __commonJS({
         return "Pino";
       },
       [lsCacheSym]: initialLsCache,
-      [writeSym]: write6,
+      [writeSym]: write7,
       [asJsonSym]: asJson,
       [getLevelSym]: getLevel,
       [setLevelSym]: setLevel
@@ -27163,7 +27163,7 @@ var require_proto = __commonJS({
     function defaultMixinMergeStrategy(mergeObject, mixinObject) {
       return Object.assign(mixinObject, mergeObject);
     }
-    function write6(_obj, msg, num) {
+    function write7(_obj, msg, num) {
       const t2 = this[timeSym]();
       const mixin = this[mixinSym];
       const errorKey = this[errorKeySym];
@@ -27824,7 +27824,7 @@ var require_multistream = __commonJS({
         });
       }
       const res = {
-        write: write6,
+        write: write7,
         add,
         remove,
         emit,
@@ -27844,7 +27844,7 @@ var require_multistream = __commonJS({
       }
       streamsArray = null;
       return res;
-      function write6(data) {
+      function write7(data) {
         let dest;
         const level = this.lastLevel;
         const { streams } = this;
@@ -27946,7 +27946,7 @@ var require_multistream = __commonJS({
           };
         }
         return {
-          write: write6,
+          write: write7,
           add,
           remove,
           minLevel: level,
@@ -27978,7 +27978,7 @@ var require_multistream = __commonJS({
 var require_pino = __commonJS({
   "../../node_modules/.pnpm/pino@9.14.0/node_modules/pino/pino.js"(exports, module) {
     "use strict";
-    var os5 = __require("node:os");
+    var os6 = __require("node:os");
     var stdSerializers = require_pino_std_serializers();
     var caller = require_caller();
     var redaction = require_redaction();
@@ -28025,7 +28025,7 @@ var require_pino = __commonJS({
     } = symbols;
     var { epochTime, nullTime } = time4;
     var { pid } = process;
-    var hostname2 = os5.hostname();
+    var hostname2 = os6.hostname();
     var defaultErrorSerializer = stdSerializers.err;
     var defaultOptions = {
       level: "info",
@@ -30063,15 +30063,15 @@ var require_pg_connection_string = __commonJS({
       if (config2.sslcert || config2.sslkey || config2.sslrootcert || config2.sslmode) {
         config2.ssl = {};
       }
-      const fs16 = config2.sslcert || config2.sslkey || config2.sslrootcert ? __require("fs") : null;
+      const fs17 = config2.sslcert || config2.sslkey || config2.sslrootcert ? __require("fs") : null;
       if (config2.sslcert) {
-        config2.ssl.cert = fs16.readFileSync(config2.sslcert).toString();
+        config2.ssl.cert = fs17.readFileSync(config2.sslcert).toString();
       }
       if (config2.sslkey) {
-        config2.ssl.key = fs16.readFileSync(config2.sslkey).toString();
+        config2.ssl.key = fs17.readFileSync(config2.sslkey).toString();
       }
       if (config2.sslrootcert) {
-        config2.ssl.ca = fs16.readFileSync(config2.sslrootcert).toString();
+        config2.ssl.ca = fs17.readFileSync(config2.sslrootcert).toString();
       }
       if (options.useLibpqCompat && config2.uselibpqcompat) {
         throw new Error("Both useLibpqCompat and uselibpqcompat are set. Please use only one of them.");
@@ -30429,11 +30429,11 @@ var require_query = __commonJS({
     "use strict";
     var { EventEmitter: EventEmitter3 } = __require("events");
     var Result2 = require_result();
-    var utils8 = require_utils4();
+    var utils9 = require_utils4();
     var Query2 = class extends EventEmitter3 {
       constructor(config2, values, callback) {
         super();
-        config2 = utils8.normalizeQueryConfig(config2, values, callback);
+        config2 = utils9.normalizeQueryConfig(config2, values, callback);
         this.text = config2.text;
         this.values = config2.values;
         this.rows = config2.rows;
@@ -30598,7 +30598,7 @@ var require_query = __commonJS({
             statement: this.name,
             values: this.values,
             binary: this.binary,
-            valueMapper: utils8.prepareValue
+            valueMapper: utils9.prepareValue
           });
         } catch (err) {
           this.handleError(err, connection);
@@ -32008,15 +32008,15 @@ var require_lib4 = __commonJS({
   "../../node_modules/.pnpm/pgpass@1.0.5/node_modules/pgpass/lib/index.js"(exports, module) {
     "use strict";
     var path15 = __require("path");
-    var fs16 = __require("fs");
+    var fs17 = __require("fs");
     var helper = require_helper();
     module.exports = function(connInfo, cb) {
       var file2 = helper.getFileName();
-      fs16.stat(file2, function(err, stat3) {
+      fs17.stat(file2, function(err, stat3) {
         if (err || !helper.usePgPass(stat3, file2)) {
           return cb(void 0);
         }
-        var st = fs16.createReadStream(file2);
+        var st = fs17.createReadStream(file2);
         helper.getPassword(connInfo, st, cb);
       });
     };
@@ -32028,7 +32028,7 @@ var require_lib4 = __commonJS({
 var require_client = __commonJS({
   "../../node_modules/.pnpm/pg@8.20.0/node_modules/pg/lib/client.js"(exports, module) {
     var EventEmitter3 = __require("events").EventEmitter;
-    var utils8 = require_utils4();
+    var utils9 = require_utils4();
     var nodeUtils = __require("util");
     var sasl = require_sasl();
     var TypeOverrides2 = require_type_overrides();
@@ -32501,10 +32501,10 @@ var require_client = __commonJS({
       // on PG
       // re-exported here for backwards compatibility
       escapeIdentifier(str) {
-        return utils8.escapeIdentifier(str);
+        return utils9.escapeIdentifier(str);
       }
       escapeLiteral(str) {
-        return utils8.escapeLiteral(str);
+        return utils9.escapeLiteral(str);
       }
       _pulseQueryQueue() {
         if (this.readyForQuery === true) {
@@ -33074,10 +33074,10 @@ var require_query2 = __commonJS({
     "use strict";
     var EventEmitter3 = __require("events").EventEmitter;
     var util4 = __require("util");
-    var utils8 = require_utils4();
+    var utils9 = require_utils4();
     var NativeQuery = module.exports = function(config2, values, callback) {
       EventEmitter3.call(this);
-      config2 = utils8.normalizeQueryConfig(config2, values, callback);
+      config2 = utils9.normalizeQueryConfig(config2, values, callback);
       this.text = config2.text;
       this.values = config2.values;
       this.name = config2.name;
@@ -33180,7 +33180,7 @@ var require_query2 = __commonJS({
           console.error("You supplied %s (%s)", this.name, this.name.length);
           console.error("This can cause conflicts and silent errors executing queries");
         }
-        const values = (this.values || []).map(utils8.prepareValue);
+        const values = (this.values || []).map(utils9.prepareValue);
         if (client.namedQueries[this.name]) {
           if (this.text && client.namedQueries[this.name] !== this.text) {
             const err = new Error(`Prepared statements must be unique - '${this.name}' was used for a different statement`);
@@ -33198,7 +33198,7 @@ var require_query2 = __commonJS({
           const err = new Error("Query values must be an array");
           return after(err);
         }
-        const vals = this.values.map(utils8.prepareValue);
+        const vals = this.values.map(utils9.prepareValue);
         client.native.query(this.text, vals, after);
       } else if (this.queryMode === "extended") {
         client.native.query(this.text, [], after);
@@ -33478,7 +33478,7 @@ var require_lib5 = __commonJS({
     var defaults3 = require_defaults();
     var Connection2 = require_connection();
     var Result2 = require_result();
-    var utils8 = require_utils4();
+    var utils9 = require_utils4();
     var Pool4 = require_pg_pool();
     var TypeOverrides2 = require_type_overrides();
     var { DatabaseError: DatabaseError2 } = require_dist2();
@@ -33503,7 +33503,7 @@ var require_lib5 = __commonJS({
       this.escapeIdentifier = escapeIdentifier2;
       this.escapeLiteral = escapeLiteral2;
       this.Result = Result2;
-      this.utils = utils8;
+      this.utils = utils9;
     };
     var clientConstructor = Client2;
     var forceNative = false;
@@ -55068,7 +55068,7 @@ var require_data_stream = __commonJS({
       throw new TypeError("Unexpected data type (" + typeof data + ")");
     }
     util4.inherits(DataStream, Stream3);
-    DataStream.prototype.write = function write6(data) {
+    DataStream.prototype.write = function write7(data) {
       this.buffer = Buffer4.concat([this.buffer, Buffer4.from(data)]);
       this.emit("data", data);
     };
@@ -61095,11 +61095,11 @@ var require_shared = __commonJS({
     "use strict";
     var urllib = __require("url");
     var util4 = __require("util");
-    var fs16 = __require("fs");
+    var fs17 = __require("fs");
     var nmfetch = require_fetch();
     var dns = __require("dns");
     var net = __require("net");
-    var os5 = __require("os");
+    var os6 = __require("os");
     var DNS_TTL = 5 * 60 * 1e3;
     var CACHE_CLEANUP_INTERVAL = 30 * 1e3;
     var MAX_CACHE_SIZE = 1e3;
@@ -61110,7 +61110,7 @@ var require_shared = __commonJS({
     };
     var networkInterfaces;
     try {
-      networkInterfaces = os5.networkInterfaces();
+      networkInterfaces = os6.networkInterfaces();
     } catch (_err) {
     }
     module.exports.networkInterfaces = networkInterfaces;
@@ -61496,7 +61496,7 @@ var require_shared = __commonJS({
           }
           return callback(null, parsedDataUri.data);
         } else if (content.path) {
-          return resolveStream(fs16.createReadStream(content.path), callback);
+          return resolveStream(fs17.createReadStream(content.path), callback);
         }
       }
       if (typeof data[key].content === "string" && !["utf8", "usascii", "ascii"].includes(encoding)) {
@@ -65105,7 +65105,7 @@ var require_mime_node = __commonJS({
   "../../node_modules/.pnpm/nodemailer@8.0.7/node_modules/nodemailer/lib/mime-node/index.js"(exports, module) {
     "use strict";
     var crypto10 = __require("crypto");
-    var fs16 = __require("fs");
+    var fs17 = __require("fs");
     var punycode = require_punycode();
     var { PassThrough: PassThrough6 } = __require("stream");
     var shared = require_shared();
@@ -65827,7 +65827,7 @@ var require_mime_node = __commonJS({
             });
             return contentStream;
           }
-          return fs16.createReadStream(content.path);
+          return fs17.createReadStream(content.path);
         }
         if (content && typeof content.href === "string") {
           if (this.disableUrlAccess) {
@@ -66863,7 +66863,7 @@ var require_dkim = __commonJS({
     var RelaxedBody = require_relaxed_body();
     var sign = require_sign3();
     var { PassThrough: PassThrough6 } = __require("stream");
-    var fs16 = __require("fs");
+    var fs17 = __require("fs");
     var path15 = __require("path");
     var crypto10 = __require("crypto");
     var DKIM_ALGO = "sha256";
@@ -66898,10 +66898,10 @@ var require_dkim = __commonJS({
         if (!this.cache || !this.cachePath) {
           return;
         }
-        fs16.unlink(this.cachePath, () => false);
+        fs17.unlink(this.cachePath, () => false);
       }
       createReadCache() {
-        this.cache = fs16.createReadStream(this.cachePath);
+        this.cache = fs17.createReadStream(this.cachePath);
         this.cache.once("error", (err) => {
           this.cleanup();
           this.output.emit("error", err);
@@ -66957,7 +66957,7 @@ var require_dkim = __commonJS({
       }
       createWriteCache() {
         this.output.usingCache = true;
-        this.cache = fs16.createWriteStream(this.cachePath);
+        this.cache = fs17.createWriteStream(this.cachePath);
         this.cache.once("error", (err) => {
           this.cleanup();
           this.relaxedBody.unpipe(this.cache);
@@ -67886,7 +67886,7 @@ var require_smtp_connection = __commonJS({
     var { EventEmitter: EventEmitter3 } = __require("events");
     var net = __require("net");
     var tls = __require("tls");
-    var os5 = __require("os");
+    var os6 = __require("os");
     var crypto10 = __require("crypto");
     var DataStream = require_data_stream2();
     var { PassThrough: PassThrough6 } = __require("stream");
@@ -69321,7 +69321,7 @@ var require_smtp_connection = __commonJS({
       _getHostname() {
         let defaultHostname;
         try {
-          defaultHostname = os5.hostname() || "";
+          defaultHostname = os6.hostname() || "";
         } catch (_err) {
           defaultHostname = "localhost";
         }
@@ -75124,12 +75124,12 @@ var require_ponyfill_es2018 = __commonJS({
         const close = original === null || original === void 0 ? void 0 : original.close;
         const start = original === null || original === void 0 ? void 0 : original.start;
         const type = original === null || original === void 0 ? void 0 : original.type;
-        const write6 = original === null || original === void 0 ? void 0 : original.write;
+        const write7 = original === null || original === void 0 ? void 0 : original.write;
         return {
           abort: abort === void 0 ? void 0 : convertUnderlyingSinkAbortCallback(abort, original, `${context} has member 'abort' that`),
           close: close === void 0 ? void 0 : convertUnderlyingSinkCloseCallback(close, original, `${context} has member 'close' that`),
           start: start === void 0 ? void 0 : convertUnderlyingSinkStartCallback(start, original, `${context} has member 'start' that`),
-          write: write6 === void 0 ? void 0 : convertUnderlyingSinkWriteCallback(write6, original, `${context} has member 'write' that`),
+          write: write7 === void 0 ? void 0 : convertUnderlyingSinkWriteCallback(write7, original, `${context} has member 'write' that`),
           type
         };
       }
@@ -83240,8 +83240,8 @@ var require_util2 = __commonJS({
     exports.removeUndefinedValuesInObject = removeUndefinedValuesInObject;
     exports.isValidFile = isValidFile;
     exports.getWellKnownCertificateConfigFileLocation = getWellKnownCertificateConfigFileLocation;
-    var fs16 = __require("fs");
-    var os5 = __require("os");
+    var fs17 = __require("fs");
+    var os6 = __require("os");
     var path15 = __require("path");
     var WELL_KNOWN_CERTIFICATE_CONFIG_FILE = "certificate_config.json";
     var CLOUDSDK_CONFIG_DIRECTORY = "gcloud";
@@ -83328,7 +83328,7 @@ var require_util2 = __commonJS({
     }
     async function isValidFile(filePath) {
       try {
-        const stats = await fs16.promises.lstat(filePath);
+        const stats = await fs17.promises.lstat(filePath);
         return stats.isFile();
       } catch (e2) {
         return false;
@@ -83339,7 +83339,7 @@ var require_util2 = __commonJS({
       return path15.join(configDir, WELL_KNOWN_CERTIFICATE_CONFIG_FILE);
     }
     function _isWindows() {
-      return os5.platform().startsWith("win");
+      return os6.platform().startsWith("win");
     }
   }
 });
@@ -84742,10 +84742,10 @@ var require_getCredentials = __commonJS({
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.getCredentials = getCredentials;
     var path15 = __require("path");
-    var fs16 = __require("fs");
+    var fs17 = __require("fs");
     var util_1 = __require("util");
     var errorWithCode_1 = require_errorWithCode();
-    var readFile3 = fs16.readFile ? (0, util_1.promisify)(fs16.readFile) : async () => {
+    var readFile3 = fs17.readFile ? (0, util_1.promisify)(fs17.readFile) : async () => {
       throw new errorWithCode_1.ErrorWithCode("use key rather than keyFile.", "MISSING_CREDENTIALS");
     };
     var ExtensionFiles;
@@ -86422,12 +86422,12 @@ var require_filesubjecttokensupplier = __commonJS({
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.FileSubjectTokenSupplier = void 0;
     var util_1 = __require("util");
-    var fs16 = __require("fs");
-    var readFile3 = (0, util_1.promisify)(fs16.readFile ?? (() => {
+    var fs17 = __require("fs");
+    var readFile3 = (0, util_1.promisify)(fs17.readFile ?? (() => {
     }));
-    var realpath = (0, util_1.promisify)(fs16.realpath ?? (() => {
+    var realpath = (0, util_1.promisify)(fs17.realpath ?? (() => {
     }));
-    var lstat3 = (0, util_1.promisify)(fs16.lstat ?? (() => {
+    var lstat3 = (0, util_1.promisify)(fs17.lstat ?? (() => {
     }));
     var FileSubjectTokenSupplier = class {
       filePath;
@@ -86545,7 +86545,7 @@ var require_certificatesubjecttokensupplier = __commonJS({
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.CertificateSubjectTokenSupplier = exports.InvalidConfigurationError = exports.CertificateSourceUnavailableError = exports.CERTIFICATE_CONFIGURATION_ENV_VARIABLE = void 0;
     var util_1 = require_util2();
-    var fs16 = __require("fs");
+    var fs17 = __require("fs");
     var crypto_1 = __require("crypto");
     var https2 = __require("https");
     exports.CERTIFICATE_CONFIGURATION_ENV_VARIABLE = "GOOGLE_API_CERTIFICATE_CONFIG";
@@ -86639,7 +86639,7 @@ var require_certificatesubjecttokensupplier = __commonJS({
         const configPath = this.certificateConfigPath;
         let fileContents;
         try {
-          fileContents = await fs16.promises.readFile(configPath, "utf8");
+          fileContents = await fs17.promises.readFile(configPath, "utf8");
         } catch (err) {
           throw new CertificateSourceUnavailableError(`Failed to read certificate config file at: ${configPath}`);
         }
@@ -86664,14 +86664,14 @@ var require_certificatesubjecttokensupplier = __commonJS({
       async #getKeyAndCert(certPath, keyPath) {
         let cert, key;
         try {
-          cert = await fs16.promises.readFile(certPath);
+          cert = await fs17.promises.readFile(certPath);
           new crypto_1.X509Certificate(cert);
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
           throw new CertificateSourceUnavailableError(`Failed to read certificate file at ${certPath}: ${message}`);
         }
         try {
-          key = await fs16.promises.readFile(keyPath);
+          key = await fs17.promises.readFile(keyPath);
           (0, crypto_1.createPrivateKey)(key);
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
@@ -86690,7 +86690,7 @@ var require_certificatesubjecttokensupplier = __commonJS({
           return JSON.stringify([leafCert.raw.toString("base64")]);
         }
         try {
-          const chainPems = await fs16.promises.readFile(this.trustChainPath, "utf8");
+          const chainPems = await fs17.promises.readFile(this.trustChainPath, "utf8");
           const pemBlocks = chainPems.match(/-----BEGIN CERTIFICATE-----[^-]+-----END CERTIFICATE-----/g) ?? [];
           const chainCerts = pemBlocks.map((pem, index3) => {
             try {
@@ -87392,7 +87392,7 @@ var require_pluggable_auth_handler = __commonJS({
     exports.PluggableAuthHandler = exports.ExecutableError = void 0;
     var executable_response_1 = require_executable_response();
     var childProcess = __require("child_process");
-    var fs16 = __require("fs");
+    var fs17 = __require("fs");
     var ExecutableError = class extends Error {
       /**
        * The exit code returned by the executable.
@@ -87477,14 +87477,14 @@ var require_pluggable_auth_handler = __commonJS({
         }
         let filePath;
         try {
-          filePath = await fs16.promises.realpath(this.outputFile);
+          filePath = await fs17.promises.realpath(this.outputFile);
         } catch {
           return void 0;
         }
-        if (!(await fs16.promises.lstat(filePath)).isFile()) {
+        if (!(await fs17.promises.lstat(filePath)).isFile()) {
           return void 0;
         }
-        const responseString = await fs16.promises.readFile(filePath, {
+        const responseString = await fs17.promises.readFile(filePath, {
           encoding: "utf8"
         });
         if (responseString === "") {
@@ -87895,10 +87895,10 @@ var require_googleauth = __commonJS({
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.GoogleAuth = exports.GoogleAuthExceptionMessages = void 0;
     var child_process_1 = __require("child_process");
-    var fs16 = __require("fs");
+    var fs17 = __require("fs");
     var gaxios_1 = require_src2();
     var gcpMetadata = require_src4();
-    var os5 = __require("os");
+    var os6 = __require("os");
     var path15 = __require("path");
     var crypto_1 = require_crypto3();
     var computeclient_1 = require_computeclient();
@@ -88190,7 +88190,7 @@ var require_googleauth = __commonJS({
         }
         if (location) {
           location = path15.join(location, "gcloud", "application_default_credentials.json");
-          if (!fs16.existsSync(location)) {
+          if (!fs17.existsSync(location)) {
             location = null;
           }
         }
@@ -88211,8 +88211,8 @@ var require_googleauth = __commonJS({
           throw new Error("The file path is invalid.");
         }
         try {
-          filePath = fs16.realpathSync(filePath);
-          if (!fs16.lstatSync(filePath).isFile()) {
+          filePath = fs17.realpathSync(filePath);
+          if (!fs17.lstatSync(filePath).isFile()) {
             throw new Error();
           }
         } catch (err) {
@@ -88221,7 +88221,7 @@ var require_googleauth = __commonJS({
           }
           throw err;
         }
-        const readStream = fs16.createReadStream(filePath);
+        const readStream = fs17.createReadStream(filePath);
         return this.fromStream(readStream, options);
       }
       /**
@@ -88401,7 +88401,7 @@ var require_googleauth = __commonJS({
        * @api private
        */
       _isWindows() {
-        const sys = os5.platform();
+        const sys = os6.platform();
         if (sys && sys.length >= 3) {
           if (sys.substring(0, 3).toLowerCase() === "win") {
             return true;
@@ -88534,7 +88534,7 @@ var require_googleauth = __commonJS({
           return this._cacheClientFromJSON(this.jsonContent, this.clientOptions);
         } else if (this.keyFilename) {
           const filePath = path15.resolve(this.keyFilename);
-          const stream2 = fs16.createReadStream(filePath);
+          const stream2 = fs17.createReadStream(filePath);
           return await this.fromStreamAsync(stream2, this.clientOptions);
         } else if (this.apiKey) {
           const client = await this.fromAPIKey(this.apiKey, this.clientOptions);
@@ -89982,13 +89982,13 @@ var require_discovery = __commonJS({
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.Discovery = void 0;
-    var fs16 = __require("fs");
+    var fs17 = __require("fs");
     var gaxios_1 = require_src2();
     var resolve4 = __require("url");
     var util4 = __require("util");
     var apirequest_1 = require_apirequest();
     var endpoint_1 = require_endpoint();
-    var readFile3 = util4.promisify(fs16.readFile);
+    var readFile3 = util4.promisify(fs17.readFile);
     var Discovery = class {
       transporter = new gaxios_1.Gaxios();
       options;
@@ -1019392,12 +1019392,12 @@ var require_main4 = __commonJS({
 var require_png_js = __commonJS({
   "../../node_modules/.pnpm/png-js@1.1.0/node_modules/png-js/lib/png-js.cjs"(exports, module) {
     "use strict";
-    var fs16 = __require("fs");
+    var fs17 = __require("fs");
     var zlib4 = __require("zlib");
     function _interopDefaultCompat(e2) {
       return e2 && typeof e2 === "object" && "default" in e2 ? e2 : { default: e2 };
     }
-    var fs__default = /* @__PURE__ */ _interopDefaultCompat(fs16);
+    var fs__default = /* @__PURE__ */ _interopDefaultCompat(fs17);
     var zlib__default = /* @__PURE__ */ _interopDefaultCompat(zlib4);
     var PNG = class _PNG {
       static decode(path15, fn) {
@@ -1019701,11 +1019701,11 @@ var require_pdfkit = __commonJS({
     "use strict";
     var stream2 = __require("stream");
     var zlib4 = __require("zlib");
-    var utils8 = require_utils6();
+    var utils9 = require_utils6();
     var md52 = require_md5();
     var sha256 = require_sha256();
     var aes = require_aes();
-    var fs16 = __require("fs");
+    var fs17 = __require("fs");
     var fontkit = require_main3();
     var events = __require("events");
     var LineBreaker = require_main4();
@@ -1020419,7 +1020419,7 @@ var require_pdfkit = __commonJS({
         let digest;
         if (this.version < 5) {
           const suffix = new Uint8Array([obj & 255, obj >> 8 & 255, obj >> 16 & 255, gen & 255, gen >> 8 & 255]);
-          digest = utils8.concatBytes(this.encryptionKey, suffix);
+          digest = utils9.concatBytes(this.encryptionKey, suffix);
         }
         if (this.version === 1 || this.version === 2) {
           let key2 = md5Hash(digest);
@@ -1020430,14 +1020430,14 @@ var require_pdfkit = __commonJS({
         let key;
         if (this.version === 4) {
           const saltMarker = new Uint8Array([115, 65, 108, 84]);
-          key = md5Hash(utils8.concatBytes(digest, saltMarker));
+          key = md5Hash(utils9.concatBytes(digest, saltMarker));
         } else {
           key = this.encryptionKey;
         }
         const iv = _PDFSecurity.generateRandomWordArray(16);
         return (buffer) => {
           const encrypted = aesCbcEncrypt(new Uint8Array(buffer), key, iv, true);
-          return Buffer.from(utils8.concatBytes(iv, encrypted));
+          return Buffer.from(utils9.concatBytes(iv, encrypted));
         };
       }
       end() {
@@ -1020493,7 +1020493,7 @@ var require_pdfkit = __commonJS({
     }
     function getUserPasswordR3R4(documentId, encryptionKey) {
       const key = encryptionKey.slice();
-      let cipher = md5Hash(utils8.concatBytes(processPasswordR2R3R4(), new Uint8Array(documentId)));
+      let cipher = md5Hash(utils9.concatBytes(processPasswordR2R3R4(), new Uint8Array(documentId)));
       for (let i2 = 0; i2 < 20; i2++) {
         const xorKey = new Uint8Array(key.length);
         for (let j = 0; j < key.length; j++) {
@@ -1020526,7 +1020526,7 @@ var require_pdfkit = __commonJS({
     }
     function getEncryptionKeyR2R3R4(r2, keyBits, documentId, paddedUserPassword, ownerPasswordEntry, permissions) {
       const permBytes = new Uint8Array([permissions & 255, permissions >> 8 & 255, permissions >> 16 & 255, permissions >> 24 & 255]);
-      let key = utils8.concatBytes(paddedUserPassword, ownerPasswordEntry, permBytes, new Uint8Array(documentId));
+      let key = utils9.concatBytes(paddedUserPassword, ownerPasswordEntry, permBytes, new Uint8Array(documentId));
       const round = r2 >= 3 ? 51 : 1;
       const keyLen = keyBits / 8;
       for (let i2 = 0; i2 < round; i2++) {
@@ -1020538,22 +1020538,22 @@ var require_pdfkit = __commonJS({
     function getUserPasswordR5(processedUserPassword, generateRandomWordArray) {
       const validationSalt = generateRandomWordArray(8);
       const keySalt = generateRandomWordArray(8);
-      const hash2 = sha256Hash(utils8.concatBytes(processedUserPassword, validationSalt));
-      return utils8.concatBytes(hash2, validationSalt, keySalt);
+      const hash2 = sha256Hash(utils9.concatBytes(processedUserPassword, validationSalt));
+      return utils9.concatBytes(hash2, validationSalt, keySalt);
     }
     function getUserEncryptionKeyR5(processedUserPassword, userKeySalt, encryptionKey) {
-      const key = sha256Hash(utils8.concatBytes(processedUserPassword, userKeySalt));
+      const key = sha256Hash(utils9.concatBytes(processedUserPassword, userKeySalt));
       const iv = new Uint8Array(16);
       return aesCbcEncrypt(encryptionKey, key, iv, false);
     }
     function getOwnerPasswordR5(processedOwnerPassword, userPasswordEntry, generateRandomWordArray) {
       const validationSalt = generateRandomWordArray(8);
       const keySalt = generateRandomWordArray(8);
-      const hash2 = sha256Hash(utils8.concatBytes(processedOwnerPassword, validationSalt, userPasswordEntry));
-      return utils8.concatBytes(hash2, validationSalt, keySalt);
+      const hash2 = sha256Hash(utils9.concatBytes(processedOwnerPassword, validationSalt, userPasswordEntry));
+      return utils9.concatBytes(hash2, validationSalt, keySalt);
     }
     function getOwnerEncryptionKeyR5(processedOwnerPassword, ownerKeySalt, userPasswordEntry, encryptionKey) {
-      const key = sha256Hash(utils8.concatBytes(processedOwnerPassword, ownerKeySalt, userPasswordEntry));
+      const key = sha256Hash(utils9.concatBytes(processedOwnerPassword, ownerKeySalt, userPasswordEntry));
       const iv = new Uint8Array(16);
       return aesCbcEncrypt(encryptionKey, key, iv, false);
     }
@@ -1022092,46 +1022092,46 @@ udieresis     yacute         thorn          ydieresis`.split(/\s+/);
     };
     var STANDARD_FONTS = {
       Courier() {
-        return fs16.readFileSync(__dirname + "/data/Courier.afm", "utf8");
+        return fs17.readFileSync(__dirname + "/data/Courier.afm", "utf8");
       },
       "Courier-Bold"() {
-        return fs16.readFileSync(__dirname + "/data/Courier-Bold.afm", "utf8");
+        return fs17.readFileSync(__dirname + "/data/Courier-Bold.afm", "utf8");
       },
       "Courier-Oblique"() {
-        return fs16.readFileSync(__dirname + "/data/Courier-Oblique.afm", "utf8");
+        return fs17.readFileSync(__dirname + "/data/Courier-Oblique.afm", "utf8");
       },
       "Courier-BoldOblique"() {
-        return fs16.readFileSync(__dirname + "/data/Courier-BoldOblique.afm", "utf8");
+        return fs17.readFileSync(__dirname + "/data/Courier-BoldOblique.afm", "utf8");
       },
       Helvetica() {
-        return fs16.readFileSync(__dirname + "/data/Helvetica.afm", "utf8");
+        return fs17.readFileSync(__dirname + "/data/Helvetica.afm", "utf8");
       },
       "Helvetica-Bold"() {
-        return fs16.readFileSync(__dirname + "/data/Helvetica-Bold.afm", "utf8");
+        return fs17.readFileSync(__dirname + "/data/Helvetica-Bold.afm", "utf8");
       },
       "Helvetica-Oblique"() {
-        return fs16.readFileSync(__dirname + "/data/Helvetica-Oblique.afm", "utf8");
+        return fs17.readFileSync(__dirname + "/data/Helvetica-Oblique.afm", "utf8");
       },
       "Helvetica-BoldOblique"() {
-        return fs16.readFileSync(__dirname + "/data/Helvetica-BoldOblique.afm", "utf8");
+        return fs17.readFileSync(__dirname + "/data/Helvetica-BoldOblique.afm", "utf8");
       },
       "Times-Roman"() {
-        return fs16.readFileSync(__dirname + "/data/Times-Roman.afm", "utf8");
+        return fs17.readFileSync(__dirname + "/data/Times-Roman.afm", "utf8");
       },
       "Times-Bold"() {
-        return fs16.readFileSync(__dirname + "/data/Times-Bold.afm", "utf8");
+        return fs17.readFileSync(__dirname + "/data/Times-Bold.afm", "utf8");
       },
       "Times-Italic"() {
-        return fs16.readFileSync(__dirname + "/data/Times-Italic.afm", "utf8");
+        return fs17.readFileSync(__dirname + "/data/Times-Italic.afm", "utf8");
       },
       "Times-BoldItalic"() {
-        return fs16.readFileSync(__dirname + "/data/Times-BoldItalic.afm", "utf8");
+        return fs17.readFileSync(__dirname + "/data/Times-BoldItalic.afm", "utf8");
       },
       Symbol() {
-        return fs16.readFileSync(__dirname + "/data/Symbol.afm", "utf8");
+        return fs17.readFileSync(__dirname + "/data/Symbol.afm", "utf8");
       },
       ZapfDingbats() {
-        return fs16.readFileSync(__dirname + "/data/ZapfDingbats.afm", "utf8");
+        return fs17.readFileSync(__dirname + "/data/ZapfDingbats.afm", "utf8");
       }
     };
     var StandardFont = class extends PDFFont {
@@ -1022423,7 +1022423,7 @@ end`);
           if (StandardFont.isStandardFont(src)) {
             return new StandardFont(document2, src, id);
           }
-          src = fs16.readFileSync(src);
+          src = fs17.readFileSync(src);
         }
         if (src instanceof Uint8Array) {
           font = fontkit.create(src, family);
@@ -1023607,7 +1023607,7 @@ end`);
           if (match2) {
             data = Buffer.from(match2[1], "base64");
           } else {
-            data = fs16.readFileSync(src);
+            data = fs17.readFileSync(src);
             if (!data) {
               return;
             }
@@ -1024743,14 +1024743,14 @@ end`);
             }
             data = Buffer.from(match2[2], "base64");
           } else {
-            data = fs16.readFileSync(src);
+            data = fs17.readFileSync(src);
             if (!data) {
               throw new Error(`Could not read contents of file at filepath ${src}`);
             }
             const {
               birthtime,
               ctime
-            } = fs16.statSync(src);
+            } = fs17.statSync(src);
             refBody.Params.CreationDate = birthtime;
             refBody.Params.ModDate = ctime;
           }
@@ -1024823,7 +1024823,7 @@ end`);
         this._addColorOutputIntent();
       },
       _addColorOutputIntent() {
-        const iccProfile = fs16.readFileSync(`${__dirname}/data/sRGB_IEC61966_2_1.icc`);
+        const iccProfile = fs17.readFileSync(`${__dirname}/data/sRGB_IEC61966_2_1.icc`);
         const colorProfileRef = this.ref({
           Length: iccProfile.length,
           N: 3
@@ -1026201,6 +1026201,10 @@ function formatPhaseDurations(specialization, rawDuration) {
 function cleanDoctorName(rawName) {
   if (!rawName) return "";
   return rawName.replace(/^(?:\s*(?:dr\.?|doctor)\s*)+/gi, "").trim();
+}
+function formatDoctorName(rawName) {
+  const clean = cleanDoctorName(rawName);
+  return clean ? `Dr. ${clean}` : "";
 }
 function getLogoPaths() {
   const root = process.cwd();
@@ -1030060,9 +1030064,9 @@ var require_cpexcel = __commonJS({
 // ../../node_modules/.pnpm/xlsx@0.18.5/node_modules/xlsx/xlsx.js
 var require_xlsx = __commonJS({
   "../../node_modules/.pnpm/xlsx@0.18.5/node_modules/xlsx/xlsx.js"(exports, module) {
-    var XLSX8 = {};
-    function make_xlsx_lib(XLSX9) {
-      XLSX9.version = "0.18.5";
+    var XLSX9 = {};
+    function make_xlsx_lib(XLSX10) {
+      XLSX10.version = "0.18.5";
       var current_codepage = 1200, current_ansi = 1252;
       var $cptable;
       if (typeof cptable !== "undefined") $cptable = cptable;
@@ -1031933,9 +1031937,9 @@ var require_xlsx = __commonJS({
           }
           return o;
         }
-        var fs16;
+        var fs17;
         function get_fs() {
-          return fs16 || (fs16 = __require("fs"));
+          return fs17 || (fs17 = __require("fs"));
         }
         function parse4(file2, options) {
           if (file2[0] == 80 && file2[1] == 75) return parse_zip2(file2, options);
@@ -1032211,7 +1032215,7 @@ var require_xlsx = __commonJS({
         }
         function read_file(filename2, options) {
           get_fs();
-          return parse4(fs16.readFileSync(filename2), options);
+          return parse4(fs17.readFileSync(filename2), options);
         }
         function read2(blob, options) {
           var type = options && options.type;
@@ -1032537,19 +1032541,19 @@ var require_xlsx = __commonJS({
         function write_file(cfb, filename2, options) {
           get_fs();
           var o = _write(cfb, options);
-          fs16.writeFileSync(filename2, o);
+          fs17.writeFileSync(filename2, o);
         }
         function a2s2(o) {
           var out = new Array(o.length);
           for (var i3 = 0; i3 < o.length; ++i3) out[i3] = String.fromCharCode(o[i3]);
           return out.join("");
         }
-        function write6(cfb, options) {
+        function write7(cfb, options) {
           var o = _write(cfb, options);
           switch (options && options.type || "buffer") {
             case "file":
               get_fs();
-              fs16.writeFileSync(options.filename, o);
+              fs17.writeFileSync(options.filename, o);
               return o;
             case "binary":
               return typeof o == "string" ? o : a2s2(o);
@@ -1033396,7 +1033400,7 @@ var require_xlsx = __commonJS({
         exports2.find = find;
         exports2.read = read2;
         exports2.parse = parse4;
-        exports2.write = write6;
+        exports2.write = write7;
         exports2.writeFile = write_file;
         exports2.utils = {
           cfb_new,
@@ -1035945,7 +1035949,7 @@ var require_xlsx = __commonJS({
         return o.join("");
       }
       function write_meta_ods() {
-        return '<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.2"><office:meta><meta:generator>SheetJS ' + XLSX9.version + "</meta:generator></office:meta></office:document-meta>";
+        return '<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.2"><office:meta><meta:generator>SheetJS ' + XLSX10.version + "</meta:generator></office:meta></office:document-meta>";
       }
       var CORE_PROPS = [
         ["cp:category", "Category"],
@@ -1037471,9 +1037475,9 @@ var require_xlsx = __commonJS({
         cell2.isst = blob.read_shift(4);
         return cell2;
       }
-      function write_LabelSst(R, C, v, os5) {
+      function write_LabelSst(R, C, v, os6) {
         var o = new_buf(10);
-        write_XLSCell(R, C, os5, o);
+        write_XLSCell(R, C, os6, o);
         o.write_shift(4, v);
         return o;
       }
@@ -1037486,10 +1037490,10 @@ var require_xlsx = __commonJS({
         cell2.val = str;
         return cell2;
       }
-      function write_Label(R, C, v, os5, opts) {
+      function write_Label(R, C, v, os6, opts) {
         var b8 = !opts || opts.biff == 8;
         var o = new_buf(6 + 2 + +b8 + (1 + b8) * v.length);
-        write_XLSCell(R, C, os5, o);
+        write_XLSCell(R, C, os6, o);
         o.write_shift(2, v.length);
         if (b8) o.write_shift(1, 1);
         o.write_shift((1 + b8) * v.length, v, b8 ? "utf16le" : "sbcs");
@@ -1037643,9 +1037647,9 @@ var require_xlsx = __commonJS({
         cell2.t = val === true || val === false ? "b" : "e";
         return cell2;
       }
-      function write_BoolErr(R, C, v, os5, opts, t2) {
+      function write_BoolErr(R, C, v, os6, opts, t2) {
         var o = new_buf(8);
-        write_XLSCell(R, C, os5, o);
+        write_XLSCell(R, C, os6, o);
         write_Bes(v, t2, o);
         return o;
       }
@@ -1037656,9 +1037660,9 @@ var require_xlsx = __commonJS({
         cell2.val = xnum;
         return cell2;
       }
-      function write_Number(R, C, v, os5) {
+      function write_Number(R, C, v, os6) {
         var o = new_buf(14);
-        write_XLSCell(R, C, os5, o);
+        write_XLSCell(R, C, os6, o);
         write_Xnum(v, o);
         return o;
       }
@@ -1044481,8 +1044485,8 @@ var require_xlsx = __commonJS({
         var cbf = parse_XLSCellParsedFormula(blob, end - blob.l, opts);
         return { cell: cell2, val: val[0], formula: cbf, shared: flags >> 3 & 1, tt: val[1] };
       }
-      function write_Formula(cell2, R, C, opts, os5) {
-        var o1 = write_XLSCell(R, C, os5);
+      function write_Formula(cell2, R, C, opts, os6) {
+        var o1 = write_XLSCell(R, C, os6);
         var o2 = write_FormulaValue(cell2.v);
         var o3 = new_buf(6);
         var flags = 1 | 32;
@@ -1046061,8 +1046065,8 @@ var require_xlsx = __commonJS({
             break;
         }
         var v = writetag("v", escapexml(vv)), o = { r: ref };
-        var os5 = get_cell_style(opts.cellXfs, cell2, opts);
-        if (os5 !== 0) o.s = os5;
+        var os6 = get_cell_style(opts.cellXfs, cell2, opts);
+        if (os6 !== 0) o.s = os6;
         switch (cell2.t) {
           case "n":
             break;
@@ -1048323,8 +1048327,8 @@ var require_xlsx = __commonJS({
         if (!o) o = new_buf(127);
         for (var i2 = 0; i2 != 4; ++i2) o.write_shift(4, 0);
         write_XLWideString("SheetJS", o);
-        write_XLWideString(XLSX9.version, o);
-        write_XLWideString(XLSX9.version, o);
+        write_XLWideString(XLSX10.version, o);
+        write_XLWideString(XLSX10.version, o);
         write_XLWideString("7262", o);
         return o.length > o.l ? o.slice(0, o.l) : o;
       }
@@ -1049877,8 +1049881,8 @@ var require_xlsx = __commonJS({
             p = escapexlml(cell2.v || "");
             break;
         }
-        var os5 = get_cell_style(opts.cellXfs, cell2, opts);
-        attr["ss:StyleID"] = "s" + (21 + os5);
+        var os6 = get_cell_style(opts.cellXfs, cell2, opts);
+        attr["ss:StyleID"] = "s" + (21 + os6);
         attr["ss:Index"] = addr.c + 1;
         var _v = cell2.v != null ? p : "";
         var m2 = cell2.t == "z" ? "" : '<Data ss:Type="' + t2 + '">' + _v + "</Data>";
@@ -1055713,32 +1055717,32 @@ var require_xlsx = __commonJS({
         });
       }
       function write_ws_biff8_cell(ba, cell2, R, C, opts) {
-        var os5 = 16 + get_cell_style(opts.cellXfs, cell2, opts);
+        var os6 = 16 + get_cell_style(opts.cellXfs, cell2, opts);
         if (cell2.v == null && !cell2.bf) {
-          write_biff_rec(ba, 513, write_XLSCell(R, C, os5));
+          write_biff_rec(ba, 513, write_XLSCell(R, C, os6));
           return;
         }
-        if (cell2.bf) write_biff_rec(ba, 6, write_Formula(cell2, R, C, opts, os5));
+        if (cell2.bf) write_biff_rec(ba, 6, write_Formula(cell2, R, C, opts, os6));
         else switch (cell2.t) {
           case "d":
           case "n":
             var v = cell2.t == "d" ? datenum(parseDate(cell2.v)) : cell2.v;
-            write_biff_rec(ba, 515, write_Number(R, C, v, os5, opts));
+            write_biff_rec(ba, 515, write_Number(R, C, v, os6, opts));
             break;
           case "b":
           case "e":
-            write_biff_rec(ba, 517, write_BoolErr(R, C, cell2.v, os5, opts, cell2.t));
+            write_biff_rec(ba, 517, write_BoolErr(R, C, cell2.v, os6, opts, cell2.t));
             break;
           /* TODO: codepage, sst */
           case "s":
           case "str":
             if (opts.bookSST) {
               var isst = get_sst_id(opts.Strings, cell2.v, opts.revStrings);
-              write_biff_rec(ba, 253, write_LabelSst(R, C, isst, os5, opts));
-            } else write_biff_rec(ba, 516, write_Label(R, C, (cell2.v || "").slice(0, 255), os5, opts));
+              write_biff_rec(ba, 253, write_LabelSst(R, C, isst, os6, opts));
+            } else write_biff_rec(ba, 516, write_Label(R, C, (cell2.v || "").slice(0, 255), os6, opts));
             break;
           default:
-            write_biff_rec(ba, 513, write_XLSCell(R, C, os5));
+            write_biff_rec(ba, 513, write_XLSCell(R, C, os6));
         }
       }
       function write_ws_biff8(idx, opts, wb) {
@@ -1059539,7 +1059543,7 @@ var require_xlsx = __commonJS({
         return out;
       }
       var qreg = /"/g;
-      function make_csv_row(sheet, r2, R, cols, fs16, rs, FS, o) {
+      function make_csv_row(sheet, r2, R, cols, fs17, rs, FS, o) {
         var isempty = true;
         var row = [], txt = "", rr = encode_row(R);
         for (var C = r2.s.c; C <= r2.e.c; ++C) {
@@ -1059549,7 +1059553,7 @@ var require_xlsx = __commonJS({
           else if (val.v != null) {
             isempty = false;
             txt = "" + (o.rawNumbers && val.t == "n" ? val.v : format_cell(val, null, o));
-            for (var i2 = 0, cc = 0; i2 !== txt.length; ++i2) if ((cc = txt.charCodeAt(i2)) === fs16 || cc === rs || cc === 34 || o.forceQuotes) {
+            for (var i2 = 0, cc = 0; i2 !== txt.length; ++i2) if ((cc = txt.charCodeAt(i2)) === fs17 || cc === rs || cc === 34 || o.forceQuotes) {
               txt = '"' + txt.replace(qreg, '""') + '"';
               break;
             }
@@ -1059569,7 +1059573,7 @@ var require_xlsx = __commonJS({
         var o = opts == null ? {} : opts;
         if (sheet == null || sheet["!ref"] == null) return "";
         var r2 = safe_decode_range(sheet["!ref"]);
-        var FS = o.FS !== void 0 ? o.FS : ",", fs16 = FS.charCodeAt(0);
+        var FS = o.FS !== void 0 ? o.FS : ",", fs17 = FS.charCodeAt(0);
         var RS = o.RS !== void 0 ? o.RS : "\n", rs = RS.charCodeAt(0);
         var endregex = new RegExp((FS == "|" ? "\\|" : FS) + "+$");
         var row = "", cols = [];
@@ -1059580,7 +1059584,7 @@ var require_xlsx = __commonJS({
         var w = 0;
         for (var R = r2.s.r; R <= r2.e.r; ++R) {
           if ((rowinfo[R] || {}).hidden) continue;
-          row = make_csv_row(sheet, r2, R, cols, fs16, rs, FS, o);
+          row = make_csv_row(sheet, r2, R, cols, fs17, rs, FS, o);
           if (row == null) {
             continue;
           }
@@ -1059801,7 +1059805,7 @@ var require_xlsx = __commonJS({
         }
         return ws;
       }
-      var utils8 = {
+      var utils9 = {
         encode_col,
         encode_row,
         encode_cell,
@@ -1059852,7 +1059856,7 @@ var require_xlsx = __commonJS({
           return stream2;
         }
         var r2 = safe_decode_range(sheet["!ref"]);
-        var FS = o.FS !== void 0 ? o.FS : ",", fs16 = FS.charCodeAt(0);
+        var FS = o.FS !== void 0 ? o.FS : ",", fs17 = FS.charCodeAt(0);
         var RS = o.RS !== void 0 ? o.RS : "\n", rs = RS.charCodeAt(0);
         var endregex = new RegExp((FS == "|" ? "\\|" : FS) + "+$");
         var row = "", cols = [];
@@ -1059870,7 +1059874,7 @@ var require_xlsx = __commonJS({
           while (R <= r2.e.r) {
             ++R;
             if ((rowinfo[R - 1] || {}).hidden) continue;
-            row = make_csv_row(sheet, r2, R - 1, cols, fs16, rs, FS, o);
+            row = make_csv_row(sheet, r2, R - 1, cols, fs17, rs, FS, o);
             if (row != null) {
               if (o.strip) row = row.replace(endregex, "");
               if (row || o.blankrows !== false) return stream2.push((w++ ? RS : "") + row);
@@ -1059991,21 +1059995,21 @@ var require_xlsx = __commonJS({
         to_csv: write_csv_stream,
         set_readable
       };
-      if (typeof parse_xlscfb !== "undefined") XLSX9.parse_xlscfb = parse_xlscfb;
-      XLSX9.parse_zip = parse_zip;
-      XLSX9.read = readSync;
-      XLSX9.readFile = readFileSync;
-      XLSX9.readFileSync = readFileSync;
-      XLSX9.write = writeSync;
-      XLSX9.writeFile = writeFileSync2;
-      XLSX9.writeFileSync = writeFileSync2;
-      XLSX9.writeFileAsync = writeFileAsync;
-      XLSX9.utils = utils8;
-      XLSX9.writeXLSX = writeSyncXLSX;
-      XLSX9.writeFileXLSX = writeFileSyncXLSX;
-      XLSX9.SSF = SSF;
-      if (typeof __stream !== "undefined") XLSX9.stream = __stream;
-      if (typeof CFB !== "undefined") XLSX9.CFB = CFB;
+      if (typeof parse_xlscfb !== "undefined") XLSX10.parse_xlscfb = parse_xlscfb;
+      XLSX10.parse_zip = parse_zip;
+      XLSX10.read = readSync;
+      XLSX10.readFile = readFileSync;
+      XLSX10.readFileSync = readFileSync;
+      XLSX10.write = writeSync;
+      XLSX10.writeFile = writeFileSync2;
+      XLSX10.writeFileSync = writeFileSync2;
+      XLSX10.writeFileAsync = writeFileAsync;
+      XLSX10.utils = utils9;
+      XLSX10.writeXLSX = writeSyncXLSX;
+      XLSX10.writeFileXLSX = writeFileSyncXLSX;
+      XLSX10.SSF = SSF;
+      if (typeof __stream !== "undefined") XLSX10.stream = __stream;
+      if (typeof CFB !== "undefined") XLSX10.CFB = CFB;
       if (typeof __require !== "undefined") {
         var strmod = __require("stream");
         if ((strmod || {}).Readable) set_readable(strmod.Readable);
@@ -1060014,14 +1060018,483 @@ var require_xlsx = __commonJS({
     if (typeof exports !== "undefined") make_xlsx_lib(exports);
     else if (typeof module !== "undefined" && module.exports) make_xlsx_lib(module.exports);
     else if (typeof define === "function" && define.amd) define("xlsx", function() {
-      if (!XLSX8.version) make_xlsx_lib(XLSX8);
-      return XLSX8;
+      if (!XLSX9.version) make_xlsx_lib(XLSX9);
+      return XLSX9;
     });
-    else make_xlsx_lib(XLSX8);
+    else make_xlsx_lib(XLSX9);
     if (typeof window !== "undefined" && !window.XLSX) try {
-      window.XLSX = XLSX8;
+      window.XLSX = XLSX9;
     } catch (e2) {
     }
+  }
+});
+
+// src/lib/attendance-and-ranks.ts
+import path3 from "path";
+import fs5 from "fs";
+function getLogoPath() {
+  const cwd = process.cwd();
+  const candidates = [
+    path3.resolve(cwd, "logo.png"),
+    path3.resolve(cwd, "artifacts/api-server/logo.png"),
+    path3.resolve(cwd, "artifacts/fellowship-exam/public/logo.png"),
+    path3.resolve(cwd, "public/logo.png")
+  ];
+  for (const p of candidates) {
+    if (fs5.existsSync(p)) return p;
+  }
+  return null;
+}
+function drawReportHeader(doc, title, subtitle, bannerTitle, bannerRight, accentHex = "#C2410C") {
+  const left = 28;
+  const pageWidth = doc.page.width - 56;
+  const top = 24;
+  doc.rect(left, top, pageWidth, 4).fill(accentHex);
+  const logoPath = getLogoPath();
+  let textLeft = left;
+  if (logoPath) {
+    try {
+      doc.image(logoPath, left, top + 10, { height: 34 });
+      textLeft = left + 46;
+    } catch {
+      textLeft = left;
+    }
+  }
+  doc.font("Helvetica-Bold").fontSize(13).fillColor("#0F172A").text("SANKARA ACADEMY OF VISION \u2014 FELLOWSHIP SELECTION", textLeft, top + 10, {
+    width: pageWidth - (textLeft - left) - 180
+  });
+  doc.font("Helvetica-Bold").fontSize(10.5).fillColor(accentHex).text(title, textLeft, top + 27, {
+    width: pageWidth - (textLeft - left) - 180
+  });
+  doc.font("Helvetica").fontSize(8).fillColor("#475569").text(subtitle, left + pageWidth - 220, top + 12, {
+    width: 220,
+    align: "right"
+  });
+  doc.font("Helvetica").fontSize(7.5).fillColor("#64748B").text(`Generated: ${(/* @__PURE__ */ new Date()).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`, left + pageWidth - 220, top + 26, {
+    width: 220,
+    align: "right"
+  });
+  const bannerY = top + 50;
+  doc.roundedRect(left, bannerY, pageWidth, 24, 3).fill("#0F172A");
+  doc.font("Helvetica-Bold").fontSize(10).fillColor("#FFFFFF").text(bannerTitle, left + 10, bannerY + 6.5, { width: pageWidth * 0.6 });
+  doc.font("Helvetica-Bold").fontSize(8.5).fillColor("#FDBA74").text(bannerRight, left + pageWidth * 0.55, bannerY + 7, {
+    width: pageWidth * 0.45 - 10,
+    align: "right"
+  });
+  return bannerY + 30;
+}
+async function generateAttendanceSheetPdf(options) {
+  return new Promise((resolve4, reject) => {
+    const doc = new import_pdfkit2.default({
+      size: "A4",
+      layout: "landscape",
+      margin: 28,
+      bufferPages: true
+    });
+    const chunks = [];
+    doc.on("data", (c) => chunks.push(c));
+    doc.on("end", () => resolve4(Buffer.concat(chunks)));
+    doc.on("error", reject);
+    const left = 28;
+    const pageWidth = doc.page.width - 56;
+    const bottomLimit = doc.page.height - 62;
+    const cols = [
+      { label: "S.No", w: 28, align: "center" },
+      { label: "Code & Hall Ticket", w: 88, align: "left" },
+      { label: "Candidate Name", w: 150, align: "left" },
+      { label: "Qualification & College", w: 110, align: "left" },
+      { label: "Mobile & Email", w: 118, align: "left" },
+      { label: "MCQ (/50)", w: 54, align: "center" },
+      { label: "Mind Matter", w: 54, align: "center" },
+      { label: "Candidate Signature", w: 112, align: "center" },
+      { label: "Remarks / Panel", w: 71.8, align: "left" }
+    ];
+    const drawTableHeader = (y) => {
+      const h2 = 22;
+      doc.rect(left, y, pageWidth, h2).fill("#EA580C");
+      let cx = left;
+      doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#FFFFFF");
+      for (const col of cols) {
+        doc.text(col.label, cx + 4, y + 7, {
+          width: col.w - 8,
+          align: col.align
+        });
+        cx += col.w;
+      }
+      return y + h2;
+    };
+    const drawFooter = (totalCount) => {
+      const fy = doc.page.height - 52;
+      doc.moveTo(left, fy).lineTo(left + pageWidth, fy).strokeColor("#CBD5E1").lineWidth(0.6).stroke();
+      doc.font("Helvetica-Bold").fontSize(8).fillColor("#0F172A").text(
+        `Total Listed: ${totalCount}    |    Present: ____________    |    Absent: ____________`,
+        left,
+        fy + 8
+      );
+      doc.font("Helvetica").fontSize(8).fillColor("#334155").text(
+        "Exam Coordinator Signature: ______________________        Speciality Panel Lead: ______________________",
+        left,
+        fy + 22,
+        { width: pageWidth, align: "right" }
+      );
+    };
+    const activeGroups = options.groups.filter((g) => g.rows.length > 0);
+    if (activeGroups.length === 0) {
+      const startY = drawReportHeader(
+        doc,
+        "FINAL EXAMINATION & INTERVIEW ATTENDANCE SHEET",
+        `${options.programName}${options.academicSession ? ` (${options.academicSession})` : ""}`,
+        "SPECIALITY ATTENDANCE REGISTER",
+        "No matching candidates found"
+      );
+      doc.font("Helvetica").fontSize(11).fillColor("#64748B").text("No candidates matched the selected speciality or status filter.", left, startY + 24, {
+        align: "center",
+        width: pageWidth
+      });
+      doc.end();
+      return;
+    }
+    activeGroups.forEach((group, gIdx) => {
+      if (gIdx > 0) doc.addPage();
+      let curY = drawReportHeader(
+        doc,
+        "FINAL EXAMINATION & INTERVIEW ATTENDANCE SHEET",
+        `${options.programName}${options.academicSession ? ` (${options.academicSession})` : ""}`,
+        `SPECIALITY: ${group.specialityName.toUpperCase()} (${group.specialityCode})`,
+        `Candidates: ${group.rows.length}   |   Panel Date: ______________`
+      );
+      curY = drawTableHeader(curY);
+      group.rows.forEach((row, idx) => {
+        const isMulti = row.allSpecialities.length > 1;
+        const otherSpecs = row.allSpecialities.filter(
+          (s2) => s2.toLowerCase() !== group.specialityName.toLowerCase()
+        );
+        const rowH = isMulti ? 36 : 32;
+        if (curY + rowH > bottomLimit) {
+          drawFooter(group.rows.length);
+          doc.addPage();
+          curY = drawReportHeader(
+            doc,
+            "FINAL EXAMINATION & INTERVIEW ATTENDANCE SHEET (CONT.)",
+            `${options.programName}${options.academicSession ? ` (${options.academicSession})` : ""}`,
+            `SPECIALITY: ${group.specialityName.toUpperCase()} (${group.specialityCode})`,
+            `Continued \u2014 Total Candidates: ${group.rows.length}`
+          );
+          curY = drawTableHeader(curY);
+        }
+        const bg = idx % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
+        doc.rect(left, curY, pageWidth, rowH).fill(bg);
+        doc.rect(left, curY, pageWidth, rowH).strokeColor("#CBD5E1").lineWidth(0.5).stroke();
+        let divX = left;
+        for (let c = 0; c < cols.length - 1; c++) {
+          divX += cols[c].w;
+          doc.moveTo(divX, curY).lineTo(divX, curY + rowH).strokeColor("#E2E8F0").lineWidth(0.5).stroke();
+        }
+        let cx = left;
+        doc.font("Helvetica-Bold").fontSize(8.5).fillColor("#0F172A");
+        doc.text(String(idx + 1), cx + 2, curY + 11, { width: cols[0].w - 4, align: "center" });
+        cx += cols[0].w;
+        doc.font("Helvetica-Bold").fontSize(8).fillColor("#0F172A");
+        doc.text(row.candidateCode, cx + 4, curY + 6, { width: cols[1].w - 8, ellipsis: true });
+        if (row.hallTicketNumber) {
+          doc.font("Helvetica").fontSize(7).fillColor("#475569");
+          doc.text(`HT: ${row.hallTicketNumber}`, cx + 4, curY + 17, { width: cols[1].w - 8, ellipsis: true });
+        }
+        cx += cols[1].w;
+        doc.font("Helvetica-Bold").fontSize(8.5).fillColor("#0F172A");
+        doc.text(row.fullName, cx + 4, curY + 5, { width: cols[2].w - 8, ellipsis: true });
+        if (isMulti) {
+          const prefStr = row.preferenceOrder ? `Pref #${row.preferenceOrder} \xB7 ` : "";
+          doc.font("Helvetica").fontSize(6.8).fillColor("#B45309");
+          doc.text(`${prefStr}Also: ${otherSpecs.join(", ")}`, cx + 4, curY + 17, {
+            width: cols[2].w - 8,
+            height: 16,
+            ellipsis: true
+          });
+        } else if (row.preferenceOrder) {
+          doc.font("Helvetica").fontSize(7).fillColor("#64748B");
+          doc.text(`Preference #${row.preferenceOrder}`, cx + 4, curY + 18, { width: cols[2].w - 8 });
+        }
+        cx += cols[2].w;
+        doc.font("Helvetica").fontSize(7.5).fillColor("#1E293B");
+        doc.text(row.qualification || "MS / DNB / DO", cx + 4, curY + 6, {
+          width: cols[3].w - 8,
+          ellipsis: true
+        });
+        if (row.college) {
+          doc.font("Helvetica").fontSize(6.8).fillColor("#64748B");
+          doc.text(row.college, cx + 4, curY + 17, {
+            width: cols[3].w - 8,
+            ellipsis: true
+          });
+        }
+        cx += cols[3].w;
+        doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#0F172A");
+        doc.text(row.phone || "\u2014", cx + 4, curY + 6, { width: cols[4].w - 8, ellipsis: true });
+        doc.font("Helvetica").fontSize(6.8).fillColor("#475569");
+        doc.text(row.email || "\u2014", cx + 4, curY + 17, { width: cols[4].w - 8, ellipsis: true });
+        cx += cols[4].w;
+        doc.font("Helvetica-Bold").fontSize(8).fillColor("#1E293B");
+        const mcqText = row.mcqScore != null ? `${Number(row.mcqScore).toFixed(1)}/50` : "[  ] P";
+        doc.text(mcqText, cx + 2, curY + 11, { width: cols[5].w - 4, align: "center" });
+        cx += cols[5].w;
+        const mmText = row.psychometricScore != null ? `${Number(row.psychometricScore).toFixed(1)}/10` : "[  ] P";
+        doc.text(mmText, cx + 2, curY + 11, { width: cols[6].w - 4, align: "center" });
+        cx += cols[6].w;
+        cx += cols[7].w;
+        if (row.vivaScore != null) {
+          doc.font("Helvetica").fontSize(7).fillColor("#047857");
+          doc.text(`Viva: ${Number(row.vivaScore).toFixed(1)}/50`, cx + 4, curY + 11, {
+            width: cols[8].w - 8,
+            ellipsis: true
+          });
+        }
+        curY += rowH;
+      });
+      drawFooter(group.rows.length);
+    });
+    doc.end();
+  });
+}
+function generateAttendanceSheetExcel(options) {
+  const wb = XLSX.utils.book_new();
+  const consolidatedRows = [];
+  for (const group of options.groups) {
+    if (group.rows.length === 0) continue;
+    const sheetRows = group.rows.map((r2, i2) => {
+      const otherSpecs = r2.allSpecialities.filter(
+        (s2) => s2.toLowerCase() !== group.specialityName.toLowerCase()
+      );
+      const record2 = {
+        "S.No": i2 + 1,
+        "Speciality": group.specialityName,
+        "Speciality Code": group.specialityCode,
+        "Candidate Code": r2.candidateCode,
+        "Hall Ticket No": r2.hallTicketNumber || "\u2014",
+        "Candidate Name": r2.fullName,
+        "Preference Order": r2.preferenceOrder ?? "\u2014",
+        "Other Applied Specialities": otherSpecs.length > 0 ? otherSpecs.join(", ") : "Single Speciality",
+        "Mobile": r2.phone || "\u2014",
+        "Email": r2.email,
+        "PG Qualification": r2.qualification || "\u2014",
+        "Medical College": r2.college || "\u2014",
+        "MCQ Marks (/50)": r2.mcqScore != null ? Number(r2.mcqScore.toFixed(1)) : "Pending",
+        "Mind Matter (/10)": r2.psychometricScore != null ? Number(r2.psychometricScore.toFixed(1)) : "Pending",
+        "Doctor Viva (/50)": r2.vivaScore != null ? Number(r2.vivaScore.toFixed(1)) : "Pending",
+        "Attendance Status": "",
+        "Candidate Signature": "",
+        "Panel / Remarks": ""
+      };
+      consolidatedRows.push(record2);
+      return record2;
+    });
+    const sheetName = group.specialityName.replace(/[\\/?*\[\]:]/g, "").slice(0, 31) || `Spec_${group.specialityId}`;
+    const ws = XLSX.utils.json_to_sheet(sheetRows);
+    ws["!cols"] = [
+      { wch: 6 },
+      { wch: 24 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 26 },
+      { wch: 12 },
+      { wch: 24 },
+      { wch: 15 },
+      { wch: 28 },
+      { wch: 20 },
+      { wch: 26 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 24 },
+      { wch: 20 }
+    ];
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  }
+  if (consolidatedRows.length === 0) {
+    const ws = XLSX.utils.json_to_sheet([{ Note: "No candidates found for selected filters" }]);
+    XLSX.utils.book_append_sheet(wb, ws, "Attendance Sheet");
+  } else {
+    const wsAll = XLSX.utils.json_to_sheet(consolidatedRows);
+    wsAll["!cols"] = [
+      { wch: 6 },
+      { wch: 24 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 26 },
+      { wch: 12 },
+      { wch: 24 },
+      { wch: 15 },
+      { wch: 28 },
+      { wch: 20 },
+      { wch: 26 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 24 },
+      { wch: 20 }
+    ];
+    XLSX.utils.book_append_sheet(wb, wsAll, "All Specialities");
+  }
+  return XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+}
+async function generateRankSheetPdf(options) {
+  return new Promise((resolve4, reject) => {
+    const doc = new import_pdfkit2.default({
+      size: "A4",
+      layout: "landscape",
+      margin: 28,
+      bufferPages: true
+    });
+    const chunks = [];
+    doc.on("data", (c) => chunks.push(c));
+    doc.on("end", () => resolve4(Buffer.concat(chunks)));
+    doc.on("error", reject);
+    const left = 28;
+    const pageWidth = doc.page.width - 56;
+    const bottomLimit = doc.page.height - 56;
+    const cols = [
+      { label: "Rank", w: 42, align: "center" },
+      { label: "Code", w: 78, align: "left" },
+      { label: "Candidate Name", w: 165, align: "left" },
+      { label: "PG Qualification", w: 125, align: "left" },
+      { label: "MCQ (/50)", w: 62, align: "center" },
+      { label: "Mind Matter (/10)", w: 72, align: "center" },
+      { label: "Doctor Viva (/50)", w: 72, align: "center" },
+      { label: "Total (/110)", w: 68, align: "center" },
+      { label: "Status / Unit", w: 101.8, align: "left" }
+    ];
+    const drawTableHeader = (y) => {
+      const h2 = 22;
+      doc.rect(left, y, pageWidth, h2).fill("#1E293B");
+      let cx = left;
+      doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#FFFFFF");
+      for (const col of cols) {
+        doc.text(col.label, cx + 4, y + 7, { width: col.w - 8, align: col.align });
+        cx += col.w;
+      }
+      return y + h2;
+    };
+    const drawFooter = () => {
+      const fy = doc.page.height - 46;
+      doc.moveTo(left, fy).lineTo(left + pageWidth, fy).strokeColor("#CBD5E1").lineWidth(0.6).stroke();
+      doc.font("Helvetica").fontSize(8).fillColor("#334155").text(
+        "Total Formula: MCQ (Max 50) + Mind Matter (Max 10) + Doctor Interview Viva (Max 50) = 110 Marks        |        Controller of Examinations: ______________________",
+        left,
+        fy + 10,
+        { width: pageWidth }
+      );
+    };
+    const activeGroups = options.groups.filter((g) => g.rows.length > 0);
+    if (activeGroups.length === 0) {
+      drawReportHeader(
+        doc,
+        "OFFICIAL FELLOWSHIP MERIT RANK SHEET",
+        `${options.programName}${options.academicSession ? ` (${options.academicSession})` : ""}`,
+        "MERIT RANKING REGISTER",
+        "No ranked candidates found",
+        "#1E40AF"
+      );
+      doc.end();
+      return;
+    }
+    activeGroups.forEach((group, gIdx) => {
+      if (gIdx > 0) doc.addPage();
+      let curY = drawReportHeader(
+        doc,
+        "OFFICIAL FELLOWSHIP MERIT RANK SHEET",
+        `${options.programName}${options.academicSession ? ` (${options.academicSession})` : ""}`,
+        `SPECIALITY MERIT LIST: ${group.specialityName.toUpperCase()} (${group.specialityCode})`,
+        `Total Candidates: ${group.rows.length}   |   Max Marks: 110`,
+        "#1E40AF"
+      );
+      curY = drawTableHeader(curY);
+      group.rows.forEach((row, idx) => {
+        const rowH = row.otherSpecialities && row.otherSpecialities.length > 0 ? 30 : 25;
+        if (curY + rowH > bottomLimit) {
+          drawFooter();
+          doc.addPage();
+          curY = drawReportHeader(
+            doc,
+            "OFFICIAL FELLOWSHIP MERIT RANK SHEET (CONT.)",
+            `${options.programName}${options.academicSession ? ` (${options.academicSession})` : ""}`,
+            `SPECIALITY MERIT LIST: ${group.specialityName.toUpperCase()} (${group.specialityCode})`,
+            `Continued \u2014 Total: ${group.rows.length}`,
+            "#1E40AF"
+          );
+          curY = drawTableHeader(curY);
+        }
+        const bg = idx % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
+        doc.rect(left, curY, pageWidth, rowH).fill(bg);
+        doc.rect(left, curY, pageWidth, rowH).strokeColor("#CBD5E1").lineWidth(0.5).stroke();
+        let cx = left;
+        const textY = curY + 8;
+        doc.font("Helvetica-Bold").fontSize(8.5).fillColor(row.rank ? "#1D4ED8" : "#94A3B8");
+        doc.text(row.rank ? `#${row.rank}` : "Pend", cx + 2, textY, { width: cols[0].w - 4, align: "center" });
+        cx += cols[0].w;
+        doc.font("Helvetica-Bold").fontSize(8).fillColor("#334155");
+        doc.text(row.candidateCode, cx + 4, textY, { width: cols[1].w - 8, ellipsis: true });
+        cx += cols[1].w;
+        doc.font("Helvetica-Bold").fontSize(8.5).fillColor("#0F172A");
+        doc.text(row.fullName, cx + 4, row.otherSpecialities?.length ? curY + 5 : textY, {
+          width: cols[2].w - 8,
+          ellipsis: true
+        });
+        if (row.otherSpecialities && row.otherSpecialities.length > 0) {
+          doc.font("Helvetica").fontSize(6.5).fillColor("#B45309");
+          doc.text(`Also applied: ${row.otherSpecialities.join(", ")}`, cx + 4, curY + 16, {
+            width: cols[2].w - 8,
+            ellipsis: true
+          });
+        }
+        cx += cols[2].w;
+        doc.font("Helvetica").fontSize(7.5).fillColor("#475569");
+        doc.text(row.qualification || "\u2014", cx + 4, textY, { width: cols[3].w - 8, ellipsis: true });
+        cx += cols[3].w;
+        doc.font("Helvetica").fontSize(8.5).fillColor("#0F172A");
+        doc.text(row.mcqScore != null ? row.mcqScore.toFixed(1) : "\u2014", cx + 2, textY, {
+          width: cols[4].w - 4,
+          align: "center"
+        });
+        cx += cols[4].w;
+        doc.font("Helvetica").fontSize(8.5).fillColor("#B45309");
+        doc.text(row.psychometricScore != null ? row.psychometricScore.toFixed(1) : "\u2014", cx + 2, textY, {
+          width: cols[5].w - 4,
+          align: "center"
+        });
+        cx += cols[5].w;
+        doc.font("Helvetica-Bold").fontSize(8.5).fillColor("#4338CA");
+        doc.text(row.vivaScore != null ? row.vivaScore.toFixed(1) : "Pending", cx + 2, textY, {
+          width: cols[6].w - 4,
+          align: "center"
+        });
+        cx += cols[6].w;
+        doc.font("Helvetica-Bold").fontSize(9).fillColor("#0F172A");
+        doc.text(row.totalScore != null ? row.totalScore.toFixed(1) : "\u2014", cx + 2, textY, {
+          width: cols[7].w - 4,
+          align: "center"
+        });
+        cx += cols[7].w;
+        doc.font("Helvetica").fontSize(7.5).fillColor("#334155");
+        const statusStr = row.unitName ? `${row.status.toUpperCase()} (${row.unitName})` : row.status.toUpperCase();
+        doc.text(statusStr, cx + 4, textY, { width: cols[8].w - 8, ellipsis: true });
+        curY += rowH;
+      });
+      drawFooter();
+    });
+    doc.end();
+  });
+}
+var import_pdfkit2, XLSX;
+var init_attendance_and_ranks = __esm({
+  "src/lib/attendance-and-ranks.ts"() {
+    "use strict";
+    init_afm_fonts();
+    import_pdfkit2 = __toESM(require_pdfkit(), 1);
+    XLSX = __toESM(require_xlsx(), 1);
   }
 });
 
@@ -1061118,7 +1061591,7 @@ var init_escape = __esm({
 });
 
 // ../../node_modules/.pnpm/minimatch@10.2.6/node_modules/minimatch/dist/esm/index.js
-var minimatch, starDotExtRE, starDotExtTest, starDotExtTestDot, starDotExtTestNocase, starDotExtTestNocaseDot, starDotStarRE, starDotStarTest, starDotStarTestDot, dotStarRE, dotStarTest, starRE, starTest, starTestDot, qmarksRE, qmarksTestNocase, qmarksTestNocaseDot, qmarksTestDot, qmarksTest, qmarksTestNoExt, qmarksTestNoExtDot, defaultPlatform, path3, sep, GLOBSTAR, qmark2, star2, twoStarDot, twoStarNoDot, filter, ext, defaults2, braceExpand, makeRe, match, globMagic, regExpEscape2, Minimatch;
+var minimatch, starDotExtRE, starDotExtTest, starDotExtTestDot, starDotExtTestNocase, starDotExtTestNocaseDot, starDotStarRE, starDotStarTest, starDotStarTestDot, dotStarRE, dotStarTest, starRE, starTest, starTestDot, qmarksRE, qmarksTestNocase, qmarksTestNocaseDot, qmarksTestDot, qmarksTest, qmarksTestNoExt, qmarksTestNoExtDot, defaultPlatform, path4, sep, GLOBSTAR, qmark2, star2, twoStarDot, twoStarNoDot, filter, ext, defaults2, braceExpand, makeRe, match, globMagic, regExpEscape2, Minimatch;
 var init_esm4 = __esm({
   "../../node_modules/.pnpm/minimatch@10.2.6/node_modules/minimatch/dist/esm/index.js"() {
     init_esm3();
@@ -1061187,11 +1061660,11 @@ var init_esm4 = __esm({
       return (f3) => f3.length === len && f3 !== "." && f3 !== "..";
     };
     defaultPlatform = typeof process === "object" && process ? typeof process.env === "object" && process.env && process.env.__MINIMATCH_TESTING_PLATFORM__ || process.platform : "posix";
-    path3 = {
+    path4 = {
       win32: { sep: "\\" },
       posix: { sep: "/" }
     };
-    sep = defaultPlatform === "win32" ? path3.win32.sep : path3.posix.sep;
+    sep = defaultPlatform === "win32" ? path4.win32.sep : path4.posix.sep;
     minimatch.sep = sep;
     GLOBSTAR = /* @__PURE__ */ Symbol("globstar **");
     minimatch.GLOBSTAR = GLOBSTAR;
@@ -1061940,12 +1062413,12 @@ var init_esm4 = __esm({
 });
 
 // ../../node_modules/.pnpm/readdir-glob@3.0.0/node_modules/readdir-glob/dist/index.mjs
-import * as fs5 from "fs";
+import * as fs6 from "fs";
 import { EventEmitter } from "events";
 import { resolve } from "path";
 function readdir2(dir, strict2) {
   return new Promise((resolve$1, reject) => {
-    fs5.readdir(dir, { withFileTypes: true }, (err, files) => {
+    fs6.readdir(dir, { withFileTypes: true }, (err, files) => {
       if (err) switch (err.code) {
         case "ENOTDIR":
           if (strict2) reject(err);
@@ -1061968,7 +1062441,7 @@ function readdir2(dir, strict2) {
 }
 function getStat(file2, followSymlinks) {
   return new Promise((resolve$1) => {
-    const statFunc = followSymlinks ? fs5.stat : fs5.lstat;
+    const statFunc = followSymlinks ? fs6.stat : fs6.lstat;
     statFunc(file2, (err, stats) => {
       if (err) switch (err.code) {
         case "ENOENT":
@@ -1070633,12 +1071106,12 @@ var require_duplexify = __commonJS({
         });
       }
       if (typeof body === "function") {
-        const { value, write: write6, final, destroy } = fromAsyncGen(body);
+        const { value, write: write7, final, destroy } = fromAsyncGen(body);
         if (isIterable(value)) {
           return from(Duplexify, value, {
             // TODO (ronag): highWaterMark?
             objectMode: true,
-            write: write6,
+            write: write7,
             final,
             destroy
           });
@@ -1070662,7 +1071135,7 @@ var require_duplexify = __commonJS({
             // TODO (ronag): highWaterMark?
             objectMode: true,
             readable: false,
-            write: write6,
+            write: write7,
             final(cb) {
               final(async () => {
                 try {
@@ -1072223,13 +1072696,13 @@ var require_stream3 = __commonJS({
     var { destroyer } = require_destroy2();
     var eos = require_end_of_stream();
     var promises = require_promises();
-    var utils8 = require_utils8();
+    var utils9 = require_utils8();
     var Stream3 = module.exports = require_legacy().Stream;
-    Stream3.isDestroyed = utils8.isDestroyed;
-    Stream3.isDisturbed = utils8.isDisturbed;
-    Stream3.isErrored = utils8.isErrored;
-    Stream3.isReadable = utils8.isReadable;
-    Stream3.isWritable = utils8.isWritable;
+    Stream3.isDestroyed = utils9.isDestroyed;
+    Stream3.isDisturbed = utils9.isDisturbed;
+    Stream3.isErrored = utils9.isErrored;
+    Stream3.isReadable = utils9.isReadable;
+    Stream3.isWritable = utils9.isWritable;
     Stream3.Readable = require_readable2();
     for (const key of ObjectKeys(streamReturningOperators)) {
       let fn = function(...args) {
@@ -1074766,7 +1075239,7 @@ var require_b4a = __commonJS({
     function toString(buffer, encoding, start, end) {
       return toBuffer(buffer).toString(encoding, start, end);
     }
-    function write6(buffer, string4, offset, length, encoding) {
+    function write7(buffer, string4, offset, length, encoding) {
       return toBuffer(buffer).write(string4, offset, length, encoding);
     }
     function readDoubleBE(buffer, offset) {
@@ -1074838,7 +1075311,7 @@ var require_b4a = __commonJS({
       swap64,
       toBuffer,
       toString,
-      write: write6,
+      write: write7,
       readDoubleBE,
       readDoubleLE,
       readFloatBE,
@@ -1077746,6 +1078219,881 @@ var init_default_sections = __esm({
   }
 });
 
+// src/lib/application-pdf.ts
+import fs7 from "node:fs";
+import path5 from "node:path";
+import os2 from "node:os";
+function cleanDisplayValue(val) {
+  if (val === null || val === void 0) return "";
+  if (typeof val === "boolean") return val ? "Yes" : "No";
+  if (typeof val === "number") return Number.isFinite(val) ? String(val) : "";
+  if (Array.isArray(val)) {
+    return val.map((v) => cleanDisplayValue(v)).filter((v) => v && v !== "\u2014").join(", ");
+  }
+  if (typeof val === "object") {
+    try {
+      const entries = Object.entries(val).map(([k, v]) => `${prettifyKey(k)}: ${cleanDisplayValue(v)}`).filter((s2) => !s2.endsWith(": "));
+      return entries.join(" | ");
+    } catch {
+      return "";
+    }
+  }
+  const str = String(val).replace(/\u0000/g, "").trim();
+  if (!str || str === "null" || str === "undefined" || str === "[object Object]") return "";
+  if (str.toLowerCase() === "true") return "Yes";
+  if (str.toLowerCase() === "false") return "No";
+  return str;
+}
+function displayOrDash(val) {
+  const c = cleanDisplayValue(val);
+  return c || "\u2014";
+}
+function prettifyKey(raw) {
+  return raw.replace(/[_-]+/g, " ").replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/\s+/g, " ").trim().replace(/\b\w/g, (ch) => ch.toUpperCase());
+}
+function normalizeSpecToken(s2) {
+  return s2.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+function isMatchingSpecialityKey(prefKey, appliedSpecs) {
+  if (appliedSpecs.length === 0) return true;
+  const nk = normalizeSpecToken(prefKey);
+  if (!nk) return false;
+  return appliedSpecs.some((sp) => {
+    const ns = normalizeSpecToken(sp);
+    if (!ns) return false;
+    if (ns === nk || ns.includes(nk) || nk.includes(ns)) return true;
+    const pairs = [
+      ["vitreo", "vr"],
+      ["medicalretina", "mr"],
+      ["cataract", "iol"],
+      ["anterior", "cataract"],
+      ["anterior", "phaco"],
+      ["pediatric", "paediatric"],
+      ["oculoplasty", "orbit"]
+    ];
+    return pairs.some(
+      ([a, b]) => (ns.includes(a) || ns.includes(b)) && (nk.includes(a) || nk.includes(b))
+    );
+  });
+}
+function formatCenterPreferences(rawPref, appliedSpecs, customAnswers, formData, labelMap) {
+  const rows = [];
+  let parsed = rawPref;
+  if (typeof rawPref === "string") {
+    const trimmed = rawPref.trim();
+    if (trimmed) {
+      if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+        try {
+          parsed = JSON.parse(trimmed);
+        } catch {
+          return [{ speciality: appliedSpecs.join(", ") || "Center Preference", preferences: trimmed }];
+        }
+      } else {
+        return [{ speciality: appliedSpecs.join(", ") || "Center Preference", preferences: trimmed }];
+      }
+    } else {
+      parsed = null;
+    }
+  }
+  if (Array.isArray(parsed)) {
+    const list = parsed.map((x2) => cleanDisplayValue(x2)).filter(Boolean);
+    if (list.length > 0) {
+      rows.push({ speciality: appliedSpecs.join(", ") || "Preferred Units", preferences: list.join("  \u2192  ") });
+    }
+  } else if (parsed && typeof parsed === "object") {
+    for (const [key, val] of Object.entries(parsed)) {
+      if (!isMatchingSpecialityKey(key, appliedSpecs)) continue;
+      let valStr = "";
+      if (Array.isArray(val)) {
+        valStr = val.map((item, idx) => {
+          const c = cleanDisplayValue(item);
+          return c ? `${idx + 1}. ${c}` : "";
+        }).filter(Boolean).join("   |   ");
+      } else {
+        valStr = cleanDisplayValue(val);
+      }
+      if (valStr) {
+        rows.push({ speciality: key, preferences: valStr });
+      }
+    }
+  }
+  if (rows.length === 0) {
+    const sources = [customAnswers, formData];
+    for (const src of sources) {
+      if (!src || typeof src !== "object" || Array.isArray(src)) continue;
+      for (const [key, val] of Object.entries(src)) {
+        if (!key.startsWith("unit_") || !val) continue;
+        const specGuess = (labelMap?.get(key) || key.replace(/^unit_/, "").replace(/_/g, " ")).replace(/Preferred Center/i, "").trim();
+        if (!isMatchingSpecialityKey(specGuess, appliedSpecs)) continue;
+        const valStr = Array.isArray(val) ? val.map((item, idx) => `${idx + 1}. ${cleanDisplayValue(item)}`).filter(Boolean).join("   |   ") : cleanDisplayValue(val);
+        if (valStr && !rows.some((r2) => normalizeSpecToken(r2.speciality) === normalizeSpecToken(specGuess))) {
+          rows.push({ speciality: prettifyKey(specGuess), preferences: valStr });
+        }
+      }
+    }
+  }
+  return rows;
+}
+function cleanSpouseValue(maritalStatus, spouseDetails) {
+  const m2 = cleanDisplayValue(maritalStatus).toLowerCase();
+  const s2 = cleanDisplayValue(spouseDetails);
+  if (!s2 || s2 === "0" || s2 === "-" || s2.toLowerCase() === "na" || s2.toLowerCase() === "n/a" || s2.toLowerCase() === "nil" || s2.toLowerCase() === "none") {
+    return m2.includes("married") && !m2.includes("unmarried") ? "Not Specified" : "N/A";
+  }
+  return s2;
+}
+function extractCustomFieldLabelMap(form) {
+  const labelMap = /* @__PURE__ */ new Map();
+  if (!form) return labelMap;
+  if (Array.isArray(form.customFields)) {
+    for (const f3 of form.customFields) {
+      if (f3 && f3.id && f3.label) {
+        labelMap.set(String(f3.id), String(f3.label));
+      }
+    }
+  }
+  if (Array.isArray(form.sectionsConfig)) {
+    for (const sec of form.sectionsConfig) {
+      if (Array.isArray(sec?.fields)) {
+        for (const f3 of sec.fields) {
+          const id = f3?.id || f3?.name || f3?.key;
+          const label = f3?.label || f3?.title;
+          if (id && label) labelMap.set(String(id), String(label));
+        }
+      }
+      if (Array.isArray(sec?.customFields)) {
+        for (const f3 of sec.customFields) {
+          if (f3?.id && f3?.label) labelMap.set(String(f3.id), String(f3.label));
+        }
+      }
+    }
+  }
+  return labelMap;
+}
+async function resolveCandidatePhotoBuffer(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== "string") return null;
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return null;
+  let rawBuffer = null;
+  try {
+    if (trimmed.startsWith("data:image/")) {
+      const commaIdx = trimmed.indexOf(",");
+      if (commaIdx !== -1) {
+        rawBuffer = Buffer.from(trimmed.slice(commaIdx + 1), "base64");
+      }
+    } else if (/^https?:\/\//i.test(trimmed)) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5e3);
+      try {
+        const resp = await fetch(trimmed, { signal: controller.signal });
+        if (resp.ok) {
+          const contentType = resp.headers.get("content-type") || "";
+          if (!contentType || contentType.startsWith("image/") || contentType.includes("octet-stream")) {
+            rawBuffer = Buffer.from(await resp.arrayBuffer());
+          }
+        }
+      } finally {
+        clearTimeout(timer);
+      }
+    } else {
+      const cleaned = trimmed.replace(/^\/?(api\/)?storage\/files\//, "").replace(/^\/?(api\/)?objects\//, "").replace(/^\/?uploads\//, "").replace(/^\/+/, "");
+      const diskCandidates = [
+        path5.resolve(process.cwd(), "uploads", cleaned),
+        path5.resolve(process.cwd(), "artifacts/api-server/uploads", cleaned),
+        path5.resolve(os2.tmpdir(), "uploads", cleaned),
+        path5.resolve(os2.tmpdir(), cleaned)
+      ];
+      if (path5.isAbsolute(trimmed) && !trimmed.startsWith("/objects") && !trimmed.startsWith("/api")) {
+        diskCandidates.unshift(trimmed);
+      }
+      for (const fp of diskCandidates) {
+        try {
+          if (fs7.existsSync(fp) && fs7.statSync(fp).isFile()) {
+            rawBuffer = fs7.readFileSync(fp);
+            break;
+          }
+        } catch {
+        }
+      }
+      if (!rawBuffer) {
+        const baseName = path5.basename(cleaned);
+        const dbKeys = Array.from(
+          new Set(
+            [
+              trimmed,
+              cleaned,
+              `/${cleaned}`,
+              `/objects/${cleaned}`,
+              `objects/${cleaned}`,
+              `uploads/${cleaned}`,
+              `/uploads/${cleaned}`,
+              baseName
+            ].filter(Boolean)
+          )
+        );
+        try {
+          const rows = await db.select({ fileData: uploadedFilesTable.fileData, contentType: uploadedFilesTable.contentType }).from(uploadedFilesTable).where(inArray(uploadedFilesTable.filePath, dbKeys)).limit(1);
+          if (rows[0]?.fileData) {
+            const ct = (rows[0].contentType || "").toLowerCase();
+            if (!ct.includes("pdf")) {
+              rawBuffer = Buffer.from(rows[0].fileData);
+            }
+          }
+        } catch {
+        }
+      }
+    }
+    if (!rawBuffer || rawBuffer.length < 32) return null;
+    if (rawBuffer.subarray(0, 4).toString("utf8") === "%PDF") return null;
+    try {
+      const sharpMod = (await import("sharp")).default;
+      return await sharpMod(rawBuffer, { failOn: "none" }).rotate().resize(300, 360, { fit: "cover", position: "center" }).jpeg({ quality: 88 }).toBuffer();
+    } catch {
+      return rawBuffer;
+    }
+  } catch {
+    return null;
+  }
+}
+function stampLetterPageFooters(doc, footerLabel = "CONFIDENTIAL \u2014 SANKARA ACADEMY OF VISION \xB7 FELLOWSHIP ADMISSIONS DOSSIER") {
+  const range2 = doc.bufferedPageRange();
+  const totalPages = range2.count;
+  const generatedStamp = formatToLocalDateTime(/* @__PURE__ */ new Date());
+  for (let i2 = 0; i2 < totalPages; i2++) {
+    doc.switchToPage(range2.start + i2);
+    const page = doc.page;
+    const prevBottomMargin = page.margins.bottom;
+    page.margins.bottom = 0;
+    try {
+      const footerRuleY = page.height - 32;
+      const footerTextY = page.height - 24;
+      doc.save();
+      doc.strokeColor(COLORS.border).lineWidth(0.6).moveTo(PAGE_LEFT, footerRuleY).lineTo(PAGE_RIGHT, footerRuleY).stroke();
+      doc.fillColor(COLORS.slate500).font("Helvetica").fontSize(7.2).text(footerLabel, PAGE_LEFT, footerTextY, { width: 350, lineBreak: false });
+      doc.fillColor(COLORS.slate600).font("Helvetica-Bold").fontSize(7.2).text(
+        `Generated ${generatedStamp}   |   Page ${i2 + 1} of ${totalPages} (US Letter)`,
+        PAGE_LEFT,
+        footerTextY,
+        { width: CONTENT_WIDTH, align: "right", lineBreak: false }
+      );
+      doc.restore();
+    } finally {
+      page.margins.bottom = prevBottomMargin;
+    }
+  }
+}
+async function appendApplicationToPdfDoc(doc, input) {
+  const { sub, form, program, candidate, scores, includeScores } = input;
+  const fd = sub?.formData && typeof sub.formData === "object" ? sub.formData : {};
+  const fullNameRaw = cleanDisplayValue(sub?.fullName || fd.fullName || candidate?.fullName) || "Applicant";
+  const candidateCode = cleanDisplayValue(candidate?.candidateCode || fd.candidateCode) || (sub?.id ? `APP-${String(sub.id).padStart(4, "0")}` : "N/A");
+  const statusStr = (cleanDisplayValue(sub?.status || candidate?.status) || "pending").toUpperCase();
+  const submittedStr = sub?.submittedAt ? formatToDDMMYYYY(sub.submittedAt) : candidate?.createdAt ? formatToDDMMYYYY(candidate.createdAt) : "\u2014";
+  const programStr = cleanDisplayValue(program?.name || form?.title) || "Ophthalmology Fellowship Program";
+  const emailStr = cleanDisplayValue(sub?.email || fd.email || candidate?.email) || "\u2014";
+  const phoneStr = cleanDisplayValue(sub?.phone || fd.phone || candidate?.phone) || "\u2014";
+  const rawSpec = sub?.specialization ?? sub?.specializations ?? fd.specialization ?? fd.specializations ?? candidate?.specialityName ?? null;
+  const appliedSpecs = Array.isArray(rawSpec) ? rawSpec.map((s2) => cleanDisplayValue(s2)).filter(Boolean) : parseSpecializationString(typeof rawSpec === "string" ? rawSpec : cleanDisplayValue(rawSpec) || null);
+  const specSummaryStr = appliedSpecs.length > 0 ? appliedSpecs.join(", ") : cleanDisplayValue(rawSpec) || "Not Specified";
+  const photoUrl = cleanDisplayValue(sub?.photoUrl || fd.photoUrl || "");
+  const [photoBuffer, { sefLogo, savLogo }] = await Promise.all([
+    resolveCandidatePhotoBuffer(photoUrl),
+    Promise.resolve(getLogoPaths())
+  ]);
+  let currY = 26;
+  const drawContinuationHeader = () => {
+    doc.save();
+    doc.fillColor(COLORS.navy).font("Helvetica-Bold").fontSize(8).text(`${fullNameRaw.toUpperCase()}  (${candidateCode})`, PAGE_LEFT, 22, { width: 340, lineBreak: false });
+    doc.fillColor(COLORS.slate500).font("Helvetica").fontSize(7.5).text("Sankara Academy of Vision \xB7 Candidate Application Dossier", PAGE_LEFT, 22, { width: CONTENT_WIDTH, align: "right", lineBreak: false });
+    doc.strokeColor(COLORS.borderLight).lineWidth(0.75).moveTo(PAGE_LEFT, 34).lineTo(PAGE_RIGHT, 34).stroke();
+    doc.restore();
+    currY = 44;
+  };
+  const ensureSpace = (needed) => {
+    if (currY + needed > CONTENT_BOTTOM) {
+      doc.addPage({ size: "LETTER", margins: { top: 30, bottom: 34, left: 36, right: 36 } });
+      drawContinuationHeader();
+    }
+  };
+  const drawSectionHeader = (num, title, minFollow = 44) => {
+    ensureSpace(24 + minFollow);
+    doc.save();
+    doc.rect(PAGE_LEFT, currY, CONTENT_WIDTH, 18).fill(COLORS.bgHeader);
+    doc.rect(PAGE_LEFT, currY, 3.5, 18).fill(COLORS.navy);
+    doc.strokeColor(COLORS.borderLight).lineWidth(0.5).moveTo(PAGE_LEFT, currY + 18).lineTo(PAGE_RIGHT, currY + 18).stroke();
+    doc.fillColor(COLORS.navy).font("Helvetica-Bold").fontSize(8.5).text(`${num}.  ${title.toUpperCase()}`, PAGE_LEFT + 10, currY + 5, { width: CONTENT_WIDTH - 16, lineBreak: false });
+    doc.restore();
+    currY += 23;
+  };
+  const drawKvGrid = (items) => {
+    const rows = [];
+    let pendingPair = [];
+    for (const item of items) {
+      if (item.fullWidth) {
+        if (pendingPair.length > 0) {
+          rows.push(pendingPair);
+          pendingPair = [];
+        }
+        rows.push([item]);
+      } else {
+        pendingPair.push(item);
+        if (pendingPair.length === 2) {
+          rows.push(pendingPair);
+          pendingPair = [];
+        }
+      }
+    }
+    if (pendingPair.length > 0) rows.push(pendingPair);
+    const halfWidth = (CONTENT_WIDTH - 10) / 2;
+    for (const row of rows) {
+      const isFull = row.length === 1 && Boolean(row[0].fullWidth);
+      const cellW = isFull ? CONTENT_WIDTH : halfWidth;
+      let maxH = 0;
+      const cellMetrics = row.map((cell2) => {
+        doc.font("Helvetica-Bold").fontSize(7);
+        const labelH = doc.heightOfString(cell2.label.toUpperCase(), { width: cellW - 10 });
+        doc.font("Helvetica").fontSize(8.6);
+        const valText = cell2.value || "\u2014";
+        const valH = doc.heightOfString(valText, { width: cellW - 10, lineGap: 1.4 });
+        const totalH = labelH + valH + 10;
+        if (totalH > maxH) maxH = totalH;
+        return { labelH, valText };
+      });
+      const rowH = Math.max(24, maxH);
+      ensureSpace(rowH + 2);
+      row.forEach((cell2, idx) => {
+        const cx = isFull ? PAGE_LEFT : PAGE_LEFT + idx * (halfWidth + 10);
+        const metric = cellMetrics[idx];
+        doc.save();
+        doc.rect(cx, currY, cellW, rowH).fill(COLORS.white);
+        doc.strokeColor(COLORS.borderLight).lineWidth(0.5).rect(cx, currY, cellW, rowH).stroke();
+        doc.fillColor(COLORS.slate500).font("Helvetica-Bold").fontSize(6.8).text(cell2.label.toUpperCase(), cx + 6, currY + 4, { width: cellW - 12 });
+        doc.fillColor(COLORS.slate900).font("Helvetica").fontSize(8.6).text(metric.valText, cx + 6, currY + 4 + metric.labelH + 2, { width: cellW - 12, lineGap: 1.4 });
+        doc.restore();
+      });
+      currY += rowH + 4;
+    }
+  };
+  doc.save();
+  if (sefLogo && fs7.existsSync(sefLogo)) {
+    doc.image(sefLogo, PAGE_LEFT, 22, { fit: [84, 42], valign: "center" });
+  }
+  if (savLogo && fs7.existsSync(savLogo)) {
+    doc.image(savLogo, PAGE_RIGHT - 44, 22, { fit: [44, 42], align: "right", valign: "center" });
+  }
+  doc.fillColor(COLORS.navy).font("Helvetica-Bold").fontSize(13.5).text("SANKARA ACADEMY OF VISION", PAGE_LEFT + 88, 24, { width: CONTENT_WIDTH - 140, align: "center" });
+  doc.fillColor(COLORS.slate600).font("Helvetica").fontSize(7.6).text("An Educational Unit of Sankara Eye Foundation, India \xB7 Sri Kanchi Kamakoti Medical Trust", PAGE_LEFT + 88, 41, { width: CONTENT_WIDTH - 140, align: "center" });
+  doc.fillColor(COLORS.amber).font("Helvetica-Bold").fontSize(8).text("FELLOWSHIP CANDIDATE APPLICATION DOSSIER", PAGE_LEFT + 88, 53, { width: CONTENT_WIDTH - 140, align: "center" });
+  doc.strokeColor(COLORS.navy).lineWidth(1.5).moveTo(PAGE_LEFT, 68).lineTo(PAGE_RIGHT, 68).stroke();
+  doc.strokeColor(COLORS.amber).lineWidth(0.75).moveTo(PAGE_LEFT, 71).lineTo(PAGE_RIGHT, 71).stroke();
+  doc.restore();
+  currY = 78;
+  const photoBoxW = 88;
+  const photoBoxH = 104;
+  const heroCardW = CONTENT_WIDTH - photoBoxW - 10;
+  doc.save();
+  doc.rect(PAGE_LEFT, currY, heroCardW, photoBoxH).fill(COLORS.bgLight);
+  doc.strokeColor(COLORS.border).lineWidth(0.75).rect(PAGE_LEFT, currY, heroCardW, photoBoxH).stroke();
+  doc.rect(PAGE_LEFT, currY, 4, photoBoxH).fill(COLORS.navy);
+  const formattedDoctorHeading = formatDoctorName(fullNameRaw) || fullNameRaw;
+  doc.fillColor(COLORS.slate900).font("Helvetica-Bold").fontSize(13).text(formattedDoctorHeading, PAGE_LEFT + 12, currY + 8, { width: heroCardW - 22, ellipsis: true, height: 18 });
+  doc.fillColor(COLORS.navy).font("Helvetica-Bold").fontSize(8).text(`Code: ${candidateCode}   |   Status: ${statusStr}   |   Submitted: ${submittedStr}`, PAGE_LEFT + 12, currY + 28, { width: heroCardW - 22 });
+  doc.fillColor(COLORS.slate700).font("Helvetica").fontSize(8.2).text(`Program / Form: ${programStr}`, PAGE_LEFT + 12, currY + 42, { width: heroCardW - 22, ellipsis: true, height: 12 });
+  doc.fillColor(COLORS.slate700).font("Helvetica").fontSize(8.2).text(`Email: ${emailStr}   |   Mobile: ${phoneStr}`, PAGE_LEFT + 12, currY + 56, { width: heroCardW - 22, height: 13, ellipsis: true });
+  doc.fillColor(COLORS.slate500).font("Helvetica-Bold").fontSize(7).text("APPLIED SPECIALITIES:", PAGE_LEFT + 12, currY + 72, { width: heroCardW - 22 });
+  doc.fillColor(COLORS.slate900).font("Helvetica-Bold").fontSize(8.3).text(specSummaryStr, PAGE_LEFT + 12, currY + 82, { width: heroCardW - 22, height: 20, ellipsis: true });
+  const photoX = PAGE_LEFT + heroCardW + 10;
+  doc.rect(photoX, currY, photoBoxW, photoBoxH).fill(COLORS.white);
+  doc.strokeColor(COLORS.border).lineWidth(0.8).rect(photoX, currY, photoBoxW, photoBoxH).stroke();
+  if (photoBuffer) {
+    try {
+      doc.image(photoBuffer, photoX + 3, currY + 3, {
+        fit: [photoBoxW - 6, photoBoxH - 6],
+        align: "center",
+        valign: "center"
+      });
+    } catch {
+      doc.fillColor(COLORS.slate400).font("Helvetica").fontSize(7).text("PHOTO\nUNAVAILABLE", photoX + 4, currY + 42, { width: photoBoxW - 8, align: "center" });
+    }
+  } else {
+    doc.fillColor(COLORS.slate400).font("Helvetica").fontSize(7).text("PASSPORT\nPHOTO\nNOT UPLOADED", photoX + 4, currY + 36, { width: photoBoxW - 8, align: "center" });
+  }
+  doc.restore();
+  currY += photoBoxH + 10;
+  const labelMap = extractCustomFieldLabelMap(form);
+  drawSectionHeader("01", "Applied Specializations & Preferred Study Centers", 52);
+  const centerRows = formatCenterPreferences(
+    sub?.centerPreference ?? fd.centerPreference,
+    appliedSpecs,
+    sub?.customAnswers,
+    fd,
+    labelMap
+  );
+  const s1Items = [
+    { label: "Selected Fellowship Specialities", value: specSummaryStr, fullWidth: true }
+  ];
+  for (const cr of centerRows) {
+    s1Items.push({
+      label: `Center Preference \u2014 ${cr.speciality}`,
+      value: cr.preferences,
+      fullWidth: true
+    });
+  }
+  const refSrc = cleanDisplayValue(sub?.referralSource || fd.referralSource);
+  const refName = cleanDisplayValue(sub?.referredByName || fd.referredByName);
+  const medSrc = cleanDisplayValue(sub?.mediaSource || fd.mediaSource);
+  const prevApp = cleanDisplayValue(sub?.previousApplicationMonthYear || fd.previousApplicationMonthYear);
+  if (refSrc || refName || medSrc || prevApp) {
+    s1Items.push(
+      { label: "Referral / Awareness Source", value: [refSrc, refName ? `Referred by: ${refName}` : "", medSrc].filter(Boolean).join(" \xB7 ") || "\u2014" },
+      { label: "Previous Application Month/Year", value: prevApp || "First Time Applicant" }
+    );
+  }
+  drawKvGrid(s1Items);
+  currY += 4;
+  drawSectionHeader("02", "Personal, Contact & Health Details", 64);
+  const dobFormatted = formatDOBToStandard(sub?.dateOfBirth || fd.dateOfBirth || candidate?.dateOfBirth);
+  const marital = cleanDisplayValue(sub?.maritalStatus || fd.maritalStatus);
+  const spouseFormatted = cleanSpouseValue(marital, sub?.spouseDetails ?? fd.spouseDetails);
+  const permAddr = cleanDisplayValue(sub?.permanentAddress || fd.permanentAddress || candidate?.address);
+  const mailAddr = cleanDisplayValue(sub?.mailingAddress || fd.mailingAddress) || permAddr;
+  const healthDecl = cleanDisplayValue(sub?.healthDeclaration || fd.healthDeclaration);
+  const healthNotes = [cleanDisplayValue(sub?.medicalConditions || fd.medicalConditions), cleanDisplayValue(sub?.healthDetails || fd.healthDetails)].filter(Boolean).join(" \u2014 ");
+  const s2Items = [
+    { label: "Full Name", value: fullNameRaw },
+    { label: "Date of Birth", value: dobFormatted },
+    { label: "Gender", value: displayOrDash(sub?.gender || fd.gender || candidate?.gender) },
+    { label: "Marital Status", value: marital || "\u2014" },
+    { label: "Email Address", value: emailStr },
+    { label: "Mobile / Contact No.", value: phoneStr }
+  ];
+  if (marital.toLowerCase().includes("married") && !marital.toLowerCase().includes("unmarried")) {
+    s2Items.push({ label: "Spouse Details", value: spouseFormatted, fullWidth: true });
+  }
+  s2Items.push(
+    { label: "Mailing / Communication Address", value: mailAddr || "\u2014", fullWidth: true },
+    {
+      label: "Permanent Address",
+      value: !permAddr ? "\u2014" : permAddr === mailAddr ? "Same as Mailing Address" : permAddr,
+      fullWidth: true
+    },
+    { label: "Health Declaration", value: healthDecl || "\u2014" },
+    { label: "Known Medical Conditions / Remarks", value: healthNotes || "None Reported" }
+  );
+  drawKvGrid(s2Items);
+  currY += 4;
+  drawSectionHeader("03", "Academic Qualifications & Medical Council Registration", 68);
+  const pgItems = [
+    { label: "Qualifying UG Degree", value: displayOrDash(sub?.degree || fd.degree || candidate?.qualification) },
+    { label: "MBBS Medical College", value: displayOrDash(sub?.medicalCollege || fd.medicalCollege || candidate?.collegeName) },
+    { label: "Affiliated University", value: displayOrDash(sub?.university || fd.university) },
+    { label: "Medical Council Registration No.", value: displayOrDash(sub?.medicalCouncilNumber || fd.medicalCouncilNumber) },
+    {
+      label: "MS / MD Ophthalmology",
+      value: `${cleanDisplayValue(sub?.msMdQualification) || (sub?.msMdDetails ? "Yes" : "No")}${cleanDisplayValue(sub?.msMdDetails) ? ` \u2014 ${cleanDisplayValue(sub?.msMdDetails)}` : ""}`
+    },
+    {
+      label: "DNB / DO Qualifications",
+      value: [
+        sub?.dnbQualification || sub?.dnbDetails ? `DNB: ${cleanDisplayValue(sub?.dnbDetails) || "Yes"}` : "",
+        sub?.doQualification || sub?.doDetails ? `DO: ${cleanDisplayValue(sub?.doDetails) || "Yes"}` : ""
+      ].filter(Boolean).join("  |  ") || "\u2014"
+    }
+  ];
+  const pgQual = cleanDisplayValue(sub?.pgQualifications || fd.pgQualifications);
+  if (pgQual) {
+    pgItems.push({ label: "PG Qualification Summary", value: pgQual, fullWidth: true });
+  }
+  const otherTrain = cleanDisplayValue(sub?.otherTraining || fd.otherTraining);
+  if (otherTrain) {
+    pgItems.push({ label: "Other Fellowship / Clinical Training", value: otherTrain, fullWidth: true });
+  }
+  drawKvGrid(pgItems);
+  currY += 4;
+  drawSectionHeader("04", "Clinical & Diagnostic Proficiencies", 48);
+  const skills = parseDiagnosticSkills(sub?.diagnosticSkills ?? fd.diagnosticSkills);
+  if (skills.length > 0) {
+    const pairWidth = CONTENT_WIDTH / 2;
+    const skillNameW = 180;
+    const skillLvlW = 84;
+    ensureSpace(22);
+    doc.save();
+    doc.rect(PAGE_LEFT, currY, CONTENT_WIDTH, 16).fill(COLORS.navy);
+    doc.fillColor(COLORS.white).font("Helvetica-Bold").fontSize(7);
+    doc.text("INSTRUMENT / DIAGNOSTIC SKILL", PAGE_LEFT + 6, currY + 5, { width: skillNameW - 6 });
+    doc.text("PROFICIENCY", PAGE_LEFT + skillNameW, currY + 5, { width: skillLvlW - 4, align: "center" });
+    doc.text("INSTRUMENT / DIAGNOSTIC SKILL", PAGE_LEFT + pairWidth + 6, currY + 5, { width: skillNameW - 6 });
+    doc.text("PROFICIENCY", PAGE_LEFT + pairWidth + skillNameW, currY + 5, { width: skillLvlW - 4, align: "center" });
+    doc.restore();
+    currY += 16;
+    for (let i2 = 0; i2 < skills.length; i2 += 2) {
+      const leftSkill = skills[i2];
+      const rightSkill = skills[i2 + 1];
+      doc.font("Helvetica").fontSize(8.2);
+      const h1 = doc.heightOfString(leftSkill.name, { width: skillNameW - 8 });
+      const h2 = rightSkill ? doc.heightOfString(rightSkill.name, { width: skillNameW - 8 }) : 0;
+      const rowH = Math.max(18, Math.max(h1, h2) + 8);
+      ensureSpace(rowH);
+      const bg = i2 / 2 % 2 === 0 ? COLORS.white : COLORS.bgLight;
+      doc.save();
+      doc.rect(PAGE_LEFT, currY, CONTENT_WIDTH, rowH).fill(bg);
+      doc.strokeColor(COLORS.borderLight).lineWidth(0.5).rect(PAGE_LEFT, currY, CONTENT_WIDTH, rowH).stroke();
+      doc.moveTo(PAGE_LEFT + pairWidth, currY).lineTo(PAGE_LEFT + pairWidth, currY + rowH).stroke();
+      const drawSkillCell = (sk, baseX) => {
+        const lvlColor = sk.level.toLowerCase().includes("expert") ? COLORS.emerald : sk.level.toLowerCase().includes("inter") ? COLORS.blue : COLORS.amber;
+        doc.fillColor(COLORS.slate900).font("Helvetica").fontSize(8.2).text(sk.name, baseX + 6, currY + 4, { width: skillNameW - 10 });
+        doc.fillColor(lvlColor).font("Helvetica-Bold").fontSize(7.8).text(sk.level, baseX + skillNameW, currY + 4, { width: skillLvlW - 4, align: "center" });
+      };
+      drawSkillCell(leftSkill, PAGE_LEFT);
+      if (rightSkill) drawSkillCell(rightSkill, PAGE_LEFT + pairWidth);
+      doc.restore();
+      currY += rowH;
+    }
+    currY += 8;
+  } else {
+    const rawDiag = cleanDisplayValue(sub?.diagnosticSkills ?? fd.diagnosticSkills);
+    const displayDiag = rawDiag && !rawDiag.startsWith("{") && !rawDiag.startsWith("[") ? rawDiag : "No diagnostic proficiencies listed";
+    drawKvGrid([{ label: "Diagnostic Proficiencies", value: displayDiag, fullWidth: true }]);
+    currY += 4;
+  }
+  drawSectionHeader("05", "Surgical Experience & Operative Log", 52);
+  const surgeries = parseSurgicalExperience(sub?.surgicalExperience ?? fd.surgicalExperience);
+  const declaredTotal = cleanDisplayValue(sub?.totalSurgeries ?? fd.totalSurgeries);
+  if (surgeries.length > 0) {
+    const computedSup = surgeries.reduce((acc, s2) => acc + (Number(s2.supervision) || 0), 0);
+    const computedInd = surgeries.reduce((acc, s2) => acc + (Number(s2.independent) || 0), 0);
+    const computedSum = computedSup + computedInd;
+    const headlineTotal = declaredTotal && Number(declaredTotal) > 0 ? declaredTotal : String(computedSum);
+    ensureSpace(22);
+    doc.save();
+    doc.rect(PAGE_LEFT, currY, CONTENT_WIDTH, 18).fill(COLORS.amberLight);
+    doc.strokeColor(COLORS.amberBorder).lineWidth(0.6).rect(PAGE_LEFT, currY, CONTENT_WIDTH, 18).stroke();
+    doc.fillColor(COLORS.amber).font("Helvetica-Bold").fontSize(8.2).text(`TOTAL SURGERIES PERFORMED: ${headlineTotal}   (Independent: ${computedInd}  \xB7  Under Supervision: ${computedSup})`, PAGE_LEFT + 8, currY + 5, { width: CONTENT_WIDTH - 16 });
+    doc.restore();
+    currY += 22;
+    const c1 = 270;
+    const c2 = 90;
+    const c3 = 90;
+    const c4 = 90;
+    ensureSpace(20);
+    doc.save();
+    doc.rect(PAGE_LEFT, currY, CONTENT_WIDTH, 16).fill(COLORS.navy);
+    doc.fillColor(COLORS.white).font("Helvetica-Bold").fontSize(7.2);
+    doc.text("SURGICAL PROCEDURE / CATEGORY", PAGE_LEFT + 8, currY + 5, { width: c1 - 12 });
+    doc.text("SUPERVISION", PAGE_LEFT + c1, currY + 5, { width: c2 - 8, align: "right" });
+    doc.text("INDEPENDENT", PAGE_LEFT + c1 + c2, currY + 5, { width: c3 - 8, align: "right" });
+    doc.text("TOTAL", PAGE_LEFT + c1 + c2 + c3, currY + 5, { width: c4 - 8, align: "right" });
+    doc.restore();
+    currY += 16;
+    surgeries.forEach((sg, idx) => {
+      const sup = Number(sg.supervision) || 0;
+      const ind = Number(sg.independent) || 0;
+      const tot = Number(sg.total) || sup + ind;
+      const rowH = 18;
+      ensureSpace(rowH);
+      doc.save();
+      doc.rect(PAGE_LEFT, currY, CONTENT_WIDTH, rowH).fill(idx % 2 === 0 ? COLORS.white : COLORS.bgLight);
+      doc.strokeColor(COLORS.borderLight).lineWidth(0.5).rect(PAGE_LEFT, currY, CONTENT_WIDTH, rowH).stroke();
+      doc.fillColor(COLORS.slate900).font("Helvetica-Bold").fontSize(8.2).text(sg.procedure, PAGE_LEFT + 8, currY + 5, { width: c1 - 12, ellipsis: true, height: 11 });
+      doc.fillColor(COLORS.slate700).font("Helvetica").fontSize(8.4).text(String(sup), PAGE_LEFT + c1, currY + 5, { width: c2 - 8, align: "right" }).text(String(ind), PAGE_LEFT + c1 + c2, currY + 5, { width: c3 - 8, align: "right" });
+      doc.fillColor(COLORS.navy).font("Helvetica-Bold").fontSize(8.4).text(String(tot), PAGE_LEFT + c1 + c2 + c3, currY + 5, { width: c4 - 8, align: "right" });
+      doc.restore();
+      currY += rowH;
+    });
+    ensureSpace(18);
+    doc.save();
+    doc.rect(PAGE_LEFT, currY, CONTENT_WIDTH, 18).fill(COLORS.bgHeader);
+    doc.strokeColor(COLORS.border).lineWidth(0.6).rect(PAGE_LEFT, currY, CONTENT_WIDTH, 18).stroke();
+    doc.fillColor(COLORS.navy).font("Helvetica-Bold").fontSize(8.2).text("AGGREGATE TOTAL", PAGE_LEFT + 8, currY + 5, { width: c1 - 12 }).text(String(computedSup), PAGE_LEFT + c1, currY + 5, { width: c2 - 8, align: "right" }).text(String(computedInd), PAGE_LEFT + c1 + c2, currY + 5, { width: c3 - 8, align: "right" }).text(headlineTotal, PAGE_LEFT + c1 + c2 + c3, currY + 5, { width: c4 - 8, align: "right" });
+    doc.restore();
+    currY += 24;
+  } else {
+    drawKvGrid([
+      { label: "Total Surgeries Performed", value: declaredTotal || "0", fullWidth: true }
+    ]);
+    currY += 4;
+  }
+  drawSectionHeader("06", "Research, Publications & Conference Presentations", 46);
+  const s6Items = [
+    { label: "Journal Publications", value: displayOrDash(sub?.publications || fd.publications), fullWidth: true },
+    { label: "Conference Paper / Poster Presentations", value: displayOrDash(sub?.presentations || fd.presentations), fullWidth: true }
+  ];
+  const otherInfo = cleanDisplayValue(sub?.otherInformation || fd.otherInformation);
+  if (otherInfo) {
+    s6Items.push({ label: "Other Academic Honors / Relevant Information", value: otherInfo, fullWidth: true });
+  }
+  drawKvGrid(s6Items);
+  currY += 4;
+  const extraItems = [];
+  const seenExtraKeys = /* @__PURE__ */ new Set();
+  const collectExtraFromObj = (obj) => {
+    if (!obj || typeof obj !== "object" || Array.isArray(obj)) return;
+    for (const [key, rawVal] of Object.entries(obj)) {
+      if (STANDARD_FIELD_KEYS.has(key) || seenExtraKeys.has(key) || key.startsWith("unit_")) continue;
+      const valStr = cleanDisplayValue(rawVal);
+      if (!valStr || valStr.startsWith("{") && valStr.length > 500) continue;
+      seenExtraKeys.add(key);
+      const label = labelMap.get(key) || prettifyKey(key);
+      extraItems.push({ label, value: valStr, fullWidth: valStr.length > 65 });
+    }
+  };
+  collectExtraFromObj(sub?.customAnswers);
+  collectExtraFromObj(fd);
+  if (extraItems.length > 0) {
+    drawSectionHeader("07", "Additional Application Disclosures", 36);
+    drawKvGrid(extraItems);
+    currY += 4;
+  }
+  const mcqScore = scores?.mcq ?? candidate?.mcqScore ?? null;
+  const psychScore = scores?.psychometric ?? candidate?.psychometricScore ?? null;
+  const specScore = scores?.specialityTotal ?? null;
+  const hasAnyScore = Boolean(includeScores) || mcqScore != null || psychScore != null || specScore != null || scores?.breakdown && scores.breakdown.length > 0;
+  let secNum = extraItems.length > 0 ? 8 : 7;
+  const nextSecNum = () => String(secNum++).padStart(2, "0");
+  if (hasAnyScore) {
+    drawSectionHeader(nextSecNum(), "Entrance Performance & Interview Evaluation Summary", 54);
+    const mcqNum = mcqScore != null && !isNaN(Number(mcqScore)) ? Number(mcqScore) : null;
+    const psychNum = psychScore != null && !isNaN(Number(psychScore)) ? Number(psychScore) : null;
+    const specNum = specScore != null && !isNaN(Number(specScore)) ? Number(specScore) : null;
+    const computed110 = scores?.total110 != null ? Number(scores.total110) : (mcqNum ?? 0) + (psychNum ?? 0) + (specNum ?? 0);
+    ensureSpace(38);
+    const boxW = (CONTENT_WIDTH - 18) / 4;
+    const scoreBoxes = [
+      { label: "MCQ ENTRANCE", val: mcqNum !== null ? `${mcqNum.toFixed(1).replace(/\.0$/, "")} / 50` : "\u2014 / 50", bg: COLORS.bgLight, fg: COLORS.slate900 },
+      { label: "MIND MATTERS", val: psychNum !== null ? `${psychNum.toFixed(1).replace(/\.0$/, "")} / 10` : "\u2014 / 10", bg: COLORS.bgLight, fg: COLORS.slate900 },
+      { label: "SPECIALITY VIVA", val: specNum !== null ? `${specNum.toFixed(1).replace(/\.0$/, "")} / 50` : "\u2014 / 50", bg: COLORS.bgLight, fg: COLORS.slate900 },
+      { label: "AGGREGATE SCORE", val: `${computed110.toFixed(1).replace(/\.0$/, "")} / 110`, bg: COLORS.amberLight, fg: COLORS.amber }
+    ];
+    scoreBoxes.forEach((sb, idx) => {
+      const bx = PAGE_LEFT + idx * (boxW + 6);
+      doc.save();
+      doc.rect(bx, currY, boxW, 34).fill(sb.bg);
+      doc.strokeColor(idx === 3 ? COLORS.amberBorder : COLORS.borderLight).lineWidth(0.75).rect(bx, currY, boxW, 34).stroke();
+      doc.fillColor(COLORS.slate500).font("Helvetica-Bold").fontSize(6.8).text(sb.label, bx + 4, currY + 5, { width: boxW - 8, align: "center" });
+      doc.fillColor(sb.fg).font("Helvetica-Bold").fontSize(11).text(sb.val, bx + 4, currY + 16, { width: boxW - 8, align: "center" });
+      doc.restore();
+    });
+    currY += 40;
+    if (scores?.breakdown && scores.breakdown.length > 0) {
+      for (const b of scores.breakdown) {
+        drawKvGrid([
+          {
+            label: b.isMindMatter ? `Mind Matters Panel \u2014 ${b.panelName || "Panel"}` : `${b.specialityName || "Speciality"} Panel \u2014 ${b.panelName || "Panel"}`,
+            value: `Score: ${b.score ?? "\u2014"}${b.isMindMatter ? " / 10" : " / 50"}${b.remarks ? `   |   Remarks: ${b.remarks}` : ""}`,
+            fullWidth: true
+          }
+        ]);
+      }
+    }
+    currY += 2;
+  }
+  drawSectionHeader(nextSecNum(), "Academic Referees (LORs), Fee Verification & Attachments", 62);
+  const lor1Text = [
+    cleanDisplayValue(sub?.lor1RefName || fd.lor1RefName),
+    cleanDisplayValue(sub?.lor1RefContact || fd.lor1RefContact),
+    cleanDisplayValue(sub?.lor1RefEmail || fd.lor1RefEmail)
+  ].filter(Boolean).join(" \xB7 ");
+  const lor2Text = [
+    cleanDisplayValue(sub?.lor2RefName || fd.lor2RefName),
+    cleanDisplayValue(sub?.lor2RefContact || fd.lor2RefContact),
+    cleanDisplayValue(sub?.lor2RefEmail || fd.lor2RefEmail)
+  ].filter(Boolean).join(" \xB7 ");
+  const lor1Status = cleanDisplayValue(sub?.lor1Url || fd.lor1Url) ? "Letter Uploaded" : "Pending / Not Attached";
+  const lor2Status = cleanDisplayValue(sub?.lor2Url || fd.lor2Url) ? "Letter Uploaded" : "Pending / Not Attached";
+  const paidAmt = sub?.paidAmount != null ? `Rs. ${sub.paidAmount}` : cleanDisplayValue(sub?.paymentMode || fd.paymentMode) ? "Verified" : "\u2014";
+  const payMeta = [paidAmt, cleanDisplayValue(sub?.paymentMode || fd.paymentMode), cleanDisplayValue(sub?.paymentId || fd.paymentId) ? `Ref: ${cleanDisplayValue(sub?.paymentId || fd.paymentId)}` : ""].filter(Boolean).join("   |   ");
+  drawKvGrid([
+    { label: `Referee 1 (${lor1Status})`, value: lor1Text || "Not Provided" },
+    { label: `Referee 2 (${lor2Status})`, value: lor2Text || "Not Provided" },
+    { label: "Application Fee & Transaction Reference", value: payMeta || "\u2014", fullWidth: true }
+  ]);
+  currY += 4;
+  ensureSpace(112);
+  drawSectionHeader(nextSecNum(), "Applicant Declaration & Official Verification", 78);
+  const declYes = sub?.declarationAccepted === true || String(sub?.declarationAccepted).toLowerCase() === "true" || !sub;
+  doc.save();
+  doc.rect(PAGE_LEFT, currY, CONTENT_WIDTH, 32).fill(COLORS.bgLight);
+  doc.strokeColor(COLORS.borderLight).lineWidth(0.6).rect(PAGE_LEFT, currY, CONTENT_WIDTH, 32).stroke();
+  doc.fillColor(COLORS.slate700).font("Helvetica").fontSize(8).text(
+    `Declaration Accepted: ${declYes ? "Yes \u2014 Confirmed" : "Pending"}   |   I hereby affirm that all academic credentials, surgical logs, diagnostic proficiencies, and identity details furnished in this fellowship application are true and complete to the best of my knowledge.`,
+    PAGE_LEFT + 8,
+    currY + 6,
+    { width: CONTENT_WIDTH - 16, lineGap: 1.5 }
+  );
+  doc.restore();
+  currY += 40;
+  const sigBoxW = (CONTENT_WIDTH - 20) / 2;
+  doc.save();
+  doc.strokeColor(COLORS.border).lineWidth(0.6).rect(PAGE_LEFT, currY, sigBoxW, 42).stroke().rect(PAGE_LEFT + sigBoxW + 20, currY, sigBoxW, 42).stroke();
+  doc.fillColor(COLORS.slate500).font("Helvetica-Bold").fontSize(7).text("APPLICANT DECLARATION & SUBMISSION VERIFICATION", PAGE_LEFT + 8, currY + 6, { width: sigBoxW - 16 }).text("ACADEMIC & ADMISSIONS COMMITTEE VERIFICATION", PAGE_LEFT + sigBoxW + 28, currY + 6, { width: sigBoxW - 16 });
+  doc.fillColor(COLORS.slate900).font("Helvetica").fontSize(8).text(`${fullNameRaw}  (${submittedStr})`, PAGE_LEFT + 8, currY + 24, { width: sigBoxW - 16, ellipsis: true });
+  doc.fillColor(COLORS.slate400).font("Helvetica").fontSize(7.5).text("Authorized Signatory / Institutional Seal", PAGE_LEFT + sigBoxW + 28, currY + 24, { width: sigBoxW - 16 });
+  doc.restore();
+  currY += 46;
+}
+async function generateApplicationPdfBuffer(input) {
+  return new Promise((resolve4, reject) => {
+    const doc = new import_pdfkit3.default({
+      size: "LETTER",
+      margins: { top: 30, bottom: 34, left: 36, right: 36 },
+      bufferPages: true
+    });
+    const chunks = [];
+    doc.on("data", (chunk) => chunks.push(chunk));
+    doc.on("end", () => resolve4(Buffer.concat(chunks)));
+    doc.on("error", reject);
+    appendApplicationToPdfDoc(doc, input).then(() => {
+      stampLetterPageFooters(doc);
+      doc.end();
+    }).catch(reject);
+  });
+}
+var import_pdfkit3, COLORS, PAGE_LEFT, CONTENT_WIDTH, PAGE_RIGHT, CONTENT_BOTTOM, STANDARD_FIELD_KEYS;
+var init_application_pdf = __esm({
+  "src/lib/application-pdf.ts"() {
+    "use strict";
+    import_pdfkit3 = __toESM(require_pdfkit(), 1);
+    init_drizzle_orm();
+    init_src();
+    init_letters();
+    init_utils5();
+    COLORS = {
+      navy: "#0b3a6e",
+      slate900: "#0f172a",
+      slate700: "#334155",
+      slate600: "#475569",
+      slate500: "#64748b",
+      slate400: "#94a3b8",
+      border: "#cbd5e1",
+      borderLight: "#e2e8f0",
+      bgLight: "#f8fafc",
+      bgHeader: "#f1f5f9",
+      amber: "#b45309",
+      amberLight: "#fffbeb",
+      amberBorder: "#fde68a",
+      emerald: "#047857",
+      blue: "#0369a1",
+      white: "#ffffff"
+    };
+    PAGE_LEFT = 36;
+    CONTENT_WIDTH = 540;
+    PAGE_RIGHT = PAGE_LEFT + CONTENT_WIDTH;
+    CONTENT_BOTTOM = 742;
+    STANDARD_FIELD_KEYS = /* @__PURE__ */ new Set([
+      "fullName",
+      "full_name",
+      "email",
+      "phone",
+      "mobile",
+      "dateOfBirth",
+      "date_of_birth",
+      "dob",
+      "gender",
+      "maritalStatus",
+      "marital_status",
+      "spouseDetails",
+      "spouse_details",
+      "permanentAddress",
+      "permanent_address",
+      "mailingAddress",
+      "mailing_address",
+      "healthDeclaration",
+      "health_declaration",
+      "healthDetails",
+      "health_details",
+      "medicalConditions",
+      "medical_conditions",
+      "previousApplicationMonthYear",
+      "previous_application_month_year",
+      "specialization",
+      "specializations",
+      "speciality",
+      "centerPreference",
+      "center_preference",
+      "referralSource",
+      "referral_source",
+      "referredByName",
+      "referred_by_name",
+      "mediaSource",
+      "media_source",
+      "degree",
+      "medicalCollege",
+      "medical_college",
+      "collegeName",
+      "college_name",
+      "university",
+      "pgQualifications",
+      "pg_qualifications",
+      "doQualification",
+      "do_qualification",
+      "doDetails",
+      "do_details",
+      "msMdQualification",
+      "ms_md_qualification",
+      "msMdDetails",
+      "ms_md_details",
+      "dnbQualification",
+      "dnb_qualification",
+      "dnbDetails",
+      "dnb_details",
+      "otherTraining",
+      "other_training",
+      "medicalCouncilNumber",
+      "medical_council_number",
+      "diagnosticSkills",
+      "diagnostic_skills",
+      "surgicalExperience",
+      "surgical_experience",
+      "totalSurgeries",
+      "total_surgeries",
+      "publications",
+      "presentations",
+      "otherInformation",
+      "other_information",
+      "lor1Url",
+      "lor1_url",
+      "lor1RefName",
+      "lor1_ref_name",
+      "lor1RefContact",
+      "lor1_ref_contact",
+      "lor1RefEmail",
+      "lor1_ref_email",
+      "lor2Url",
+      "lor2_url",
+      "lor2RefName",
+      "lor2_ref_name",
+      "lor2RefContact",
+      "lor2_ref_contact",
+      "lor2RefEmail",
+      "lor2_ref_email",
+      "declarationAccepted",
+      "declaration_accepted",
+      "paymentUrl",
+      "payment_url",
+      "photoUrl",
+      "photo_url",
+      "paidAmount",
+      "paid_amount",
+      "paymentId",
+      "payment_id",
+      "paymentMode",
+      "payment_mode",
+      "candidateCode",
+      "candidate_code",
+      "status",
+      "saveAsDraft",
+      "save_as_draft",
+      "customAnswers",
+      "custom_answers",
+      "formData",
+      "form_data",
+      "agree",
+      "submit",
+      "csrfToken"
+    ]);
+  }
+});
+
 // ../../node_modules/.pnpm/webidl-conversions@3.0.1/node_modules/webidl-conversions/lib/index.js
 var require_lib6 = __commonJS({
   "../../node_modules/.pnpm/webidl-conversions@3.0.1/node_modules/webidl-conversions/lib/index.js"(exports, module) {
@@ -1079322,9 +1080670,9 @@ var require_URL = __commonJS({
   "../../node_modules/.pnpm/whatwg-url@5.0.0/node_modules/whatwg-url/lib/URL.js"(exports, module) {
     "use strict";
     var conversions = require_lib6();
-    var utils8 = require_utils9();
+    var utils9 = require_utils9();
     var Impl = require_URL_impl();
-    var impl = utils8.implSymbol;
+    var impl = utils9.implSymbol;
     function URL5(url3) {
       if (!this || this[impl] || !(this instanceof URL5)) {
         throw new TypeError("Failed to construct 'URL': Please use the 'new' operator, this DOM object constructor cannot be called as a function.");
@@ -1079488,7 +1080836,7 @@ var require_URL = __commonJS({
         if (!privateData) privateData = {};
         privateData.wrapper = obj;
         obj[impl] = new Impl.implementation(constructorArgs, privateData);
-        obj[impl][utils8.wrapperSymbol] = obj;
+        obj[impl][utils9.wrapperSymbol] = obj;
       },
       interface: URL5,
       expose: {
@@ -1084109,12 +1085457,12 @@ var require_src11 = __commonJS({
     var _GoogleToken_requestToken;
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.GoogleToken = void 0;
-    var fs16 = __require("fs");
+    var fs17 = __require("fs");
     var gaxios_1 = require_src8();
     var jws = require_jws();
     var path15 = __require("path");
     var util_1 = __require("util");
-    var readFile3 = fs16.readFile ? (0, util_1.promisify)(fs16.readFile) : async () => {
+    var readFile3 = fs17.readFile ? (0, util_1.promisify)(fs17.readFile) : async () => {
       throw new ErrorWithCode("use key rather than keyFile.", "MISSING_CREDENTIALS");
     };
     var GOOGLE_TOKEN_URL = "https://www.googleapis.com/oauth2/v4/token";
@@ -1085671,12 +1087019,12 @@ var require_filesubjecttokensupplier2 = __commonJS({
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.FileSubjectTokenSupplier = void 0;
     var util_1 = __require("util");
-    var fs16 = __require("fs");
-    var readFile3 = (0, util_1.promisify)((_a2 = fs16.readFile) !== null && _a2 !== void 0 ? _a2 : (() => {
+    var fs17 = __require("fs");
+    var readFile3 = (0, util_1.promisify)((_a2 = fs17.readFile) !== null && _a2 !== void 0 ? _a2 : (() => {
     }));
-    var realpath = (0, util_1.promisify)((_b = fs16.realpath) !== null && _b !== void 0 ? _b : (() => {
+    var realpath = (0, util_1.promisify)((_b = fs17.realpath) !== null && _b !== void 0 ? _b : (() => {
     }));
-    var lstat3 = (0, util_1.promisify)((_c = fs16.lstat) !== null && _c !== void 0 ? _c : (() => {
+    var lstat3 = (0, util_1.promisify)((_c = fs17.lstat) !== null && _c !== void 0 ? _c : (() => {
     }));
     var FileSubjectTokenSupplier = class {
       /**
@@ -1086394,7 +1087742,7 @@ var require_pluggable_auth_handler2 = __commonJS({
     var pluggable_auth_client_1 = require_pluggable_auth_client2();
     var executable_response_1 = require_executable_response2();
     var childProcess = __require("child_process");
-    var fs16 = __require("fs");
+    var fs17 = __require("fs");
     var PluggableAuthHandler = class _PluggableAuthHandler {
       /**
        * Instantiates a PluggableAuthHandler instance using the provided
@@ -1086464,14 +1087812,14 @@ var require_pluggable_auth_handler2 = __commonJS({
         }
         let filePath;
         try {
-          filePath = await fs16.promises.realpath(this.outputFile);
+          filePath = await fs17.promises.realpath(this.outputFile);
         } catch (_a2) {
           return void 0;
         }
-        if (!(await fs16.promises.lstat(filePath)).isFile()) {
+        if (!(await fs17.promises.lstat(filePath)).isFile()) {
           return void 0;
         }
-        const responseString = await fs16.promises.readFile(filePath, {
+        const responseString = await fs17.promises.readFile(filePath, {
           encoding: "utf8"
         });
         if (responseString === "") {
@@ -1086892,9 +1088240,9 @@ var require_googleauth2 = __commonJS({
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.GoogleAuth = exports.GoogleAuthExceptionMessages = exports.CLOUD_SDK_CLIENT_ID = void 0;
     var child_process_1 = __require("child_process");
-    var fs16 = __require("fs");
+    var fs17 = __require("fs");
     var gcpMetadata = require_src10();
-    var os5 = __require("os");
+    var os6 = __require("os");
     var path15 = __require("path");
     var crypto_1 = require_crypto6();
     var transporters_1 = require_transporters();
@@ -1087161,7 +1088509,7 @@ var require_googleauth2 = __commonJS({
         }
         if (location) {
           location = path15.join(location, "gcloud", "application_default_credentials.json");
-          if (!fs16.existsSync(location)) {
+          if (!fs17.existsSync(location)) {
             location = null;
           }
         }
@@ -1087182,8 +1088530,8 @@ var require_googleauth2 = __commonJS({
           throw new Error("The file path is invalid.");
         }
         try {
-          filePath = fs16.realpathSync(filePath);
-          if (!fs16.lstatSync(filePath).isFile()) {
+          filePath = fs17.realpathSync(filePath);
+          if (!fs17.lstatSync(filePath).isFile()) {
             throw new Error();
           }
         } catch (err) {
@@ -1087192,7 +1088540,7 @@ var require_googleauth2 = __commonJS({
           }
           throw err;
         }
-        const readStream = fs16.createReadStream(filePath);
+        const readStream = fs17.createReadStream(filePath);
         return this.fromStream(readStream, options);
       }
       /**
@@ -1087335,7 +1088683,7 @@ var require_googleauth2 = __commonJS({
        * @api private
        */
       _isWindows() {
-        const sys = os5.platform();
+        const sys = os6.platform();
         if (sys && sys.length >= 3) {
           if (sys.substring(0, 3).toLowerCase() === "win") {
             return true;
@@ -1087579,7 +1088927,7 @@ var require_googleauth2 = __commonJS({
         return this._cacheClientFromJSON(this.jsonContent, this.clientOptions);
       } else if (this.keyFilename) {
         const filePath = path15.resolve(this.keyFilename);
-        const stream2 = fs16.createReadStream(filePath);
+        const stream2 = fs17.createReadStream(filePath);
         return await this.fromStreamAsync(stream2, this.clientOptions);
       } else if (this.apiKey) {
         const client = await this.fromAPIKey(this.apiKey, this.clientOptions);
@@ -1096364,7 +1097712,7 @@ var init_signer = __esm({
 
 // ../../node_modules/.pnpm/@google-cloud+storage@7.19.0/node_modules/@google-cloud/storage/build/esm/src/file.js
 import * as crypto8 from "crypto";
-import * as fs6 from "fs";
+import * as fs8 from "fs";
 import { Writable as Writable2, pipeline as pipeline2 } from "stream";
 import * as zlib3 from "zlib";
 var import_promisify3, import_mime, import_duplexify2, import_async_retry2, __classPrivateFieldGet5, _File_instances, _File_validateIntegrity, ActionToHTTPMethod, GS_URL_REGEXP, COMPRESSIBLE_MIME_REGEX, RequestError, SEVEN_DAYS2, GS_UTIL_URL_REGEX, HTTPS_PUBLIC_URL_REGEX, FileExceptionMessages, File4;
@@ -1097898,7 +1099246,7 @@ var init_file2 = __esm({
         if (destination) {
           fileStream.on("error", callback).once("data", (data) => {
             receivedData = true;
-            const writable = fs6.createWriteStream(destination);
+            const writable = fs8.createWriteStream(destination);
             writable.write(data);
             fileStream.pipe(writable).on("error", (err) => {
               callback(err, Buffer.from(""));
@@ -1097909,7 +1099257,7 @@ var init_file2 = __esm({
             if (!receivedData) {
               const data = Buffer.alloc(0);
               try {
-                fs6.writeFileSync(destination, data);
+                fs8.writeFileSync(destination, data);
                 callback(null, data);
               } catch (e2) {
                 callback(e2, data);
@@ -1100176,8 +1101524,8 @@ var init_notification = __esm({
 });
 
 // ../../node_modules/.pnpm/@google-cloud+storage@7.19.0/node_modules/@google-cloud/storage/build/esm/src/bucket.js
-import * as fs7 from "fs";
-import * as path4 from "path";
+import * as fs9 from "fs";
+import * as path6 from "path";
 import { promisify as promisify2 } from "util";
 import { Readable as Readable3 } from "stream";
 import { URL as URL4 } from "url";
@@ -1103140,7 +1104488,7 @@ var init_bucket = __esm({
               if (options.onUploadProgress) {
                 writable.on("progress", options.onUploadProgress);
               }
-              fs7.createReadStream(pathString).on("error", bail).pipe(writable).on("error", (err) => {
+              fs9.createReadStream(pathString).on("error", bail).pipe(writable).on("error", (err) => {
                 if (this.storage.retryOptions.autoRetry && this.storage.retryOptions.retryableErrorFn(err)) {
                   return reject(err);
                 } else {
@@ -1103190,7 +1104538,7 @@ var init_bucket = __esm({
             preconditionOpts: this.instancePreconditionOpts
           });
         } else {
-          const destination = path4.basename(pathString);
+          const destination = path6.basename(pathString);
           newFile = this.file(destination, {
             encryptionKey: options.encryptionKey,
             kmsKeyName: options.kmsKeyName,
@@ -1104934,9 +1106282,9 @@ var init_objectStorage = __esm({
 });
 
 // src/routes/application-forms.ts
-import fs8 from "fs/promises";
-import path5 from "path";
-import os2 from "os";
+import fs10 from "fs/promises";
+import path7 from "path";
+import os3 from "os";
 function generateToken() {
   return Math.random().toString(36).substring(2, 10).toUpperCase();
 }
@@ -1104987,317 +1106335,12 @@ async function syncSubmissionToCandidateAndDocuments(candidateId, sub) {
   }
 }
 async function generateSubmissionPdfBuffer(sub, form, program, candidate) {
-  let photoBuffer = null;
-  const photoUrl = sub.photoUrl;
-  if (photoUrl) {
-    if (photoUrl.startsWith("/objects/")) {
-      const localPath = path5.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
-      try {
-        photoBuffer = await fs8.readFile(localPath);
-      } catch {
-      }
-    } else if (photoUrl.startsWith("http://") || photoUrl.startsWith("https://")) {
-      try {
-        const resp = await fetch(photoUrl, { signal: AbortSignal.timeout(3e3) });
-        if (resp.ok) {
-          photoBuffer = Buffer.from(await resp.arrayBuffer());
-        }
-      } catch {
-      }
-    }
-  }
-  return new Promise((resolve4, reject) => {
-    try {
-      const candidateCode = candidate?.candidateCode || `APP-${sub.id}`;
-      const doc = new import_pdfkit2.default({
-        margin: 36,
-        size: "LETTER",
-        bufferPages: true,
-        info: { Title: `Application - ${sub.fullName}`, Author: "Sankara Academy of Vision" }
-      });
-      const buffers = [];
-      doc.on("data", (chunk) => buffers.push(chunk));
-      doc.on("end", () => resolve4(Buffer.concat(buffers)));
-      doc.on("error", reject);
-      const colors = {
-        primary: "#0f172a",
-        secondary: "#475569",
-        accent: "#0b4a8f",
-        muted: "#94a3b8",
-        border: "#e2e8f0",
-        bgSection: "#f8fafc",
-        expertGreen: "#059669",
-        intermOrange: "#d97706",
-        basicSlate: "#64748b"
-      };
-      const drawSectionHeader = (title) => {
-        if (doc.y > 680) {
-          doc.addPage();
-          doc.y = 36;
-        }
-        doc.moveDown(0.5);
-        const y = doc.y;
-        doc.rect(36, y, 540, 18).fill(colors.bgSection);
-        doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(9.5).text(title.toUpperCase(), 44, y + 4, { width: 520 });
-        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(36, y + 18).lineTo(576, y + 18).stroke();
-        doc.y = y + 23;
-      };
-      const renderApplicationRecordRow = (label, value) => {
-        const valText = value === null || value === void 0 || value === "null" || value === "" ? "\u2014" : String(value);
-        const startY = doc.y;
-        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(8.5).text(label.toUpperCase(), 36, startY, { width: 115, lineGap: 1 });
-        const labelEndY = doc.y;
-        doc.fillColor(colors.primary).font("Helvetica").fontSize(9).text(`: ${valText}`, 155, startY, { width: 310, lineGap: 1 });
-        const valueEndY = doc.y;
-        doc.y = Math.max(labelEndY, valueEndY) + 2.5;
-      };
-      const renderGeneralRow = (label, value) => {
-        const valText = value === null || value === void 0 || value === "null" || value === "" ? "\u2014" : String(value);
-        if (doc.y > 700) {
-          doc.addPage();
-          doc.y = 36;
-        }
-        const currentY = doc.y;
-        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(8.5).text(label.toUpperCase(), 36, currentY, { width: 145, lineGap: 1 });
-        const labelEndY = doc.y;
-        doc.fillColor(colors.primary).font("Helvetica").fontSize(9).text(`: ${valText}`, 185, currentY, { width: 390, lineGap: 1 });
-        const valueEndY = doc.y;
-        doc.y = Math.max(labelEndY, valueEndY) + 3.5;
-      };
-      const parseCenterPreferences = (cp, customAnswers, sections) => {
-        if (cp) {
-          try {
-            const parsed = JSON.parse(cp);
-            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
-          } catch {
-          }
-        }
-        if (customAnswers && typeof customAnswers === "object") {
-          const prefs = {};
-          Object.entries(customAnswers).forEach(([key, val]) => {
-            if (key.startsWith("unit_") && val) {
-              let label = key.replace("unit_", "").replace(/_/g, " ").toUpperCase();
-              if (sections) {
-                sections.forEach((sec) => {
-                  sec.fields?.forEach((f3) => {
-                    if (f3.id === key) label = f3.label.replace(" Preferred Center", "");
-                  });
-                });
-              }
-              prefs[label] = Array.isArray(val) ? val.join(", ") : String(val);
-            }
-          });
-          return prefs;
-        }
-        return {};
-      };
-      doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(18).text("SANKARA ACADEMY OF VISION", 36, 36, { width: 440, align: "left" });
-      doc.fillColor(colors.primary).font("Helvetica").fontSize(9).text("Educational unit of Sankara Eye Foundation, India \xB7 Sri Kanchi Kamakoti Medical Trust", 36, 57, { width: 440, align: "left" });
-      doc.fillColor(colors.muted).font("Helvetica-Bold").fontSize(8.5).text("FELLOWSHIP PROGRAM ADMISSIONS RECORD", 36, 70, { width: 440, align: "left" });
-      doc.strokeColor(colors.accent).lineWidth(1.5).moveTo(36, 84).lineTo(576, 84).stroke();
-      const photoX = 491;
-      const photoY = 94;
-      const photoW = 85;
-      const photoH = 105;
-      if (photoBuffer) {
-        try {
-          doc.image(photoBuffer, photoX, photoY, { width: photoW, height: photoH, fit: [photoW, photoH] });
-          doc.rect(photoX, photoY, photoW, photoH).strokeColor(colors.border).lineWidth(1).stroke();
-        } catch {
-          doc.rect(photoX, photoY, photoW, photoH).fill("#f1f5f9");
-          doc.fillColor(colors.muted).font("Helvetica").fontSize(7.5).text("PHOTO LOAD ERROR", photoX, photoY + 45, { width: photoW, align: "center" });
-        }
-      } else {
-        doc.rect(photoX, photoY, photoW, photoH).fill("#f1f5f9");
-        doc.fillColor(colors.muted).font("Helvetica").fontSize(7.5).text("NO PHOTO UPLOADED", photoX, photoY + 45, { width: photoW, align: "center" });
-      }
-      doc.y = 94;
-      doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(11).text("APPLICATION SUMMARY", 36, 94, { width: 350 });
-      doc.y = 112;
-      renderApplicationRecordRow("Application ID", `#APP-${sub.id}`);
-      renderApplicationRecordRow("Candidate Protocol", candidateCode);
-      renderApplicationRecordRow("Program Stream", program?.name || "Fellowship Program");
-      renderApplicationRecordRow("Submission Date", sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "\u2014");
-      renderApplicationRecordRow("Application Status", sub.status.toUpperCase());
-      if (doc.y < 210) {
-        doc.y = 210;
-      }
-      drawSectionHeader("Personal & Communication Details");
-      renderGeneralRow("Full Name", sub.fullName);
-      renderGeneralRow("Email Address", sub.email);
-      renderGeneralRow("Phone Number", sub.phone);
-      renderGeneralRow("Date of Birth", formatDOBToStandard(sub.dateOfBirth));
-      renderGeneralRow("Gender / Marital", [sub.gender, sub.maritalStatus].filter(Boolean).join(" \xB7 ") || "\u2014");
-      if (sub.spouseDetails) renderGeneralRow("Spouse Details", sub.spouseDetails);
-      renderGeneralRow("Permanent Address", sub.permanentAddress);
-      if (sub.mailingAddress) renderGeneralRow("Mailing Address", sub.mailingAddress);
-      if (sub.healthDeclaration || sub.medicalConditions || sub.healthDetails) {
-        renderGeneralRow("Health Declaration / Ailments", [sub.healthDeclaration, sub.medicalConditions, sub.healthDetails].filter(Boolean).join(" \xB7 ") || "Medically Fit");
-      }
-      drawSectionHeader("Academic & Professional Qualifications");
-      renderGeneralRow("Basic Degree (UG)", sub.degree || "MBBS");
-      renderGeneralRow("Medical College / University", [sub.medicalCollege, sub.university].filter(Boolean).join(" \xB7 ") || "\u2014");
-      renderGeneralRow("Medical Council Reg No", sub.medicalCouncilNumber);
-      if (sub.pgQualifications) renderGeneralRow("PG Qualifications", sub.pgQualifications);
-      if (sub.msMdQualification) renderGeneralRow("MS / MD Details", sub.msMdDetails || "Yes");
-      if (sub.dnbQualification) renderGeneralRow("DNB Details", sub.dnbDetails || "Yes");
-      if (sub.doQualification) renderGeneralRow("DO Details", sub.doDetails || "Yes");
-      if (sub.otherTraining) renderGeneralRow("Other Training / Exp", sub.otherTraining);
-      drawSectionHeader("Specialization & Center Preferences");
-      const specs = parseSpecializationString(sub.specialization);
-      const centerPrefs = parseCenterPreferences(sub.centerPreference, sub.customAnswers, form?.sectionsConfig ?? void 0);
-      if (specs.length === 0) {
-        if (doc.y > 700) {
-          doc.addPage();
-          doc.y = 36;
-        }
-        doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text("General Fellowship / No specific preference", 36, doc.y);
-      } else {
-        specs.forEach((sp, idx) => {
-          if (doc.y > 700) {
-            doc.addPage();
-            doc.y = 36;
-          }
-          const currentY = doc.y;
-          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(9).text(`${idx + 1}. ${sp}`, 36, currentY, { width: 220, lineGap: 1 });
-          const spEndY = doc.y;
-          doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text(`Preferred Center: ${centerPrefs[sp] || "Any Center"}`, 260, currentY, { width: 315, lineGap: 1 });
-          const centerEndY = doc.y;
-          doc.y = Math.max(spEndY, centerEndY) + 3;
-        });
-      }
-      const parsedSkills = parseDiagnosticSkills(sub.diagnosticSkills);
-      if (parsedSkills.length > 0) {
-        drawSectionHeader("Clinical Profile & Diagnostic Skills");
-        const colWidth = 265;
-        const colGap = 10;
-        let colIdx = 0;
-        let rowStartY = doc.y;
-        parsedSkills.forEach((skill) => {
-          if (rowStartY > 700) {
-            doc.addPage();
-            doc.y = 36;
-            rowStartY = doc.y;
-            colIdx = 0;
-          }
-          const curX = colIdx === 0 ? 36 : 36 + colWidth + colGap;
-          const levelColor = skill.level === "Expert" ? colors.expertGreen : skill.level === "Intermittent" ? colors.intermOrange : colors.basicSlate;
-          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(8.5).text(skill.name, curX, rowStartY, { width: 180, lineGap: 1 });
-          doc.fillColor(levelColor).font("Helvetica-Bold").fontSize(7.5).text(`[ ${skill.level.toUpperCase()} ]`, curX + 185, rowStartY, { width: 80, align: "right" });
-          if (colIdx === 0) {
-            colIdx = 1;
-          } else {
-            colIdx = 0;
-            rowStartY += 14;
-            doc.y = rowStartY;
-          }
-        });
-        if (colIdx === 1) {
-          rowStartY += 14;
-          doc.y = rowStartY;
-        }
-      }
-      const parsedSurgeries = parseSurgicalExperience(sub.surgicalExperience);
-      if (parsedSurgeries.length > 0 || sub.totalSurgeries) {
-        drawSectionHeader("Surgical Experience & Operative Log");
-        if (parsedSurgeries.length > 0) {
-          if (doc.y > 670) {
-            doc.addPage();
-            doc.y = 36;
-          }
-          const thY = doc.y;
-          doc.rect(36, thY, 540, 16).fill("#f1f5f9");
-          doc.strokeColor(colors.border).lineWidth(0.5).rect(36, thY, 540, 16).stroke();
-          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(8).text("SURGICAL PROCEDURE", 42, thY + 4, { width: 220 });
-          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(8).text("INDEPENDENT (SOLO)", 270, thY + 4, { width: 95, align: "center" });
-          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(8).text("UNDER SUPERVISION", 375, thY + 4, { width: 95, align: "center" });
-          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(8).text("TOTAL CASES", 475, thY + 4, { width: 95, align: "right" });
-          let rowY = thY + 16;
-          let sumInd = 0;
-          let sumSup = 0;
-          parsedSurgeries.forEach((s2, idx) => {
-            if (rowY > 700) {
-              doc.addPage();
-              doc.y = 36;
-              rowY = doc.y;
-            }
-            sumInd += s2.independent;
-            sumSup += s2.supervision;
-            const bg = idx % 2 === 0 ? "#ffffff" : "#f8fafc";
-            doc.rect(36, rowY, 540, 15).fill(bg);
-            doc.strokeColor(colors.border).lineWidth(0.3).rect(36, rowY, 540, 15).stroke();
-            doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(8).text(s2.procedure, 42, rowY + 3.5, { width: 220 });
-            doc.fillColor(colors.secondary).font("Helvetica").fontSize(8).text(String(s2.independent), 270, rowY + 3.5, { width: 95, align: "center" });
-            doc.fillColor(colors.secondary).font("Helvetica").fontSize(8).text(String(s2.supervision), 375, rowY + 3.5, { width: 95, align: "center" });
-            doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(8).text(String(s2.total), 475, rowY + 3.5, { width: 95, align: "right" });
-            rowY += 15;
-          });
-          const grandTotal = sumInd + sumSup;
-          doc.rect(36, rowY, 540, 17).fill("#e0f2fe");
-          doc.strokeColor(colors.accent).lineWidth(0.8).rect(36, rowY, 540, 17).stroke();
-          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(8.5).text("CUMULATIVE SURGICAL VOLUME", 42, rowY + 4, { width: 220 });
-          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(8.5).text(String(sumInd), 270, rowY + 4, { width: 95, align: "center" });
-          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(8.5).text(String(sumSup), 375, rowY + 4, { width: 95, align: "center" });
-          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(8.5).text(String(grandTotal), 475, rowY + 4, { width: 95, align: "right" });
-          doc.y = rowY + 22;
-        }
-        if (sub.totalSurgeries) {
-          renderGeneralRow("Declared Total Surgeries", sub.totalSurgeries);
-        }
-      }
-      if (sub.publications || sub.presentations) {
-        drawSectionHeader("Research, Publications & Presentations");
-        if (sub.publications) renderGeneralRow("Indexed Publications", sub.publications);
-        if (sub.presentations) renderGeneralRow("Conference Presentations", sub.presentations);
-      }
-      drawSectionHeader("References & Documents");
-      renderGeneralRow("Reference 1 (LOR)", `${sub.lor1RefName || "\u2014"} (${sub.lor1RefContact || "No contact"}${sub.lor1RefEmail ? ` \xB7 ${sub.lor1RefEmail}` : ""})`);
-      renderGeneralRow("Reference 2 (LOR)", `${sub.lor2RefName || "\u2014"} (${sub.lor2RefContact || "No contact"}${sub.lor2RefEmail ? ` \xB7 ${sub.lor2RefEmail}` : ""})`);
-      const docList = [];
-      if (sub.lor1Url) docList.push("LOR 1");
-      if (sub.lor2Url) docList.push("LOR 2");
-      if (sub.photoUrl) docList.push("Photo");
-      if (sub.paymentUrl) docList.push("Payment Receipt");
-      renderGeneralRow("Uploaded Dossier Files", docList.length > 0 ? docList.join(", ") : "No documents uploaded");
-      drawSectionHeader("Declaration & Fee Verification");
-      renderGeneralRow("Payment Reference ID", sub.paymentId || "\u2014");
-      renderGeneralRow("Payment Mode / Source", [sub.paymentMode?.toUpperCase(), sub.source?.toUpperCase()].filter(Boolean).join(" \xB7 ") || "\u2014");
-      renderGeneralRow("Fee Status", sub.paymentId ? "Verified & Paid" : "Pending");
-      if (doc.y > 670) {
-        doc.addPage();
-        doc.y = 36;
-      }
-      doc.moveDown(0.5);
-      doc.fillColor(colors.secondary).font("Helvetica-Oblique").fontSize(8).text(
-        "Declaration: I hereby declare that the information provided above is true and authentic to the best of my knowledge and belief.",
-        36,
-        doc.y,
-        { width: 540, lineGap: 1 }
-      );
-      doc.moveDown(1.5);
-      const signY = doc.y;
-      if (signY < 720) {
-        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(36, signY + 30).lineTo(180, signY + 30).stroke();
-        doc.fillColor(colors.secondary).font("Helvetica").fontSize(7.5).text("Candidate Signature", 36, signY + 34, { width: 144, align: "center" });
-        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(234, signY + 30).lineTo(378, signY + 30).stroke();
-        doc.fillColor(colors.secondary).font("Helvetica").fontSize(7.5).text("Reviewer Seal & Signature", 234, signY + 34, { width: 144, align: "center" });
-        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(432, signY + 30).lineTo(576, signY + 30).stroke();
-        doc.fillColor(colors.secondary).font("Helvetica").fontSize(7.5).text("Date of Verification", 432, signY + 34, { width: 144, align: "center" });
-      }
-      const range2 = doc.bufferedPageRange();
-      for (let i2 = range2.start; i2 < range2.start + range2.count; i2++) {
-        doc.switchToPage(i2);
-        doc.fillColor(colors.muted).fontSize(7.5).text(
-          `Page ${i2 + 1} of ${range2.count} | Sankara Academy of Vision Admissions Record`,
-          36,
-          doc.page.height - 24,
-          { width: 540, align: "center" }
-        );
-      }
-      doc.end();
-    } catch (err) {
-      reject(err);
-    }
+  return generateApplicationPdfBuffer({
+    sub,
+    form,
+    program,
+    candidate,
+    includeScores: false
   });
 }
 function normalizeToken(t2) {
@@ -1105343,15 +1106386,15 @@ async function saveBase64FileIfPresent(dataUrl, candidateName, fieldName) {
     const filename = `${fieldName}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext2}`;
     const objectPath = `/objects/uploads/${folderName}/${filename}`;
     try {
-      const localDir = path5.join(process.cwd(), "uploads", folderName);
-      await fs8.mkdir(localDir, { recursive: true });
-      await fs8.writeFile(path5.join(localDir, filename), buffer);
+      const localDir = path7.join(process.cwd(), "uploads", folderName);
+      await fs10.mkdir(localDir, { recursive: true });
+      await fs10.writeFile(path7.join(localDir, filename), buffer);
     } catch (_) {
     }
     try {
-      const tmpDir = path5.join(os2.tmpdir(), "uploads", folderName);
-      await fs8.mkdir(tmpDir, { recursive: true });
-      await fs8.writeFile(path5.join(tmpDir, filename), buffer);
+      const tmpDir = path7.join(os3.tmpdir(), "uploads", folderName);
+      await fs10.mkdir(tmpDir, { recursive: true });
+      await fs10.writeFile(path7.join(tmpDir, filename), buffer);
     } catch (_) {
     }
     await db.execute(sql`
@@ -1105369,7 +1106412,7 @@ async function saveBase64FileIfPresent(dataUrl, candidateName, fieldName) {
     return dataUrl;
   }
 }
-var import_express7, XLSX, import_googleapis2, import_pdfkit2, archiver, router7, application_forms_default;
+var import_express7, XLSX2, import_googleapis2, import_pdfkit4, archiver, router7, application_forms_default;
 var init_application_forms2 = __esm({
   "src/routes/application-forms.ts"() {
     "use strict";
@@ -1105378,19 +1106421,20 @@ var init_application_forms2 = __esm({
     init_drizzle_orm();
     init_src();
     init_auth2();
-    XLSX = __toESM(require_xlsx(), 1);
+    XLSX2 = __toESM(require_xlsx(), 1);
     init_email();
     init_letters();
     import_googleapis2 = __toESM(require_src7(), 1);
-    import_pdfkit2 = __toESM(require_pdfkit(), 1);
+    import_pdfkit4 = __toESM(require_pdfkit(), 1);
     init_archiver();
     init_utils5();
+    init_application_pdf();
     archiver = archiver_exports?.default || archiver_exports;
     router7 = (0, import_express7.Router)();
     router7.get(
       "/application-forms/submissions/:id/pdf",
       requireAuth,
-      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator"),
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "doctor"),
       async (req, res) => {
         try {
           const id = Number(req.params.id);
@@ -1106143,13 +1107187,13 @@ var init_application_forms2 = __esm({
           }
           return baseRow;
         });
-        const wb = XLSX.utils.book_new();
+        const wb = XLSX2.utils.book_new();
         const addAutoFilter = (ws) => {
           if (!ws["!ref"]) return;
           try {
-            const range2 = XLSX.utils.decode_range(ws["!ref"]);
+            const range2 = XLSX2.utils.decode_range(ws["!ref"]);
             ws["!autofilter"] = {
-              ref: XLSX.utils.encode_range({
+              ref: XLSX2.utils.encode_range({
                 s: { c: 0, r: 0 },
                 e: { c: range2.e.c, r: range2.e.r }
               })
@@ -1106158,12 +1107202,12 @@ var init_application_forms2 = __esm({
             console.error("Failed to add autofilter:", err);
           }
         };
-        const wsGeneral = XLSX.utils.json_to_sheet(rows);
+        const wsGeneral = XLSX2.utils.json_to_sheet(rows);
         const colWidths = Object.keys(rows[0] ?? {}).map((k) => ({ wch: Math.max(k.length + 2, 22) }));
         wsGeneral["!cols"] = colWidths;
         wsGeneral["!rows"] = [{ hpt: 35 }];
         addAutoFilter(wsGeneral);
-        XLSX.utils.book_append_sheet(wb, wsGeneral, "General");
+        XLSX2.utils.book_append_sheet(wb, wsGeneral, "General");
         const specialitiesConfig = [
           { dbName: "Cornea", sheetName: "Cornea" },
           { dbName: "Glaucoma", sheetName: "Glaucoma" },
@@ -1106190,19 +1107234,19 @@ var init_application_forms2 = __esm({
           const specRows = rows.filter((r2) => matchRowToSpeciality(r2, config2.dbName));
           let wsSpec;
           if (specRows.length > 0) {
-            wsSpec = XLSX.utils.json_to_sheet(specRows);
+            wsSpec = XLSX2.utils.json_to_sheet(specRows);
           } else {
-            wsSpec = XLSX.utils.json_to_sheet([], { header: headers });
+            wsSpec = XLSX2.utils.json_to_sheet([], { header: headers });
           }
           wsSpec["!cols"] = colWidths;
           wsSpec["!rows"] = [{ hpt: 30 }];
           addAutoFilter(wsSpec);
-          XLSX.utils.book_append_sheet(wb, wsSpec, config2.sheetName);
+          XLSX2.utils.book_append_sheet(wb, wsSpec, config2.sheetName);
         });
         const safeName = (form?.title ?? `form-${formId}`).replace(/[^a-zA-Z0-9-_]/g, "_").slice(0, 40);
         const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
         const filename = `SAV_${safeName}_Admissions_${today}.xlsx`;
-        const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+        const buffer = XLSX2.write(wb, { type: "buffer", bookType: "xlsx" });
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
         res.send(buffer);
@@ -1106277,7 +1107321,7 @@ var init_application_forms2 = __esm({
               if (!isReplit) {
                 try {
                   const fsPromises = await import("fs/promises");
-                  const localPath = path5.join(process.cwd(), "uploads", oldValue.replace("/objects/uploads/", ""));
+                  const localPath = path7.join(process.cwd(), "uploads", oldValue.replace("/objects/uploads/", ""));
                   await fsPromises.unlink(localPath);
                   req.log?.info?.({ localPath }, `Successfully deleted replaced file from disk`);
                 } catch (err) {
@@ -1107428,15 +1108472,15 @@ var init_application_forms2 = __esm({
             const objectPath = `/objects/uploads/${folderName}/${filename}`;
             const contentType = req.headers["content-type"] || "application/octet-stream";
             try {
-              const tmpUploadDir = path5.join(os2.tmpdir(), "uploads", folderName);
-              await fs8.mkdir(tmpUploadDir, { recursive: true });
-              await fs8.writeFile(path5.join(tmpUploadDir, filename), buffer);
+              const tmpUploadDir = path7.join(os3.tmpdir(), "uploads", folderName);
+              await fs10.mkdir(tmpUploadDir, { recursive: true });
+              await fs10.writeFile(path7.join(tmpUploadDir, filename), buffer);
             } catch (_) {
             }
             try {
-              const localUploadDir = path5.join(process.cwd(), "uploads", folderName);
-              await fs8.mkdir(localUploadDir, { recursive: true });
-              await fs8.writeFile(path5.join(localUploadDir, filename), buffer);
+              const localUploadDir = path7.join(process.cwd(), "uploads", folderName);
+              await fs10.mkdir(localUploadDir, { recursive: true });
+              await fs10.writeFile(path7.join(localUploadDir, filename), buffer);
             } catch (_) {
             }
             await db.execute(sql`
@@ -1107830,7 +1108874,7 @@ var init_application_forms2 = __esm({
         const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
         const [program] = form?.programId ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
         const cleanName = cleanDoctorName(sub.fullName);
-        const doc = new import_pdfkit2.default({
+        const doc = new import_pdfkit4.default({
           margin: 36,
           size: "LETTER",
           bufferPages: true,
@@ -1108291,7 +1109335,6 @@ __export(candidates_exports, {
   default: () => candidates_default,
   recalculateCandidateStatus: () => recalculateCandidateStatus
 });
-import path6 from "path";
 async function fullCandidate(c) {
   const units = await db.select().from(unitsTable);
   const unit = c.unitId ? units.find((u) => u.id === c.unitId) : null;
@@ -1108303,6 +1109346,12 @@ async function fullCandidate(c) {
   const exams = await db.select().from(examsTable);
   const interviews = await db.select().from(interviewScoresTable).where(eq(interviewScoresTable.candidateId, c.id));
   const apps = await db.select().from(applicationsTable).where(eq(applicationsTable.candidateId, c.id));
+  const batchMarks = await db.select().from(batchCandidatesTable).where(eq(batchCandidatesTable.candidateId, c.id));
+  const mmPanelMembers = await db.select({ doctorId: interviewPanelMembersTable.doctorId }).from(interviewPanelMembersTable).innerJoin(interviewPanelsTable, eq(interviewPanelMembersTable.panelId, interviewPanelsTable.id)).where(eq(interviewPanelsTable.isMindMatter, true));
+  const mmDoctorIds = new Set(mmPanelMembers.map((m2) => m2.doctorId));
+  const isMindMatterEntry = (i2) => i2.specialityId === null || mmDoctorIds.has(i2.doctorId);
+  const mmInterviews = interviews.filter(isMindMatterEntry).sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+  const vivaInterviews = interviews.filter((i2) => !isMindMatterEntry(i2) && i2.specialityId !== null).sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
   const [sub] = await db.select().from(applicationSubmissionsTable).where(
     or(
       eq(applicationSubmissionsTable.candidateId, c.id),
@@ -1108311,15 +1109360,24 @@ async function fullCandidate(c) {
   );
   const mcqAttempts = attempts.filter((a) => {
     const e2 = exams.find((x2) => x2.id === a.examId);
-    return e2?.kind === "mcq";
+    return e2?.kind === "mcq" && a.score != null;
   });
   const psychoAttempts = attempts.filter((a) => {
     const e2 = exams.find((x2) => x2.id === a.examId);
-    return e2?.kind?.startsWith("psychometric");
+    return e2?.kind?.startsWith("psychometric") && a.score != null;
   });
-  const mcqScore = mcqAttempts.length > 0 ? mcqAttempts.reduce((s2, a) => s2 + (a.score ?? 0), 0) / mcqAttempts.length : c.mcqScore ? parseFloat(c.mcqScore) : null;
-  const psychometricScore = psychoAttempts.length > 0 ? psychoAttempts.reduce((s2, a) => s2 + (a.score ?? 0), 0) / psychoAttempts.length : c.psychometricScore ? parseFloat(c.psychometricScore) : null;
-  const interviewScore = interviews.length > 0 ? interviews.reduce((s2, i2) => s2 + i2.score, 0) / interviews.length : null;
+  const batchMcq = batchMarks.find((b) => b.mcqScore != null)?.mcqScore ?? null;
+  const batchPsycho = batchMarks.find((b) => b.psychometricScore != null)?.psychometricScore ?? null;
+  const mcqScore = c.mcqScore != null && c.mcqScore !== "" ? parseFloat(c.mcqScore) : mcqAttempts.length > 0 ? mcqAttempts.reduce((s2, a) => s2 + (a.score ?? 0), 0) / mcqAttempts.length : batchMcq;
+  const psychometricScore = mmInterviews.length > 0 ? mmInterviews[0].score : c.psychometricScore != null && c.psychometricScore !== "" ? parseFloat(c.psychometricScore) : psychoAttempts.length > 0 ? psychoAttempts.reduce((s2, a) => s2 + (a.score ?? 0), 0) / psychoAttempts.length : batchPsycho;
+  const vivaBySpec = /* @__PURE__ */ new Map();
+  for (const vi of vivaInterviews) {
+    if (vi.specialityId != null && !vivaBySpec.has(vi.specialityId)) {
+      vivaBySpec.set(vi.specialityId, vi.score);
+    }
+  }
+  const specVivaValues = [...vivaBySpec.values()];
+  const interviewScore = specVivaValues.length > 0 ? specVivaValues.reduce((s2, v) => s2 + v, 0) / specVivaValues.length : null;
   const totalScore = mcqScore != null || psychometricScore != null || interviewScore != null ? (mcqScore ?? 0) + (psychometricScore ?? 0) + (interviewScore ?? 0) : null;
   let resolvedPrefs = prefs.sort((a, b) => a.preferenceOrder - b.preferenceOrder).map((p) => {
     const sp = specs.find((s2) => s2.id === p.specialityId);
@@ -1108388,7 +1109446,7 @@ async function fullCandidate(c) {
     }
   }
   const appliedSpecialities = resolvedPrefs.map((p) => {
-    const scoreEntry = interviews.find((i2) => i2.specialityId === p.specialityId);
+    const scoreEntry = vivaInterviews.find((i2) => i2.specialityId === p.specialityId);
     return {
       specialityId: p.specialityId,
       specialityName: p.specialityName,
@@ -1108525,7 +1109583,7 @@ async function fullCandidate(c) {
 }
 function buildStyledSheet(rows, sheetName) {
   if (rows.length === 0) {
-    const ws2 = XLSX2.utils.json_to_sheet([]);
+    const ws2 = XLSX3.utils.json_to_sheet([]);
     return ws2;
   }
   const headers = Object.keys(rows[0]);
@@ -1108533,10 +1109591,10 @@ function buildStyledSheet(rows, sheetName) {
   const numRows = rows.length;
   const headerColor = SHEET_HEADER_COLORS[sheetName] ?? "0B4A8F";
   const wsData = [headers, ...rows.map((r2) => headers.map((h2) => r2[h2] ?? ""))];
-  const ws = XLSX2.utils.aoa_to_sheet(wsData);
+  const ws = XLSX3.utils.aoa_to_sheet(wsData);
   for (let R = 0; R <= numRows; R++) {
     for (let C = 0; C < numCols; C++) {
-      const addr = XLSX2.utils.encode_cell({ r: R, c: C });
+      const addr = XLSX3.utils.encode_cell({ r: R, c: C });
       if (!ws[addr]) continue;
       const cell2 = ws[addr];
       if (R === 0) {
@@ -1108569,7 +1109627,7 @@ function buildStyledSheet(rows, sheetName) {
   });
   ws["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft", state: "frozen" };
   ws["!autofilter"] = {
-    ref: XLSX2.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: numCols - 1, r: numRows } })
+    ref: XLSX3.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: numCols - 1, r: numRows } })
   };
   ws["!rows"] = [{ hpt: 22 }, ...Array(numRows).fill({ hpt: 18 })];
   return ws;
@@ -1108579,11 +1109637,19 @@ async function recalculateCandidateStatus(candidateId) {
   if (!cand) return;
   if (cand.status === "allocated" || cand.status === "waitlisted" || cand.status === "rejected") return;
   const apps = await db.select().from(applicationsTable).where(eq(applicationsTable.candidateId, candidateId));
-  if (apps.length === 0) return;
   const scores = await db.select().from(interviewScoresTable).where(eq(interviewScoresTable.candidateId, candidateId));
+  const mmMembers = await db.select({ doctorId: interviewPanelMembersTable.doctorId }).from(interviewPanelMembersTable).innerJoin(interviewPanelsTable, eq(interviewPanelMembersTable.panelId, interviewPanelsTable.id)).where(eq(interviewPanelsTable.isMindMatter, true));
+  const mmDoctorIds = new Set(mmMembers.map((m2) => m2.doctorId));
+  const vivaScores = scores.filter((s2) => s2.specialityId !== null && !mmDoctorIds.has(s2.doctorId));
+  if (apps.length === 0) {
+    if (vivaScores.length > 0) {
+      await db.update(candidatesTable).set({ status: "interview_completed" }).where(eq(candidatesTable.id, candidateId));
+    }
+    return;
+  }
   let allSpecialtiesCompleted = true;
   for (const app2 of apps) {
-    const hasScore = scores.some((s2) => s2.specialityId === app2.specialityId);
+    const hasScore = vivaScores.some((s2) => s2.specialityId === app2.specialityId);
     if (!hasScore) {
       allSpecialtiesCompleted = false;
       if (app2.status === "completed") {
@@ -1108595,7 +1109661,7 @@ async function recalculateCandidateStatus(candidateId) {
       }
     }
   }
-  const overallCompleted = allSpecialtiesCompleted || scores.length > 0;
+  const overallCompleted = allSpecialtiesCompleted;
   if (overallCompleted) {
     await db.update(candidatesTable).set({ status: "interview_completed" }).where(eq(candidatesTable.id, candidateId));
   } else {
@@ -1108605,80 +1109671,155 @@ async function recalculateCandidateStatus(candidateId) {
   }
 }
 async function createCandidateDossierPdfBuffer(c) {
-  return new Promise(async (resolve4, reject) => {
-    try {
-      const full = await fullCandidate(c);
-      const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
-      const doc = new import_pdfkit3.default({ margin: 50, size: "A4" });
-      const buffers = [];
-      doc.on("data", (chunk) => buffers.push(chunk));
-      doc.on("end", () => resolve4(Buffer.concat(buffers)));
-      doc.on("error", reject);
-      const colors = {
-        primary: "#0f172a",
-        secondary: "#475569",
-        accent: "#f97316",
-        muted: "#94a3b8",
-        border: "#e2e8f0",
-        bgOrange: "#fff7ed"
-      };
-      const logoPath = path6.join(process.cwd(), "artifacts", "fellowship-exam", "src", "assets", "seh_sav_logo_1777703794142.jpg");
-      try {
-        doc.image(logoPath, 50, 40, { width: 130, height: 65 });
-      } catch (e2) {
-        doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(14).text("SANKARA ACADEMY OF VISION", 50, 50);
-      }
-      doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(16).text("CANDIDATE DOSSIER", 0, 45, { align: "right", width: 545 });
-      doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text("Sankara Academy of Vision \u2014 Fellowship Admissions", 0, 65, { align: "right", width: 545 });
-      doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text(`Protocol ID: ${c.candidateCode}`, 0, 78, { align: "right", width: 545 });
-      doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, 112).lineTo(550, 112).stroke();
-      const photoUrl = sub?.photoUrl;
-      if (photoUrl && photoUrl.startsWith("/objects/")) {
-        const localPath = path6.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
-        try {
-          doc.image(localPath, 460, 120, { width: 85, height: 105 });
-          doc.rect(460, 120, 85, 105).strokeColor(colors.border).lineWidth(1).stroke();
-        } catch (_) {
-        }
-      }
-      doc.y = 122;
-      doc.moveDown(2);
-      doc.rect(50, doc.y, 500, 30).fill(colors.bgOrange);
-      doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(12).text("ACADEMIC IDENTITY & PROFILE", 65, doc.y - 22);
-      doc.moveDown(0.5);
-      const leftCol = 70;
-      const rightCol = 320;
-      let currY = doc.y;
-      const renderField = (label, value, x2, y) => {
-        doc.fillColor(colors.muted).font("Helvetica-Bold").fontSize(8).text(label.toUpperCase(), x2, y);
-        doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(11).text(String(value || "\u2014"), x2, y + 12);
-      };
-      renderField("Full Name", full.fullName, leftCol, currY);
-      renderField("Contact Identity", full.email, rightCol, currY);
-      currY += 40;
-      renderField("Contact Phone", full.phone || "\u2014", leftCol, currY);
-      renderField("Date of Birth", formatDOBToStandard(full.dateOfBirth), rightCol, currY);
-      currY += 40;
-      renderField("MBBS Institution", full.collegeName || "\u2014", leftCol, currY);
-      renderField("Qualifying MBBS", full.qualification || "\u2014", rightCol, currY);
-      currY += 40;
-      if (sub?.pgQualifications) {
-        doc.rect(50, currY, 500, 24).fill("#f8fafc");
-        doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(10).text("POST-GRADUATE QUALIFICATIONS", 65, currY + 6);
-        currY += 32;
-        doc.fillColor(colors.secondary).font("Helvetica").fontSize(10).text(sub.pgQualifications, 65, currY, { width: 470 });
-        currY = doc.y + 16;
-      }
-      const bottom = 750;
-      doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, bottom).lineTo(550, bottom).stroke();
-      doc.fillColor(colors.muted).font("Helvetica").fontSize(8).text("CONFIDENTIAL DOCUMENT - FOR INTERNAL USE ONLY", 50, bottom + 10);
-      doc.text("SANKARA ACADEMY OF VISION - FELLOWSHIP ADMISSIONS HUB", 50, bottom + 22);
-      doc.text(`Generated on ${formatToLocalDateTime(/* @__PURE__ */ new Date())}`, 350, bottom + 10, { align: "right" });
-      doc.end();
-    } catch (err) {
-      reject(err);
+  const full = await fullCandidate(c);
+  const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
+  const [form] = sub ? await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId)) : [null];
+  const [program] = form ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
+  return generateApplicationPdfBuffer({
+    sub,
+    form,
+    program,
+    candidate: c,
+    includeScores: true,
+    scores: {
+      mcq: full.mcqScore,
+      psychometric: full.psychometricScore,
+      specialityTotal: full.interviewScore,
+      total110: full.totalScore
     }
   });
+}
+async function buildSpecialityAttendanceGroups(req) {
+  const specialityIdParam = req.query["specialityId"] ? Number(req.query["specialityId"]) : null;
+  const programIdParam = req.query["programId"] ? Number(req.query["programId"]) : null;
+  const statusParam = String(req.query["status"] || "eligible").toLowerCase();
+  const [allPrograms, allSpecs, rawCandidates] = await Promise.all([
+    readDb.select().from(programsTable),
+    readDb.select().from(specialitiesTable),
+    readDb.select().from(candidatesTable).where(eq(candidatesTable.isMock, Boolean(req.isMockMode)))
+  ]);
+  const targetProgram = programIdParam ? allPrograms.find((p) => p.id === programIdParam) : allPrograms[0];
+  let targetSpecs = programIdParam ? allSpecs.filter((s2) => s2.programId === programIdParam) : allSpecs;
+  if (specialityIdParam && !isNaN(specialityIdParam)) {
+    targetSpecs = targetSpecs.filter((s2) => s2.id === specialityIdParam);
+  }
+  targetSpecs = [...targetSpecs].sort((a, b) => a.name.localeCompare(b.name));
+  const eligibleStatuses = /* @__PURE__ */ new Set(["approved", "interview_completed", "allocated", "waitlisted"]);
+  const filteredCandidates = rawCandidates.filter((c) => {
+    if (statusParam === "all") return c.status !== "rejected";
+    return eligibleStatuses.has(c.status);
+  }).sort((a, b) => a.fullName.localeCompare(b.fullName));
+  if (filteredCandidates.length === 0 || targetSpecs.length === 0) {
+    return {
+      programName: targetProgram?.name || "Fellowship Program",
+      academicSession: targetProgram?.academicYear || "2026",
+      groups: targetSpecs.map((sp) => ({
+        specialityId: sp.id,
+        specialityName: sp.name,
+        specialityCode: sp.code,
+        rows: []
+      }))
+    };
+  }
+  const candIds = filteredCandidates.map((c) => c.id);
+  const emails = filteredCandidates.map((c) => c.email.toLowerCase().trim()).filter(Boolean);
+  const [allPrefs, allApps, allSubs, allScores, allAttempts, allExams, allBatchMarks, mmMembers] = await Promise.all([
+    readDb.select().from(candidatePreferencesTable).where(inArray(candidatePreferencesTable.candidateId, candIds)),
+    readDb.select().from(applicationsTable).where(inArray(applicationsTable.candidateId, candIds)),
+    emails.length > 0 ? readDb.select().from(applicationSubmissionsTable).where(
+      or(
+        inArray(applicationSubmissionsTable.candidateId, candIds),
+        inArray(sql`LOWER(email)`, emails)
+      )
+    ) : readDb.select().from(applicationSubmissionsTable).where(inArray(applicationSubmissionsTable.candidateId, candIds)),
+    readDb.select().from(interviewScoresTable).where(inArray(interviewScoresTable.candidateId, candIds)),
+    readDb.select().from(examAttemptsTable).where(inArray(examAttemptsTable.candidateId, candIds)),
+    readDb.select().from(examsTable),
+    readDb.select().from(batchCandidatesTable).where(inArray(batchCandidatesTable.candidateId, candIds)),
+    readDb.select({ doctorId: interviewPanelMembersTable.doctorId }).from(interviewPanelMembersTable).innerJoin(interviewPanelsTable, eq(interviewPanelMembersTable.panelId, interviewPanelsTable.id)).where(eq(interviewPanelsTable.isMindMatter, true))
+  ]);
+  const mmDoctorIds = new Set(mmMembers.map((m2) => m2.doctorId));
+  const examsMap = new Map(allExams.map((e2) => [e2.id, e2]));
+  const specsById = new Map(allSpecs.map((s2) => [s2.id, s2]));
+  const norm = (s2) => s2.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const subByCandId = /* @__PURE__ */ new Map();
+  const subByEmail = /* @__PURE__ */ new Map();
+  for (const s2 of allSubs) {
+    if (s2.candidateId) subByCandId.set(s2.candidateId, s2);
+    if (s2.email) subByEmail.set(s2.email.toLowerCase().trim(), s2);
+  }
+  const groupMap = /* @__PURE__ */ new Map();
+  for (const sp of targetSpecs) {
+    groupMap.set(sp.id, {
+      specialityId: sp.id,
+      specialityName: sp.name,
+      specialityCode: sp.code,
+      rows: []
+    });
+  }
+  for (const c of filteredCandidates) {
+    const sub = subByCandId.get(c.id) || (c.email ? subByEmail.get(c.email.toLowerCase().trim()) : void 0);
+    const prefs = allPrefs.filter((p) => p.candidateId === c.id).sort((a, b) => a.preferenceOrder - b.preferenceOrder);
+    const apps = allApps.filter((a) => a.candidateId === c.id);
+    const scores = allScores.filter((s2) => s2.candidateId === c.id).sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+    const attempts = allAttempts.filter((a) => a.candidateId === c.id);
+    const batches = allBatchMarks.filter((b) => b.candidateId === c.id);
+    const isMM = (s2) => s2.specialityId === null || mmDoctorIds.has(s2.doctorId);
+    const mmScores = scores.filter(isMM);
+    const vivaScores = scores.filter((s2) => !isMM(s2) && s2.specialityId !== null);
+    const mcqAttempts = attempts.filter((a) => examsMap.get(a.examId)?.kind === "mcq" && a.score != null);
+    const psychoAttempts = attempts.filter((a) => examsMap.get(a.examId)?.kind?.startsWith("psychometric") && a.score != null);
+    const batchMcq = batches.find((b) => b.mcqScore != null)?.mcqScore ?? null;
+    const batchPsycho = batches.find((b) => b.psychometricScore != null)?.psychometricScore ?? null;
+    const mcqScore = c.mcqScore != null && c.mcqScore !== "" ? parseFloat(c.mcqScore) : mcqAttempts.length > 0 ? mcqAttempts.reduce((acc, a) => acc + (a.score ?? 0), 0) / mcqAttempts.length : batchMcq;
+    const psychometricScore = mmScores.length > 0 ? mmScores[0].score : c.psychometricScore != null && c.psychometricScore !== "" ? parseFloat(c.psychometricScore) : psychoAttempts.length > 0 ? psychoAttempts.reduce((acc, a) => acc + (a.score ?? 0), 0) / psychoAttempts.length : batchPsycho;
+    const specOrderMap = /* @__PURE__ */ new Map();
+    prefs.forEach((p) => {
+      if (!specOrderMap.has(p.specialityId)) specOrderMap.set(p.specialityId, p.preferenceOrder);
+    });
+    apps.forEach((a) => {
+      if (!specOrderMap.has(a.specialityId)) specOrderMap.set(a.specialityId, null);
+    });
+    if (specOrderMap.size === 0 && sub?.specialization) {
+      parseSpecializationString(sub.specialization).forEach((spName, idx) => {
+        const matched = allSpecs.find(
+          (sp) => norm(sp.name) === norm(spName) || norm(sp.code) === norm(spName)
+        );
+        if (matched && !specOrderMap.has(matched.id)) {
+          specOrderMap.set(matched.id, idx + 1);
+        }
+      });
+    }
+    const allSpecialities = [...specOrderMap.keys()].map((id) => specsById.get(id)?.name).filter((n) => Boolean(n));
+    const qualStr = [sub?.pgQualifications || c.qualification, sub?.degree].filter(Boolean).join(" \xB7 ");
+    for (const [specId, prefOrder] of specOrderMap.entries()) {
+      const grp = groupMap.get(specId);
+      if (!grp) continue;
+      const app2 = apps.find((a) => a.specialityId === specId);
+      const specViva = vivaScores.find((v) => v.specialityId === specId);
+      grp.rows.push({
+        candidateId: c.id,
+        candidateCode: c.candidateCode,
+        hallTicketNumber: app2?.hallTicketNumber ?? null,
+        fullName: c.fullName,
+        email: c.email,
+        phone: c.phone,
+        qualification: qualStr || null,
+        college: sub?.medicalCollege || c.collegeName || null,
+        preferenceOrder: prefOrder,
+        allSpecialities: allSpecialities.length > 0 ? allSpecialities : [grp.specialityName],
+        mcqScore,
+        psychometricScore,
+        vivaScore: specViva ? specViva.score : null,
+        status: app2?.status || c.status
+      });
+    }
+  }
+  return {
+    programName: targetProgram?.name || "Fellowship Selection",
+    academicSession: targetProgram?.academicYear || "2026",
+    groups: [...groupMap.values()]
+  };
 }
 async function cascadeDeleteCandidates(ids) {
   const { inArray: inArray4, sql: sql2 } = await Promise.resolve().then(() => (init_drizzle_orm(), drizzle_orm_exports));
@@ -1108707,7 +1109848,7 @@ async function cascadeDeleteCandidates(ids) {
   });
   await db.delete(candidatesTable).where(inArray4(candidatesTable.id, ids));
 }
-var import_express8, import_pdfkit3, XLSX2, archiver2, router8, HEADER_FONT, HEADER_ALIGN, ROW_EVEN, ROW_ODD, BODY_FONT, BODY_ALIGN, THIN_BORDER, RETINA_FILL, RETINA_FONT, SHEET_HEADER_COLORS, candidates_default;
+var import_express8, import_pdfkit5, XLSX3, archiver2, router8, HEADER_FONT, HEADER_ALIGN, ROW_EVEN, ROW_ODD, BODY_FONT, BODY_ALIGN, THIN_BORDER, RETINA_FILL, RETINA_FONT, SHEET_HEADER_COLORS, candidates_default;
 var init_candidates2 = __esm({
   "src/routes/candidates.ts"() {
     "use strict";
@@ -1108719,12 +1109860,14 @@ var init_candidates2 = __esm({
     init_email();
     init_google_docs();
     init_src();
-    import_pdfkit3 = __toESM(require_pdfkit(), 1);
+    import_pdfkit5 = __toESM(require_pdfkit(), 1);
     init_utils5();
     init_letters();
-    XLSX2 = __toESM(require_xlsx(), 1);
+    init_attendance_and_ranks();
+    XLSX3 = __toESM(require_xlsx(), 1);
     init_archiver();
     init_application_forms2();
+    init_application_pdf();
     archiver2 = archiver_exports?.default || archiver_exports;
     router8 = (0, import_express8.Router)();
     router8.get("/candidates", requireAuth, async (req, res) => {
@@ -1108757,6 +1109900,10 @@ var init_candidates2 = __esm({
       let allSubmissions = [];
       let allApplications = [];
       let allScores = [];
+      let allAttempts = [];
+      let allExams = [];
+      let allBatchMarks = [];
+      let mmDoctorIds = /* @__PURE__ */ new Set();
       if (candidates.length > 0) {
         const candidateIds = candidates.map((c) => c.id);
         const emails = candidates.map((c) => c.email.toLowerCase().trim()).filter(Boolean);
@@ -1108772,9 +1109919,15 @@ var init_candidates2 = __esm({
         ) : await readDb.select().from(applicationSubmissionsTable).where(inArray(applicationSubmissionsTable.candidateId, candidateIds));
         allApplications = await readDb.select().from(applicationsTable).where(inArray(applicationsTable.candidateId, candidateIds));
         allScores = await readDb.select().from(interviewScoresTable).where(inArray(interviewScoresTable.candidateId, candidateIds));
+        allAttempts = await readDb.select().from(examAttemptsTable).where(inArray(examAttemptsTable.candidateId, candidateIds));
+        allExams = await readDb.select().from(examsTable);
+        allBatchMarks = await readDb.select().from(batchCandidatesTable).where(inArray(batchCandidatesTable.candidateId, candidateIds));
+        const mmMembers = await readDb.select({ doctorId: interviewPanelMembersTable.doctorId }).from(interviewPanelMembersTable).innerJoin(interviewPanelsTable, eq(interviewPanelMembersTable.panelId, interviewPanelsTable.id)).where(eq(interviewPanelsTable.isMindMatter, true));
+        mmDoctorIds = new Set(mmMembers.map((m2) => m2.doctorId));
       }
       const unitsMap = new Map(units.map((u) => [u.id, u]));
       const specsMap = new Map(allSpecs.map((s2) => [s2.id, s2]));
+      const examsMap = new Map(allExams.map((e2) => [e2.id, e2]));
       const prefsByCandidate = /* @__PURE__ */ new Map();
       for (const p of allPrefs) {
         if (!prefsByCandidate.has(p.candidateId)) prefsByCandidate.set(p.candidateId, []);
@@ -1108796,6 +1109949,16 @@ var init_candidates2 = __esm({
         if (!scoresByCandidate.has(s2.candidateId)) scoresByCandidate.set(s2.candidateId, []);
         scoresByCandidate.get(s2.candidateId).push(s2);
       }
+      const attemptsByCandidate = /* @__PURE__ */ new Map();
+      for (const a of allAttempts) {
+        if (!attemptsByCandidate.has(a.candidateId)) attemptsByCandidate.set(a.candidateId, []);
+        attemptsByCandidate.get(a.candidateId).push(a);
+      }
+      const batchByCandidate = /* @__PURE__ */ new Map();
+      for (const b of allBatchMarks) {
+        if (!batchByCandidate.has(b.candidateId)) batchByCandidate.set(b.candidateId, []);
+        batchByCandidate.get(b.candidateId).push(b);
+      }
       const out = candidates.map((c) => {
         const unit = c.unitId ? unitsMap.get(c.unitId) : null;
         const prefs = (prefsByCandidate.get(c.id) || []).sort((a, b) => a.preferenceOrder - b.preferenceOrder);
@@ -1108807,8 +1109970,27 @@ var init_candidates2 = __esm({
           }
         }
         const documents = (docsByCandidate.get(c.id) || []).map((d) => ({ id: d.id, docType: d.docType, fileName: d.fileName, fileUrl: d.fileUrl }));
-        const candScores = scoresByCandidate.get(c.id) || [];
+        const candScores = [...scoresByCandidate.get(c.id) || []].sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+        const candAttempts = attemptsByCandidate.get(c.id) || [];
+        const candBatch = batchByCandidate.get(c.id) || [];
         const sub = submissionsByCandidate.get(c.id) || (c.email ? submissionsByEmail.get(c.email.toLowerCase().trim()) : null);
+        const isMM = (s2) => s2.specialityId === null || mmDoctorIds.has(s2.doctorId);
+        const mmScores = candScores.filter(isMM);
+        const vivaScores = candScores.filter((s2) => !isMM(s2) && s2.specialityId !== null);
+        const mcqAttempts = candAttempts.filter((a) => examsMap.get(a.examId)?.kind === "mcq" && a.score != null);
+        const psychoAttempts = candAttempts.filter((a) => examsMap.get(a.examId)?.kind?.startsWith("psychometric") && a.score != null);
+        const batchMcq = candBatch.find((b) => b.mcqScore != null)?.mcqScore ?? null;
+        const batchPsycho = candBatch.find((b) => b.psychometricScore != null)?.psychometricScore ?? null;
+        const mcqVal = c.mcqScore != null && c.mcqScore !== "" ? parseFloat(c.mcqScore) : mcqAttempts.length > 0 ? mcqAttempts.reduce((acc, a) => acc + (a.score ?? 0), 0) / mcqAttempts.length : batchMcq;
+        const psyVal = mmScores.length > 0 ? mmScores[0].score : c.psychometricScore != null && c.psychometricScore !== "" ? parseFloat(c.psychometricScore) : psychoAttempts.length > 0 ? psychoAttempts.reduce((acc, a) => acc + (a.score ?? 0), 0) / psychoAttempts.length : batchPsycho;
+        const specialityScores = {};
+        for (const vs of vivaScores) {
+          if (vs.specialityId != null && specialityScores[vs.specialityId] === void 0) {
+            specialityScores[vs.specialityId] = vs.score;
+          }
+        }
+        const specScoreVals = Object.values(specialityScores);
+        const vivaVal = specScoreVals.length > 0 ? specScoreVals.reduce((acc, v) => acc + v, 0) / specScoreVals.length : null;
         return {
           id: c.id,
           candidateCode: c.candidateCode,
@@ -1108825,15 +1110007,11 @@ var init_candidates2 = __esm({
             preferenceOrder: p.preferenceOrder
           })),
           documents,
-          mcqScore: c.mcqScore ? parseFloat(c.mcqScore) : null,
-          psychometricScore: c.psychometricScore ? parseFloat(c.psychometricScore) : null,
-          interviewScore: candScores.length > 0 ? candScores.reduce((acc, s2) => acc + s2.score, 0) / candScores.length : null,
-          totalScore: (() => {
-            const mcq = c.mcqScore ? parseFloat(c.mcqScore) : null;
-            const psy = c.psychometricScore ? parseFloat(c.psychometricScore) : null;
-            const intv = candScores.length > 0 ? candScores.reduce((acc, s2) => acc + s2.score, 0) / candScores.length : null;
-            return mcq !== null || psy !== null || intv !== null ? (mcq ?? 0) + (psy ?? 0) + (intv ?? 0) : null;
-          })(),
+          mcqScore: mcqVal,
+          psychometricScore: psyVal,
+          specialityScores,
+          interviewScore: vivaVal,
+          totalScore: mcqVal !== null || psyVal !== null || vivaVal !== null ? (mcqVal ?? 0) + (psyVal ?? 0) + (vivaVal ?? 0) : null,
           rank: null,
           createdAt: c.createdAt.toISOString(),
           dateOfBirth: formatDOBToStandard(c.dateOfBirth),
@@ -1109082,10 +1110260,10 @@ var init_candidates2 = __esm({
             "Registration Date": rc.createdAt
           };
         };
-        const wb = XLSX2.utils.book_new();
+        const wb = XLSX3.utils.book_new();
         const generalRows = resolvedCandidates.map(mapToExcelRow);
         const generalWs = buildStyledSheet(generalRows, "General");
-        XLSX2.utils.book_append_sheet(wb, generalWs, "General");
+        XLSX3.utils.book_append_sheet(wb, generalWs, "General");
         const approvedResolved = resolvedCandidates.filter((c) => c.status === "approved");
         for (const spec of specOrder) {
           const specCandidates = approvedResolved.filter(
@@ -1109096,9 +1110274,9 @@ var init_candidates2 = __esm({
           );
           const specRows = specCandidates.map(mapToExcelRow);
           const specWs = buildStyledSheet(specRows, spec);
-          XLSX2.utils.book_append_sheet(wb, specWs, spec);
+          XLSX3.utils.book_append_sheet(wb, specWs, spec);
         }
-        const buffer = XLSX2.write(wb, { type: "buffer", bookType: "xlsx", cellStyles: true });
+        const buffer = XLSX3.write(wb, { type: "buffer", bookType: "xlsx", cellStyles: true });
         const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
         res.setHeader("Content-Disposition", `attachment; filename="SAV_Candidates_${today}.xlsx"`);
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -1109324,6 +1110502,26 @@ var init_candidates2 = __esm({
             ipAddress
           });
         }
+        if (psychometricScore !== void 0) {
+          const existingMmRows = await db.select().from(interviewScoresTable).where(
+            and(
+              eq(interviewScoresTable.candidateId, id),
+              sql`(speciality_id IS NULL OR doctor_id IN (SELECT doctor_id FROM interview_panel_members WHERE panel_id IN (SELECT id FROM interview_panels WHERE is_mind_matter = TRUE)))`
+            )
+          );
+          if (psychometricScore === null) {
+            if (existingMmRows.length > 0) {
+              await db.delete(interviewScoresTable).where(inArray(interviewScoresTable.id, existingMmRows.map((r2) => r2.id)));
+            }
+          } else if (existingMmRows.length > 0) {
+            await db.update(interviewScoresTable).set({
+              score: psychometricScore,
+              submittedAt: /* @__PURE__ */ new Date(),
+              lastModifiedBy: req.user.userId,
+              lastModifiedAt: /* @__PURE__ */ new Date()
+            }).where(eq(interviewScoresTable.id, existingMmRows[0].id));
+          }
+        }
         if (vivaScore !== void 0) {
           let docId = req.user.userId;
           if (targetDoctorId && (req.user.role === "super_admin" || req.user.role === "program_admin" || req.user.role === "central_exam_coordinator")) {
@@ -1109435,19 +1110633,25 @@ var init_candidates2 = __esm({
     router8.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "doctor"), async (req, res) => {
       try {
         const candidateId = Number(req.params["candidateId"]);
-        const { psychometricScore, specialityScores, status, unitId, reviewNotes } = req.body;
+        const { psychometricScore, specialityScores, status, unitId, reviewNotes, specialityId: bodySpecId, isMindMatterPanel } = req.body;
         const [cand] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, candidateId));
         if (!cand) {
           return res.status(404).json({ error: "Candidate not found." });
         }
         const userId = req.user.userId;
+        const isDoctorRole = req.user.role === "doctor";
         const now = /* @__PURE__ */ new Date();
+        let updatedMindMatter = false;
+        const scoredSpecIds = [];
+        const mmMembers = await db.select({ doctorId: interviewPanelMembersTable.doctorId }).from(interviewPanelMembersTable).innerJoin(interviewPanelsTable, eq(interviewPanelMembersTable.panelId, interviewPanelsTable.id)).where(eq(interviewPanelsTable.isMindMatter, true));
+        const mmDoctorIds = new Set(mmMembers.map((m2) => m2.doctorId));
         if (psychometricScore !== void 0) {
           if (psychometricScore !== null && (psychometricScore < 0 || psychometricScore > 10)) {
             return res.status(400).json({ error: "Psychometry / Mind Matter score must be between 0 and 10." });
           }
           await db.update(candidatesTable).set({ psychometricScore: psychometricScore !== null ? String(psychometricScore) : null }).where(eq(candidatesTable.id, candidateId));
           if (psychometricScore !== null) {
+            updatedMindMatter = true;
             const existingMm = await db.select().from(interviewScoresTable).where(
               and(
                 eq(interviewScoresTable.candidateId, candidateId),
@@ -1109480,19 +1110684,31 @@ var init_candidates2 = __esm({
         }
         if (Array.isArray(specialityScores) && specialityScores.length > 0) {
           for (const item of specialityScores) {
+            if (bodySpecId && item.specialityId !== bodySpecId) continue;
             const hasScore = typeof item.score === "number" && !isNaN(item.score);
-            const scoreVal = hasScore ? Math.max(0, Math.min(50, item.score)) : 0;
-            const existing = await db.select().from(interviewScoresTable).where(
+            const existingAll = await db.select().from(interviewScoresTable).where(
               and(
                 eq(interviewScoresTable.candidateId, candidateId),
                 eq(interviewScoresTable.specialityId, item.specialityId)
               )
             );
+            const existing = existingAll.filter((s2) => !mmDoctorIds.has(s2.doctorId));
+            if (!hasScore) {
+              if (existing.length > 0 && item.remarks !== void 0) {
+                await db.update(interviewScoresTable).set({
+                  remarks: item.remarks,
+                  lastModifiedBy: userId,
+                  lastModifiedAt: now
+                }).where(eq(interviewScoresTable.id, existing[0].id));
+              }
+              continue;
+            }
+            const scoreVal = Math.max(0, Math.min(50, item.score));
+            scoredSpecIds.push(item.specialityId);
             if (existing.length > 0) {
               const oldScore = existing[0].score;
-              const finalScore = hasScore ? scoreVal : oldScore;
               await db.update(interviewScoresTable).set({
-                score: finalScore,
+                score: scoreVal,
                 remarks: item.remarks !== void 0 ? item.remarks : existing[0].remarks,
                 doctorId: userId,
                 submittedAt: now,
@@ -1109502,7 +1110718,7 @@ var init_candidates2 = __esm({
               try {
                 await db.execute(sql`
               INSERT INTO interview_scores_audit (candidate_id, speciality_id, doctor_id, old_score, new_score, remarks, action, changed_by_user_id)
-              VALUES (${candidateId}, ${item.specialityId}, ${userId}, ${oldScore}, ${finalScore}, ${item.remarks ?? null}, 'UPDATE', ${userId})
+              VALUES (${candidateId}, ${item.specialityId}, ${userId}, ${oldScore}, ${scoreVal}, ${item.remarks ?? null}, 'UPDATE', ${userId})
             `);
               } catch (_) {
               }
@@ -1109527,22 +1110743,45 @@ var init_candidates2 = __esm({
               } catch (_) {
               }
             }
+            await db.update(applicationsTable).set({ status: "completed" }).where(and(
+              eq(applicationsTable.candidateId, candidateId),
+              eq(applicationsTable.specialityId, item.specialityId)
+            ));
+            await db.execute(sql`
+          UPDATE panel_queue pq
+          SET status = 'done'
+          FROM interview_panels ip
+          WHERE pq.panel_id = ip.id
+            AND pq.candidate_id = ${candidateId}
+            AND ip.speciality_id = ${item.specialityId}
+        `);
           }
         }
-        if (status) {
+        if (updatedMindMatter && (isMindMatterPanel || !scoredSpecIds.length)) {
+          await db.execute(sql`
+        UPDATE panel_queue pq
+        SET status = 'done'
+        FROM interview_panels ip
+        WHERE pq.panel_id = ip.id
+          AND pq.candidate_id = ${candidateId}
+          AND ip.is_mind_matter = TRUE
+      `);
+        }
+        const explicitDecision = status && !isDoctorRole && status !== cand.status && ["allocated", "waitlisted", "rejected", "interview_completed"].includes(status);
+        if (status && !isDoctorRole) {
           const allowedStatuses = ["approved", "interview_completed", "waitlisted", "allocated", "rejected"];
           if (allowedStatuses.includes(status)) {
             const candUpdate = { status };
             if (unitId !== void 0) candUpdate.unitId = unitId;
             await db.update(candidatesTable).set(candUpdate).where(eq(candidatesTable.id, candidateId));
           }
-        } else if (unitId !== void 0) {
+        } else if (unitId !== void 0 && !isDoctorRole) {
           await db.update(candidatesTable).set({ unitId }).where(eq(candidatesTable.id, candidateId));
         }
         if (reviewNotes !== void 0) {
           await db.update(applicationSubmissionsTable).set({ reviewNotes: String(reviewNotes) }).where(eq(applicationSubmissionsTable.email, cand.email));
         }
-        if (!status) {
+        if (!explicitDecision) {
           await recalculateCandidateStatus(candidateId);
         }
         const [updatedCandidate] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, candidateId));
@@ -1109604,88 +1110843,87 @@ var init_candidates2 = __esm({
     router8.get("/candidates/bulk-dossier-pdf", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
       try {
         const candidates = await db.select().from(candidatesTable).where(eq(candidatesTable.isMock, req.isMockMode)).orderBy(desc(candidatesTable.createdAt));
-        const doc = new import_pdfkit3.default({ margin: 50, size: "A4", autoFirstPage: false });
+        const doc = new import_pdfkit5.default({
+          margin: 36,
+          size: "LETTER",
+          bufferPages: true,
+          autoFirstPage: false,
+          info: { Title: "Cohort Application Dossier Compilation", Author: "Sankara Academy of Vision" }
+        });
         const filename = `Cohort_Dossier_Compilation_${Date.now()}.pdf`;
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
         doc.pipe(res);
-        const colors = {
-          primary: "#0f172a",
-          secondary: "#475569",
-          accent: "#f97316",
-          muted: "#94a3b8",
-          border: "#e2e8f0",
-          bgOrange: "#fff7ed"
-        };
-        const logoPath = path6.join(process.cwd(), "artifacts", "fellowship-exam", "src", "assets", "seh_sav_logo_1777703794142.jpg");
         for (let i2 = 0; i2 < candidates.length; i2++) {
           const c = candidates[i2];
           const full = await fullCandidate(c);
           const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
-          doc.addPage();
-          doc.save();
-          doc.fillColor(colors.bgOrange).opacity(0.1);
-          doc.circle(550, 50, 150).fill();
-          doc.circle(50, 750, 100).fill();
-          doc.restore();
-          try {
-            doc.image(logoPath, 50, 40, { width: 130, height: 65 });
-          } catch (e2) {
-            doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(14).text("SANKARA ACADEMY OF VISION", 50, 50);
-          }
-          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(16).text("CANDIDATE DOSSIER", 0, 45, { align: "right", width: 545 });
-          doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text("Sankara Academy of Vision \u2014 Fellowship Admissions", 0, 65, { align: "right", width: 545 });
-          doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text(`Protocol ID: ${c.candidateCode} (Page ${i2 + 1}/${candidates.length})`, 0, 78, { align: "right", width: 545 });
-          doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, 112).lineTo(550, 112).stroke();
-          const photoUrl = sub?.photoUrl;
-          if (photoUrl && photoUrl.startsWith("/objects/")) {
-            const localPath = path6.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
-            try {
-              doc.image(localPath, 460, 120, { width: 85, height: 105 });
-              doc.rect(460, 120, 85, 105).strokeColor(colors.border).lineWidth(1).stroke();
-            } catch (_) {
+          const [form] = sub ? await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId)) : [null];
+          const [program] = form ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
+          doc.addPage({ size: "LETTER", margins: { top: 30, bottom: 34, left: 36, right: 36 } });
+          await appendApplicationToPdfDoc(doc, {
+            sub,
+            form,
+            program,
+            candidate: c,
+            includeScores: true,
+            scores: {
+              mcq: full.mcqScore,
+              psychometric: full.psychometricScore,
+              specialityTotal: full.interviewScore,
+              total110: full.totalScore
             }
-          }
-          doc.y = 122;
-          doc.moveDown(2);
-          doc.rect(50, doc.y, 500, 30).fill(colors.bgOrange);
-          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(12).text("ACADEMIC IDENTITY & PROFILE", 65, doc.y - 22);
-          doc.moveDown(0.5);
-          const leftCol = 70;
-          const rightCol = 320;
-          let currY = doc.y;
-          const renderField = (label, value, x2, y) => {
-            doc.fillColor(colors.muted).font("Helvetica-Bold").fontSize(8).text(label.toUpperCase(), x2, y);
-            doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(11).text(String(value || "\u2014"), x2, y + 12);
-          };
-          renderField("Full Name", full.fullName, leftCol, currY);
-          renderField("Contact Identity", full.email, rightCol, currY);
-          currY += 40;
-          renderField("Contact Phone", full.phone || "\u2014", leftCol, currY);
-          renderField("Date of Birth", formatDOBToStandard(full.dateOfBirth), rightCol, currY);
-          currY += 40;
-          renderField("MBBS Institution", full.collegeName || "\u2014", leftCol, currY);
-          renderField("Qualifying MBBS", full.qualification || "\u2014", rightCol, currY);
-          currY += 40;
-          if (sub?.pgQualifications) {
-            doc.rect(50, currY, 500, 24).fill("#f8fafc");
-            doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(10).text("POST-GRADUATE QUALIFICATIONS", 65, currY + 6);
-            currY += 32;
-            doc.fillColor(colors.secondary).font("Helvetica").fontSize(10).text(sub.pgQualifications, 65, currY, { width: 470 });
-            currY = doc.y + 16;
-          }
-          const bottom = 750;
-          doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, bottom).lineTo(550, bottom).stroke();
-          doc.fillColor(colors.muted).font("Helvetica").fontSize(8).text("CONFIDENTIAL DOCUMENT - FOR INTERNAL USE ONLY", 50, bottom + 10);
-          doc.text("SANKARA ACADEMY OF VISION - FELLOWSHIP ADMISSIONS HUB", 50, bottom + 22);
-          doc.text(`Candidate ${i2 + 1} of ${candidates.length} \xB7 Generated on ${formatToLocalDateTime(/* @__PURE__ */ new Date())}`, 350, bottom + 10, { align: "right" });
+          });
         }
+        if (candidates.length === 0) {
+          doc.addPage({ size: "LETTER", margins: { top: 36, bottom: 36, left: 36, right: 36 } });
+          doc.font("Helvetica-Bold").fontSize(12).text("No candidate dossiers found for the current cohort.", 36, 120, { align: "center", width: 540 });
+        }
+        stampLetterPageFooters(doc, "CONFIDENTIAL \u2014 SANKARA ACADEMY OF VISION \xB7 COHORT APPLICATION DOSSIERS");
         doc.end();
       } catch (err) {
         console.error("[bulk-dossier-pdf] error:", err);
         if (!res.headersSent) res.status(500).json({ error: err.message || "Failed to generate bulk PDF compilation." });
       }
     });
+    router8.get(
+      "/candidates/attendance-sheet-pdf",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "unit_coordinator"),
+      async (req, res) => {
+        try {
+          const { programName, academicSession, groups } = await buildSpecialityAttendanceGroups(req);
+          const pdfBuffer = await generateAttendanceSheetPdf({ programName, academicSession, groups });
+          const specIdParam = req.query["specialityId"];
+          const singleName = specIdParam && groups.length === 1 ? `_${groups[0].specialityCode}` : "_All_Specialities";
+          res.setHeader("Content-Type", "application/pdf");
+          res.setHeader("Content-Disposition", `attachment; filename="Final_Attendance_Sheet${singleName}.pdf"`);
+          res.send(pdfBuffer);
+        } catch (err) {
+          console.error("[attendance-sheet-pdf] Error:", err);
+          res.status(500).json({ error: err.message || "Failed to generate attendance sheet PDF" });
+        }
+      }
+    );
+    router8.get(
+      "/candidates/attendance-sheet-excel",
+      requireAuth,
+      requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "unit_coordinator"),
+      async (req, res) => {
+        try {
+          const { groups } = await buildSpecialityAttendanceGroups(req);
+          const buffer = generateAttendanceSheetExcel({ groups });
+          const specIdParam = req.query["specialityId"];
+          const singleName = specIdParam && groups.length === 1 ? `_${groups[0].specialityCode}` : "_All_Specialities";
+          res.setHeader("Content-Disposition", `attachment; filename="Final_Attendance_Sheet${singleName}.xlsx"`);
+          res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+          res.send(buffer);
+        } catch (err) {
+          console.error("[attendance-sheet-excel] Error:", err);
+          res.status(500).json({ error: err.message || "Failed to generate attendance sheet Excel" });
+        }
+      }
+    );
     router8.get("/candidates/:candidateId", requireAuth, async (req, res, next) => {
       const id = Number(req.params["candidateId"]);
       if (isNaN(id)) return next();
@@ -1110190,142 +1111428,29 @@ var init_candidates2 = __esm({
         }
         const full = await fullCandidate(c);
         const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, c.email));
-        const [bc] = await db.select().from(batchCandidatesTable).where(eq(batchCandidatesTable.candidateId, c.id));
-        let batch = null;
-        if (bc) {
-          [batch] = await db.select().from(batchesTable).where(eq(batchesTable.id, bc.batchId));
-        }
-        const doc = new import_pdfkit3.default({ margin: 50, size: "A4" });
-        const filename = `Dossier_${c.fullName.replace(/\s+/g, "_")}.pdf`;
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `inline; filename=${filename}`);
-        doc.pipe(res);
-        const colors = {
-          primary: "#0f172a",
-          secondary: "#475569",
-          accent: "#f97316",
-          // Orange
-          muted: "#94a3b8",
-          border: "#e2e8f0",
-          bgOrange: "#fff7ed"
-        };
-        doc.save();
-        doc.fillColor(colors.bgOrange).opacity(0.1);
-        doc.circle(550, 50, 150).fill();
-        doc.circle(50, 750, 100).fill();
-        doc.restore();
-        const logoPath = path6.join(process.cwd(), "artifacts", "fellowship-exam", "src", "assets", "seh_sav_logo_1777703794142.jpg");
-        let logoLoaded = false;
-        try {
-          doc.image(logoPath, 50, 40, { width: 130, height: 65 });
-          logoLoaded = true;
-        } catch (e2) {
-          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(14).text("SANKARA ACADEMY OF VISION", 50, 50);
-        }
-        doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(16).text("CANDIDATE DOSSIER", 0, 45, { align: "right", width: 545 });
-        doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text("Sankara Academy of Vision \u2014 Fellowship Admissions", 0, 65, { align: "right", width: 545 });
-        doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text(`Protocol ID: ${c.candidateCode}`, 0, 78, { align: "right", width: 545 });
-        doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, 112).lineTo(550, 112).stroke();
-        const photoUrl = sub?.photoUrl;
-        if (photoUrl && photoUrl.startsWith("/objects/")) {
-          const localPath = path6.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
-          try {
-            doc.image(localPath, 460, 120, { width: 85, height: 105 });
-            doc.rect(460, 120, 85, 105).strokeColor(colors.border).lineWidth(1).stroke();
-          } catch (e2) {
+        const [form] = sub ? await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId)) : [null];
+        const [program] = form ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
+        const pdfBuffer = await generateApplicationPdfBuffer({
+          sub,
+          form,
+          program,
+          candidate: c,
+          includeScores: true,
+          scores: {
+            mcq: full.mcqScore,
+            psychometric: full.psychometricScore,
+            specialityTotal: full.interviewScore,
+            total110: full.totalScore
           }
-        }
-        doc.y = 122;
-        doc.moveDown(2);
-        doc.rect(50, doc.y, 500, 30).fill(colors.bgOrange);
-        doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(12).text("ACADEMIC IDENTITY & PROFILE", 65, doc.y - 22);
-        doc.moveDown(0.5);
-        const leftCol = 70;
-        const rightCol = 320;
-        let currY = doc.y;
-        const renderField = (label, value, x2, y) => {
-          doc.fillColor(colors.muted).font("Helvetica-Bold").fontSize(8).text(label.toUpperCase(), x2, y);
-          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(11).text(String(value || "\u2014"), x2, y + 12);
-        };
-        renderField("Full Name", full.fullName, leftCol, currY);
-        renderField("Contact Identity", full.email, rightCol, currY);
-        currY += 40;
-        renderField("Mobile Registry", full.phone, leftCol, currY);
-        renderField("Academic Year", batch?.name || "DECEMBER 2026 CYCLE", rightCol, currY);
-        currY += 40;
-        renderField("Clinical Segment", (sub?.reviewNotes ?? "").replace("Allocated to ", "") || "Fellowship Track", leftCol, currY);
-        renderField("Reporting Unit", full.unitName || "Pending Allocation", rightCol, currY);
-        doc.moveDown(4);
-        doc.rect(50, doc.y, 500, 20).fill(colors.bgOrange);
-        doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(10).text("CLINICAL & SURGICAL PEDIGREE", 65, doc.y - 15);
-        doc.moveDown(0.5);
-        currY = doc.y;
-        renderField("Degree / Qualification", sub?.degree || c.qualification, leftCol, currY);
-        renderField("Medical College", sub?.medicalCollege || c.collegeName, rightCol, currY);
-        currY += 40;
-        renderField("Medical Council No.", sub?.medicalCouncilNumber, leftCol, currY);
-        renderField("Surgical Experience", sub?.surgicalExperience || "Standard Residency", rightCol, currY);
-        currY += 40;
-        renderField("Total Surgeries", sub?.totalSurgeries, leftCol, currY);
-        renderField("Research / Publications", sub?.publications ? "PRESENT" : "NONE LISTED", rightCol, currY);
-        doc.moveDown(5);
-        doc.rect(50, doc.y, 500, 25).fill(colors.primary);
-        doc.fillColor("white").font("Helvetica-Bold").fontSize(10).text("MERIT PERFORMANCE MATRIX", 65, doc.y - 18);
-        doc.moveDown(1);
-        const marksTableY = doc.y;
-        doc.fillColor(colors.muted).font("Helvetica-Bold").fontSize(9);
-        doc.text("EVALUATION STAGE", 70, marksTableY);
-        doc.text("MAXIMUM", 350, marksTableY);
-        doc.text("OBTAINED", 450, marksTableY);
-        doc.moveDown(0.5);
-        doc.strokeColor(colors.border).lineWidth(1).moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-        doc.moveDown(0.5);
-        const renderMarkRow = (label, max2, obtained) => {
-          const y = doc.y;
-          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(10).text(label, 70, y);
-          doc.fillColor(colors.secondary).font("Helvetica").fontSize(10).text(String(max2), 350, y);
-          doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(11).text(obtained != null ? Number(obtained).toFixed(2) : "\u2014", 450, y);
-          doc.moveDown(0.8);
-          doc.strokeColor(colors.border).lineWidth(0.5).moveTo(70, doc.y).lineTo(530, doc.y).stroke();
-          doc.moveDown(0.5);
-        };
-        renderMarkRow("MCQ Assessment", batch?.mcqTotalMarks || 50, full.mcqScore);
-        renderMarkRow("Psychometry Profile", batch?.psychometricTotalMarks || 50, full.psychometricScore);
-        renderMarkRow("Clinical Interview", batch?.interviewTotalMarks || 100, full.interviewScore);
-        doc.moveDown(1);
-        doc.rect(400, doc.y, 130, 30).fill(colors.bgOrange);
-        doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(10).text("AGGREGATE", 410, doc.y - 20);
-        doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(14).text(full.totalScore != null ? full.totalScore.toFixed(2) : "\u2014", 480, doc.y - 23);
-        doc.moveDown(4);
-        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(11).text("STRATEGIC PREFERENCES", 50, doc.y);
-        doc.moveDown(0.5);
-        if (full.preferences.length > 0) {
-          full.preferences.forEach((p, i2) => {
-            doc.fillColor(colors.primary).font("Helvetica").fontSize(10).text(`${i2 + 1}. ${p.specialityName}`, { indent: 20 });
-          });
-        } else {
-          doc.fillColor(colors.muted).font("Helvetica").fontSize(10).text("Institutional Choice", { indent: 20 });
-        }
-        doc.moveDown(2);
-        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(11).text("PROFESSIONAL REFERENCES (LOR)", 50, doc.y);
-        doc.moveDown(0.5);
-        const renderLOR = (num, name2, contact, email3, status) => {
-          doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(9).text(`LOR ${num}: ${name2 || "\u2014"}`, { indent: 20 });
-          doc.fillColor(colors.secondary).font("Helvetica").fontSize(8).text(`Contact: ${contact || "\u2014"} | Email: ${email3 || "\u2014"}`, { indent: 35 });
-          doc.fillColor(status ? "#10b981" : colors.muted).font("Helvetica-Bold").fontSize(8).text(`STATUS: ${status ? "PROCESSED & VERIFIED" : "PENDING"}`, { indent: 35 });
-          doc.moveDown(0.5);
-        };
-        renderLOR(1, sub?.lor1RefName || "", sub?.lor1RefContact || "", sub?.lor1RefEmail || "", !!sub?.lor1Url);
-        renderLOR(2, sub?.lor2RefName || "", sub?.lor2RefContact || "", sub?.lor2RefEmail || "", !!sub?.lor2Url);
-        const bottom = 750;
-        doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, bottom).lineTo(550, bottom).stroke();
-        doc.fillColor(colors.muted).font("Helvetica").fontSize(8).text("CONFIDENTIAL DOCUMENT - FOR INTERNAL USE ONLY", 50, bottom + 10);
-        doc.text("SANKARA ACADEMY OF VISION - FELLOWSHIP ADMISSIONS HUB", 50, bottom + 22);
-        doc.text(`Generated on ${formatToLocalDateTime(/* @__PURE__ */ new Date())}`, 350, bottom + 10, { align: "right" });
-        doc.end();
+        });
+        const cleanName = (c.fullName || "Candidate").replace(/[^a-zA-Z0-9_-]/g, "_");
+        const filename = `Application_${cleanName}_${c.candidateCode || id}.pdf`;
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+        res.send(pdfBuffer);
       } catch (e2) {
         console.error("[summary-pdf] failed", e2);
-        res.status(500).json({ error: e2.message || "Failed to generate summary PDF." });
+        if (!res.headersSent) res.status(500).json({ error: e2.message || "Failed to generate summary PDF." });
       }
     });
     router8.post("/candidates/:id/batches", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
@@ -1110658,9 +1111783,9 @@ var require_pump = __commonJS({
   "../../node_modules/.pnpm/pump@3.0.4/node_modules/pump/index.js"(exports, module) {
     var once = require_once();
     var eos = require_end_of_stream3();
-    var fs16;
+    var fs17;
     try {
-      fs16 = __require("fs");
+      fs17 = __require("fs");
     } catch (e2) {
     }
     var noop2 = function() {
@@ -1110671,8 +1111796,8 @@ var require_pump = __commonJS({
     };
     var isFS = function(stream2) {
       if (!ancient) return false;
-      if (!fs16) return false;
-      return (stream2 instanceof (fs16.ReadStream || noop2) || stream2 instanceof (fs16.WriteStream || noop2)) && isFn(stream2.close);
+      if (!fs17) return false;
+      return (stream2 instanceof (fs17.ReadStream || noop2) || stream2 instanceof (fs17.WriteStream || noop2)) && isFn(stream2.close);
     };
     var isRequest2 = function(stream2) {
       return stream2.setHeader && isFn(stream2.abort);
@@ -1121944,7 +1123069,7 @@ var require_form_data = __commonJS({
     var http3 = __require("http");
     var https2 = __require("https");
     var parseUrl = __require("url").parse;
-    var fs16 = __require("fs");
+    var fs17 = __require("fs");
     var Stream3 = __require("stream").Stream;
     var crypto10 = __require("crypto");
     var mime3 = require_mime_types3();
@@ -1122011,7 +1123136,7 @@ var require_form_data = __commonJS({
         if (value.end != void 0 && value.end != Infinity && value.start != void 0) {
           callback(null, value.end + 1 - (value.start ? value.start : 0));
         } else {
-          fs16.stat(value.path, function(err, stat3) {
+          fs17.stat(value.path, function(err, stat3) {
             if (err) {
               callback(err);
               return;
@@ -1123940,7 +1125065,7 @@ var require_axios = __commonJS({
       self instanceof WorkerGlobalScope && typeof self.importScripts === "function";
     })();
     var origin = hasBrowserEnv && window.location.href || "http://localhost";
-    var utils8 = /* @__PURE__ */ Object.freeze({
+    var utils9 = /* @__PURE__ */ Object.freeze({
       __proto__: null,
       hasBrowserEnv,
       hasStandardBrowserEnv,
@@ -1123949,7 +1125074,7 @@ var require_axios = __commonJS({
       origin
     });
     var platform = {
-      ...utils8,
+      ...utils9,
       ...platform$1
     };
     function toURLEncodedForm(data, options) {
@@ -1130360,7 +1131485,7 @@ var require_numeric_data = __commonJS({
     NumericData.prototype.getBitsLength = function getBitsLength() {
       return NumericData.getBitsLength(this.data.length);
     };
-    NumericData.prototype.write = function write6(bitBuffer) {
+    NumericData.prototype.write = function write7(bitBuffer) {
       let i2, group, value;
       for (i2 = 0; i2 + 3 <= this.data.length; i2 += 3) {
         group = this.data.substr(i2, 3);
@@ -1130442,7 +1131567,7 @@ var require_alphanumeric_data = __commonJS({
     AlphanumericData.prototype.getBitsLength = function getBitsLength() {
       return AlphanumericData.getBitsLength(this.data.length);
     };
-    AlphanumericData.prototype.write = function write6(bitBuffer) {
+    AlphanumericData.prototype.write = function write7(bitBuffer) {
       let i2;
       for (i2 = 0; i2 + 2 <= this.data.length; i2 += 2) {
         let value = ALPHA_NUM_CHARS.indexOf(this.data[i2]) * 45;
@@ -1133237,7 +1134362,7 @@ var require_utils12 = __commonJS({
 // ../../node_modules/.pnpm/qrcode@1.5.4/node_modules/qrcode/lib/renderer/png.js
 var require_png2 = __commonJS({
   "../../node_modules/.pnpm/qrcode@1.5.4/node_modules/qrcode/lib/renderer/png.js"(exports) {
-    var fs16 = __require("fs");
+    var fs17 = __require("fs");
     var PNG = require_png().PNG;
     var Utils = require_utils12();
     exports.render = function render(qrData, options) {
@@ -1133289,7 +1134414,7 @@ var require_png2 = __commonJS({
         called = true;
         cb.apply(null, args);
       };
-      const stream2 = fs16.createWriteStream(path15);
+      const stream2 = fs17.createWriteStream(path15);
       stream2.on("error", done);
       stream2.on("close", done);
       exports.renderToFileStream(stream2, qrData, options);
@@ -1133356,9 +1134481,9 @@ var require_utf8 = __commonJS({
         cb = options;
         options = void 0;
       }
-      const fs16 = __require("fs");
+      const fs17 = __require("fs");
       const utf8 = exports.render(qrData, options);
-      fs16.writeFile(path15, utf8, cb);
+      fs17.writeFile(path15, utf8, cb);
     };
   }
 });
@@ -1133532,10 +1134657,10 @@ var require_svg = __commonJS({
         cb = options;
         options = void 0;
       }
-      const fs16 = __require("fs");
+      const fs17 = __require("fs");
       const svgTag = exports.render(qrData, options);
       const xmlStr = '<?xml version="1.0" encoding="utf-8"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">' + svgTag;
-      fs16.writeFile(path15, xmlStr, cb);
+      fs17.writeFile(path15, xmlStr, cb);
     };
   }
 });
@@ -1133798,9 +1134923,9 @@ var import_express34 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 var import_pino_http = __toESM(require_logger(), 1);
 import path14 from "path";
-import os4 from "os";
+import os5 from "os";
 import { fileURLToPath } from "url";
-import fs15 from "fs";
+import fs16 from "fs";
 
 // src/routes/index.ts
 var import_express33 = __toESM(require_express2(), 1);
@@ -1135269,19 +1136394,29 @@ var import_express15 = __toESM(require_express2(), 1);
 init_drizzle_orm();
 init_src();
 init_auth2();
-var XLSX3 = __toESM(require_xlsx(), 1);
+var XLSX4 = __toESM(require_xlsx(), 1);
 var router15 = (0, import_express15.Router)();
 router15.get("/interviews/assignments", requireAuth, requireRole("doctor", "super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   const userId = req.user.userId;
-  const panelQuery = await db.execute(sql`
-    SELECT ip.id as panel_id, ip.speciality_id, s.name as speciality_name, ip.name as panel_name, ip.is_mind_matter
-    FROM interview_panel_members ipm
-    JOIN interview_panels ip ON ip.id = ipm.panel_id
-    LEFT JOIN specialities s ON s.id = ip.speciality_id
-    WHERE ipm.doctor_id = ${userId} AND ip.is_active = TRUE
-    LIMIT 1
-  `);
-  const activePanel = panelQuery.rows[0];
+  const userRole = req.user.role;
+  const requestedPanelId = req.query["panelId"] ? Number(req.query["panelId"]) : null;
+  const isMockMode = Boolean(req.isMockMode);
+  const panelQuery = userRole === "doctor" ? await db.execute(sql`
+        SELECT ip.id as panel_id, ip.speciality_id, s.name as speciality_name, ip.name as panel_name, ip.is_mind_matter
+        FROM interview_panel_members ipm
+        JOIN interview_panels ip ON ip.id = ipm.panel_id
+        LEFT JOIN specialities s ON s.id = ip.speciality_id
+        WHERE ipm.doctor_id = ${userId} AND ip.is_active = TRUE AND ip.is_mock = ${isMockMode}
+        ORDER BY ip.is_mind_matter DESC, ip.id ASC
+      `) : await db.execute(sql`
+        SELECT ip.id as panel_id, ip.speciality_id, s.name as speciality_name, ip.name as panel_name, ip.is_mind_matter
+        FROM interview_panels ip
+        LEFT JOIN specialities s ON s.id = ip.speciality_id
+        WHERE ip.is_active = TRUE AND ip.is_mock = ${isMockMode}
+        ORDER BY ip.is_mind_matter DESC, ip.id ASC
+      `);
+  const activePanels = panelQuery.rows;
+  const activePanel = (requestedPanelId ? activePanels.find((p) => Number(p.panel_id) === requestedPanelId) : void 0) ?? activePanels[0];
   const specialityId = activePanel?.speciality_id ?? null;
   const panelId = activePanel?.panel_id ?? null;
   let queueEntries = [];
@@ -1135289,7 +1136424,9 @@ router15.get("/interviews/assignments", requireAuth, requireRole("doctor", "supe
     queueEntries = (await db.execute(sql`
       SELECT c.id as candidate_id, c.id as queue_id,
              CASE 
-               WHEN (c.psychometric_score IS NOT NULL AND c.psychometric_score != '') THEN 'completed'
+               WHEN (c.psychometric_score IS NOT NULL AND c.psychometric_score != '')
+                 OR EXISTS (SELECT 1 FROM interview_scores ist WHERE ist.candidate_id = c.id AND ist.speciality_id IS NULL)
+               THEN 'completed'
                ELSE 'pending'
              END as queue_status,
              c.full_name, c.candidate_code, c.email, c.phone, c.qualification, c.college_name, c.status as candidate_status,
@@ -1135297,7 +1136434,7 @@ router15.get("/interviews/assignments", requireAuth, requireRole("doctor", "supe
              sub.id as submission_id, sub.pg_qualifications, sub.specialization, sub.photo_url
       FROM candidates c
       LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
-      WHERE c.status != 'rejected'
+      WHERE c.status != 'rejected' AND c.is_mock = ${isMockMode}
       ORDER BY c.full_name ASC
     `)).rows;
   } else if (specialityId) {
@@ -1135311,7 +1136448,7 @@ router15.get("/interviews/assignments", requireAuth, requireRole("doctor", "supe
         FROM panel_queue pq
         JOIN candidates c ON c.id = pq.candidate_id
         LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
-        WHERE pq.panel_id = ${panelId} AND c.status != 'rejected'
+        WHERE pq.panel_id = ${panelId} AND c.status != 'rejected' AND c.is_mock = ${isMockMode}
         ORDER BY pq.queue_position ASC, pq.created_at ASC
       `)).rows;
     }
@@ -1135321,9 +1136458,12 @@ router15.get("/interviews/assignments", requireAuth, requireRole("doctor", "supe
              c.psychometric_score,
              sub.id as submission_id, sub.pg_qualifications, sub.specialization, sub.photo_url
       FROM candidates c
-      JOIN candidate_preferences cp ON cp.candidate_id = c.id
       LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
-      WHERE cp.speciality_id = ${specialityId} AND c.status != 'rejected'
+      WHERE c.status != 'rejected' AND c.is_mock = ${isMockMode}
+        AND (
+          EXISTS (SELECT 1 FROM candidate_preferences cp WHERE cp.candidate_id = c.id AND cp.speciality_id = ${specialityId})
+          OR EXISTS (SELECT 1 FROM applications a WHERE a.candidate_id = c.id AND a.speciality_id = ${specialityId})
+        )
       ORDER BY c.full_name ASC
     `)).rows;
     const seenCands = /* @__PURE__ */ new Set();
@@ -1135343,12 +1136483,20 @@ router15.get("/interviews/assignments", requireAuth, requireRole("doctor", "supe
              sub.id as submission_id, sub.pg_qualifications, sub.specialization, sub.photo_url, c.created_at
       FROM candidates c
       LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
-      WHERE c.status IN ('approved', 'interview_completed', 'allocated', 'pending')
+      WHERE c.status IN ('approved', 'interview_completed', 'allocated', 'pending') AND c.is_mock = ${isMockMode}
       ORDER BY c.created_at DESC
       LIMIT 100
     `)).rows;
   }
-  const allScores = await db.select().from(interviewScoresTable);
+  const [allScores, mmPanelDocs] = await Promise.all([
+    db.select().from(interviewScoresTable),
+    db.execute(sql`
+      SELECT ipm.doctor_id FROM interview_panel_members ipm
+      JOIN interview_panels ip ON ip.id = ipm.panel_id
+      WHERE ip.is_mind_matter = TRUE
+    `)
+  ]);
+  const mmDoctorIds = new Set(mmPanelDocs.rows.map((r2) => Number(r2.doctor_id)));
   res.json(queueEntries.map((q) => {
     const candidateId = Number(q["candidate_id"]);
     let sc = null;
@@ -1135371,7 +1136519,9 @@ router15.get("/interviews/assignments", requireAuth, requireRole("doctor", "supe
         };
       }
     } else if (specialityId) {
-      const specScore = allScores.find((s2) => s2.candidateId === candidateId && s2.specialityId === specialityId);
+      const specScore = allScores.find(
+        (s2) => s2.candidateId === candidateId && s2.specialityId === specialityId && !mmDoctorIds.has(s2.doctorId)
+      );
       if (specScore) {
         sc = {
           id: specScore.id,
@@ -1135416,29 +1136566,44 @@ router15.get("/interviews/assignments", requireAuth, requireRole("doctor", "supe
   }));
 });
 router15.get("/interviews/scores", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+  const isMockMode = Boolean(req.isMockMode);
   const scores = await db.select().from(interviewScoresTable);
-  const candidates = await db.select().from(candidatesTable);
+  const candidates = await db.select().from(candidatesTable).where(eq(candidatesTable.isMock, isMockMode));
   const users = await db.select().from(usersTable);
-  const { db: workspaceDb, batchesTable: batchesTable3 } = await Promise.resolve().then(() => (init_src(), src_exports));
-  const batches = await db.select().from(batchesTable3);
-  res.json(scores.map((s2) => {
-    const cand = candidates.find((c) => c.id === s2.candidateId);
-    const doc = users.find((u) => u.id === s2.doctorId);
-    const batch = batches[0] ?? null;
-    return {
-      id: s2.id,
-      candidateId: s2.candidateId,
-      candidateName: cand?.fullName ?? `#${s2.candidateId}`,
-      candidateCode: cand?.candidateCode ?? "",
-      doctorId: s2.doctorId,
-      doctorName: doc?.fullName ?? `#${s2.doctorId}`,
-      score: s2.score,
-      specialityId: s2.specialityId,
-      totalMarks: batch?.interviewTotalMarks ?? 100,
-      remarks: s2.remarks,
-      submittedAt: s2.submittedAt.toISOString()
-    };
-  }));
+  const allSpecs = await db.select().from(specialitiesTable);
+  const mmDocs = (await db.execute(sql`
+    SELECT ipm.doctor_id FROM interview_panel_members ipm
+    JOIN interview_panels ip ON ip.id = ipm.panel_id
+    WHERE ip.is_mind_matter = TRUE
+  `)).rows;
+  const mmDocSet = new Set(mmDocs.map((d) => Number(d.doctor_id)));
+  const candMap = new Map(candidates.map((c) => [c.id, c]));
+  const { batchesTable: batchesTable4 } = await Promise.resolve().then(() => (init_src(), src_exports));
+  const batches = await db.select().from(batchesTable4);
+  res.json(
+    scores.filter((s2) => candMap.has(s2.candidateId)).map((s2) => {
+      const cand = candMap.get(s2.candidateId);
+      const doc = users.find((u) => u.id === s2.doctorId);
+      const spec = s2.specialityId ? allSpecs.find((sp) => sp.id === s2.specialityId) : null;
+      const isMM = s2.specialityId === null || s2.specialityId === void 0 || mmDocSet.has(s2.doctorId);
+      const batch = batches[0] ?? null;
+      return {
+        id: s2.id,
+        candidateId: s2.candidateId,
+        candidateName: cand?.fullName ?? `#${s2.candidateId}`,
+        candidateCode: cand?.candidateCode ?? "",
+        doctorId: s2.doctorId,
+        doctorName: doc?.fullName ?? `#${s2.doctorId}`,
+        score: s2.score,
+        specialityId: s2.specialityId,
+        specialityName: isMM ? "Mind Matter" : spec?.name ?? "Speciality Viva",
+        isMindMatter: isMM,
+        totalMarks: batch?.interviewTotalMarks ?? 100,
+        remarks: s2.remarks,
+        submittedAt: s2.submittedAt.toISOString()
+      };
+    })
+  );
 });
 router15.patch("/interviews/scores/:scoreId", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   try {
@@ -1135453,8 +1136618,8 @@ router15.patch("/interviews/scores/:scoreId", requireAuth, requireRole("super_ad
       res.status(404).json({ error: "Score not found" });
       return;
     }
-    let maxScore = 50;
-    if (existingScore.specialityId) {
+    let isMindMatter = existingScore.specialityId === null;
+    if (!isMindMatter && existingScore.specialityId) {
       const panelQuery = await db.execute(sql`
         SELECT ip.is_mind_matter
         FROM interview_panel_members ipm
@@ -1135462,14 +1136627,17 @@ router15.patch("/interviews/scores/:scoreId", requireAuth, requireRole("super_ad
         WHERE ipm.doctor_id = ${existingScore.doctorId} AND ip.speciality_id = ${existingScore.specialityId}
         LIMIT 1
       `);
-      const isMindMatter = panelQuery.rows[0]?.is_mind_matter;
-      if (isMindMatter) maxScore = 10;
+      isMindMatter = Boolean(panelQuery.rows[0]?.is_mind_matter);
     }
+    const maxScore = isMindMatter ? 10 : 50;
     if (score < 0 || score > maxScore) {
       res.status(400).json({ error: `Score must be between 0 and ${maxScore}` });
       return;
     }
     const [updated] = await db.update(interviewScoresTable).set({ score, remarks: remarks ?? null, submittedAt: /* @__PURE__ */ new Date() }).where(eq(interviewScoresTable.id, scoreId)).returning();
+    if (isMindMatter) {
+      await db.update(candidatesTable).set({ psychometricScore: String(score) }).where(eq(candidatesTable.id, existingScore.candidateId));
+    }
     const { recalculateCandidateStatus: recalculateCandidateStatus2 } = await Promise.resolve().then(() => (init_candidates2(), candidates_exports));
     await recalculateCandidateStatus2(existingScore.candidateId);
     res.json(updated);
@@ -1135486,6 +1136654,14 @@ router15.delete("/interviews/scores/:scoreId", requireAuth, requireRole("super_a
       return;
     }
     await db.delete(interviewScoresTable).where(eq(interviewScoresTable.id, scoreId));
+    if (existingScore.specialityId === null) {
+      const remainingMm = await db.select().from(interviewScoresTable).where(
+        and(eq(interviewScoresTable.candidateId, existingScore.candidateId), sql`speciality_id IS NULL`)
+      );
+      if (remainingMm.length === 0) {
+        await db.update(candidatesTable).set({ psychometricScore: null }).where(eq(candidatesTable.id, existingScore.candidateId));
+      }
+    }
     const { recalculateCandidateStatus: recalculateCandidateStatus2 } = await Promise.resolve().then(() => (init_candidates2(), candidates_exports));
     await recalculateCandidateStatus2(existingScore.candidateId);
     res.json({ success: true });
@@ -1135582,27 +1136758,35 @@ router15.delete("/interviews/assign/:assignmentId", requireAuth, requireRole("su
   await db.delete(doctorAssignmentsTable).where(eq(doctorAssignmentsTable.id, id));
   res.json({ success: true });
 });
-router15.post("/interviews/scores", requireAuth, requireRole("doctor"), async (req, res) => {
+router15.post("/interviews/scores", requireAuth, requireRole("doctor", "super_admin"), async (req, res) => {
   const userId = req.user.userId;
-  const { candidateId, score, remarks } = req.body;
+  const userRole = req.user.role;
+  const isMockMode = Boolean(req.isMockMode);
+  const { candidateId, score, remarks, panelId: bodyPanelId, specialityId: bodySpecId } = req.body;
   if (!candidateId || score == null) {
     res.status(400).json({ error: "Missing fields" });
     return;
   }
-  const panelQuery = await db.execute(sql`
-    SELECT ip.speciality_id, ip.id as panel_id, ip.is_mind_matter, ipm.marks_entry_enabled
-    FROM interview_panel_members ipm
-    JOIN interview_panels ip ON ip.id = ipm.panel_id
-    WHERE ipm.doctor_id = ${userId} AND ip.is_active = TRUE
-    LIMIT 1
-  `);
-  const activePanel = panelQuery.rows[0];
+  const panelQuery = userRole === "doctor" ? await db.execute(sql`
+        SELECT ip.speciality_id, ip.id as panel_id, ip.is_mind_matter, ipm.marks_entry_enabled
+        FROM interview_panel_members ipm
+        JOIN interview_panels ip ON ip.id = ipm.panel_id
+        WHERE ipm.doctor_id = ${userId} AND ip.is_active = TRUE AND ip.is_mock = ${isMockMode}
+        ORDER BY ip.is_mind_matter DESC, ip.id ASC
+      `) : await db.execute(sql`
+        SELECT ip.speciality_id, ip.id as panel_id, ip.is_mind_matter, TRUE as marks_entry_enabled
+        FROM interview_panels ip
+        WHERE ip.is_active = TRUE AND ip.is_mock = ${isMockMode}
+        ORDER BY ip.is_mind_matter DESC, ip.id ASC
+      `);
+  const activePanels = panelQuery.rows;
+  const activePanel = (bodyPanelId ? activePanels.find((p) => Number(p.panel_id) === Number(bodyPanelId)) : void 0) ?? (bodySpecId !== void 0 ? activePanels.find((p) => Number(p.speciality_id) === Number(bodySpecId)) : void 0) ?? activePanels[0];
   if (!activePanel) {
-    return res.status(403).json({ error: "Access denied. Doctor is not currently active in any panel." });
+    return res.status(403).json({ error: "Access denied. No active interview panel selected." });
   }
   const specialityId = activePanel.speciality_id;
   const panelId = activePanel.panel_id;
-  if (!activePanel.marks_entry_enabled) {
+  if (userRole !== "super_admin" && !activePanel.marks_entry_enabled) {
     return res.status(403).json({
       error: "Access denied. You do not have marks entry enabled for this panel."
     });
@@ -1135655,14 +1136839,27 @@ router15.post("/interviews/scores", requireAuth, requireRole("doctor"), async (r
       eq(applicationsTable.specialityId, specialityId)
     ));
   }
+  if (panelId) {
+    await db.execute(sql`
+      UPDATE panel_queue SET status = 'done'
+      WHERE panel_id = ${panelId} AND candidate_id = ${candidateId}
+    `);
+  }
   const [cand] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, candidateId));
   if (cand) {
-    if (cand.status !== "allocated") {
+    if (cand.status !== "allocated" && cand.status !== "waitlisted" && cand.status !== "rejected") {
       const apps = await db.select().from(applicationsTable).where(eq(applicationsTable.candidateId, candidateId));
       const scores = await db.select().from(interviewScoresTable).where(eq(interviewScoresTable.candidateId, candidateId));
-      let allSpecialtiesCompleted = true;
+      const mmDocs = (await db.execute(sql`
+        SELECT ipm.doctor_id FROM interview_panel_members ipm
+        JOIN interview_panels ip ON ip.id = ipm.panel_id
+        WHERE ip.is_mind_matter = TRUE
+      `)).rows;
+      const mmDocSet = new Set(mmDocs.map((d) => Number(d.doctor_id)));
+      const vivaOnlyScores = scores.filter((s2) => s2.specialityId !== null && !mmDocSet.has(s2.doctorId));
+      let allSpecialtiesCompleted = apps.length > 0;
       for (const app2 of apps) {
-        const hasScore = scores.some((s2) => s2.specialityId === app2.specialityId);
+        const hasScore = vivaOnlyScores.some((s2) => s2.specialityId === app2.specialityId);
         if (!hasScore) {
           allSpecialtiesCompleted = false;
           if (app2.status === "completed") {
@@ -1135674,7 +1136871,7 @@ router15.post("/interviews/scores", requireAuth, requireRole("doctor"), async (r
           }
         }
       }
-      if (allSpecialtiesCompleted || scores.length > 0) {
+      if (allSpecialtiesCompleted) {
         await db.update(candidatesTable).set({ status: "interview_completed" }).where(eq(candidatesTable.id, candidateId));
       } else {
         if (cand.status === "interview_completed") {
@@ -1135772,17 +1136969,17 @@ var THIN_BORDER2 = {
 };
 function buildStyledSheet2(rows, headerColorHex = "0B4A8F") {
   if (rows.length === 0) {
-    const ws2 = XLSX3.utils.json_to_sheet([]);
+    const ws2 = XLSX4.utils.json_to_sheet([]);
     return ws2;
   }
   const headers = Object.keys(rows[0]);
   const numCols = headers.length;
   const numRows = rows.length;
   const wsData = [headers, ...rows.map((r2) => headers.map((h2) => r2[h2] ?? ""))];
-  const ws = XLSX3.utils.aoa_to_sheet(wsData);
+  const ws = XLSX4.utils.aoa_to_sheet(wsData);
   for (let R = 0; R <= numRows; R++) {
     for (let C = 0; C < numCols; C++) {
-      const addr = XLSX3.utils.encode_cell({ r: R, c: C });
+      const addr = XLSX4.utils.encode_cell({ r: R, c: C });
       if (!ws[addr]) continue;
       const cell2 = ws[addr];
       if (R === 0) {
@@ -1135812,7 +1137009,7 @@ function buildStyledSheet2(rows, headerColorHex = "0B4A8F") {
   });
   ws["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft", state: "frozen" };
   ws["!autofilter"] = {
-    ref: XLSX3.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: numCols - 1, r: numRows } })
+    ref: XLSX4.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: numCols - 1, r: numRows } })
   };
   ws["!rows"] = [{ hpt: 22 }, ...Array(numRows).fill({ hpt: 18 })];
   return ws;
@@ -1135853,10 +1137050,10 @@ router15.get("/interviews/my-scores/export", requireAuth, requireRole("doctor"),
         "Evaluation Date": s2.submittedAt ? s2.submittedAt.toLocaleDateString("en-IN") : "N/A"
       };
     });
-    const wb = XLSX3.utils.book_new();
+    const wb = XLSX4.utils.book_new();
     const ws = buildStyledSheet2(rows, "2563EB");
-    XLSX3.utils.book_append_sheet(wb, ws, "My Evaluations");
-    const buffer = XLSX3.write(wb, { type: "buffer", bookType: "xlsx", cellStyles: true });
+    XLSX4.utils.book_append_sheet(wb, ws, "My Evaluations");
+    const buffer = XLSX4.write(wb, { type: "buffer", bookType: "xlsx", cellStyles: true });
     res.setHeader("Content-Disposition", `attachment; filename="Doctor_Evaluations_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.xlsx"`);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.send(buffer);
@@ -1135867,13 +1137064,18 @@ router15.get("/interviews/my-scores/export", requireAuth, requireRole("doctor"),
 router15.get("/interviews/scores/export", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   try {
     const specId = req.query["specialityId"] ? Number(req.query["specialityId"]) : void 0;
-    const candidates = await db.select().from(candidatesTable).where(eq(candidatesTable.isMock, req.isMockMode));
+    const candidates = await db.select().from(candidatesTable).where(eq(candidatesTable.isMock, Boolean(req.isMockMode)));
     const allSpecs = await db.select().from(specialitiesTable);
     const allSubmissions = await db.select().from(applicationSubmissionsTable);
     const allBatchCand = await db.select().from(batchCandidatesTable);
     const allScores = await db.select().from(interviewScoresTable);
     const allDoctors = await db.select().from(usersTable).where(eq(usersTable.role, "doctor"));
     const allApps = await db.select().from(applicationsTable);
+    const allPrefs = await db.select().from(candidatePreferencesTable);
+    const allAttempts = await db.select().from(examAttemptsTable);
+    const allExams = await db.select().from(examsTable);
+    const allOverrides = await db.select().from(vivaScoreOverridesTable);
+    const examsMap = new Map(allExams.map((e2) => [e2.id, e2]));
     const panelQuery = await db.execute(sql`
       SELECT ip.id, ip.name, ip.room_number, ip.speciality_id, ip.is_mind_matter, ipm.doctor_id
       FROM interview_panels ip
@@ -1135881,6 +1137083,7 @@ router15.get("/interviews/scores/export", requireAuth, requireRole("super_admin"
     `);
     const allPanels = panelQuery.rows;
     const isMindMatterScore = (s2) => {
+      if (s2.specialityId === null || s2.specialityId === void 0) return true;
       return allPanels.some(
         (p) => p.speciality_id === s2.specialityId && p.doctor_id === s2.doctorId && p.is_mind_matter === true
       );
@@ -1135898,9 +1137101,25 @@ router15.get("/interviews/scores/export", requireAuth, requireRole("super_admin"
     }
     const rawRows = [];
     for (const c of filteredCandidates) {
-      const sub = allSubmissions.find((s2) => s2.email.toLowerCase() === c.email.toLowerCase());
+      const sub = allSubmissions.find((s2) => s2.candidateId === c.id || s2.email.toLowerCase() === c.email.toLowerCase());
       const candidateApps = allApps.filter((app2) => app2.candidateId === c.id);
-      let candidateSpecs = candidateApps.map((app2) => allSpecs.find((sp) => sp.id === app2.specialityId)).filter(Boolean);
+      const candidatePrefs = allPrefs.filter((p) => p.candidateId === c.id).sort((a, b) => a.preferenceOrder - b.preferenceOrder);
+      const seenSpecIds = /* @__PURE__ */ new Set();
+      let candidateSpecs = [];
+      for (const p of candidatePrefs) {
+        const sp = allSpecs.find((x2) => x2.id === p.specialityId);
+        if (sp && !seenSpecIds.has(sp.id)) {
+          seenSpecIds.add(sp.id);
+          candidateSpecs.push(sp);
+        }
+      }
+      for (const app2 of candidateApps) {
+        const sp = allSpecs.find((x2) => x2.id === app2.specialityId);
+        if (sp && !seenSpecIds.has(sp.id)) {
+          seenSpecIds.add(sp.id);
+          candidateSpecs.push(sp);
+        }
+      }
       if (candidateSpecs.length === 0 && sub?.specialization) {
         const parsedNames = parseSpecializationString2(sub.specialization);
         candidateSpecs = allSpecs.filter((sp) => parsedNames.some((pn) => pn.toLowerCase() === sp.name.toLowerCase()));
@@ -1135911,47 +1137130,45 @@ router15.get("/interviews/scores/export", requireAuth, requireRole("super_admin"
       if (specId !== void 0) {
         candidateSpecs = candidateSpecs.filter((sp) => sp.id === specId);
       }
+      const candAttempts = allAttempts.filter((a) => a.candidateId === c.id && a.submittedAt != null);
+      const mcqAtts = candAttempts.filter((a) => examsMap.get(a.examId)?.kind === "mcq" && a.score != null);
+      const psyAtts = candAttempts.filter((a) => examsMap.get(a.examId)?.kind?.startsWith("psychometric") && a.score != null);
+      const candidateBatchCands = allBatchCand.filter((bc) => bc.candidateId === c.id);
+      const bcRow = candidateBatchCands[0];
+      const mcqScore = c.mcqScore != null && c.mcqScore !== "" ? Number(c.mcqScore) : mcqAtts.length > 0 ? mcqAtts.reduce((sum2, a) => sum2 + (a.score ?? 0), 0) / mcqAtts.length : bcRow?.mcqScore ?? null;
+      const allCandScores = allScores.filter((s2) => s2.candidateId === c.id).sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+      const mmScores = allCandScores.filter((s2) => isMindMatterScore(s2));
+      const psychometricScore = mmScores.length > 0 ? mmScores[0].score : c.psychometricScore != null && c.psychometricScore !== "" ? Number(c.psychometricScore) : psyAtts.length > 0 && psyAtts[0].score != null ? psyAtts[0].score : bcRow?.psychometricScore ?? null;
       for (const spec of candidateSpecs) {
-        const candScores = allScores.filter((s2) => s2.candidateId === c.id && (spec.id ? s2.specialityId === spec.id : true));
-        const vivaScores = candScores.filter((s2) => !isMindMatterScore(s2));
-        const mmScores = candScores.filter((s2) => isMindMatterScore(s2));
-        const sortedVivaScores = [...vivaScores].sort((a, b) => a.doctorId - b.doctorId);
-        const doc1 = sortedVivaScores[0]?.score ?? "\u2014";
-        const doc2 = sortedVivaScores[1]?.score ?? "\u2014";
-        const doc3 = sortedVivaScores[2]?.score ?? "\u2014";
-        const doc4 = sortedVivaScores[3]?.score ?? "\u2014";
-        const avgVivaScore = vivaScores.length > 0 ? vivaScores.reduce((acc, val) => acc + val.score, 0) / vivaScores.length : null;
-        const candidateBatchCands = allBatchCand.filter((bc) => bc.candidateId === c.id);
-        const bcRow = candidateBatchCands[0];
-        const rawMcq = bcRow?.mcqScore ?? (c.mcqScore ? Number(c.mcqScore) : null);
-        const mcqScore = rawMcq != null ? Number(rawMcq) : null;
-        const avgMindMatter = mmScores.length > 0 ? mmScores.reduce((acc, val) => acc + val.score, 0) / mmScores.length : null;
-        const psychometricScore = avgMindMatter !== null ? avgMindMatter : bcRow?.psychometricScore ?? (c.psychometricScore ? Number(c.psychometricScore) : null);
-        const totalScore = mcqScore != null || avgVivaScore != null || psychometricScore != null ? (mcqScore ?? 0) + (avgVivaScore ?? 0) + (psychometricScore ?? 0) : null;
+        const vivaScores = allCandScores.filter((s2) => !isMindMatterScore(s2) && (spec.id ? s2.specialityId === spec.id : true));
+        const override = spec.id ? allOverrides.find((o) => o.candidateId === c.id && o.specialityId === spec.id) : void 0;
+        const consensusViva = override ? override.overrideScore : vivaScores.length > 0 ? vivaScores[0].score : null;
+        const totalScore = mcqScore != null || consensusViva != null || psychometricScore != null ? (mcqScore ?? 0) + (consensusViva ?? 0) + (psychometricScore ?? 0) : null;
         const appForSpec = allApps.find((app2) => app2.candidateId === c.id && app2.specialityId === spec.id);
+        const prefForSpec = candidatePrefs.find((p) => p.specialityId === spec.id);
         const status = appForSpec?.status ?? c.status;
         const panel = allPanels.find((p) => {
           const pSpecId = p["speciality_id"] !== void 0 ? p["speciality_id"] : p["specialityId"];
           return pSpecId != null && Number(pSpecId) === spec.id;
         });
         const panelName = panel ? `${panel["name"]} (Room ${panel["room_number"] || panel["roomNumber"]})` : "General";
-        const evaluators = candScores.map((s2) => allDoctors.find((d) => d.id === s2.doctorId)?.fullName).filter(Boolean).join(", ") || "None";
+        const vivaEvaluators = [...new Set(vivaScores.map((s2) => allDoctors.find((d) => d.id === s2.doctorId)?.fullName).filter(Boolean))].join(", ") || "Pending";
+        const mmEvaluator = mmScores[0] ? allDoctors.find((d) => d.id === mmScores[0].doctorId)?.fullName || "Mind Matter Panel" : "Pending";
         rawRows.push({
           "Candidate Name": c.fullName,
+          "Candidate Code": c.candidateCode,
           "Specialty": spec.name,
-          "MCQ Marks": mcqScore != null ? mcqScore : "\u2014",
-          "Mind Mapping Marks": psychometricScore != null ? psychometricScore : "\u2014",
-          "Doctor 1 Marks": doc1,
-          "Doctor 2 Marks": doc2,
-          "Doctor 3 Marks": doc3,
-          "Doctor 4 Marks": doc4,
-          "Average Viva": avgVivaScore != null ? Number(avgVivaScore.toFixed(2)) : "\u2014",
-          "Final Score": totalScore,
+          "Preference #": prefForSpec?.preferenceOrder ?? "\u2014",
+          "MCQ Marks (/50)": mcqScore != null ? Number(mcqScore.toFixed(1)) : "\u2014",
+          "Mind Matter (/10)": psychometricScore != null ? Number(psychometricScore.toFixed(1)) : "\u2014",
+          "Doctor Viva (/50)": consensusViva != null ? Number(consensusViva.toFixed(1)) : "Pending",
+          "Final Score": totalScore != null ? Number(totalScore.toFixed(2)) : null,
           "Rank": 0,
           // Will be filled after sorting
           "Status": status,
           "Panel": panelName,
-          "Evaluators": evaluators
+          "Speciality Panel Doctor": vivaEvaluators,
+          "Mind Matter Evaluator": mmEvaluator
         });
       }
     }
@@ -1135985,11 +1137202,11 @@ router15.get("/interviews/scores/export", requireAuth, requireRole("super_admin"
       "Panel": row["Panel"],
       "Evaluators": row["Evaluators"]
     }));
-    const wb = XLSX3.utils.book_new();
+    const wb = XLSX4.utils.book_new();
     const sheetTitle = specId !== void 0 ? allSpecs.find((s2) => s2.id === specId)?.name || "Specialized" : "Central Marksheet";
     const ws = buildStyledSheet2(finalRows, "0B4A8F");
-    XLSX3.utils.book_append_sheet(wb, ws, sheetTitle.substring(0, 31));
-    const buffer = XLSX3.write(wb, { type: "buffer", bookType: "xlsx", cellStyles: true });
+    XLSX4.utils.book_append_sheet(wb, ws, sheetTitle.substring(0, 31));
+    const buffer = XLSX4.write(wb, { type: "buffer", bookType: "xlsx", cellStyles: true });
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     res.setHeader("Content-Disposition", `attachment; filename="Central_Coordinator_Marksheet_${today}.xlsx"`);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -1136000,13 +1137217,17 @@ router15.get("/interviews/scores/export", requireAuth, requireRole("super_admin"
 });
 router15.get("/interviews/scores/specialty-export", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   try {
-    const candidates = await db.select().from(candidatesTable).where(eq(candidatesTable.isMock, req.isMockMode));
+    const candidates = await db.select().from(candidatesTable).where(eq(candidatesTable.isMock, Boolean(req.isMockMode)));
     const allSpecs = await db.select().from(specialitiesTable);
     const allScores = await db.select().from(interviewScoresTable);
     const allDoctors = await db.select().from(usersTable).where(eq(usersTable.role, "doctor"));
     const allApps = await db.select().from(applicationsTable);
-    const { candidatePreferencesTable: candidatePreferencesTable2 } = await Promise.resolve().then(() => (init_src(), src_exports));
-    const allPrefs = await db.select().from(candidatePreferencesTable2);
+    const allBatchCand = await db.select().from(batchCandidatesTable);
+    const allAttempts = await db.select().from(examAttemptsTable);
+    const allExams = await db.select().from(examsTable);
+    const allOverrides = await db.select().from(vivaScoreOverridesTable);
+    const examsMap = new Map(allExams.map((e2) => [e2.id, e2]));
+    const allPrefs = await db.select().from(candidatePreferencesTable);
     const allSubmissions = await db.select().from(applicationSubmissionsTable);
     const panelQuery = await db.execute(sql`
       SELECT ip.id, ip.name, ip.room_number, ip.speciality_id, ip.is_mind_matter, ipm.doctor_id
@@ -1136015,6 +1137236,7 @@ router15.get("/interviews/scores/specialty-export", requireAuth, requireRole("su
     `);
     const allPanels = panelQuery.rows;
     const isMindMatterScore = (s2) => {
+      if (s2.specialityId === null || s2.specialityId === void 0) return true;
       return allPanels.some(
         (p) => p.speciality_id === s2.specialityId && p.doctor_id === s2.doctorId && p.is_mind_matter === true
       );
@@ -1136022,46 +1137244,53 @@ router15.get("/interviews/scores/specialty-export", requireAuth, requireRole("su
     const addAutoFilter = (ws) => {
       if (!ws["!ref"]) return;
       try {
-        const range2 = XLSX3.utils.decode_range(ws["!ref"]);
-        ws["!autofilter"] = { ref: XLSX3.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: range2.e.c, r: range2.e.r } }) };
+        const range2 = XLSX4.utils.decode_range(ws["!ref"]);
+        ws["!autofilter"] = { ref: XLSX4.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: range2.e.c, r: range2.e.r } }) };
       } catch {
       }
+    };
+    const getMcqScore = (c) => {
+      if (c.mcqScore != null && c.mcqScore !== "") return Number(c.mcqScore);
+      const mcqAtts = allAttempts.filter((a) => a.candidateId === c.id && a.submittedAt != null && examsMap.get(a.examId)?.kind === "mcq" && a.score != null);
+      if (mcqAtts.length > 0) return mcqAtts.reduce((s2, a) => s2 + (a.score ?? 0), 0) / mcqAtts.length;
+      const bc = allBatchCand.find((b) => b.candidateId === c.id && b.mcqScore != null);
+      return bc?.mcqScore ?? null;
+    };
+    const getMindMatterScore = (c) => {
+      const candMmScores = allScores.filter((s2) => s2.candidateId === c.id && isMindMatterScore(s2)).sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+      if (candMmScores.length > 0) return candMmScores[0].score;
+      if (c.psychometricScore != null && c.psychometricScore !== "") return Number(c.psychometricScore);
+      const psyAtts = allAttempts.filter((a) => a.candidateId === c.id && a.submittedAt != null && examsMap.get(a.examId)?.kind?.startsWith("psychometric") && a.score != null);
+      if (psyAtts.length > 0) return psyAtts[0].score ?? null;
+      const bc = allBatchCand.find((b) => b.candidateId === c.id && b.psychometricScore != null);
+      return bc?.psychometricScore ?? null;
+    };
+    const getSpecViva = (candidateId, specId) => {
+      const ov = allOverrides.find((o) => o.candidateId === candidateId && o.specialityId === specId);
+      if (ov) return ov.overrideScore;
+      const vs = allScores.filter((s2) => s2.candidateId === candidateId && s2.specialityId === specId && !isMindMatterScore(s2)).sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+      return vs.length > 0 ? vs[0].score : null;
     };
     const summaryRows = allSpecs.map((spec) => {
       const specCandIds = /* @__PURE__ */ new Set();
       allApps.filter((a) => a.specialityId === spec.id).forEach((a) => specCandIds.add(a.candidateId));
       allPrefs.filter((p) => p.specialityId === spec.id).forEach((p) => specCandIds.add(p.candidateId));
       const specCandidates = candidates.filter((c) => specCandIds.has(c.id));
-      const specScores = allScores.filter((s2) => s2.specialityId === spec.id);
-      const specVivaScores = specScores.filter((s2) => !isMindMatterScore(s2));
-      const specMmScores = specScores.filter((s2) => isMindMatterScore(s2));
-      const mcqScores = specCandidates.map((c) => c.mcqScore ? Number(c.mcqScore) : null).filter((v) => v !== null);
-      const mindScores = specCandidates.map((c) => {
-        const candMmScores = specMmScores.filter((s2) => s2.candidateId === c.id);
-        if (candMmScores.length > 0) {
-          return candMmScores.reduce((acc, s2) => acc + s2.score, 0) / candMmScores.length;
-        }
-        return c.psychometricScore ? Number(c.psychometricScore) : null;
-      }).filter((v) => v !== null);
-      const vivaScores = specVivaScores.map((s2) => s2.score);
+      const mcqScores = specCandidates.map(getMcqScore).filter((v) => v !== null);
+      const mindScores = specCandidates.map(getMindMatterScore).filter((v) => v !== null);
+      const vivaScores = specCandidates.map((c) => getSpecViva(c.id, spec.id)).filter((v) => v !== null);
       const avg2 = (arr) => arr.length > 0 ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length * 10) / 10 : null;
-      const vivaByCandidate = specCandidates.map((c) => {
-        const cs = specVivaScores.filter((s2) => s2.candidateId === c.id);
-        return cs.length > 0 ? cs.reduce((a, s2) => a + s2.score, 0) / cs.length : null;
-      }).filter((v) => v !== null);
       const avgTotal = specCandidates.map((c) => {
-        const mcq = c.mcqScore ? Number(c.mcqScore) : 0;
-        const candMmScores = specMmScores.filter((s2) => s2.candidateId === c.id);
-        const mm = candMmScores.length > 0 ? candMmScores.reduce((acc, s2) => acc + s2.score, 0) / candMmScores.length : c.psychometricScore ? Number(c.psychometricScore) : 0;
-        const cs = specVivaScores.filter((s2) => s2.candidateId === c.id);
-        const viva = cs.length > 0 ? cs.reduce((a, s2) => a + s2.score, 0) / cs.length : 0;
+        const mcq = getMcqScore(c) ?? 0;
+        const mm = getMindMatterScore(c) ?? 0;
+        const viva = getSpecViva(c.id, spec.id) ?? 0;
         return mcq + mm + viva;
       });
       return {
         "Specialty": spec.name,
         "Code": spec.code,
         "Total Candidates": specCandidates.length,
-        "VIVA Evaluated": new Set(specVivaScores.map((s2) => s2.candidateId)).size,
+        "VIVA Evaluated": vivaScores.length,
         "Avg MCQ (Max 50)": avg2(mcqScores) ?? "\u2014",
         "Avg VIVA (Max 50)": avg2(vivaScores) ?? "\u2014",
         "Avg Mind Matter (Max 10)": avg2(mindScores) ?? "\u2014",
@@ -1136074,33 +1137303,24 @@ router15.get("/interviews/scores/specialty-export", requireAuth, requireRole("su
       allApps.filter((a) => a.specialityId === spec.id).forEach((a) => specCandIds.add(a.candidateId));
       allPrefs.filter((p) => p.specialityId === spec.id).forEach((p) => specCandIds.add(p.candidateId));
       const specCandidates = candidates.filter((c) => specCandIds.has(c.id));
-      const specScores = allScores.filter((s2) => s2.specialityId === spec.id);
-      const specVivaScores = specScores.filter((s2) => !isMindMatterScore(s2));
-      const specMmScores = specScores.filter((s2) => isMindMatterScore(s2));
-      const doctorIdsForSpec = [...new Set(specVivaScores.map((s2) => s2.doctorId))].slice(0, 4);
       for (const c of specCandidates) {
-        const candScores = specVivaScores.filter((s2) => s2.candidateId === c.id);
-        const avgViva = candScores.length > 0 ? candScores.reduce((a, s2) => a + s2.score, 0) / candScores.length : null;
-        const candMmScores = specMmScores.filter((s2) => s2.candidateId === c.id);
-        const mm = candMmScores.length > 0 ? candMmScores.reduce((acc, s2) => acc + s2.score, 0) / candMmScores.length : c.psychometricScore ? Number(c.psychometricScore) : null;
-        const mcq = c.mcqScore ? Number(c.mcqScore) : null;
-        const total = (mcq ?? 0) + (avgViva ?? 0) + (mm ?? 0);
+        const mcq = getMcqScore(c);
+        const mm = getMindMatterScore(c);
+        const viva = getSpecViva(c.id, spec.id);
+        const latestVivaRow = allScores.filter((s2) => s2.candidateId === c.id && s2.specialityId === spec.id && !isMindMatterScore(s2)).sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())[0];
+        const evaluatorName = latestVivaRow ? allDoctors.find((d) => d.id === latestVivaRow.doctorId)?.fullName ?? "Panel" : "\u2014";
+        const total = (mcq ?? 0) + (viva ?? 0) + (mm ?? 0);
         const row = {
           "Specialty": spec.name,
           "Candidate Name": c.fullName,
           "Candidate Code": c.candidateCode,
-          "MCQ (Max 50)": mcq ?? "\u2014",
-          "Mind Matter (Max 10)": mm ?? "\u2014"
+          "MCQ (Max 50)": mcq != null ? Number(mcq.toFixed(1)) : "\u2014",
+          "Mind Matter (Max 10)": mm != null ? Number(mm.toFixed(1)) : "\u2014",
+          "Doctor Viva (Max 50)": viva != null ? Number(viva.toFixed(1)) : "Pending",
+          "Panel Doctor": evaluatorName,
+          "Total (Max 110)": mcq !== null || viva !== null || mm !== null ? Math.round(total * 10) / 10 : "\u2014",
+          "Status": c.status
         };
-        for (let di = 0; di < 4; di++) {
-          const docId = doctorIdsForSpec[di];
-          const doc = docId ? allDoctors.find((d) => d.id === docId) : void 0;
-          const sc = docId ? candScores.find((s2) => s2.doctorId === docId) : void 0;
-          row[`Doctor ${di + 1}${doc ? ` (${doc.fullName.split(" ")[0]})` : ""} VIVA`] = sc ? sc.score : "\u2014";
-        }
-        row["Avg VIVA (Max 50)"] = avgViva !== null ? Math.round(avgViva * 10) / 10 : "\u2014";
-        row["Total (Max 110)"] = mcq !== null || avgViva !== null || mm !== null ? Math.round(total * 10) / 10 : "\u2014";
-        row["Status"] = c.status;
         detailRows.push(row);
       }
     }
@@ -1136125,20 +1137345,20 @@ router15.get("/interviews/scores/specialty-export", requireAuth, requireRole("su
         "Max Score": docScores.length > 0 ? Math.max(...docScores.map((s2) => s2.score)) : "\u2014"
       };
     });
-    const wb = XLSX3.utils.book_new();
-    const wsSummary = XLSX3.utils.json_to_sheet(summaryRows);
+    const wb = XLSX4.utils.book_new();
+    const wsSummary = XLSX4.utils.json_to_sheet(summaryRows);
     wsSummary["!cols"] = summaryRows[0] ? Object.keys(summaryRows[0]).map((_, i2) => ({ wch: i2 < 2 ? 35 : 22 })) : [];
     addAutoFilter(wsSummary);
-    XLSX3.utils.book_append_sheet(wb, wsSummary, "Specialty Summary");
-    const wsDetail = XLSX3.utils.json_to_sheet(detailRows);
+    XLSX4.utils.book_append_sheet(wb, wsSummary, "Specialty Summary");
+    const wsDetail = XLSX4.utils.json_to_sheet(detailRows);
     wsDetail["!cols"] = detailRows[0] ? Object.keys(detailRows[0]).map(() => ({ wch: 22 })) : [];
     addAutoFilter(wsDetail);
-    XLSX3.utils.book_append_sheet(wb, wsDetail, "Candidate Detail");
-    const wsDoctor = XLSX3.utils.json_to_sheet(doctorRows);
+    XLSX4.utils.book_append_sheet(wb, wsDetail, "Candidate Detail");
+    const wsDoctor = XLSX4.utils.json_to_sheet(doctorRows);
     wsDoctor["!cols"] = doctorRows[0] ? Object.keys(doctorRows[0]).map(() => ({ wch: 28 })) : [];
     addAutoFilter(wsDoctor);
-    XLSX3.utils.book_append_sheet(wb, wsDoctor, "Doctor Performance");
-    const buffer = XLSX3.write(wb, { type: "buffer", bookType: "xlsx" });
+    XLSX4.utils.book_append_sheet(wb, wsDoctor, "Doctor Performance");
+    const buffer = XLSX4.write(wb, { type: "buffer", bookType: "xlsx" });
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     res.setHeader("Content-Disposition", `attachment; filename="SAV_Specialty_Marks_Breakdown_${today}.xlsx"`);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -1137086,7 +1138306,7 @@ router16.patch("/panel/status/:doctorId", requireAuth, requireRole("central_exam
   `)).rows;
   res.json({ doctorId, isEngaged: row["is_engaged"], currentCandidateId: row["current_candidate_id"], currentCandidateName: row["candidate_name"] });
 });
-router16.patch("/panel/status", requireAuth, requireRole("doctor"), async (req, res) => {
+router16.patch("/panel/status", requireAuth, requireRole("doctor", "super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   const doctorId = req.user.userId;
   const { isEngaged, candidateId } = req.body;
   await db.execute(sql`INSERT INTO doctor_panel_status (doctor_id) VALUES (${doctorId}) ON CONFLICT (doctor_id) DO NOTHING`);
@@ -1137108,36 +1138328,62 @@ router16.patch("/panel/status", requireAuth, requireRole("doctor"), async (req, 
   `)).rows;
   res.json({ doctorId, isEngaged: row["is_engaged"], currentCandidateId: row["current_candidate_id"], currentCandidateName: row["candidate_name"] });
 });
-router16.get("/panel/my-status", requireAuth, requireRole("doctor"), async (req, res) => {
+router16.get("/panel/my-status", requireAuth, requireRole("doctor", "super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   const doctorId = req.user.userId;
+  const userRole = req.user.role;
+  const isMockMode = Boolean(req.isMockMode);
   await db.execute(sql`INSERT INTO doctor_panel_status (doctor_id) VALUES (${doctorId}) ON CONFLICT (doctor_id) DO NOTHING`);
-  const [row] = (await db.execute(sql`
-    SELECT dps.*, c.full_name as candidate_name, c.candidate_code,
-           ip.id as panel_id, ip.name as panel_name, ip.room_number, ip.speciality_id,
-           ip.is_mind_matter, s.name as speciality_name, ipm.is_main as is_main_doctor,
-           ipm.marks_entry_enabled
+  const [dpsRow] = (await db.execute(sql`
+    SELECT dps.*, c.full_name as candidate_name, c.candidate_code
     FROM doctor_panel_status dps
     LEFT JOIN candidates c ON c.id = dps.current_candidate_id
-    LEFT JOIN interview_panel_members ipm ON ipm.doctor_id = ${doctorId}
-    LEFT JOIN interview_panels ip ON ip.id = ipm.panel_id
-    LEFT JOIN specialities s ON s.id = ip.speciality_id
     WHERE dps.doctor_id = ${doctorId}
-    ORDER BY ip.is_active DESC, ip.is_mind_matter DESC, ip.id DESC
     LIMIT 1
   `)).rows;
+  const panelRows = userRole === "doctor" ? (await db.execute(sql`
+        SELECT ip.id as panel_id, ip.name as panel_name, ip.room_number, ip.speciality_id,
+               ip.is_mind_matter, s.name as speciality_name, ipm.is_main as is_main_doctor,
+               ipm.marks_entry_enabled
+        FROM interview_panel_members ipm
+        JOIN interview_panels ip ON ip.id = ipm.panel_id AND ip.is_active = TRUE AND ip.is_mock = ${isMockMode}
+        LEFT JOIN specialities s ON s.id = ip.speciality_id
+        WHERE ipm.doctor_id = ${doctorId}
+        ORDER BY ip.is_mind_matter DESC, ip.id ASC
+      `)).rows : (await db.execute(sql`
+        SELECT ip.id as panel_id, ip.name as panel_name, ip.room_number, ip.speciality_id,
+               ip.is_mind_matter, s.name as speciality_name, TRUE as is_main_doctor,
+               TRUE as marks_entry_enabled
+        FROM interview_panels ip
+        LEFT JOIN specialities s ON s.id = ip.speciality_id
+        WHERE ip.is_active = TRUE AND ip.is_mock = ${isMockMode}
+        ORDER BY ip.is_mind_matter DESC, ip.id ASC
+      `)).rows;
+  const requestedPanelId = req.query["panelId"] ? Number(req.query["panelId"]) : null;
+  const activePanel = (requestedPanelId ? panelRows.find((r2) => Number(r2["panel_id"]) === requestedPanelId) : void 0) ?? panelRows[0] ?? {};
+  const panels = panelRows.filter((r2) => r2["panel_id"] != null).map((r2) => ({
+    panelId: Number(r2["panel_id"]),
+    panelName: String(r2["panel_name"] ?? ""),
+    roomNumber: r2["room_number"] ?? null,
+    specialityId: r2["speciality_id"] != null ? Number(r2["speciality_id"]) : null,
+    specialityName: r2["speciality_name"] ?? null,
+    isMindMatter: r2["is_mind_matter"] === true || r2["is_mind_matter"] === 1,
+    isMain: r2["is_main_doctor"] === true,
+    marksEntryEnabled: userRole === "super_admin" ? true : r2["marks_entry_enabled"] === true
+  }));
   res.json({
-    isEngaged: row["is_engaged"] ?? false,
-    currentCandidateId: row["current_candidate_id"],
-    currentCandidateName: row["candidate_name"],
-    currentCandidateCode: row["candidate_code"],
-    panelId: row["panel_id"] ?? null,
-    panelName: row["panel_name"],
-    roomNumber: row["room_number"],
-    specialityId: row["speciality_id"],
-    specialityName: row["speciality_name"],
-    isMindMatter: row["is_mind_matter"] === true || row["is_mind_matter"] === 1,
-    isMain: row["is_main_doctor"] === true,
-    marksEntryEnabled: row["marks_entry_enabled"] === true
+    isEngaged: dpsRow?.["is_engaged"] ?? false,
+    currentCandidateId: dpsRow?.["current_candidate_id"] ?? null,
+    currentCandidateName: dpsRow?.["candidate_name"] ?? null,
+    currentCandidateCode: dpsRow?.["candidate_code"] ?? null,
+    panelId: activePanel["panel_id"] ?? null,
+    panelName: activePanel["panel_name"] ?? null,
+    roomNumber: activePanel["room_number"] ?? null,
+    specialityId: activePanel["speciality_id"] ?? null,
+    specialityName: activePanel["speciality_name"] ?? null,
+    isMindMatter: activePanel["is_mind_matter"] === true || activePanel["is_mind_matter"] === 1,
+    isMain: activePanel["is_main_doctor"] === true,
+    marksEntryEnabled: userRole === "super_admin" ? true : activePanel["marks_entry_enabled"] === true,
+    panels
   });
 });
 var panel_default = router16;
@@ -1137250,19 +1138496,28 @@ function getSpecialitySegment(specName) {
   }
   return "Anterior";
 }
-async function computeScoresForProgram(programId) {
+async function computeScoresForProgram(programId, isMock) {
   const specs = await readDb.select().from(specialitiesTable).where(eq(specialitiesTable.programId, programId));
   const programSpecIds = specs.map((s2) => s2.id);
   const programSpecSet = new Set(programSpecIds);
   if (programSpecIds.length === 0) return [];
-  const prefs = await readDb.select().from(candidatePreferencesTable).where(inArray(candidatePreferencesTable.specialityId, programSpecIds));
-  const candidateIds = [...new Set(prefs.map((p) => p.candidateId))];
+  const [prefs, apps] = await Promise.all([
+    readDb.select().from(candidatePreferencesTable).where(inArray(candidatePreferencesTable.specialityId, programSpecIds)),
+    readDb.select().from(applicationsTable).where(inArray(applicationsTable.specialityId, programSpecIds))
+  ]);
+  const candidateIds = [.../* @__PURE__ */ new Set([...prefs.map((p) => p.candidateId), ...apps.map((a) => a.candidateId)])];
   if (candidateIds.length === 0) return [];
-  const candidates = await readDb.select().from(candidatesTable).where(inArray(candidatesTable.id, candidateIds));
+  let candidates = await readDb.select().from(candidatesTable).where(inArray(candidatesTable.id, candidateIds));
+  if (typeof isMock === "boolean") {
+    candidates = candidates.filter((c) => c.isMock === isMock && c.status !== "rejected");
+  }
+  const activeCandIds = candidates.map((c) => c.id);
+  if (activeCandIds.length === 0) return [];
   const exams = await readDb.select().from(examsTable);
-  const attempts = await readDb.select().from(examAttemptsTable).where(inArray(examAttemptsTable.candidateId, candidateIds));
-  const interviews = await readDb.select().from(interviewScoresTable).where(inArray(interviewScoresTable.candidateId, candidateIds));
-  const overrides = await readDb.select().from(vivaScoreOverridesTable).where(inArray(vivaScoreOverridesTable.candidateId, candidateIds));
+  const attempts = await readDb.select().from(examAttemptsTable).where(inArray(examAttemptsTable.candidateId, activeCandIds));
+  const interviews = await readDb.select().from(interviewScoresTable).where(inArray(interviewScoresTable.candidateId, activeCandIds));
+  const overrides = await readDb.select().from(vivaScoreOverridesTable).where(inArray(vivaScoreOverridesTable.candidateId, activeCandIds));
+  const batchMarks = await readDb.select().from(batchCandidatesTable).where(inArray(batchCandidatesTable.candidateId, activeCandIds));
   const emails = candidates.map((c) => c.email.toLowerCase().trim()).filter(Boolean);
   const submissions = emails.length > 0 ? await readDb.select().from(applicationSubmissionsTable).where(
     or(
@@ -1137304,6 +1138559,20 @@ async function computeScoresForProgram(programId) {
     }
     prefsByCandidate.get(p.candidateId).push(p);
   }
+  const appsByCandidate = /* @__PURE__ */ new Map();
+  for (const a of apps) {
+    if (!appsByCandidate.has(a.candidateId)) {
+      appsByCandidate.set(a.candidateId, []);
+    }
+    appsByCandidate.get(a.candidateId).push(a);
+  }
+  const batchByCandidate = /* @__PURE__ */ new Map();
+  for (const b of batchMarks) {
+    if (!batchByCandidate.has(b.candidateId)) {
+      batchByCandidate.set(b.candidateId, []);
+    }
+    batchByCandidate.get(b.candidateId).push(b);
+  }
   const attemptsByCandidate = /* @__PURE__ */ new Map();
   for (const a of attempts) {
     if (!attemptsByCandidate.has(a.candidateId)) {
@@ -1137326,16 +1138595,29 @@ async function computeScoresForProgram(programId) {
   }
   const examsMap = new Map(exams.map((e2) => [e2.id, e2]));
   for (const c of candidates) {
-    const candPrefs = (prefsByCandidate.get(c.id) || []).filter((p) => programSpecSet.has(p.specialityId)).sort((a, b) => a.preferenceOrder - b.preferenceOrder);
+    let candPrefs = (prefsByCandidate.get(c.id) || []).filter((p) => programSpecSet.has(p.specialityId)).sort((a, b) => a.preferenceOrder - b.preferenceOrder);
+    if (candPrefs.length === 0) {
+      const cApps = (appsByCandidate.get(c.id) || []).filter((a) => programSpecSet.has(a.specialityId));
+      candPrefs = cApps.map((a, idx) => ({
+        id: -a.id,
+        candidateId: c.id,
+        specialityId: a.specialityId,
+        preferenceOrder: idx + 1,
+        createdAt: /* @__PURE__ */ new Date()
+      }));
+    }
     if (candPrefs.length === 0) continue;
     const candAttempts = (attemptsByCandidate.get(c.id) || []).filter((a) => a.submittedAt != null);
     const mcqs = candAttempts.filter((a) => examsMap.get(a.examId)?.kind === "mcq");
     const psychos = candAttempts.filter((a) => examsMap.get(a.examId)?.kind?.startsWith("psychometric"));
-    const mcqScore = mcqs.length > 0 ? mcqs.reduce((sum2, a) => sum2 + (a.score ?? 0), 0) / mcqs.length : Number(c.mcqScore) || 0;
-    const candInterviews = interviewsByCandidate.get(c.id) || [];
+    const candBatches = batchByCandidate.get(c.id) || [];
+    const batchMcq = candBatches.find((b) => b.mcqScore != null)?.mcqScore ?? null;
+    const batchPsycho = candBatches.find((b) => b.psychometricScore != null)?.psychometricScore ?? null;
+    const mcqScore = c.mcqScore != null && c.mcqScore !== "" ? Number(c.mcqScore) || 0 : mcqs.length > 0 ? mcqs.reduce((sum2, a) => sum2 + (a.score ?? 0), 0) / mcqs.length : batchMcq ?? 0;
+    const candInterviews = [...interviewsByCandidate.get(c.id) || []].sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime());
     const mmInterviews = candInterviews.filter((i2) => isMindMatterScore(i2));
     const singleMindMatter = mmInterviews.length > 0 ? mmInterviews[mmInterviews.length - 1].score : null;
-    const psychoScore = singleMindMatter !== null ? singleMindMatter : psychos.length > 0 && psychos[0].score != null ? psychos[0].score : Number(c.psychometricScore) || 0;
+    const psychoScore = singleMindMatter !== null ? singleMindMatter : c.psychometricScore != null && c.psychometricScore !== "" ? Number(c.psychometricScore) || 0 : psychos.length > 0 && psychos[0].score != null ? psychos[0].score : batchPsycho ?? 0;
     const sub = submissionsByCandidate.get(c.id) || (c.email ? submissionsByEmail.get(c.email.toLowerCase().trim()) : null);
     const appliedAt = sub?.submittedAt ? sub.submittedAt.toISOString() : c.createdAt ? new Date(c.createdAt).toISOString() : (/* @__PURE__ */ new Date()).toISOString();
     const preferredLocations = {};
@@ -1137415,6 +1138697,10 @@ async function computeScoresForProgram(programId) {
         if (avgInterview > maxInterviewScore) maxInterviewScore = avgInterview;
       }
     }
+    const anyVivaCompleted = Object.values(specialityVivaStatus).some((st) => st !== "pending");
+    if (!anyVivaCompleted) {
+      maxTotalScore = mcqScore + psychoScore;
+    }
     result.push({
       candidateId: c.id,
       candidateCode: c.candidateCode,
@@ -1137462,7 +1138748,8 @@ async function computeScoresForProgram(programId) {
 }
 
 // src/routes/rankings.ts
-var XLSX4 = __toESM(require_xlsx(), 1);
+init_attendance_and_ranks();
+var XLSX5 = __toESM(require_xlsx(), 1);
 var router18 = (0, import_express18.Router)();
 var HEADER_FONT3 = { bold: true, color: { rgb: "FFFFFF" }, sz: 11, name: "Calibri" };
 var HEADER_ALIGN3 = { horizontal: "center", vertical: "center", wrapText: false };
@@ -1137478,17 +1138765,17 @@ var THIN_BORDER3 = {
 };
 function buildStyledSheet3(rows, headerColorHex = "0B4A8F") {
   if (rows.length === 0) {
-    const ws2 = XLSX4.utils.json_to_sheet([]);
+    const ws2 = XLSX5.utils.json_to_sheet([]);
     return ws2;
   }
   const headers = Object.keys(rows[0]);
   const numCols = headers.length;
   const numRows = rows.length;
   const wsData = [headers, ...rows.map((r2) => headers.map((h2) => r2[h2] ?? ""))];
-  const ws = XLSX4.utils.aoa_to_sheet(wsData);
+  const ws = XLSX5.utils.aoa_to_sheet(wsData);
   for (let R = 0; R <= numRows; R++) {
     for (let C = 0; C < numCols; C++) {
-      const addr = XLSX4.utils.encode_cell({ r: R, c: C });
+      const addr = XLSX5.utils.encode_cell({ r: R, c: C });
       if (!ws[addr]) continue;
       const cell2 = ws[addr];
       if (R === 0) {
@@ -1137518,7 +1138805,7 @@ function buildStyledSheet3(rows, headerColorHex = "0B4A8F") {
   });
   ws["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft", state: "frozen" };
   ws["!autofilter"] = {
-    ref: XLSX4.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: numCols - 1, r: numRows } })
+    ref: XLSX5.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: numCols - 1, r: numRows } })
   };
   ws["!rows"] = [{ hpt: 22 }, ...Array(numRows).fill({ hpt: 18 })];
   return ws;
@@ -1137537,7 +1138824,7 @@ router18.get(
       const specFilter = req.query["specialityId"] ? Number(req.query["specialityId"]) : void 0;
       const segmentFilter = req.query["segment"] ? String(req.query["segment"]) : void 0;
       const examFilter = req.query["examId"] ? Number(req.query["examId"]) : void 0;
-      const scores = await computeScoresForProgram(programId);
+      const scores = await computeScoresForProgram(programId, Boolean(req.isMockMode));
       const specs = await readDb.select().from(specialitiesTable).where(eq(specialitiesTable.programId, programId));
       let filteredScores = scores;
       if (examFilter) {
@@ -1137586,6 +1138873,19 @@ router18.get(
           specialityRank: topSpecId ? s2.specialityRanks[topSpecId] ?? null : null,
           segmentRank: null,
           topPreference: topSpec?.name ?? null,
+          appliedSpecialityNames: s2.preferenceSpecIds.map((id) => specs.find((sp) => sp.id === id)?.name).filter(Boolean),
+          specialityBreakdown: s2.preferenceSpecIds.map((id) => {
+            const sp = specs.find((x2) => x2.id === id);
+            return {
+              specialityId: id,
+              specialityName: sp?.name ?? "",
+              specialityCode: sp?.code ?? "",
+              vivaScore: s2.specialityInterviewScores[id] ?? 0,
+              totalScore: s2.specialityScores[id] ?? 0,
+              rank: s2.specialityRanks[id] ?? null,
+              vivaStatus: s2.specialityVivaStatus[id] ?? "pending"
+            };
+          }),
           unitName: unit?.name ?? null,
           status: cand?.status ?? "pending",
           preferredLocations: topSpecId ? s2.preferredLocations[topSpecId] ?? [] : [],
@@ -1137612,39 +1138912,74 @@ router18.get(
       return;
     }
     try {
-      const scores = await computeScoresForProgram(programId);
-      const specs = await readDb.select().from(specialitiesTable).where(eq(specialitiesTable.programId, programId));
-      const wb = XLSX4.utils.book_new();
+      const specFilter = req.query["specialityId"] && req.query["specialityId"] !== "all" ? Number(req.query["specialityId"]) : void 0;
+      const examFilter = req.query["examId"] && req.query["examId"] !== "all" ? Number(req.query["examId"]) : void 0;
+      let scores = await computeScoresForProgram(programId, Boolean(req.isMockMode));
+      if (examFilter && !isNaN(examFilter)) {
+        const { examAttemptsTable: examAttemptsTable2, candidateExamAssignmentsTable: candidateExamAssignmentsTable3 } = await Promise.resolve().then(() => (init_src(), src_exports));
+        const examAttempts = await readDb.select().from(examAttemptsTable2).where(eq(examAttemptsTable2.examId, examFilter));
+        const examAssignments = await readDb.select().from(candidateExamAssignmentsTable3).where(eq(candidateExamAssignmentsTable3.examId, examFilter));
+        const examCandIds = /* @__PURE__ */ new Set([
+          ...examAttempts.map((a) => a.candidateId),
+          ...examAssignments.map((a) => a.candidateId)
+        ]);
+        if (examCandIds.size > 0) {
+          scores = scores.filter((s2) => examCandIds.has(s2.candidateId));
+        }
+      }
+      const allSpecs = await readDb.select().from(specialitiesTable).where(eq(specialitiesTable.programId, programId));
+      const specs = specFilter && !isNaN(specFilter) ? allSpecs.filter((s2) => s2.id === specFilter) : allSpecs;
+      const candIds = scores.map((s2) => s2.candidateId);
+      const candidates = candIds.length > 0 ? await readDb.select().from(candidatesTable).where(inArray(candidatesTable.id, candIds)) : [];
+      const units = await readDb.select().from(unitsTable);
+      const unitMap = new Map(units.map((u) => [u.id, u.name]));
+      const candMap = new Map(candidates.map((c) => [c.id, c]));
+      const specNameMap = new Map(allSpecs.map((s2) => [s2.id, s2.name]));
+      const wb = XLSX5.utils.book_new();
+      const consolidatedRows = [];
       for (const spec of specs) {
         const specCandidates = scores.filter((s2) => s2.specialityScores[spec.id] !== void 0);
         specCandidates.sort((a, b) => {
+          const pendA = a.specialityVivaStatus[spec.id] === "pending" ? 1 : 0;
+          const pendB = b.specialityVivaStatus[spec.id] === "pending" ? 1 : 0;
+          if (pendA !== pendB) return pendA - pendB;
           const scoreA = a.specialityScores[spec.id] ?? 0;
           const scoreB = b.specialityScores[spec.id] ?? 0;
           if (scoreB !== scoreA) return scoreB - scoreA;
-          const rankA = a.specialityRanks[spec.id] ?? 999;
-          const rankB = b.specialityRanks[spec.id] ?? 999;
-          return rankA - rankB;
+          return (a.specialityRanks[spec.id] ?? 9999) - (b.specialityRanks[spec.id] ?? 9999);
         });
         const specRows = specCandidates.map((s2) => {
-          const rank = s2.specialityRanks[spec.id] ?? 999;
-          const score = s2.specialityScores[spec.id] ?? 0;
+          const isPending = s2.specialityVivaStatus[spec.id] === "pending";
+          const rank = isPending ? "Pending" : s2.specialityRanks[spec.id] ?? "Pending";
+          const totalScore = s2.specialityScores[spec.id] ?? 0;
           const intScore = s2.specialityInterviewScores[spec.id] ?? 0;
-          return {
+          const cand = candMap.get(s2.candidateId);
+          const otherSpecs = s2.preferenceSpecIds.filter((id) => id !== spec.id).map((id) => specNameMap.get(id)).filter(Boolean).join(", ");
+          const row = {
             "Rank": rank,
             "Application No": s2.candidateCode,
             "Student Name": s2.fullName,
             "Speciality": spec.name,
-            "MCQ": Number(s2.mcqScore.toFixed(1)),
-            "Viva": Number(intScore.toFixed(1)),
-            "Mind Matters": Number(s2.psychometricScore.toFixed(1)),
-            "Total": Number(score.toFixed(2))
+            "Other Applied Specialities": otherSpecs || "\u2014",
+            "MCQ (/50)": Number(s2.mcqScore.toFixed(1)),
+            "Mind Matters (/10)": Number(s2.psychometricScore.toFixed(1)),
+            "Doctor Viva (/50)": isPending ? "Pending" : Number(intScore.toFixed(1)),
+            "Total (/110)": Number(totalScore.toFixed(2)),
+            "Status": cand?.status || "approved",
+            "Allocated Unit": cand?.unitId ? unitMap.get(cand.unitId) || "\u2014" : "\u2014"
           };
+          consolidatedRows.push(row);
+          return row;
         });
-        const sheetName = spec.name.substring(0, 30);
+        const sheetName = spec.name.replace(/[\\/?*\[\]:]/g, "").substring(0, 30);
         const wsSpec = buildStyledSheet3(specRows, "0B4A8F");
-        XLSX4.utils.book_append_sheet(wb, wsSpec, sheetName);
+        XLSX5.utils.book_append_sheet(wb, wsSpec, sheetName);
       }
-      const buf = XLSX4.write(wb, { type: "buffer", bookType: "xlsx" });
+      if (!specFilter && consolidatedRows.length > 0) {
+        const wsAll = buildStyledSheet3(consolidatedRows, "1E293B");
+        XLSX5.utils.book_append_sheet(wb, wsAll, "Consolidated Merit List");
+      }
+      const buf = XLSX5.write(wb, { type: "buffer", bookType: "xlsx", cellStyles: true });
       const now = /* @__PURE__ */ new Date();
       const YYYY = now.getFullYear();
       const MM = String(now.getMonth() + 1).padStart(2, "0");
@@ -1137658,6 +1138993,97 @@ router18.get(
       res.send(buf);
     } catch (e2) {
       res.status(500).json({ error: String(e2) });
+    }
+  }
+);
+router18.get(
+  "/rankings/export-pdf",
+  requireAuth,
+  requireRole("super_admin", "program_admin", "central_exam_coordinator"),
+  async (req, res) => {
+    const programId = Number(req.query["programId"]);
+    if (!programId) {
+      res.status(400).json({ error: "programId required" });
+      return;
+    }
+    try {
+      const specFilter = req.query["specialityId"] && req.query["specialityId"] !== "all" ? Number(req.query["specialityId"]) : void 0;
+      const examFilter = req.query["examId"] && req.query["examId"] !== "all" ? Number(req.query["examId"]) : void 0;
+      let scores = await computeScoresForProgram(programId, Boolean(req.isMockMode));
+      if (examFilter && !isNaN(examFilter)) {
+        const { examAttemptsTable: examAttemptsTable2, candidateExamAssignmentsTable: candidateExamAssignmentsTable3 } = await Promise.resolve().then(() => (init_src(), src_exports));
+        const examAttempts = await readDb.select().from(examAttemptsTable2).where(eq(examAttemptsTable2.examId, examFilter));
+        const examAssignments = await readDb.select().from(candidateExamAssignmentsTable3).where(eq(candidateExamAssignmentsTable3.examId, examFilter));
+        const examCandIds = /* @__PURE__ */ new Set([
+          ...examAttempts.map((a) => a.candidateId),
+          ...examAssignments.map((a) => a.candidateId)
+        ]);
+        if (examCandIds.size > 0) {
+          scores = scores.filter((s2) => examCandIds.has(s2.candidateId));
+        }
+      }
+      const [programs, allSpecs, units] = await Promise.all([
+        readDb.select().from(programsTable).where(eq(programsTable.id, programId)),
+        readDb.select().from(specialitiesTable).where(eq(specialitiesTable.programId, programId)),
+        readDb.select().from(unitsTable)
+      ]);
+      const program = programs[0];
+      const specs = specFilter && !isNaN(specFilter) ? allSpecs.filter((s2) => s2.id === specFilter) : allSpecs;
+      const candIds = scores.map((s2) => s2.candidateId);
+      const candidates = candIds.length > 0 ? await readDb.select().from(candidatesTable).where(inArray(candidatesTable.id, candIds)) : [];
+      const submissions = candIds.length > 0 ? await readDb.select().from(applicationSubmissionsTable).where(inArray(applicationSubmissionsTable.candidateId, candIds)) : [];
+      const candMap = new Map(candidates.map((c) => [c.id, c]));
+      const subByCand = new Map(submissions.filter((s2) => s2.candidateId).map((s2) => [s2.candidateId, s2]));
+      const unitMap = new Map(units.map((u) => [u.id, u.name]));
+      const specNameMap = new Map(allSpecs.map((s2) => [s2.id, s2.name]));
+      const groups = specs.sort((a, b) => a.name.localeCompare(b.name)).map((spec) => {
+        const specCandidates = scores.filter((s2) => s2.specialityScores[spec.id] !== void 0);
+        specCandidates.sort((a, b) => {
+          const pendA = a.specialityVivaStatus[spec.id] === "pending" ? 1 : 0;
+          const pendB = b.specialityVivaStatus[spec.id] === "pending" ? 1 : 0;
+          if (pendA !== pendB) return pendA - pendB;
+          const scoreA = a.specialityScores[spec.id] ?? 0;
+          const scoreB = b.specialityScores[spec.id] ?? 0;
+          if (scoreB !== scoreA) return scoreB - scoreA;
+          return (a.specialityRanks[spec.id] ?? 9999) - (b.specialityRanks[spec.id] ?? 9999);
+        });
+        return {
+          specialityId: spec.id,
+          specialityName: spec.name,
+          specialityCode: spec.code,
+          rows: specCandidates.map((s2) => {
+            const isPending = s2.specialityVivaStatus[spec.id] === "pending";
+            const cand = candMap.get(s2.candidateId);
+            const sub = subByCand.get(s2.candidateId);
+            const qual = [sub?.pgQualifications || cand?.qualification, sub?.degree].filter(Boolean).join(" \xB7 ") || null;
+            const otherSpecs = s2.preferenceSpecIds.filter((id) => id !== spec.id).map((id) => specNameMap.get(id)).filter((n) => Boolean(n));
+            return {
+              rank: isPending ? null : s2.specialityRanks[spec.id] ?? null,
+              candidateCode: s2.candidateCode,
+              fullName: s2.fullName,
+              qualification: qual,
+              otherSpecialities: otherSpecs,
+              mcqScore: s2.mcqScore,
+              psychometricScore: s2.psychometricScore,
+              vivaScore: isPending ? null : s2.specialityInterviewScores[spec.id] ?? null,
+              totalScore: s2.specialityScores[spec.id] ?? null,
+              status: cand?.status ?? "approved",
+              unitName: cand?.unitId ? unitMap.get(cand.unitId) ?? null : null
+            };
+          })
+        };
+      });
+      const pdfBuffer = await generateRankSheetPdf({
+        programName: program?.name || "Fellowship Program",
+        academicSession: program?.academicYear || "2026",
+        groups
+      });
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="Merit_Rank_Sheet_${program?.code || programId}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (e2) {
+      console.error("[rankings-export-pdf] error:", e2);
+      res.status(500).json({ error: e2.message || "Failed to generate Rank Sheet PDF" });
     }
   }
 );
@@ -1137881,37 +1139307,69 @@ router19.get("/dashboard/summary", requireAuth, async (req, res) => {
     res.status(500).json({ error: error40.message || "Failed to load dashboard metrics" });
   }
 });
-router19.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor"), async (req, res) => {
+router19.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor", "super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   const doctorId = req.user.userId;
-  const panelQuery = await readDb.execute(sql`
-    SELECT ip.id as panel_id, ip.name as panel_name, ip.speciality_id,
-           s.name as speciality_name
-    FROM interview_panel_members ipm
-    JOIN interview_panels ip ON ip.id = ipm.panel_id
-    LEFT JOIN specialities s ON s.id = ip.speciality_id
-    WHERE ipm.doctor_id = ${doctorId} AND ip.is_active = TRUE
-    LIMIT 1
-  `);
-  const activePanel = panelQuery.rows[0];
+  const userRole = req.user.role;
+  const isMockMode = Boolean(req.isMockMode);
+  const requestedPanelId = req.query["panelId"] ? Number(req.query["panelId"]) : null;
+  const panelQuery = userRole === "doctor" ? await readDb.execute(sql`
+        SELECT ip.id as panel_id, ip.name as panel_name, ip.speciality_id,
+               ip.is_mind_matter, ipm.marks_entry_enabled,
+               s.name as speciality_name
+        FROM interview_panel_members ipm
+        JOIN interview_panels ip ON ip.id = ipm.panel_id
+        LEFT JOIN specialities s ON s.id = ip.speciality_id
+        WHERE ipm.doctor_id = ${doctorId} AND ip.is_active = TRUE AND ip.is_mock = ${isMockMode}
+        ORDER BY ip.is_mind_matter DESC, ip.id ASC
+      `) : await readDb.execute(sql`
+        SELECT ip.id as panel_id, ip.name as panel_name, ip.speciality_id,
+               ip.is_mind_matter, TRUE as marks_entry_enabled,
+               s.name as speciality_name
+        FROM interview_panels ip
+        LEFT JOIN specialities s ON s.id = ip.speciality_id
+        WHERE ip.is_active = TRUE AND ip.is_mock = ${isMockMode}
+        ORDER BY ip.is_mind_matter DESC, ip.id ASC
+      `);
+  const allActivePanels = panelQuery.rows;
+  const activePanel = (requestedPanelId ? allActivePanels.find((p) => Number(p.panel_id) === requestedPanelId) : void 0) ?? allActivePanels[0];
   let totalAssigned = 0;
   let totalCompleted = 0;
   let remaining = 0;
   let avgInterviewMinutes = null;
   let panelName = null;
   let specialityName = null;
+  const panelId = activePanel?.panel_id ?? null;
+  const panelSpecialityId = activePanel?.speciality_id ?? null;
+  const isMindMatterPanel = activePanel?.is_mind_matter === true || activePanel?.is_mind_matter === 1;
+  const marksEntryEnabled = userRole === "super_admin" || activePanel?.marks_entry_enabled === true || activePanel?.marks_entry_enabled === 1;
   if (activePanel) {
     panelName = activePanel.panel_name;
     specialityName = activePanel.speciality_name;
-    const queueCountQuery = await readDb.execute(sql`
-      SELECT COUNT(*) as total,
-             SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_count
-      FROM panel_queue
-      WHERE panel_id = ${activePanel.panel_id}
-    `);
-    const row = queueCountQuery.rows[0];
-    totalAssigned = Number(row?.total ?? 0);
-    totalCompleted = Number(row?.completed_count ?? 0);
-    remaining = Math.max(0, totalAssigned - totalCompleted);
+    if (isMindMatterPanel) {
+      const mmCountQuery = await readDb.execute(sql`
+        SELECT COUNT(*) as total,
+               SUM(CASE WHEN (c.psychometric_score IS NOT NULL AND c.psychometric_score != '')
+                          OR EXISTS (SELECT 1 FROM interview_scores ist WHERE ist.candidate_id = c.id AND ist.speciality_id IS NULL)
+                        THEN 1 ELSE 0 END) as completed_count
+        FROM candidates c
+        WHERE c.status != 'rejected' AND c.is_mock = ${isMockMode}
+      `);
+      const row = mmCountQuery.rows[0];
+      totalAssigned = Number(row?.total ?? 0);
+      totalCompleted = Number(row?.completed_count ?? 0);
+      remaining = Math.max(0, totalAssigned - totalCompleted);
+    } else {
+      const queueCountQuery = await readDb.execute(sql`
+        SELECT COUNT(*) as total,
+               SUM(CASE WHEN status IN ('done', 'completed') THEN 1 ELSE 0 END) as completed_count
+        FROM panel_queue
+        WHERE panel_id = ${activePanel.panel_id}
+      `);
+      const row = queueCountQuery.rows[0];
+      totalAssigned = Number(row?.total ?? 0);
+      totalCompleted = Number(row?.completed_count ?? 0);
+      remaining = Math.max(0, totalAssigned - totalCompleted);
+    }
   } else {
     const assignRows = await readDb.execute(sql`
       SELECT COUNT(*) as total,
@@ -1137924,27 +1139382,78 @@ router19.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor"), asyn
     totalCompleted = Number(row?.done ?? 0);
     remaining = Math.max(0, totalAssigned - totalCompleted);
   }
-  const avgQuery = await readDb.execute(sql`
-    SELECT AVG(EXTRACT(EPOCH FROM (submitted_at - created_at)) / 60) as avg_minutes
-    FROM interview_scores
-    WHERE doctor_id = ${doctorId}
-  `);
-  const avgRow = avgQuery.rows[0];
-  if (avgRow?.avg_minutes) {
-    avgInterviewMinutes = Math.round(Number(avgRow.avg_minutes) * 10) / 10;
+  try {
+    const avgQuery = userRole === "doctor" ? await readDb.execute(sql`
+          SELECT AVG(EXTRACT(EPOCH FROM (ist.submitted_at - pq.called_at)) / 60) as avg_minutes
+          FROM interview_scores ist
+          JOIN panel_queue pq ON pq.candidate_id = ist.candidate_id
+          WHERE ist.doctor_id = ${doctorId}
+            AND pq.called_at IS NOT NULL
+            AND ist.submitted_at >= pq.called_at
+            AND EXTRACT(EPOCH FROM (ist.submitted_at - pq.called_at)) < 7200
+        `) : await readDb.execute(sql`
+          SELECT AVG(EXTRACT(EPOCH FROM (ist.submitted_at - pq.called_at)) / 60) as avg_minutes
+          FROM interview_scores ist
+          JOIN panel_queue pq ON pq.candidate_id = ist.candidate_id
+          WHERE pq.called_at IS NOT NULL
+            AND ist.submitted_at >= pq.called_at
+            AND EXTRACT(EPOCH FROM (ist.submitted_at - pq.called_at)) < 7200
+        `);
+    const avgRow = avgQuery.rows[0];
+    if (avgRow?.avg_minutes != null && !isNaN(Number(avgRow.avg_minutes))) {
+      avgInterviewMinutes = Math.round(Number(avgRow.avg_minutes) * 10) / 10;
+    }
+  } catch {
+    avgInterviewMinutes = null;
   }
-  const recentScores = await readDb.execute(sql`
-    SELECT ist.id, ist.candidate_id, ist.score, ist.submitted_at,
-           c.full_name as candidate_name, c.candidate_code
-    FROM interview_scores ist
-    JOIN candidates c ON c.id = ist.candidate_id
-    WHERE ist.doctor_id = ${doctorId}
-    ORDER BY ist.submitted_at DESC
-    LIMIT 5
-  `);
+  const recentScores = userRole === "doctor" ? await readDb.execute(sql`
+        SELECT ist.id, ist.candidate_id, ist.score, ist.submitted_at,
+               c.full_name as candidate_name, c.candidate_code
+        FROM interview_scores ist
+        JOIN candidates c ON c.id = ist.candidate_id
+        WHERE ist.doctor_id = ${doctorId} AND c.is_mock = ${isMockMode}
+        ORDER BY ist.submitted_at DESC
+        LIMIT 5
+      `) : activePanel && isMindMatterPanel ? await readDb.execute(sql`
+        SELECT ist.id, ist.candidate_id, ist.score, ist.submitted_at,
+               c.full_name as candidate_name, c.candidate_code
+        FROM interview_scores ist
+        JOIN candidates c ON c.id = ist.candidate_id
+        WHERE ist.speciality_id IS NULL AND c.is_mock = ${isMockMode}
+        ORDER BY ist.submitted_at DESC
+        LIMIT 5
+      `) : activePanel && panelSpecialityId ? await readDb.execute(sql`
+        SELECT ist.id, ist.candidate_id, ist.score, ist.submitted_at,
+               c.full_name as candidate_name, c.candidate_code
+        FROM interview_scores ist
+        JOIN candidates c ON c.id = ist.candidate_id
+        WHERE ist.speciality_id = ${panelSpecialityId} AND c.is_mock = ${isMockMode}
+        ORDER BY ist.submitted_at DESC
+        LIMIT 5
+      `) : await readDb.execute(sql`
+        SELECT ist.id, ist.candidate_id, ist.score, ist.submitted_at,
+               c.full_name as candidate_name, c.candidate_code
+        FROM interview_scores ist
+        JOIN candidates c ON c.id = ist.candidate_id
+        WHERE c.is_mock = ${isMockMode}
+        ORDER BY ist.submitted_at DESC
+        LIMIT 5
+      `);
   res.json({
+    panelId,
     panelName,
+    specialityId: panelSpecialityId,
     specialityName,
+    isMindMatterPanel,
+    marksEntryEnabled,
+    panels: allActivePanels.map((p) => ({
+      panelId: Number(p.panel_id),
+      panelName: String(p.panel_name ?? ""),
+      specialityId: p.speciality_id != null ? Number(p.speciality_id) : null,
+      specialityName: p.speciality_name ?? null,
+      isMindMatter: p.is_mind_matter === true || p.is_mind_matter === 1,
+      marksEntryEnabled: userRole === "super_admin" || p.marks_entry_enabled === true || p.marks_entry_enabled === 1
+    })),
     totalAssigned,
     totalCompleted,
     remaining,
@@ -1137963,12 +1139472,12 @@ var dashboard_default = router19;
 
 // src/routes/import-excel.ts
 var import_express20 = __toESM(require_express2(), 1);
-var XLSX5 = __toESM(require_xlsx(), 1);
+var XLSX6 = __toESM(require_xlsx(), 1);
 init_src();
 init_drizzle_orm();
 init_auth2();
-import * as fs9 from "fs";
-import * as path7 from "path";
+import * as fs11 from "fs";
+import * as path8 from "path";
 var router20 = (0, import_express20.Router)();
 function excelDateToString(v) {
   if (!v) return null;
@@ -1138060,17 +1139569,17 @@ function cell(row, col) {
 }
 router20.post("/import/excel", requireAuth, requireRole("super_admin", "central_exam_coordinator"), async (_req, res) => {
   try {
-    const xlsxPath = path7.resolve(
+    const xlsxPath = path8.resolve(
       process.cwd(),
       "../../attached_assets/Fellowship_Application_form_-_Jan_2026_(Responses)_1777703761557.xlsx"
     );
-    if (!fs9.existsSync(xlsxPath)) {
+    if (!fs11.existsSync(xlsxPath)) {
       res.status(404).json({ error: "Excel file not found at " + xlsxPath });
       return;
     }
-    const wb = XLSX5.readFile(xlsxPath);
+    const wb = XLSX6.readFile(xlsxPath);
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX5.utils.sheet_to_json(ws, { header: 1 });
+    const rows = XLSX6.utils.sheet_to_json(ws, { header: 1 });
     const dataRows = rows.slice(1).filter((r2) => r2[COL.FULL_NAME] && r2[COL.EMAIL]);
     const [program] = await db.select().from(programsTable).limit(1);
     if (!program) {
@@ -1138328,9 +1139837,9 @@ router20.post("/import/excel/detect", requireAuth, requireRole("super_admin", "c
     const { fileData, fileName } = req.body;
     if (!fileData) return res.status(400).json({ error: "fileData (base64) is required" });
     const buf = Buffer.from(fileData, "base64");
-    const wb = XLSX5.read(buf, { type: "buffer" });
+    const wb = XLSX6.read(buf, { type: "buffer" });
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX5.utils.sheet_to_json(ws, { header: 1 });
+    const rows = XLSX6.utils.sheet_to_json(ws, { header: 1 });
     if (rows.length === 0) return res.status(400).json({ error: "Excel file is empty" });
     const headers = rows[0].map((h2) => String(h2 ?? "").trim());
     const suggestedMapping = autoDetectMapping(headers);
@@ -1138355,9 +1139864,9 @@ router20.post("/import/excel/process", requireAuth, requireRole("super_admin", "
       return res.status(400).json({ error: "fileData, programId, and mapping are required" });
     }
     const buf = Buffer.from(fileData, "base64");
-    const wb = XLSX5.read(buf, { type: "buffer" });
+    const wb = XLSX6.read(buf, { type: "buffer" });
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX5.utils.sheet_to_json(ws, { header: 1 });
+    const rows = XLSX6.utils.sheet_to_json(ws, { header: 1 });
     const dataRows = rows.slice(1).filter((r2) => {
       const nameIdx = mapping["FULL_NAME"] ?? mapping["EMAIL"];
       return nameIdx != null ? r2[nameIdx] : r2.some((c) => c != null && c !== "");
@@ -1138522,13 +1140031,13 @@ init_application_forms2();
 
 // src/routes/seat-matrix.ts
 var import_express21 = __toESM(require_express2(), 1);
-var XLSX6 = __toESM(require_xlsx(), 1);
+var XLSX7 = __toESM(require_xlsx(), 1);
 init_src();
 init_drizzle_orm();
 init_drizzle_orm();
 init_auth2();
-import * as fs10 from "fs";
-import * as path8 from "path";
+import * as fs12 from "fs";
+import * as path9 from "path";
 var router21 = (0, import_express21.Router)();
 function getCanonicalSpecialtyName2(name2) {
   const norm = name2.toLowerCase().trim();
@@ -1138563,17 +1140072,17 @@ var INDUCTION_DATES = [
   { displayDate: "11.01.2027, Monday", event: "New Fellows Reporting", venue: "Respective Units" }
 ];
 function findLatestFile() {
-  const assetsDir = path8.resolve(process.cwd(), "../../attached_assets");
-  if (!fs10.existsSync(assetsDir)) return null;
-  const files = fs10.readdirSync(assetsDir).filter((f3) => f3.startsWith("Seat_Matrix_") && f3.endsWith(".xlsx")).sort().reverse();
-  return files[0] ? path8.join(assetsDir, files[0]) : null;
+  const assetsDir = path9.resolve(process.cwd(), "../../attached_assets");
+  if (!fs12.existsSync(assetsDir)) return null;
+  const files = fs12.readdirSync(assetsDir).filter((f3) => f3.startsWith("Seat_Matrix_") && f3.endsWith(".xlsx")).sort().reverse();
+  return files[0] ? path9.join(assetsDir, files[0]) : null;
 }
 function parseMatrixFromFile() {
   const xlsxPath = findLatestFile();
   if (!xlsxPath) return null;
-  const wb = XLSX6.readFile(xlsxPath);
+  const wb = XLSX7.readFile(xlsxPath);
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const allRows = XLSX6.utils.sheet_to_json(ws, { header: 1 });
+  const allRows = XLSX7.utils.sheet_to_json(ws, { header: 1 });
   const headerRow = allRows.find((r2) => Array.isArray(r2) && r2[1] === "Unit/Speciality");
   if (!headerRow) return null;
   const units = [];
@@ -1139059,9 +1140568,9 @@ init_auth2();
 init_src();
 init_drizzle_orm();
 import { Readable as Readable6 } from "stream";
-import path9 from "path";
-import os3 from "os";
-import fs11 from "fs";
+import path10 from "path";
+import os4 from "os";
+import fs13 from "fs";
 var router24 = (0, import_express24.Router)();
 var objectStorageService = new ObjectStorageService();
 router24.post("/storage/uploads/request-url", requireAuth, async (req, res) => {
@@ -1139102,15 +1140611,15 @@ router24.put("/storage/local-upload/:filename", requireAuth, async (req, res) =>
         const objectPath = `/objects/uploads/${filename}`;
         const contentType = req.headers["content-type"] || "application/octet-stream";
         try {
-          const tmpUploadDir = path9.join(os3.tmpdir(), "uploads");
-          await fs11.promises.mkdir(tmpUploadDir, { recursive: true });
-          await fs11.promises.writeFile(path9.join(tmpUploadDir, filename), buffer);
+          const tmpUploadDir = path10.join(os4.tmpdir(), "uploads");
+          await fs13.promises.mkdir(tmpUploadDir, { recursive: true });
+          await fs13.promises.writeFile(path10.join(tmpUploadDir, filename), buffer);
         } catch (_) {
         }
         try {
-          const localUploadDir = path9.join(process.cwd(), "uploads");
-          await fs11.promises.mkdir(localUploadDir, { recursive: true });
-          await fs11.promises.writeFile(path9.join(localUploadDir, filename), buffer);
+          const localUploadDir = path10.join(process.cwd(), "uploads");
+          await fs13.promises.mkdir(localUploadDir, { recursive: true });
+          await fs13.promises.writeFile(path10.join(localUploadDir, filename), buffer);
         } catch (_) {
         }
         await db.execute(sql`
@@ -1139234,13 +1140743,13 @@ router24.get("/storage/objects/*path", requireAuth, requireRole("super_admin", "
     const isReplit = !!process.env.REPL_ID;
     if (!isReplit) {
       const candidatePaths = [
-        path9.join(process.cwd(), "uploads", objectPath.replace("/objects/uploads/", "")),
-        path9.join(os3.tmpdir(), "uploads", objectPath.replace("/objects/uploads/", "")),
-        path9.join(process.cwd(), "uploads", objectPath.replace("/objects/", "")),
-        path9.join(os3.tmpdir(), "uploads", objectPath.replace("/objects/", ""))
+        path10.join(process.cwd(), "uploads", objectPath.replace("/objects/uploads/", "")),
+        path10.join(os4.tmpdir(), "uploads", objectPath.replace("/objects/uploads/", "")),
+        path10.join(process.cwd(), "uploads", objectPath.replace("/objects/", "")),
+        path10.join(os4.tmpdir(), "uploads", objectPath.replace("/objects/", ""))
       ];
       for (const cp of candidatePaths) {
-        if (fs11.existsSync(cp)) {
+        if (fs13.existsSync(cp)) {
           return res.sendFile(cp);
         }
       }
@@ -1139473,8 +1140982,8 @@ router26.post("/batches", requireAuth, requireRole("super_admin", "program_admin
     }).returning();
     res.json(batch);
   } catch (e2) {
-    const fs16 = __require("fs");
-    fs16.writeFileSync("batch_error_log.txt", String(e2) + "\n" + (e2.stack || ""));
+    const fs17 = __require("fs");
+    fs17.writeFileSync("batch_error_log.txt", String(e2) + "\n" + (e2.stack || ""));
     res.status(500).json({ error: String(e2) });
   }
 });
@@ -1139511,6 +1141020,16 @@ router26.patch("/batches/:id/marks", requireAuth, requireRole("super_admin", "pr
         interviewScore: u.interviewScore,
         status: "completed"
       }).where(and(eq(batchCandidatesTable.batchId, batchId), eq(batchCandidatesTable.candidateId, u.candidateId)));
+      const candSync = {};
+      if (u.mcqScore !== void 0) {
+        candSync["mcqScore"] = u.mcqScore != null ? String(u.mcqScore) : null;
+      }
+      if (u.psychometricScore !== void 0) {
+        candSync["psychometricScore"] = u.psychometricScore != null ? String(u.psychometricScore) : null;
+      }
+      if (Object.keys(candSync).length > 0) {
+        await db.update(candidatesTable).set(candSync).where(eq(candidatesTable.id, u.candidateId));
+      }
     }
     res.json({ success: true });
   } catch (e2) {
@@ -1139875,17 +1141394,17 @@ var debug_default = router27;
 // src/routes/tv-access.ts
 var import_express28 = __toESM(require_express2(), 1);
 init_auth2();
-import fs12 from "fs/promises";
-import path10 from "path";
+import fs14 from "fs/promises";
+import path11 from "path";
 var router28 = (0, import_express28.Router)();
-var DB_PATH = path10.join(process.cwd(), "tv-access.json");
+var DB_PATH = path11.join(process.cwd(), "tv-access.json");
 async function getAccessCode() {
   try {
-    const data = await fs12.readFile(DB_PATH, "utf-8");
+    const data = await fs14.readFile(DB_PATH, "utf-8");
     return JSON.parse(data).code;
   } catch {
     const defaultCode = generateCode();
-    await fs12.writeFile(DB_PATH, JSON.stringify({ code: defaultCode }));
+    await fs14.writeFile(DB_PATH, JSON.stringify({ code: defaultCode }));
     return defaultCode;
   }
 }
@@ -1139912,7 +1141431,7 @@ router28.get("/tv-access/code", requireAuth, requireRole("super_admin", "program
 });
 router28.post("/tv-access/code/generate", requireAuth, requireRole("super_admin", "program_admin"), async (req, res) => {
   const newCode = generateCode();
-  await fs12.writeFile(DB_PATH, JSON.stringify({ code: newCode }));
+  await fs14.writeFile(DB_PATH, JSON.stringify({ code: newCode }));
   res.json({ code: newCode });
 });
 var tv_access_default = router28;
@@ -1139989,10 +1141508,10 @@ var import_express30 = __toESM(require_express2(), 1);
 init_src();
 init_drizzle_orm();
 init_auth2();
-var import_pdfkit4 = __toESM(require_pdfkit(), 1);
+var import_pdfkit6 = __toESM(require_pdfkit(), 1);
 var import_qrcode = __toESM(require_lib9(), 1);
 init_utils5();
-import path11 from "path";
+import path12 from "path";
 var router30 = (0, import_express30.Router)();
 router30.patch(
   "/programs/:id/hall-ticket-settings",
@@ -1140098,7 +1141617,7 @@ async function drawHallTicketPage(doc, data) {
   const photoH = 105;
   let hasPhoto = false;
   if (data.photoUrl && data.photoUrl.startsWith("/objects/")) {
-    const localPath = path11.join(process.cwd(), "uploads", data.photoUrl.replace("/objects/", ""));
+    const localPath = path12.join(process.cwd(), "uploads", data.photoUrl.replace("/objects/", ""));
     try {
       doc.image(localPath, photoX, photoY, { width: photoW, height: photoH });
       doc.rect(photoX, photoY, photoW, photoH).strokeColor(colors.border).lineWidth(1).stroke();
@@ -1140223,7 +1141742,7 @@ router30.get("/hall-tickets/download/:identifier", async (req, res) => {
     const candidateName = sub?.fullName || candidate?.fullName || "Candidate";
     const candidateCode = sub?.candidateCode || candidate?.candidateCode || `SAV-${sub?.id || "2026"}`;
     const hallTicketNumber = application?.hallTicketNumber || `${program?.hallTicketPrefix || "SAV-2026"}-${String(sub?.id || 1).padStart(3, "0")}`;
-    const doc = new import_pdfkit4.default({ margin: 36, size: "LETTER" });
+    const doc = new import_pdfkit6.default({ margin: 36, size: "LETTER" });
     const filename = `HallTicket_${candidateName.replace(/\s+/g, "_")}_${hallTicketNumber}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
@@ -1140287,7 +1141806,7 @@ router30.get(
       if (list.length === 0) {
         return res.status(400).json({ error: "No candidate records found for this program." });
       }
-      const doc = new import_pdfkit4.default({ margin: 36, size: "LETTER", autoFirstPage: false });
+      const doc = new import_pdfkit6.default({ margin: 36, size: "LETTER", autoFirstPage: false });
       const filename = `Batch_HallTickets_${program.code}_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.pdf`;
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -1140384,11 +1141903,11 @@ var import_express32 = __toESM(require_express2(), 1);
 init_src();
 init_drizzle_orm();
 init_auth2();
-var XLSX7 = __toESM(require_xlsx(), 1);
+var XLSX8 = __toESM(require_xlsx(), 1);
 init_utils5();
-var import_pdfkit5 = __toESM(require_pdfkit(), 1);
-import path12 from "path";
-import fs13 from "fs/promises";
+var import_pdfkit7 = __toESM(require_pdfkit(), 1);
+import path13 from "path";
+import fs15 from "fs/promises";
 var router32 = (0, import_express32.Router)();
 router32.get("/reports/cycle-report", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
   try {
@@ -1140443,13 +1141962,13 @@ router32.get("/reports/cycle-report", requireAuth, requireRole("super_admin", "p
       { "Metric": "Active Staff Members", "Value": users.length },
       { "Metric": "Report Generation Date", "Value": formatToLocalDateTime(/* @__PURE__ */ new Date()) }
     ];
-    const wb = XLSX7.utils.book_new();
+    const wb = XLSX8.utils.book_new();
     const addAutoFilter = (ws) => {
       if (!ws["!ref"]) return;
       try {
-        const range2 = XLSX7.utils.decode_range(ws["!ref"]);
+        const range2 = XLSX8.utils.decode_range(ws["!ref"]);
         ws["!autofilter"] = {
-          ref: XLSX7.utils.encode_range({
+          ref: XLSX8.utils.encode_range({
             s: { c: 0, r: 0 },
             e: { c: range2.e.c, r: range2.e.r }
           })
@@ -1140458,9 +1141977,9 @@ router32.get("/reports/cycle-report", requireAuth, requireRole("super_admin", "p
         console.error("Failed to add autofilter:", err);
       }
     };
-    const wsSummary = XLSX7.utils.json_to_sheet(summaryData);
+    const wsSummary = XLSX8.utils.json_to_sheet(summaryData);
     wsSummary["!cols"] = [{ wch: 35 }, { wch: 25 }];
-    XLSX7.utils.book_append_sheet(wb, wsSummary, "Cycle Summary Overview");
+    XLSX8.utils.book_append_sheet(wb, wsSummary, "Cycle Summary Overview");
     let totalRetinaCount = 0;
     let totalAnteriorCount = 0;
     let vrs = 0;
@@ -1140510,19 +1142029,19 @@ router32.get("/reports/cycle-report", requireAuth, requireRole("super_admin", "p
       { "Segment": "Anterior Segment", "Speciality": "Pediatric Ophthalmology", "Applications Count": pediatric },
       { "Segment": "Anterior Segment", "Speciality": "Orbit & Oculoplastics", "Applications Count": orbit }
     ];
-    const wsSpecStats = XLSX7.utils.json_to_sheet(specializationStatsData);
+    const wsSpecStats = XLSX8.utils.json_to_sheet(specializationStatsData);
     wsSpecStats["!cols"] = [{ wch: 25 }, { wch: 40 }, { wch: 25 }];
     addAutoFilter(wsSpecStats);
-    XLSX7.utils.book_append_sheet(wb, wsSpecStats, "Speciality Stats Chart Data");
-    const wsFinance = XLSX7.utils.json_to_sheet(financialAdmissionsData);
+    XLSX8.utils.book_append_sheet(wb, wsSpecStats, "Speciality Stats Chart Data");
+    const wsFinance = XLSX8.utils.json_to_sheet(financialAdmissionsData);
     wsFinance["!cols"] = financialAdmissionsData[0] ? Object.keys(financialAdmissionsData[0]).map(() => ({ wch: 25 })) : [];
     addAutoFilter(wsFinance);
-    XLSX7.utils.book_append_sheet(wb, wsFinance, "Student Payments & Status");
-    const wsStaff = XLSX7.utils.json_to_sheet(staffActivityData);
+    XLSX8.utils.book_append_sheet(wb, wsFinance, "Student Payments & Status");
+    const wsStaff = XLSX8.utils.json_to_sheet(staffActivityData);
     wsStaff["!cols"] = staffActivityData[0] ? Object.keys(staffActivityData[0]).map(() => ({ wch: 25 })) : [];
     addAutoFilter(wsStaff);
-    XLSX7.utils.book_append_sheet(wb, wsStaff, "Staff Usage & Appraisals");
-    const buf = XLSX7.write(wb, { type: "buffer", bookType: "xlsx" });
+    XLSX8.utils.book_append_sheet(wb, wsStaff, "Staff Usage & Appraisals");
+    const buf = XLSX8.write(wb, { type: "buffer", bookType: "xlsx" });
     const date6 = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     res.setHeader("Content-Disposition", `attachment; filename=SAV_Full_Cycle_Report_${date6}.xlsx`);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -1140616,13 +1142135,13 @@ router32.get("/reports/daily-report", requireAuth, requireRole("super_admin", "p
       { "Metric": "Interviews Evaluated Today", "Value": scoresToday.length },
       { "Metric": "Report Generation Date", "Value": formatToLocalDateTime(/* @__PURE__ */ new Date()) }
     ];
-    const wb = XLSX7.utils.book_new();
+    const wb = XLSX8.utils.book_new();
     const addAutoFilter = (ws) => {
       if (!ws["!ref"]) return;
       try {
-        const range2 = XLSX7.utils.decode_range(ws["!ref"]);
+        const range2 = XLSX8.utils.decode_range(ws["!ref"]);
         ws["!autofilter"] = {
-          ref: XLSX7.utils.encode_range({
+          ref: XLSX8.utils.encode_range({
             s: { c: 0, r: 0 },
             e: { c: range2.e.c, r: range2.e.r }
           })
@@ -1140631,22 +1142150,22 @@ router32.get("/reports/daily-report", requireAuth, requireRole("super_admin", "p
         console.error("Failed to add autofilter:", err);
       }
     };
-    const wsSummary = XLSX7.utils.json_to_sheet(summaryData);
+    const wsSummary = XLSX8.utils.json_to_sheet(summaryData);
     wsSummary["!cols"] = [{ wch: 40 }, { wch: 25 }];
-    XLSX7.utils.book_append_sheet(wb, wsSummary, "Daily Summary");
-    const wsFinance = XLSX7.utils.json_to_sheet(financialAdmissionsData);
+    XLSX8.utils.book_append_sheet(wb, wsSummary, "Daily Summary");
+    const wsFinance = XLSX8.utils.json_to_sheet(financialAdmissionsData);
     wsFinance["!cols"] = financialAdmissionsData[0] ? Object.keys(financialAdmissionsData[0]).map(() => ({ wch: 25 })) : [];
     addAutoFilter(wsFinance);
-    XLSX7.utils.book_append_sheet(wb, wsFinance, "Today's Payments & Status");
-    const wsCandidates = XLSX7.utils.json_to_sheet(candidatesData);
+    XLSX8.utils.book_append_sheet(wb, wsFinance, "Today's Payments & Status");
+    const wsCandidates = XLSX8.utils.json_to_sheet(candidatesData);
     wsCandidates["!cols"] = candidatesData[0] ? Object.keys(candidatesData[0]).map(() => ({ wch: 25 })) : [];
     addAutoFilter(wsCandidates);
-    XLSX7.utils.book_append_sheet(wb, wsCandidates, "Today's Enrolled Candidates");
-    const wsStaff = XLSX7.utils.json_to_sheet(staffActivityData);
+    XLSX8.utils.book_append_sheet(wb, wsCandidates, "Today's Enrolled Candidates");
+    const wsStaff = XLSX8.utils.json_to_sheet(staffActivityData);
     wsStaff["!cols"] = staffActivityData[0] ? Object.keys(staffActivityData[0]).map(() => ({ wch: 25 })) : [];
     addAutoFilter(wsStaff);
-    XLSX7.utils.book_append_sheet(wb, wsStaff, "Today's Appraisals");
-    const buf = XLSX7.write(wb, { type: "buffer", bookType: "xlsx" });
+    XLSX8.utils.book_append_sheet(wb, wsStaff, "Today's Appraisals");
+    const buf = XLSX8.write(wb, { type: "buffer", bookType: "xlsx" });
     const date6 = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     res.setHeader("Content-Disposition", `attachment; filename=SAV_Daily_Report_${date6}.xlsx`);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -1140828,9 +1142347,9 @@ router32.get("/applications/:id/hall-ticket", requireAuth, async (req, res) => {
       and(eq(documentsTable.candidateId, candidate.id), eq(documentsTable.docType, "PHOTO"))
     );
     if (photoDoc && photoDoc.fileUrl && photoDoc.fileUrl.startsWith("/objects/uploads/")) {
-      const p = path12.join(process.cwd(), "uploads", photoDoc.fileUrl.replace("/objects/uploads/", ""));
+      const p = path13.join(process.cwd(), "uploads", photoDoc.fileUrl.replace("/objects/uploads/", ""));
       try {
-        await fs13.stat(p);
+        await fs15.stat(p);
         localPhotoPath = p;
       } catch {
       }
@@ -1140838,15 +1142357,15 @@ router32.get("/applications/:id/hall-ticket", requireAuth, async (req, res) => {
     if (!localPhotoPath) {
       const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, candidate.email));
       if (sub && sub.photoUrl && sub.photoUrl.startsWith("/objects/uploads/")) {
-        const p = path12.join(process.cwd(), "uploads", sub.photoUrl.replace("/objects/uploads/", ""));
+        const p = path13.join(process.cwd(), "uploads", sub.photoUrl.replace("/objects/uploads/", ""));
         try {
-          await fs13.stat(p);
+          await fs15.stat(p);
           localPhotoPath = p;
         } catch {
         }
       }
     }
-    const doc = new import_pdfkit5.default({ size: "A4", margin: 40 });
+    const doc = new import_pdfkit7.default({ size: "A4", margin: 40 });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="HallTicket_${candidate.fullName.replace(/\s+/g, "_")}.pdf"`);
     doc.pipe(res);
@@ -1141028,9 +1142547,9 @@ router32.get("/candidates/:id/hall-ticket", requireAuth, async (req, res) => {
       and(eq(documentsTable.candidateId, candidate.id), eq(documentsTable.docType, "PHOTO"))
     );
     if (photoDoc && photoDoc.fileUrl && photoDoc.fileUrl.startsWith("/objects/uploads/")) {
-      const p = path12.join(process.cwd(), "uploads", photoDoc.fileUrl.replace("/objects/uploads/", ""));
+      const p = path13.join(process.cwd(), "uploads", photoDoc.fileUrl.replace("/objects/uploads/", ""));
       try {
-        await fs13.stat(p);
+        await fs15.stat(p);
         localPhotoPath = p;
       } catch {
       }
@@ -1141038,15 +1142557,15 @@ router32.get("/candidates/:id/hall-ticket", requireAuth, async (req, res) => {
     if (!localPhotoPath) {
       const [sub] = await db.select().from(applicationSubmissionsTable).where(eq(applicationSubmissionsTable.email, candidate.email));
       if (sub && sub.photoUrl && sub.photoUrl.startsWith("/objects/uploads/")) {
-        const p = path12.join(process.cwd(), "uploads", sub.photoUrl.replace("/objects/uploads/", ""));
+        const p = path13.join(process.cwd(), "uploads", sub.photoUrl.replace("/objects/uploads/", ""));
         try {
-          await fs13.stat(p);
+          await fs15.stat(p);
           localPhotoPath = p;
         } catch {
         }
       }
     }
-    const doc = new import_pdfkit5.default({ size: "A4", margin: 40 });
+    const doc = new import_pdfkit7.default({ size: "A4", margin: 40 });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="HallTicket_${candidate.fullName.replace(/\s+/g, "_")}.pdf"`);
     doc.pipe(res);
@@ -1141207,11 +1142726,9 @@ var reports_default = router32;
 // src/routes/index.ts
 init_src();
 init_drizzle_orm();
-var import_pdfkit6 = __toESM(require_pdfkit(), 1);
 init_auth2();
 init_utils5();
-import path13 from "path";
-import fs14 from "fs/promises";
+init_application_pdf();
 var router33 = (0, import_express33.Router)();
 router33.get("/ping", (req, res) => res.send("pong"));
 router33.get(
@@ -1141226,158 +1142743,17 @@ router33.get(
       if (!sub) return res.status(404).json({ error: "Submission not found" });
       const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
       const [program] = form ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
-      const doc = new import_pdfkit6.default({
-        margin: 50,
-        size: "A4",
-        info: { Title: `Application - ${sub.fullName}`, Author: "Sankara Academy of Vision" }
-      });
-      const filename = `Application_${sub.fullName.replace(/\s+/g, "_")}_${id}.pdf`;
+      let candidate = null;
+      if (sub.email) {
+        const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.email, sub.email));
+        candidate = c || null;
+      }
+      const pdfBuffer = await generateApplicationPdfBuffer({ sub, form, program, candidate });
+      const filename = `Application_${(sub.fullName || "Candidate").replace(/[^a-zA-Z0-9_-]/g, "_")}_${id}.pdf`;
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `inline; filename=${filename}`);
+      res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
       res.setHeader("Content-Security-Policy", "default-src 'self' 'unsafe-inline' blob: data:; img-src 'self' data: blob:;");
-      doc.pipe(res);
-      const colors = { primary: "#0f172a", secondary: "#475569", accent: "#2563eb", muted: "#94a3b8", border: "#e2e8f0" };
-      const drawSectionHeader = (title) => {
-        if (doc.y > 680) {
-          doc.addPage();
-          doc.y = 50;
-        }
-        doc.moveDown(1);
-        const y = doc.y;
-        doc.rect(50, y, 500, 24).fill("#f1f5f9");
-        doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(12.5).text(title.toUpperCase(), 60, y + 6, { width: 480 });
-        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(50, y + 24).lineTo(550, y + 24).stroke();
-        doc.y = y + 32;
-      };
-      const renderApplicationRecordRow = (label, value) => {
-        const valText = value === null || value === void 0 || value === "null" || value === "" ? "\u2014" : String(value);
-        const startY = doc.y;
-        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(10.5).text(label.toUpperCase(), 50, startY, { width: 120, lineGap: 2 });
-        const labelEndY = doc.y;
-        doc.fillColor(colors.primary).font("Helvetica").fontSize(11.5).text(`: ${valText}`, 180, startY, { width: 250, lineGap: 2 });
-        const valueEndY = doc.y;
-        doc.y = Math.max(labelEndY, valueEndY) + 5;
-      };
-      const renderGeneralRow = (label, value) => {
-        const valText = value === null || value === void 0 || value === "null" || value === "" ? "\u2014" : String(value);
-        if (doc.y > 720) {
-          doc.addPage();
-          doc.y = 50;
-        }
-        const currentY = doc.y;
-        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(10.5).text(label.toUpperCase(), 50, currentY, { width: 160, lineGap: 2 });
-        const labelEndY = doc.y;
-        doc.fillColor(colors.primary).font("Helvetica").fontSize(11.5).text(`: ${valText}`, 220, currentY, { width: 330, lineGap: 2 });
-        const valueEndY = doc.y;
-        doc.y = Math.max(labelEndY, valueEndY) + 6;
-      };
-      const parseSpecializations = (spec) => {
-        return parseSpecializationString(spec);
-      };
-      const parseCenterPreferences = (cp, customAnswers, sections) => {
-        if (cp) {
-          try {
-            const parsed = JSON.parse(cp);
-            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
-          } catch {
-          }
-        }
-        if (customAnswers && typeof customAnswers === "object") {
-          const prefs = {};
-          Object.entries(customAnswers).forEach(([key, val]) => {
-            if (key.startsWith("unit_") && val) {
-              let label = key.replace("unit_", "").replace(/_/g, " ").toUpperCase();
-              if (sections) {
-                sections.forEach((sec) => {
-                  sec.fields?.forEach((f3) => {
-                    if (f3.id === key) label = f3.label.replace(" Preferred Center", "");
-                  });
-                });
-              }
-              prefs[label] = Array.isArray(val) ? val.join(", ") : String(val);
-            }
-          });
-          return prefs;
-        }
-        return {};
-      };
-      doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(24).text("SANKARA ACADEMY OF VISION", 50, 50, { width: 500, align: "left" });
-      doc.fillColor(colors.primary).font("Helvetica").fontSize(11).text("Educational unit of Sankara Eye Foundation, India", 50, 75, { width: 500, align: "left" });
-      doc.moveDown(0.2);
-      doc.fillColor(colors.muted).font("Helvetica-Bold").fontSize(10).text("FELLOWSHIP PROGRAM ADMISSIONS", 50, 90, { width: 500, align: "left" });
-      doc.strokeColor(colors.accent).lineWidth(2).moveTo(50, 105).lineTo(550, 105).stroke();
-      const photoUrl = sub.photoUrl;
-      const photoX = 450;
-      const photoY = 120;
-      const photoW = 100;
-      const photoH = 120;
-      if (photoUrl && photoUrl.startsWith("/objects/")) {
-        const localPath = path13.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
-        try {
-          doc.image(localPath, photoX, photoY, { width: photoW, height: photoH });
-          doc.rect(photoX, photoY, photoW, photoH).strokeColor(colors.border).lineWidth(1).stroke();
-        } catch (e2) {
-          doc.rect(photoX, photoY, photoW, photoH).fill("#f1f5f9");
-          doc.fillColor(colors.muted).font("Helvetica").fontSize(8.5).text("PHOTO NOT AVAILABLE", photoX, photoY + 50, { width: photoW, align: "center" });
-        }
-      } else {
-        doc.rect(photoX, photoY, photoW, photoH).fill("#f1f5f9");
-        doc.fillColor(colors.muted).font("Helvetica").fontSize(8.5).text("NO PHOTO UPLOADED", photoX, photoY + 50, { width: photoW, align: "center" });
-      }
-      doc.y = 120;
-      doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(14).text("APPLICATION RECORD", 50, 120, { width: 380 });
-      doc.y = 145;
-      renderApplicationRecordRow("Application ID", id);
-      renderApplicationRecordRow("Program", program?.name || "Fellowship Program");
-      renderApplicationRecordRow("Submission Date", sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "\u2014");
-      if (doc.y < 250) {
-        doc.y = 250;
-      }
-      drawSectionHeader("Personal Details");
-      renderGeneralRow("Full Name", sub.fullName);
-      renderGeneralRow("Email Address", sub.email);
-      renderGeneralRow("Phone Number", sub.phone);
-      renderGeneralRow("Date of Birth", formatDOBToStandard(sub.dateOfBirth));
-      renderGeneralRow("Permanent Address", sub.permanentAddress);
-      drawSectionHeader("Qualifications");
-      renderGeneralRow("Degree", sub.degree);
-      renderGeneralRow("College", sub.medicalCollege);
-      renderGeneralRow("University", sub.university);
-      renderGeneralRow("Reg No", sub.medicalCouncilNumber);
-      drawSectionHeader("Specialization & Centers");
-      const specs = parseSpecializations(sub.specialization);
-      const centerPrefs = parseCenterPreferences(sub.centerPreference, sub.customAnswers, form?.sectionsConfig ?? void 0);
-      specs.forEach((sp, idx) => {
-        if (doc.y > 720) {
-          doc.addPage();
-          doc.y = 50;
-        }
-        const currentY = doc.y;
-        doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(10.5).text(`${idx + 1}. ${sp}`, 50, currentY, { width: 180, lineGap: 2 });
-        const spEndY = doc.y;
-        doc.fillColor(colors.secondary).font("Helvetica").fontSize(10).text(` - Center: ${centerPrefs[sp] || "No preference"}`, 230, currentY, { width: 320, lineGap: 2 });
-        const centerEndY = doc.y;
-        doc.y = Math.max(spEndY, centerEndY) + 6;
-      });
-      drawSectionHeader("Declaration");
-      renderGeneralRow("Payment ID", sub.paymentId || "\u2014");
-      if (doc.y > 720) {
-        doc.addPage();
-        doc.y = 50;
-      }
-      doc.moveDown(0.5);
-      doc.fillColor(colors.secondary).font("Helvetica-Oblique").fontSize(8.5).text(
-        "Declaration: I hereby declare that the information provided above is true to the best of my knowledge and belief.",
-        50,
-        doc.y,
-        { width: 500, lineGap: 2 }
-      );
-      const range2 = doc.bufferedPageRange();
-      for (let i2 = range2.start; i2 < range2.start + range2.count; i2++) {
-        doc.switchToPage(i2);
-        doc.fillColor(colors.muted).fontSize(8).text(`Page ${i2 + 1} of ${range2.count} | Generated by SAV Admissions Portal`, 50, 780, { align: "center" });
-      }
-      doc.end();
+      res.send(pdfBuffer);
     } catch (e2) {
       console.error("[print-gen] error:", e2);
       if (!res.headersSent) res.status(500).json({ error: "Failed to generate PDF" });
@@ -1141396,15 +1142772,9 @@ router33.get(
       if (!sub) return res.status(404).send("<h1>Submission not found</h1>");
       const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
       let photoDataUrl = "";
-      if (sub.photoUrl && sub.photoUrl.startsWith("/objects/")) {
-        try {
-          const localPath = path13.join(process.cwd(), "uploads", sub.photoUrl.replace("/objects/", ""));
-          const buf = await fs14.readFile(localPath);
-          const ext2 = localPath.split(".").pop()?.toLowerCase() || "jpg";
-          const mime3 = ext2 === "png" ? "image/png" : "image/jpeg";
-          photoDataUrl = `data:${mime3};base64,${buf.toString("base64")}`;
-        } catch {
-        }
+      const photoBuf = await resolveCandidatePhotoBuffer(sub.photoUrl);
+      if (photoBuf) {
+        photoDataUrl = `data:image/jpeg;base64,${photoBuf.toString("base64")}`;
       }
       const parseSpecs = (s2) => parseSpecializationString(s2);
       const fld = (val) => {
@@ -1141421,11 +1142791,12 @@ router33.get(
           }
         }
       }
+      const spouseClean = sub.spouseDetails && sub.spouseDetails !== "0" && sub.spouseDetails.toLowerCase() !== "na" ? sub.spouseDetails : null;
       const personalRows = [
         ["Date of Birth", formatDOBToStandard(sub.dateOfBirth)],
         ["Gender", sub.gender],
         ["Marital Status", sub.maritalStatus],
-        ["Spouse / Family Details", sub.spouseDetails],
+        ["Spouse / Family Details", spouseClean],
         ["Mailing Address", sub.mailingAddress],
         ["Permanent Address", sub.permanentAddress]
       ];
@@ -1141440,11 +1142811,8 @@ router33.get(
         ["DNB Details", sub.dnbQualification ? sub.dnbDetails : null],
         ["Other Training", sub.otherTraining]
       ];
-      const clinicalRows = [
-        ["Diagnostic Skills", sub.diagnosticSkills],
-        ["Surgical Experience", sub.surgicalExperience],
-        ["Total Surgeries Done", sub.totalSurgeries]
-      ];
+      const parsedSkills = parseDiagnosticSkills(sub.diagnosticSkills);
+      const parsedSurgeries = parseSurgicalExperience(sub.surgicalExperience);
       const researchRows = [
         ["Publications", sub.publications],
         ["Presentations", sub.presentations]
@@ -1141473,9 +1142841,61 @@ router33.get(
           </div>
         `;
       };
+      const escHtml = (v) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const buildClinicalCardHtml = () => {
+        if (parsedSkills.length === 0 && parsedSurgeries.length === 0 && !sub.totalSurgeries) return "";
+        const skillPills = parsedSkills.map((sk) => {
+          const isExpert = sk.level.toLowerCase().includes("expert");
+          const isInterm = sk.level.toLowerCase().includes("inter");
+          const badgeStyle = isExpert ? "background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;" : isInterm ? "background:#eff6ff;color:#0369a1;border:1px solid #bfdbfe;" : "background:#fffbeb;color:#b45309;border:1px solid #fde68a;";
+          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border:1px solid #f1f5f9;border-radius:8px;background:#f8fafc;">
+            <span style="font-size:11.5px;font-weight:700;color:#0f172a;">${escHtml(sk.name)}</span>
+            <span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;${badgeStyle}">${escHtml(sk.level)}</span>
+          </div>`;
+        }).join("");
+        const totalSup = parsedSurgeries.reduce((a, s2) => a + s2.supervision, 0);
+        const totalInd = parsedSurgeries.reduce((a, s2) => a + s2.independent, 0);
+        const surgeryRows = parsedSurgeries.map((s2) => `
+          <tr>
+            <td style="padding:8px 12px;font-size:12px;font-weight:700;color:#0f172a;border-bottom:1px solid #f1f5f9;">${escHtml(s2.procedure)}</td>
+            <td style="padding:8px 12px;font-size:12px;color:#334155;text-align:right;border-bottom:1px solid #f1f5f9;">${s2.supervision}</td>
+            <td style="padding:8px 12px;font-size:12px;color:#334155;text-align:right;border-bottom:1px solid #f1f5f9;">${s2.independent}</td>
+            <td style="padding:8px 12px;font-size:12px;font-weight:800;color:#0b3a6e;text-align:right;border-bottom:1px solid #f1f5f9;">${s2.total}</td>
+          </tr>
+        `).join("");
+        return `
+          <div style="margin-bottom:20px;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+            <div style="background:#f8fafc;padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.1em;color:#334155;">Clinical Skills &amp; Surgical Profile</span>
+              ${sub.totalSurgeries ? `<span style="font-size:11px;font-weight:800;background:#fffbeb;color:#b45309;border:1px solid #fde68a;padding:3px 10px;border-radius:999px;">Total Surgeries: ${escHtml(String(sub.totalSurgeries))}</span>` : ""}
+            </div>
+            <div style="padding:14px 16px;">
+              ${parsedSkills.length > 0 ? `<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#64748b;letter-spacing:0.06em;margin-bottom:8px;">Diagnostic &amp; Clinical Proficiencies</div>
+              <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:16px;">${skillPills}</div>` : ""}
+              ${parsedSurgeries.length > 0 ? `<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#64748b;letter-spacing:0.06em;margin-bottom:8px;">Surgical Operative Log</div>
+              <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+                <thead><tr style="background:#f1f5f9;">
+                  <th style="padding:8px 12px;font-size:10px;font-weight:800;color:#475569;text-align:left;text-transform:uppercase;">Procedure</th>
+                  <th style="padding:8px 12px;font-size:10px;font-weight:800;color:#475569;text-align:right;text-transform:uppercase;">Supervision</th>
+                  <th style="padding:8px 12px;font-size:10px;font-weight:800;color:#475569;text-align:right;text-transform:uppercase;">Independent</th>
+                  <th style="padding:8px 12px;font-size:10px;font-weight:800;color:#475569;text-align:right;text-transform:uppercase;">Total</th>
+                </tr></thead>
+                <tbody>${surgeryRows}
+                  <tr style="background:#f8fafc;">
+                    <td style="padding:8px 12px;font-size:11px;font-weight:900;color:#0f172a;">CUMULATIVE LOG TOTAL</td>
+                    <td style="padding:8px 12px;font-size:11px;font-weight:800;color:#0f172a;text-align:right;">${totalSup}</td>
+                    <td style="padding:8px 12px;font-size:11px;font-weight:800;color:#0f172a;text-align:right;">${totalInd}</td>
+                    <td style="padding:8px 12px;font-size:11px;font-weight:900;color:#0b3a6e;text-align:right;">${totalSup + totalInd}</td>
+                  </tr>
+                </tbody>
+              </table>` : ""}
+            </div>
+          </div>
+        `;
+      };
       const personalCard = createCardHtml("Personal Details", personalRows);
       const qualificationsCard = createCardHtml("Academic Qualifications", qualificationsRows);
-      const clinicalCard = createCardHtml("Clinical Skills & Surgical Profile", clinicalRows);
+      const clinicalCard = buildClinicalCardHtml();
       const researchCard = createCardHtml("Research & Academic Achievements", researchRows);
       const referralCard = createCardHtml("Referral & Additional Profile Details", referralRows);
       const customRowsHtml = [];
@@ -1141707,7 +1143127,6 @@ var routes_default = router33;
 // src/app.ts
 init_src();
 init_drizzle_orm();
-var import_pdfkit7 = __toESM(require_pdfkit(), 1);
 init_auth2();
 
 // src/middleware/mock.ts
@@ -1141724,7 +1143143,7 @@ async function attachMockMode(req, res, next) {
 }
 
 // src/app.ts
-init_utils5();
+init_application_pdf();
 
 // src/lib/db-bootstrap.ts
 init_src();
@@ -1142976,7 +1144395,7 @@ app.get(["/healthz", "/ping"], (req, res) => res.json({ status: "ok", timestamp:
 app.get(
   ["/api/v2/generate-print/:id", "/v2/generate-print/:id"],
   requireAuth,
-  requireRole("super_admin", "program_admin", "central_exam_coordinator"),
+  requireRole("super_admin", "program_admin", "central_exam_coordinator", "doctor"),
   async (req, res) => {
     try {
       const id = Number(req.params.id);
@@ -1142985,197 +1144404,17 @@ app.get(
       if (!sub) return res.status(404).json({ error: "Submission not found" });
       const [form] = await db.select().from(applicationFormsTable).where(eq(applicationFormsTable.id, sub.formId));
       const [program] = form ? await db.select().from(programsTable).where(eq(programsTable.id, form.programId)) : [null];
-      let candidateCode = "PENDING";
+      let candidate = null;
       if (sub.email) {
-        const [candidate] = await db.select().from(candidatesTable).where(eq(candidatesTable.email, sub.email));
-        if (candidate) candidateCode = candidate.candidateCode;
+        const [c] = await db.select().from(candidatesTable).where(eq(candidatesTable.email, sub.email));
+        candidate = c || null;
       }
-      const doc = new import_pdfkit7.default({
-        margin: 36,
-        size: "LETTER",
-        bufferPages: true,
-        info: { Title: `Application - ${sub.fullName}`, Author: "Sankara Academy of Vision" }
-      });
-      const filename = `Application_${sub.fullName.replace(/\s+/g, "_")}_${id}.pdf`;
+      const pdfBuffer = await generateApplicationPdfBuffer({ sub, form, program, candidate });
+      const filename = `Application_${(sub.fullName || "Candidate").replace(/[^a-zA-Z0-9_-]/g, "_")}_${id}.pdf`;
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `inline; filename=${filename}`);
+      res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
       res.setHeader("Content-Security-Policy", "default-src 'self' 'unsafe-inline' blob: data:; img-src 'self' data: blob:;");
-      doc.pipe(res);
-      const colors = { primary: "#0f172a", secondary: "#475569", accent: "#0b4a8f", muted: "#94a3b8", border: "#e2e8f0", bgSection: "#f8fafc" };
-      const drawSectionHeader = (title) => {
-        if (doc.y > 680) {
-          doc.addPage();
-          doc.y = 36;
-        }
-        doc.moveDown(0.6);
-        const y = doc.y;
-        doc.rect(36, y, 540, 18).fill(colors.bgSection);
-        doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(10).text(title.toUpperCase(), 44, y + 4, { width: 520 });
-        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(36, y + 18).lineTo(576, y + 18).stroke();
-        doc.y = y + 24;
-      };
-      const renderApplicationRecordRow = (label, value) => {
-        const valText = value === null || value === void 0 || value === "null" || value === "" ? "\u2014" : String(value);
-        const startY = doc.y;
-        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(9).text(label.toUpperCase(), 36, startY, { width: 115, lineGap: 1 });
-        const labelEndY = doc.y;
-        doc.fillColor(colors.primary).font("Helvetica").fontSize(9.5).text(`: ${valText}`, 155, startY, { width: 310, lineGap: 1 });
-        const valueEndY = doc.y;
-        doc.y = Math.max(labelEndY, valueEndY) + 3;
-      };
-      const renderGeneralRow = (label, value) => {
-        const valText = value === null || value === void 0 || value === "null" || value === "" ? "\u2014" : String(value);
-        if (doc.y > 700) {
-          doc.addPage();
-          doc.y = 36;
-        }
-        const currentY = doc.y;
-        doc.fillColor(colors.secondary).font("Helvetica-Bold").fontSize(8.5).text(label.toUpperCase(), 36, currentY, { width: 145, lineGap: 1 });
-        const labelEndY = doc.y;
-        doc.fillColor(colors.primary).font("Helvetica").fontSize(9).text(`: ${valText}`, 185, currentY, { width: 390, lineGap: 1 });
-        const valueEndY = doc.y;
-        doc.y = Math.max(labelEndY, valueEndY) + 4;
-      };
-      const parseSpecializations = (spec) => {
-        return parseSpecializationString(spec);
-      };
-      const parseCenterPreferences = (cp, customAnswers, sections) => {
-        if (cp) {
-          try {
-            const parsed = JSON.parse(cp);
-            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
-          } catch {
-          }
-        }
-        if (customAnswers && typeof customAnswers === "object") {
-          const prefs = {};
-          Object.entries(customAnswers).forEach(([key, val]) => {
-            if (key.startsWith("unit_") && val) {
-              let label = key.replace("unit_", "").replace(/_/g, " ").toUpperCase();
-              if (sections) {
-                sections.forEach((sec) => {
-                  sec.fields?.forEach((f3) => {
-                    if (f3.id === key) label = f3.label.replace(" Preferred Center", "");
-                  });
-                });
-              }
-              prefs[label] = Array.isArray(val) ? val.join(", ") : String(val);
-            }
-          });
-          return prefs;
-        }
-        return {};
-      };
-      doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(18).text("SANKARA ACADEMY OF VISION", 36, 36, { width: 440, align: "left" });
-      doc.fillColor(colors.primary).font("Helvetica").fontSize(9).text("Educational unit of Sankara Eye Foundation, India", 36, 57, { width: 440, align: "left" });
-      doc.fillColor(colors.muted).font("Helvetica-Bold").fontSize(8.5).text("FELLOWSHIP PROGRAM ADMISSIONS RECORD", 36, 70, { width: 440, align: "left" });
-      doc.strokeColor(colors.accent).lineWidth(1.5).moveTo(36, 84).lineTo(576, 84).stroke();
-      const photoUrl = sub.photoUrl;
-      const photoX = 491;
-      const photoY = 94;
-      const photoW = 85;
-      const photoH = 105;
-      if (photoUrl && photoUrl.startsWith("/objects/")) {
-        const localPath = path14.join(process.cwd(), "uploads", photoUrl.replace("/objects/", ""));
-        try {
-          doc.image(localPath, photoX, photoY, { width: photoW, height: photoH });
-          doc.rect(photoX, photoY, photoW, photoH).strokeColor(colors.border).lineWidth(1).stroke();
-        } catch (e2) {
-          doc.rect(photoX, photoY, photoW, photoH).fill("#f1f5f9");
-          doc.fillColor(colors.muted).font("Helvetica").fontSize(7.5).text("PHOTO NOT AVAILABLE", photoX, photoY + 45, { width: photoW, align: "center" });
-        }
-      } else {
-        doc.rect(photoX, photoY, photoW, photoH).fill("#f1f5f9");
-        doc.fillColor(colors.muted).font("Helvetica").fontSize(7.5).text("NO PHOTO UPLOADED", photoX, photoY + 45, { width: photoW, align: "center" });
-      }
-      doc.y = 94;
-      doc.fillColor(colors.accent).font("Helvetica-Bold").fontSize(11).text("APPLICATION SUMMARY", 36, 94, { width: 350 });
-      doc.y = 112;
-      renderApplicationRecordRow("Application ID", `#APP-${id}`);
-      renderApplicationRecordRow("Program", program?.name || "Fellowship Program");
-      renderApplicationRecordRow("Submission Date", sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "\u2014");
-      renderApplicationRecordRow("Application Status", sub.status.toUpperCase());
-      if (doc.y < 210) {
-        doc.y = 210;
-      }
-      drawSectionHeader("Personal & Communication Details");
-      renderGeneralRow("Full Name", sub.fullName);
-      renderGeneralRow("Email Address", sub.email);
-      renderGeneralRow("Phone Number", sub.phone);
-      renderGeneralRow("Date of Birth", formatDOBToStandard(sub.dateOfBirth));
-      renderGeneralRow("Gender / Marital", [sub.gender, sub.maritalStatus].filter(Boolean).join(" \xB7 ") || "\u2014");
-      renderGeneralRow("Permanent Address", sub.permanentAddress);
-      drawSectionHeader("Academic & Professional Qualifications");
-      renderGeneralRow("Degree / Qualifications", sub.degree);
-      renderGeneralRow("Medical College / University", [sub.medicalCollege, sub.university].filter(Boolean).join(" \xB7 ") || "\u2014");
-      renderGeneralRow("Medical Council Reg No", sub.medicalCouncilNumber);
-      if (sub.pgQualifications) renderGeneralRow("PG Qualifications", sub.pgQualifications);
-      if (sub.doQualification && sub.doDetails) renderGeneralRow("DO Details", sub.doDetails);
-      if (sub.msMdQualification && sub.msMdDetails) renderGeneralRow("MS / MD Details", sub.msMdDetails);
-      if (sub.dnbQualification && sub.dnbDetails) renderGeneralRow("DNB Details", sub.dnbDetails);
-      if (sub.otherTraining) renderGeneralRow("Other Training", sub.otherTraining);
-      drawSectionHeader("Applied Specialization & Center Preferences");
-      const specs = parseSpecializations(sub.specialization);
-      const centerPrefs = parseCenterPreferences(sub.centerPreference, sub.customAnswers, form?.sectionsConfig ?? void 0);
-      specs.forEach((sp, idx) => {
-        if (doc.y > 700) {
-          doc.addPage();
-          doc.y = 36;
-        }
-        const currentY = doc.y;
-        doc.fillColor(colors.primary).font("Helvetica-Bold").fontSize(9.5).text(`${idx + 1}. ${sp}`, 36, currentY, { width: 220, lineGap: 1 });
-        const spEndY = doc.y;
-        doc.fillColor(colors.secondary).font("Helvetica").fontSize(9).text(`Preferred Center: ${centerPrefs[sp] || "Any Center"}`, 260, currentY, { width: 315, lineGap: 1 });
-        const centerEndY = doc.y;
-        doc.y = Math.max(spEndY, centerEndY) + 4;
-      });
-      if (sub.diagnosticSkills || sub.surgicalExperience || sub.totalSurgeries) {
-        drawSectionHeader("Clinical & Surgical Profile");
-        if (sub.diagnosticSkills) renderGeneralRow("Diagnostic Skills", sub.diagnosticSkills);
-        if (sub.surgicalExperience) renderGeneralRow("Surgical Experience", sub.surgicalExperience);
-        if (sub.totalSurgeries) renderGeneralRow("Total Surgeries Done", sub.totalSurgeries);
-      }
-      if (sub.publications || sub.presentations) {
-        drawSectionHeader("Research & Publications");
-        if (sub.publications) renderGeneralRow("Publications", sub.publications);
-        if (sub.presentations) renderGeneralRow("Presentations", sub.presentations);
-      }
-      drawSectionHeader("Payment & Verification");
-      renderGeneralRow("Payment Reference ID", sub.paymentId || "\u2014");
-      renderGeneralRow("Payment Mode", sub.paymentMode || "Online");
-      renderGeneralRow("Fee Status", sub.paymentId ? "Verified & Paid" : "Pending");
-      if (doc.y > 670) {
-        doc.addPage();
-        doc.y = 36;
-      }
-      doc.moveDown(0.5);
-      doc.fillColor(colors.secondary).font("Helvetica-Oblique").fontSize(8).text(
-        "Declaration: I hereby declare that the information provided above is true and authentic to the best of my knowledge and belief.",
-        36,
-        doc.y,
-        { width: 540, lineGap: 1 }
-      );
-      doc.moveDown(1.5);
-      const signY = doc.y;
-      if (signY < 720) {
-        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(36, signY + 30).lineTo(180, signY + 30).stroke();
-        doc.fillColor(colors.secondary).font("Helvetica").fontSize(7.5).text("Candidate Signature", 36, signY + 34, { width: 144, align: "center" });
-        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(234, signY + 30).lineTo(378, signY + 30).stroke();
-        doc.fillColor(colors.secondary).font("Helvetica").fontSize(7.5).text("Reviewer Seal & Signature", 234, signY + 34, { width: 144, align: "center" });
-        doc.strokeColor(colors.border).lineWidth(0.5).moveTo(432, signY + 30).lineTo(576, signY + 30).stroke();
-        doc.fillColor(colors.secondary).font("Helvetica").fontSize(7.5).text("Date of Verification", 432, signY + 34, { width: 144, align: "center" });
-      }
-      const range2 = doc.bufferedPageRange();
-      for (let i2 = range2.start; i2 < range2.start + range2.count; i2++) {
-        doc.switchToPage(i2);
-        doc.fillColor(colors.muted).fontSize(7.5).text(
-          `Page ${i2 + 1} of ${range2.count} | Letter Format | Sankara Academy of Vision Admissions System`,
-          36,
-          doc.page.height - 24,
-          { width: 540, align: "center" }
-        );
-      }
-      doc.end();
+      res.send(pdfBuffer);
     } catch (e2) {
       console.error("[print-gen] error:", e2);
       if (!res.headersSent) res.status(500).json({ error: "Failed to generate PDF" });
@@ -1143190,13 +1144429,13 @@ app.use(["/objects", "/api/objects"], async (req, res, next) => {
   const cleanPath = fullPath.replace(/^\/api/, "").split("?")[0];
   const candidatePaths = [
     path14.join(process.cwd(), "uploads", cleanPath.replace("/objects/uploads/", "")),
-    path14.join(os4.tmpdir(), "uploads", cleanPath.replace("/objects/uploads/", "")),
+    path14.join(os5.tmpdir(), "uploads", cleanPath.replace("/objects/uploads/", "")),
     path14.join(process.cwd(), "uploads", cleanPath.replace("/objects/", "")),
-    path14.join(os4.tmpdir(), "uploads", cleanPath.replace("/objects/", ""))
+    path14.join(os5.tmpdir(), "uploads", cleanPath.replace("/objects/", ""))
   ];
   for (const cp of candidatePaths) {
     try {
-      if (fs15.existsSync(cp) && fs15.statSync(cp).isFile()) {
+      if (fs16.existsSync(cp) && fs16.statSync(cp).isFile()) {
         return res.sendFile(cp);
       }
     } catch (_) {
@@ -1143231,7 +1144470,7 @@ var candidateDistPaths = [
   path14.join(process.cwd(), "public"),
   path14.join(process.cwd(), "dist/public")
 ];
-var examDist = candidateDistPaths.find((p) => fs15.existsSync(p));
+var examDist = candidateDistPaths.find((p) => fs16.existsSync(p));
 if (examDist) {
   app.use(import_express34.default.static(examDist));
   app.use((req, res, next) => {

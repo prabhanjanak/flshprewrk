@@ -27,16 +27,28 @@ interface CandidateRank {
   psychometricScore: number;
   interviewScore: number;
   totalScore: number;
-  rank: number;
+  rank: number | null;
   specialityRank: number | null;
   segmentRank: number | null;
   topPreference: string | null;
+  appliedSpecialityNames?: string[];
+  specialityBreakdown?: Array<{
+    specialityId: number;
+    specialityName: string;
+    specialityCode: string;
+    vivaScore: number;
+    totalScore: number;
+    rank: number | null;
+    vivaStatus: "complete" | "pending" | "override";
+  }>;
   unitName: string | null;
   status: string | null;
   preferredLocations: string[];
   phone: string;
   email: string;
   photoUrl?: string | null;
+  vivaStatus?: "complete" | "pending" | "override";
+  isPendingViva?: boolean;
 }
 
 const statusColors: Record<string, string> = {
@@ -173,14 +185,38 @@ export default function RankingsPage() {
               Consolidated rank standings according to MCQ exam scores, Mind Matters psychometry marks, and Doctor Viva interview evaluations.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             {selectedProgram && (
-              <Button 
-                onClick={handleExportExcel}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl h-11 px-5 shadow-lg gap-2"
-              >
-                <Download className="h-4 w-4" /> Export Excel
-              </Button>
+              <>
+                <Button 
+                  onClick={handleExportExcel}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl h-11 px-4 shadow-lg gap-2"
+                >
+                  <Download className="h-4 w-4" /> Rank Sheet (Excel)
+                </Button>
+                <Button
+                  onClick={() => {
+                    const specParam = selectedSpeciality && selectedSpeciality !== "all" ? `&specialityId=${selectedSpeciality}` : "";
+                    const examParam = selectedExam && selectedExam !== "all" ? `&examId=${selectedExam}` : "";
+                    window.open(`/api/rankings/export-pdf?programId=${selectedProgram}${specParam}${examParam}&token=${token}`, "_blank");
+                    toast({ title: "Generating Rank Sheet PDF", description: "Downloading official Merit Rank Sheet..." });
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl h-11 px-4 shadow-lg gap-2"
+                >
+                  <FileText className="h-4 w-4" /> Rank Sheet (PDF)
+                </Button>
+                <Button
+                  onClick={() => {
+                    const specParam = selectedSpeciality && selectedSpeciality !== "all" ? `&specialityId=${selectedSpeciality}` : "";
+                    window.open(`/api/candidates/attendance-sheet-pdf?programId=${selectedProgram}${specParam}&token=${token}`, "_blank");
+                    toast({ title: "Final Attendance Sheet", description: "Generating speciality-wise attendance sheet PDF..." });
+                  }}
+                  variant="outline"
+                  className="bg-white/10 hover:bg-white/20 text-white border-white/25 font-bold text-xs uppercase tracking-wider rounded-xl h-11 px-4 shadow-sm gap-2"
+                >
+                  <FileText className="h-4 w-4 text-orange-300" /> Attendance Sheet (PDF)
+                </Button>
+              </>
             )}
             <Button
               variant="outline"
@@ -393,12 +429,15 @@ export default function RankingsPage() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200/80 text-xs uppercase font-extrabold text-slate-600 tracking-wider">
-                  <th className="px-5 py-3.5 text-left w-20">#</th>
-                  <th className="px-5 py-3.5 text-left">Candidate Dossier</th>
-                  <th className="px-4 py-3.5 text-left">Specialization</th>
-                  <th className="px-4 py-3.5 text-left">Admission Status</th>
-                  <th className="px-4 py-3.5 text-left">Assigned Hospital Unit</th>
-                  <th className="px-5 py-3.5 text-right w-56">Actions</th>
+                  <th className="px-4 py-3.5 text-left w-20">Rank</th>
+                  <th className="px-4 py-3.5 text-left">Candidate Dossier</th>
+                  <th className="px-3 py-3.5 text-left">Specialization</th>
+                  <th className="px-3 py-3.5 text-center w-24">MCQ (/50)</th>
+                  <th className="px-3 py-3.5 text-center w-28">Mind Matter (/10)</th>
+                  <th className="px-3 py-3.5 text-center w-28">Doctor Viva (/50)</th>
+                  <th className="px-3 py-3.5 text-center w-28">Total (/110)</th>
+                  <th className="px-3 py-3.5 text-left">Status & Unit</th>
+                  <th className="px-4 py-3.5 text-right w-48">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -414,26 +453,33 @@ export default function RankingsPage() {
                       }`}
                     >
                       {/* Rank Position */}
-                      <td className="px-5 py-4 text-left">
-                        {currentRank <= 3 ? (
-                          <div className="flex items-center gap-1.5">
-                            <Medal className={`h-5 w-5 ${
-                              currentRank === 1 ? "text-yellow-500 fill-yellow-500" : currentRank === 2 ? "text-slate-400 fill-slate-400" : "text-amber-600 fill-amber-600"
-                            }`} />
-                            <span className="font-black text-sm font-mono text-slate-900">#{currentRank}</span>
-                          </div>
-                        ) : (
-                          <span className="font-bold text-slate-600 font-mono text-sm">#{currentRank}</span>
-                        )}
+                      <td className="px-4 py-4 text-left">
+                        {r.isPendingViva || r.vivaStatus === "pending" ? (
+                          <Badge variant="outline" className="text-[10px] font-bold text-amber-700 border-amber-300 bg-amber-50">
+                            Pending
+                          </Badge>
+                        ) : (() => {
+                          const displayRank = (selectedSpeciality !== "all" ? r.rank : r.specialityRank) ?? currentRank;
+                          return displayRank <= 3 ? (
+                            <div className="flex items-center gap-1.5">
+                              <Medal className={`h-5 w-5 ${
+                                displayRank === 1 ? "text-yellow-500 fill-yellow-500" : displayRank === 2 ? "text-slate-400 fill-slate-400" : "text-amber-600 fill-amber-600"
+                              }`} />
+                              <span className="font-black text-sm font-mono text-slate-900">#{displayRank}</span>
+                            </div>
+                          ) : (
+                            <span className="font-bold text-slate-700 font-mono text-sm">#{displayRank}</span>
+                          );
+                        })()}
                       </td>
 
                       {/* Candidate Identity */}
-                      <td className="px-5 py-4 text-left">
+                      <td className="px-4 py-4 text-left">
                         <div className="flex flex-col">
                           <button
                             type="button"
                             onClick={() => setSelectedCandidateId(r.candidateId)}
-                            className="text-left font-black text-slate-900 hover:text-orange-600 hover:underline cursor-pointer transition-colors text-sm flex items-center gap-2"
+                            className="text-left font-black text-slate-900 hover:text-orange-600 hover:underline cursor-pointer transition-colors text-sm flex items-center gap-2 flex-wrap"
                             title="Click to open full Examination Dossier"
                           >
                             {r.fullName}
@@ -444,51 +490,98 @@ export default function RankingsPage() {
                           <div className="flex items-center gap-2 text-xs text-slate-500 font-medium mt-1">
                             <span>{r.email}</span>
                             {r.phone && <span>· {r.phone}</span>}
-                            {r.unitName && <span className="text-indigo-600 font-bold">· Unit: {r.unitName}</span>}
                           </div>
                         </div>
                       </td>
 
-                      {/* Specialization */}
-                      <td className="px-4 py-4 text-left">
-                        <Badge variant="outline" className="text-xs font-bold text-slate-800 bg-slate-50 border-slate-200">
-                          {r.topPreference || currentSpecName}
+                      {/* Specialization (with multi-speciality breakdown when in All view) */}
+                      <td className="px-3 py-4 text-left">
+                        {selectedSpeciality === "all" && r.specialityBreakdown && r.specialityBreakdown.length > 1 ? (
+                          <div className="flex flex-col gap-1">
+                            {r.specialityBreakdown.map((sb) => (
+                              <div key={sb.specialityId} className="flex items-center gap-1.5 flex-wrap">
+                                <Badge variant="outline" className="text-[10px] font-bold text-slate-800 bg-slate-50 border-slate-200">
+                                  {sb.specialityName}
+                                </Badge>
+                                <span className="text-[10px] font-mono text-indigo-700 font-bold">
+                                  Viva: {sb.vivaStatus === "pending" ? "Pend" : sb.vivaScore.toFixed(1)} · Tot: {sb.totalScore.toFixed(1)}
+                                  {sb.rank ? ` (#${sb.rank})` : ""}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <Badge variant="outline" className="text-xs font-bold text-slate-800 bg-slate-50 border-slate-200">
+                            {selectedSpeciality !== "all" ? currentSpecName : (r.topPreference || currentSpecName)}
+                          </Badge>
+                        )}
+                      </td>
+
+                      {/* MCQ Score (/50) */}
+                      <td className="px-3 py-4 text-center font-mono font-bold text-slate-800">
+                        {Number(r.mcqScore ?? 0).toFixed(1)}
+                      </td>
+
+                      {/* Mind Matters (/10) */}
+                      <td className="px-3 py-4 text-center">
+                        <span className="font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                          {Number(r.psychometricScore ?? 0).toFixed(1)}
+                        </span>
+                      </td>
+
+                      {/* Doctor Viva (/50) */}
+                      <td className="px-3 py-4 text-center">
+                        {r.isPendingViva || r.vivaStatus === "pending" ? (
+                          <Badge variant="outline" className="text-[10px] font-bold text-slate-500 border-slate-300 bg-slate-50">
+                            Pending
+                          </Badge>
+                        ) : (
+                          <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
+                            {Number(r.interviewScore ?? 0).toFixed(1)}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Total Score (/110) */}
+                      <td className="px-3 py-4 text-center">
+                        <Badge className="bg-slate-900 text-white font-mono font-black text-xs px-2.5 py-1 rounded-lg">
+                          {Number(r.totalScore ?? 0).toFixed(1)}
                         </Badge>
                       </td>
 
-                      {/* Admission Status */}
-                      <td className="px-4 py-4 text-left">
-                        {isAllocated ? (
-                          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 font-extrabold text-xs px-2.5 py-0.5">
-                            <CheckCircle2 className="h-3 w-3 mr-1 inline text-emerald-600" />
-                            Selected Fellow
-                          </Badge>
-                        ) : r.status === "interview_completed" ? (
-                          <Badge className="bg-blue-100 text-blue-800 border-blue-300 font-extrabold text-xs px-2.5 py-0.5">
-                            Interview Completed
-                          </Badge>
-                        ) : r.status === "waitlisted" ? (
-                          <Badge className="bg-amber-100 text-amber-800 border-amber-300 font-extrabold text-xs px-2.5 py-0.5">
-                            Waitlisted
-                          </Badge>
-                        ) : r.status === "rejected" ? (
-                          <Badge className="bg-rose-100 text-rose-800 border-rose-300 font-extrabold text-xs px-2.5 py-0.5">
-                            Not Selected
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-bold text-xs px-2.5 py-0.5">
-                            {r.status || "Under Review"}
-                          </Badge>
-                        )}
-                      </td>
-
-                      {/* Assigned Hospital Unit */}
-                      <td className="px-4 py-4 text-left text-xs font-bold text-slate-700">
-                        {r.unitName ? (
-                          <span className="text-indigo-700 font-extrabold">{r.unitName}</span>
-                        ) : (
-                          <span className="text-slate-400 italic">Not Assigned</span>
-                        )}
+                      {/* Admission Status & Assigned Unit */}
+                      <td className="px-3 py-4 text-left space-y-1">
+                        <div>
+                          {isAllocated ? (
+                            <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 font-extrabold text-[10px] px-2 py-0.5">
+                              <CheckCircle2 className="h-3 w-3 mr-1 inline text-emerald-600" />
+                              Selected Fellow
+                            </Badge>
+                          ) : r.status === "interview_completed" ? (
+                            <Badge className="bg-blue-100 text-blue-800 border-blue-300 font-extrabold text-[10px] px-2 py-0.5">
+                              Interview Completed
+                            </Badge>
+                          ) : r.status === "waitlisted" ? (
+                            <Badge className="bg-amber-100 text-amber-800 border-amber-300 font-extrabold text-[10px] px-2 py-0.5">
+                              Waitlisted
+                            </Badge>
+                          ) : r.status === "rejected" ? (
+                            <Badge className="bg-rose-100 text-rose-800 border-rose-300 font-extrabold text-[10px] px-2 py-0.5">
+                              Not Selected
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-bold text-[10px] px-2 py-0.5">
+                              {r.status || "Under Review"}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-[11px] font-bold">
+                          {r.unitName ? (
+                            <span className="text-indigo-700">{r.unitName}</span>
+                          ) : (
+                            <span className="text-slate-400 italic font-normal">Unit: Not Assigned</span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Action Buttons */}

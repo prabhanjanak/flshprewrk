@@ -2,6 +2,8 @@ import {
   readDb, 
   candidatesTable, 
   candidatePreferencesTable, 
+  applicationsTable,
+  batchCandidatesTable,
   examAttemptsTable, 
   examsTable, 
   interviewScoresTable, 
@@ -42,23 +44,33 @@ export function getSpecialitySegment(specName: string): "Retina" | "Anterior" {
 }
 
 
-export async function computeScoresForProgram(programId: number): Promise<CandidateScore[]> {
+export async function computeScoresForProgram(programId: number, isMock?: boolean): Promise<CandidateScore[]> {
   const specs = await readDb.select().from(specialitiesTable).where(eq(specialitiesTable.programId, programId));
   const programSpecIds = specs.map((s) => s.id);
   const programSpecSet = new Set(programSpecIds);
 
   if (programSpecIds.length === 0) return [];
 
-  const prefs = await readDb.select().from(candidatePreferencesTable).where(inArray(candidatePreferencesTable.specialityId, programSpecIds));
-  const candidateIds = [...new Set(prefs.map((p) => p.candidateId))];
+  const [prefs, apps] = await Promise.all([
+    readDb.select().from(candidatePreferencesTable).where(inArray(candidatePreferencesTable.specialityId, programSpecIds)),
+    readDb.select().from(applicationsTable).where(inArray(applicationsTable.specialityId, programSpecIds)),
+  ]);
+  const candidateIds = [...new Set([...prefs.map((p) => p.candidateId), ...apps.map((a) => a.candidateId)])];
 
   if (candidateIds.length === 0) return [];
 
-  const candidates = await readDb.select().from(candidatesTable).where(inArray(candidatesTable.id, candidateIds));
+  let candidates = await readDb.select().from(candidatesTable).where(inArray(candidatesTable.id, candidateIds));
+  if (typeof isMock === "boolean") {
+    candidates = candidates.filter((c) => c.isMock === isMock && c.status !== "rejected");
+  }
+  const activeCandIds = candidates.map((c) => c.id);
+  if (activeCandIds.length === 0) return [];
+
   const exams = await readDb.select().from(examsTable);
-  const attempts = await readDb.select().from(examAttemptsTable).where(inArray(examAttemptsTable.candidateId, candidateIds));
-  const interviews = await readDb.select().from(interviewScoresTable).where(inArray(interviewScoresTable.candidateId, candidateIds));
-  const overrides = await readDb.select().from(vivaScoreOverridesTable).where(inArray(vivaScoreOverridesTable.candidateId, candidateIds));
+  const attempts = await readDb.select().from(examAttemptsTable).where(inArray(examAttemptsTable.candidateId, activeCandIds));
+  const interviews = await readDb.select().from(interviewScoresTable).where(inArray(interviewScoresTable.candidateId, activeCandIds));
+  const overrides = await readDb.select().from(vivaScoreOverridesTable).where(inArray(vivaScoreOverridesTable.candidateId, activeCandIds));
+  const batchMarks = await readDb.select().from(batchCandidatesTable).where(inArray(batchCandidatesTable.candidateId, activeCandIds));
   
   const emails = candidates.map(c => c.email.toLowerCase().trim()).filter(Boolean);
   const submissions = emails.length > 0 
@@ -117,6 +129,22 @@ export async function computeScoresForProgram(programId: number): Promise<Candid
     prefsByCandidate.get(p.candidateId)!.push(p);
   }
 
+  const appsByCandidate = new Map<number, typeof apps>();
+  for (const a of apps) {
+    if (!appsByCandidate.has(a.candidateId)) {
+      appsByCandidate.set(a.candidateId, []);
+    }
+    appsByCandidate.get(a.candidateId)!.push(a);
+  }
+
+  const batchByCandidate = new Map<number, typeof batchMarks>();
+  for (const b of batchMarks) {
+    if (!batchByCandidate.has(b.candidateId)) {
+      batchByCandidate.set(b.candidateId, []);
+    }
+    batchByCandidate.get(b.candidateId)!.push(b);
+  }
+
   const attemptsByCandidate = new Map<number, typeof attempts>();
   for (const a of attempts) {
     if (!attemptsByCandidate.has(a.candidateId)) {
@@ -144,20 +172,40 @@ export async function computeScoresForProgram(programId: number): Promise<Candid
 
   // Compute Candidate Scores & specialty-specific values
   for (const c of candidates) {
-    const candPrefs = (prefsByCandidate.get(c.id) || [])
+    let candPrefs = (prefsByCandidate.get(c.id) || [])
       .filter((p) => programSpecSet.has(p.specialityId))
       .sort((a, b) => a.preferenceOrder - b.preferenceOrder);
+
+    // Fallback to applications table if candidate_preferences has not been seeded yet
+    if (candPrefs.length === 0) {
+      const cApps = (appsByCandidate.get(c.id) || []).filter((a) => programSpecSet.has(a.specialityId));
+      candPrefs = cApps.map((a, idx) => ({
+        id: -a.id,
+        candidateId: c.id,
+        specialityId: a.specialityId,
+        preferenceOrder: idx + 1,
+        createdAt: new Date(),
+      }));
+    }
     if (candPrefs.length === 0) continue;
 
-    // MCQ & Psychometric Exam Averages
+    // MCQ & Psychometric Exam Averages (manual override -> exam attempt -> batch fallback)
     const candAttempts = (attemptsByCandidate.get(c.id) || []).filter((a) => a.submittedAt != null);
     const mcqs = candAttempts.filter((a) => examsMap.get(a.examId)?.kind === "mcq");
     const psychos = candAttempts.filter((a) => examsMap.get(a.examId)?.kind?.startsWith("psychometric"));
+    const candBatches = batchByCandidate.get(c.id) || [];
+    const batchMcq = candBatches.find((b) => b.mcqScore != null)?.mcqScore ?? null;
+    const batchPsycho = candBatches.find((b) => b.psychometricScore != null)?.psychometricScore ?? null;
 
-    const mcqScore = mcqs.length > 0 ? mcqs.reduce((sum, a) => sum + (a.score ?? 0), 0) / mcqs.length : (Number(c.mcqScore) || 0);
+    const mcqScore = c.mcqScore != null && c.mcqScore !== ""
+      ? (Number(c.mcqScore) || 0)
+      : mcqs.length > 0
+        ? mcqs.reduce((sum, a) => sum + (a.score ?? 0), 0) / mcqs.length
+        : (batchMcq ?? 0);
 
-    // Compute candidate-wide Mind Matter score based on direct psychometric score or doctor Mind Matter panel entries
-    const candInterviews = interviewsByCandidate.get(c.id) || [];
+    // Compute candidate-wide Mind Matter score (chronological so latest single score wins)
+    const candInterviews = [...(interviewsByCandidate.get(c.id) || [])]
+      .sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime());
     const mmInterviews = candInterviews.filter((i) => isMindMatterScore(i));
     const singleMindMatter = mmInterviews.length > 0
       ? mmInterviews[mmInterviews.length - 1]!.score // Take the single entered Mind Matter score (out of 10)
@@ -165,7 +213,9 @@ export async function computeScoresForProgram(programId: number): Promise<Candid
 
     const psychoScore = singleMindMatter !== null
       ? singleMindMatter
-      : (psychos.length > 0 && psychos[0]!.score != null ? psychos[0]!.score : (Number(c.psychometricScore) || 0));
+      : (c.psychometricScore != null && c.psychometricScore !== ""
+        ? (Number(c.psychometricScore) || 0)
+        : (psychos.length > 0 && psychos[0]!.score != null ? psychos[0]!.score : (batchPsycho ?? 0)));
 
     // Handle multiple submissions by selecting the LATEST submission by submittedAt
     const sub = submissionsByCandidate.get(c.id) || (c.email ? submissionsByEmail.get(c.email.toLowerCase().trim()) : null);
@@ -270,6 +320,11 @@ export async function computeScoresForProgram(programId: number): Promise<Candid
         if (specTotalScore > maxTotalScore) maxTotalScore = specTotalScore;
         if (avgInterview > maxInterviewScore) maxInterviewScore = avgInterview;
       }
+    }
+
+    const anyVivaCompleted = Object.values(specialityVivaStatus).some((st) => st !== "pending");
+    if (!anyVivaCompleted) {
+      maxTotalScore = mcqScore + psychoScore;
     }
 
     result.push({

@@ -44,6 +44,8 @@ interface ScoreEntry {
   id: number; candidateId: number; candidateName: string; candidateCode: string;
   doctorId: number; doctorName: string; score: number; remarks: string | null; submittedAt: string; totalMarks?: number;
   specialityId?: number | null;
+  specialityName?: string | null;
+  isMindMatter?: boolean;
 }
 
 interface DoctorAssignment {
@@ -98,8 +100,16 @@ export default function InterviewsPage() {
   return null;
 }
 
+export function DoctorPortalView() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  return <DoctorView toast={toast} qc={qc} />;
+}
+
 /* ─── Doctor View ─── */
-function DoctorView({ toast, qc }: { toast: ReturnType<typeof import("../hooks/use-toast").useToast>["toast"]; qc: ReturnType<typeof useQueryClient> }) {
+export function DoctorView({ toast, qc }: { toast: ReturnType<typeof import("../hooks/use-toast").useToast>["toast"]; qc: ReturnType<typeof useQueryClient> }) {
+  const { user } = useAuth();
+  const [selectedDoctorPanelId, setSelectedDoctorPanelId] = useState<number | null>(null);
   const [dossierOpen, setDossierOpen] = useState<DoctorAssignment | null>(null);
   const [scoreOpen, setScoreOpen] = useState<DoctorAssignment | null>(null);
   const [examCandidateId, setExamCandidateId] = useState<number | null>(null);
@@ -111,8 +121,10 @@ function DoctorView({ toast, qc }: { toast: ReturnType<typeof import("../hooks/u
   const [remarks, setRemarks] = useState("");
 
   const { data: assignments = [] } = useQuery<DoctorAssignment[]>({
-    queryKey: ["doctor-assignments"],
-    queryFn: () => api.get<DoctorAssignment[]>("/interviews/assignments"),
+    queryKey: ["doctor-assignments", selectedDoctorPanelId],
+    queryFn: () => api.get<DoctorAssignment[]>(
+      selectedDoctorPanelId ? `/interviews/assignments?panelId=${selectedDoctorPanelId}` : "/interviews/assignments"
+    ),
     refetchInterval: 8000,
   });
 
@@ -136,9 +148,20 @@ function DoctorView({ toast, qc }: { toast: ReturnType<typeof import("../hooks/u
     isMindMatter: boolean;
     isMain?: boolean;
     marksEntryEnabled?: boolean;
+    panels?: Array<{
+      panelId: number;
+      panelName: string;
+      roomNumber: string;
+      specialityId: number | null;
+      specialityName: string | null;
+      isMindMatter: boolean;
+      marksEntryEnabled: boolean;
+    }>;
   }>({
-    queryKey: ["panel-my-status"],
-    queryFn: () => api.get("/panel/my-status"),
+    queryKey: ["panel-my-status", selectedDoctorPanelId],
+    queryFn: () => api.get(
+      selectedDoctorPanelId ? `/panel/my-status?panelId=${selectedDoctorPanelId}` : "/panel/my-status"
+    ),
     refetchInterval: 8000,
   });
 
@@ -153,13 +176,20 @@ function DoctorView({ toast, qc }: { toast: ReturnType<typeof import("../hooks/u
 
   const submitScore = useMutation({
     mutationFn: ({ candidateId, score, remarks }: { candidateId: number; score: number; remarks: string }) =>
-      api.post("/interviews/scores", { candidateId, score, remarks }),
+      api.post("/interviews/scores", {
+        candidateId,
+        score,
+        remarks,
+        panelId: myStatus?.panelId ?? selectedDoctorPanelId ?? undefined,
+        specialityId: isMindMatterDoctor ? null : (myStatus?.specialityId ?? undefined),
+      }),
     onSuccess: (_data, variables) => {
       const panelType = isMindMatterDoctor ? "Mind Matter" : "VIVA";
       const maxVal = isMindMatterDoctor ? 10 : 50;
       const candidateName = scoreOpen?.candidateName ?? dossierOpen?.candidateName ?? "Candidate";
       toast({ title: `${panelType} Score Saved`, description: `${candidateName} — ${variables.score}/${maxVal} recorded successfully.` });
       qc.invalidateQueries({ queryKey: ["doctor-assignments"] });
+      qc.invalidateQueries({ queryKey: ["panel-my-status"] });
       setScoreOpen(null);
       setScore("");
       setRemarks("");
@@ -209,6 +239,28 @@ function DoctorView({ toast, qc }: { toast: ReturnType<typeof import("../hooks/u
                     <Badge className="ml-2 text-[9px] bg-amber-100 text-amber-700 border-amber-200 h-4 px-1.5 font-black uppercase">Mind Matter</Badge>
                   )}
                 </p>
+              )}
+              {myStatus?.panels && (myStatus.panels.length > 1 || (user?.role !== "doctor" && myStatus.panels.length >= 1)) && (
+                <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Switch Panel:</span>
+                  {myStatus.panels.map((p) => {
+                    const isActivePanel = myStatus.panelId === p.panelId;
+                    return (
+                      <button
+                        key={p.panelId}
+                        type="button"
+                        onClick={() => setSelectedDoctorPanelId(p.panelId)}
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-bold border transition-all ${
+                          isActivePanel
+                            ? "bg-indigo-600 text-white border-indigo-700 shadow-2xs"
+                            : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        {p.panelName}{p.isMindMatter ? " (MM)" : p.specialityName ? ` (${p.specialityName})` : ""}
+                      </button>
+                    );
+                  })}
+                </div>
               )}
               {isEngaged && myStatus?.currentCandidateName && (
                 <p className="text-xs text-muted-foreground mt-0.5">
@@ -457,6 +509,7 @@ function DoctorView({ toast, qc }: { toast: ReturnType<typeof import("../hooks/u
         onSaved={() => {
           qc.invalidateQueries({ queryKey: ["doctor-assignments"] });
           qc.invalidateQueries({ queryKey: ["interview-scores"] });
+          qc.invalidateQueries({ queryKey: ["panel-my-status"] });
         }}
       />
 
@@ -1126,7 +1179,7 @@ function AdminView({ toast, qc, isCEC }: { toast: ReturnType<typeof import("../h
                       });
 
                       const isMindMatterScore = (s: ScoreEntry) => {
-                        return s.specialityId === null || s.specialityId === undefined;
+                        return Boolean(s.isMindMatter) || s.specialityId === null || s.specialityId === undefined;
                       };
 
                       return Object.entries(grouped).map(([cid, data]) => {
@@ -1172,8 +1225,8 @@ function AdminView({ toast, qc, isCEC }: { toast: ReturnType<typeof import("../h
                                           {s.score} / {isMM ? 10 : 50}
                                         </Badge>
                                         <span className="text-xs font-bold text-slate-700">{s.doctorName}</span>
-                                        <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400">
-                                          ({isMM ? 'Mind Matter' : 'VIVA'})
+                                        <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-500">
+                                          ({isMM ? 'Mind Matter' : (s.specialityName ? `VIVA · ${s.specialityName}` : 'VIVA')})
                                         </span>
                                         {s.remarks && (
                                           <span className="text-[10px] italic text-muted-foreground truncate max-w-[120px]" title={s.remarks}>
@@ -2325,7 +2378,7 @@ function MarkSheetTab({ specialities, candidates, scores, isCEC, toast, doctors,
 }) {
   const [selectedSpec, setSelectedSpec] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [vivaDialogOpen, setVivaDialogOpen] = useState<any | null>(null);
+  const [vivaDialogOpen, setVivaDialogOpen] = useState<{ candidate: any; specialityId?: number } | null>(null);
   const { user } = useAuth();
   const qc = useQueryClient();
 
@@ -2337,15 +2390,19 @@ function MarkSheetTab({ specialities, candidates, scores, isCEC, toast, doctors,
       mcqScore, 
       psychometricScore, 
       vivaScore,
-      targetDoctorId
+      targetDoctorId,
+      specialityId,
     }: { 
       candidateId: number; 
       mcqScore?: number | null; 
       psychometricScore?: number | null; 
       vivaScore?: number | null; 
       targetDoctorId?: number | null;
+      specialityId?: number | null;
     }) => {
-      const specId = selectedSpec !== "all" ? Number(selectedSpec) : null;
+      const specId = specialityId !== undefined
+        ? specialityId
+        : (selectedSpec !== "all" ? Number(selectedSpec) : null);
       return api.patch(`/candidates/${candidateId}/marks`, {
         mcqScore,
         psychometricScore,
@@ -2358,6 +2415,7 @@ function MarkSheetTab({ specialities, candidates, scores, isCEC, toast, doctors,
       toast({ title: "Score updated successfully" });
       qc.invalidateQueries({ queryKey: ["candidates"] });
       qc.invalidateQueries({ queryKey: ["interview-scores"] });
+      qc.invalidateQueries({ queryKey: ["rankings"] });
     },
     onError: (e: any) => {
       let desc = e.message;
@@ -2441,15 +2499,19 @@ function MarkSheetTab({ specialities, candidates, scores, isCEC, toast, doctors,
     });
   }
 
-  const isMindMatterScore = (s: { doctorId: number; specialityId: number | null }) => {
-    return s.specialityId === null || s.specialityId === undefined;
+  const mmPanelDoctorIds = new Set(
+    panels.filter(p => p.isMindMatter).flatMap(p => p.members.map(m => m.doctorId))
+  );
+
+  const isMindMatterScore = (s: { doctorId: number; specialityId: number | null; isMindMatter?: boolean }) => {
+    return Boolean(s.isMindMatter) || s.specialityId === null || s.specialityId === undefined || mmPanelDoctorIds.has(s.doctorId);
   };
 
   // Helper stats
   const totalInView = filteredCandidates.length;
   const gradedCandidates = filteredCandidates.filter(c => {
     const candScores = scores.filter(s => s.candidateId === c.id);
-    return candScores.length > 0;
+    return candScores.length > 0 || c.psychometricScore !== null;
   });
   const fullyGradedCount = gradedCandidates.length;
 
@@ -2499,6 +2561,30 @@ function MarkSheetTab({ specialities, candidates, scores, isCEC, toast, doctors,
               >
                 <FileText className="h-4 w-4 text-indigo-500" />
                 Specialty Breakdown
+              </Button>
+              <Button
+                onClick={() => {
+                  let url = `/api/candidates/attendance-sheet-pdf?status=eligible&token=${localStorage.getItem("fellowship_token")}`;
+                  if (selectedSpec !== "all") url += `&specialityId=${selectedSpec}`;
+                  window.open(url, "_blank");
+                }}
+                variant="outline"
+                className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 font-bold h-10 px-4 rounded-xl text-xs uppercase tracking-wider shadow-sm transition-all active:scale-95 duration-150"
+              >
+                <FileText className="h-4 w-4 text-emerald-600" />
+                Attendance (PDF)
+              </Button>
+              <Button
+                onClick={() => {
+                  let url = `/api/candidates/attendance-sheet-excel?status=eligible&token=${localStorage.getItem("fellowship_token")}`;
+                  if (selectedSpec !== "all") url += `&specialityId=${selectedSpec}`;
+                  window.open(url, "_blank");
+                }}
+                variant="outline"
+                className="gap-2 border-teal-200 text-teal-700 hover:bg-teal-50 font-bold h-10 px-4 rounded-xl text-xs uppercase tracking-wider shadow-sm transition-all active:scale-95 duration-150"
+              >
+                <FileText className="h-4 w-4 text-teal-600" />
+                Attendance (Excel)
               </Button>
             </div>
           </div>
@@ -2567,116 +2653,155 @@ function MarkSheetTab({ specialities, candidates, scores, isCEC, toast, doctors,
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700 font-semibold animate-in fade-in duration-300">
-                  {filteredCandidates.map((c) => {
-                    const candSpecs = getSpecsArray(c);
-                    const targetAppSpecId = c.applications?.[0]?.specialityId;
-                    const targetPrefSpec = specialities.find(s => candSpecs.some(cs => cs.toLowerCase() === s.name.toLowerCase()));
-                    const currentSpecId = selectedSpec !== "all" ? Number(selectedSpec) : (targetAppSpecId ?? targetPrefSpec?.id);
+                  {filteredCandidates.flatMap((c) => {
+                    const candSpecsNames = getSpecsArray(c);
+                    const rowSpecialities: { specId: number | undefined; specName: string }[] = [];
+                    const addSpecEntry = (specId?: number | null, fallbackName?: string | null) => {
+                      if (!specId && !fallbackName) return;
+                      const specObj = specId
+                        ? specialities.find(s => s.id === specId)
+                        : specialities.find(
+                            s => s.name.toLowerCase().replace(/[^a-z0-9]/g, "") === String(fallbackName).toLowerCase().replace(/[^a-z0-9]/g, "")
+                          );
+                      const resolvedId = specObj?.id ?? (specId || undefined);
+                      const resolvedName = specObj?.name ?? (fallbackName ? String(fallbackName) : "Speciality");
+                      if (rowSpecialities.some(r => (resolvedId && r.specId === resolvedId) || r.specName.toLowerCase() === resolvedName.toLowerCase())) {
+                        return;
+                      }
+                      rowSpecialities.push({ specId: resolvedId, specName: resolvedName });
+                    };
 
-                    const candScores = scores.filter(s => 
-                      s.candidateId === c.id && 
-                      (currentSpecId ? s.specialityId === currentSpecId : true)
-                    );
+                    (c.applications || []).forEach((app: any) => addSpecEntry(app.specialityId, app.specialityName));
+                    (c.preferences || []).forEach((p: any) => addSpecEntry(p.specialityId, p.specialityName));
+                    candSpecsNames.forEach((nm: string) => addSpecEntry(undefined, nm));
 
-                    // Separate VIVA and Mind Matter panel scores
-                    const candidateVivaScores = candScores.filter(s => !isMindMatterScore(s));
-                    const candidateMmScores = candScores.filter(s => isMindMatterScore(s));
+                    const visibleRows = selectedSpec !== "all"
+                      ? (() => {
+                          const targetId = Number(selectedSpec);
+                          const matched = rowSpecialities.find(r => r.specId === targetId);
+                          if (matched) return [matched];
+                          const sObj = specialities.find(s => s.id === targetId);
+                          return [{ specId: targetId, specName: sObj?.name ?? "Selected Speciality" }];
+                        })()
+                      : (rowSpecialities.length > 0 ? rowSpecialities : [{ specId: undefined, specName: "General" }]);
 
-                    const avgViva = candidateVivaScores.length > 0
-                      ? candidateVivaScores.reduce((sum, s) => sum + s.score, 0) / candidateVivaScores.length
+                    // Mind Matter is evaluated ONCE per candidate across all specialities
+                    const candidateMmScores = scores
+                      .filter(s => s.candidateId === c.id && isMindMatterScore(s))
+                      .sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime());
+                    const latestMmScore = candidateMmScores.length > 0
+                      ? Number(candidateMmScores[candidateMmScores.length - 1].score)
                       : null;
+                    const mindMatterScore = latestMmScore !== null
+                      ? latestMmScore
+                      : (c.psychometricScore !== null && c.psychometricScore !== undefined ? Number(c.psychometricScore) : null);
 
-                    const avgMindMatter = candidateMmScores.length > 0
-                      ? candidateMmScores.reduce((sum, s) => sum + s.score, 0) / candidateMmScores.length
-                      : null;
+                    const mcqScore = c.mcqScore !== null && c.mcqScore !== undefined ? Number(c.mcqScore) : null;
 
-                    const mcqScore = c.mcqScore !== null ? Number(c.mcqScore) : null;
-                    const mindMatterScore = avgMindMatter !== null
-                      ? avgMindMatter
-                      : (c.psychometricScore !== null ? Number(c.psychometricScore) : null);
-                    
-                    const totalScore = (mcqScore !== null || avgViva !== null || mindMatterScore !== null)
-                      ? (mcqScore ?? 0) + (avgViva ?? 0) + (mindMatterScore ?? 0)
-                      : null;
+                    return visibleRows.map((rowSpec, rowIdx) => {
+                      const currentSpecId = rowSpec.specId;
+                      // VIVA scores belong strictly to this row's speciality
+                      const candidateVivaScores = scores
+                        .filter(s =>
+                          s.candidateId === c.id &&
+                          !isMindMatterScore(s) &&
+                          (currentSpecId ? s.specialityId === currentSpecId : true)
+                        )
+                        .sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime());
 
-                    return (
-                      <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="px-6 py-4">
-                          <div>
-                            <p className="font-bold text-slate-800 text-sm leading-tight">{c.fullName}</p>
-                            <div className="flex flex-wrap gap-1.5 mt-1">
-                              {getSpecsArray(c).map((spec: string, index: number) => (
-                                <Badge 
-                                  key={index} 
-                                  variant="outline" 
-                                  className="text-[9px] font-black uppercase px-2 py-0.5 tracking-wider bg-slate-50 border-slate-200/80 text-slate-500 rounded-md"
+                      const specScoreFromCandidate = currentSpecId && c.specialityScores?.[String(currentSpecId)]?.score != null
+                        ? Number(c.specialityScores[String(currentSpecId)].score)
+                        : null;
+                      const avgViva = candidateVivaScores.length > 0
+                        ? Number(candidateVivaScores[candidateVivaScores.length - 1].score)
+                        : specScoreFromCandidate;
+
+                      const totalScore = (mcqScore !== null || avgViva !== null || mindMatterScore !== null)
+                        ? (mcqScore ?? 0) + (avgViva ?? 0) + (mindMatterScore ?? 0)
+                        : null;
+
+                      return (
+                        <tr key={`${c.id}-${currentSpecId ?? rowIdx}`} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="px-6 py-4">
+                            <div>
+                              <p className="font-bold text-slate-800 text-sm leading-tight">{c.fullName}</p>
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                <Badge
+                                  variant="outline"
+                                  className="text-[9px] font-black uppercase px-2 py-0.5 tracking-wider bg-indigo-50 border-indigo-200 text-indigo-700 rounded-md"
                                 >
-                                  {spec}
+                                  {rowSpec.specName}
                                 </Badge>
-                              ))}
+                                {rowSpecialities.length > 1 && (
+                                  <span className="text-[10px] font-semibold text-slate-400">
+                                    (Multi-speciality: {rowSpecialities.length})
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 text-center">
-                          <span className="font-mono text-xs text-slate-500 uppercase font-black bg-slate-100 px-2 py-1 rounded-md border border-slate-200/30">
-                            {c.candidateCode}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 text-right">
-                          <EditableCell
-                            value={mcqScore}
-                            max={50}
-                            canEdit={canEdit}
-                            onSave={async (val) => {
-                              await updateScoreMutation.mutateAsync({ candidateId: c.id, mcqScore: val });
-                            }}
-                          />
-                        </td>
-                        <td className="px-4 py-4 text-right">
-                          <div className="flex flex-col items-end gap-1">
+                          </td>
+                          <td className="px-4 py-4 text-center">
+                            <span className="font-mono text-xs text-slate-500 uppercase font-black bg-slate-100 px-2 py-1 rounded-md border border-slate-200/30">
+                              {c.candidateCode}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-right">
                             <EditableCell
-                              value={avgViva}
+                              value={mcqScore}
                               max={50}
                               canEdit={canEdit}
                               onSave={async (val) => {
-                                await updateScoreMutation.mutateAsync({
-                                  candidateId: c.id,
-                                  vivaScore: val
-                                });
+                                await updateScoreMutation.mutateAsync({ candidateId: c.id, mcqScore: val });
                               }}
                             />
-                            {avgViva !== null && (
-                              <button
-                                onClick={() => setVivaDialogOpen(c)}
-                                className="text-[9px] text-slate-450 hover:text-indigo-600 hover:underline font-bold"
-                                title="Click to view auditor breakdown details"
-                              >
-                                View Details
-                              </button>
+                          </td>
+                          <td className="px-4 py-4 text-right">
+                            <div className="flex flex-col items-end gap-1">
+                              <EditableCell
+                                value={avgViva}
+                                max={50}
+                                canEdit={canEdit}
+                                onSave={async (val) => {
+                                  await updateScoreMutation.mutateAsync({
+                                    candidateId: c.id,
+                                    vivaScore: val,
+                                    specialityId: currentSpecId ?? null,
+                                  });
+                                }}
+                              />
+                              {(avgViva !== null || canEdit) && (
+                                <button
+                                  onClick={() => setVivaDialogOpen({ candidate: c, specialityId: currentSpecId })}
+                                  className="text-[9px] text-slate-450 hover:text-indigo-600 hover:underline font-bold"
+                                  title="Click to view auditor breakdown details"
+                                >
+                                  View Details
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 text-right">
+                            <EditableCell
+                              value={mindMatterScore}
+                              max={10}
+                              canEdit={canEdit}
+                              onSave={async (val) => {
+                                await updateScoreMutation.mutateAsync({ candidateId: c.id, psychometricScore: val });
+                              }}
+                            />
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            {totalScore !== null ? (
+                              <Badge className="bg-slate-900 text-white font-mono font-bold text-sm tracking-wide shadow-sm hover:bg-slate-950 px-3 py-1 rounded-lg">
+                                {totalScore.toFixed(1)}
+                              </Badge>
+                            ) : (
+                              <span className="text-slate-400 font-mono">—</span>
                             )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 text-right">
-                          <EditableCell
-                            value={mindMatterScore}
-                            max={10}
-                            canEdit={canEdit}
-                            onSave={async (val) => {
-                              await updateScoreMutation.mutateAsync({ candidateId: c.id, psychometricScore: val });
-                            }}
-                          />
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          {totalScore !== null ? (
-                            <Badge className="bg-slate-900 text-white font-mono font-bold text-sm tracking-wide shadow-sm hover:bg-slate-950 px-3 py-1 rounded-lg">
-                              {totalScore.toFixed(1)}
-                            </Badge>
-                          ) : (
-                            <span className="text-slate-400 font-mono">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
+                          </td>
+                        </tr>
+                      );
+                    });
                   })}
                 </tbody>
               </table>
@@ -2688,7 +2813,8 @@ function MarkSheetTab({ specialities, candidates, scores, isCEC, toast, doctors,
       {/* ── VIVA Marks Breakdown & Auditor Modal ── */}
       {vivaDialogOpen && (
         <VivaScoresDialog
-          candidate={vivaDialogOpen}
+          candidate={vivaDialogOpen.candidate}
+          specialityIdOverride={vivaDialogOpen.specialityId}
           open={!!vivaDialogOpen}
           onClose={() => setVivaDialogOpen(null)}
           scores={scores}
@@ -2714,6 +2840,7 @@ function VivaScoresDialog({
   specialities,
   updateScoreMutation,
   panels = [],
+  specialityIdOverride,
 }: {
   candidate: any;
   open: boolean;
@@ -2724,6 +2851,7 @@ function VivaScoresDialog({
   specialities: any[];
   updateScoreMutation: any;
   panels?: Panel[];
+  specialityIdOverride?: number;
 }) {
   const [newDoctorId, setNewDoctorId] = useState<string>("");
   const [newScore, setNewScore] = useState<string>("");
@@ -2748,15 +2876,21 @@ function VivaScoresDialog({
     return [];
   };
 
+  const mmDoctorIds = new Set(
+    panels.filter(p => p.isMindMatter).flatMap(p => p.members.map(m => m.doctorId))
+  );
+  const isMMScoreEntry = (s: any) =>
+    Boolean(s.isMindMatter) || s.specialityId === null || s.specialityId === undefined || mmDoctorIds.has(s.doctorId);
+
   const candSpecs = getSpecsArray(candidate);
   const targetAppSpecId = candidate.applications?.[0]?.specialityId;
   const targetPrefSpec = specialities.find((s: any) => candSpecs.some((cs: string) => cs.toLowerCase() === s.name.toLowerCase()));
-  const specialityId = selectedSpec !== "all" ? Number(selectedSpec) : (targetAppSpecId ?? targetPrefSpec?.id);
+  const specialityId = specialityIdOverride ?? (selectedSpec !== "all" ? Number(selectedSpec) : (targetAppSpecId ?? targetPrefSpec?.id));
   const specialityName = specialities.find((s: any) => s.id === specialityId)?.name ?? "Speciality Interview";
 
-  // Filter existing scores for this candidate and speciality
+  // Filter existing VIVA scores for this candidate and speciality (never include Mind Matter)
   const candidateScores = scores.filter(
-    (s) => s.candidateId === candidate.id && (specialityId ? s.specialityId === specialityId : true)
+    (s) => s.candidateId === candidate.id && !isMMScoreEntry(s) && (specialityId ? s.specialityId === specialityId : true)
   );
 
   const isMMPanel = panels.some(p => p.specialityId === specialityId && p.isMindMatter === true);

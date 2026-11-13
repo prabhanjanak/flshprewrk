@@ -119,7 +119,7 @@ export function formatDoctorName(rawName: string | null | undefined): string {
   return clean ? `Dr. ${clean}` : "";
 }
 
-function getLogoPaths() {
+export function getLogoPaths() {
   const root = process.cwd();
   const tryPaths = [
     path.join(__dirname, "assets"),

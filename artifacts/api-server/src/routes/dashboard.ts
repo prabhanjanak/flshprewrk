@@ -320,25 +320,46 @@ router.get("/dashboard/summary", requireAuth, async (req: any, res) => {
   }
 });
 
-// Doctor: Get personal session statistics (read-only dashboard)
-router.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor"), async (req: any, res) => {
+// Doctor / Super Admin: Get Doctor View panel statistics (supports ?panelId= selection)
+router.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor", "super_admin", "program_admin", "central_exam_coordinator"), async (req: any, res) => {
   const doctorId = req.user!.userId;
+  const userRole = req.user!.role;
+  const isMockMode = Boolean(req.isMockMode);
+  const requestedPanelId = req.query["panelId"] ? Number(req.query["panelId"]) : null;
 
-  const panelQuery = await readDb.execute(sql`
-    SELECT ip.id as panel_id, ip.name as panel_name, ip.speciality_id,
-           s.name as speciality_name
-    FROM interview_panel_members ipm
-    JOIN interview_panels ip ON ip.id = ipm.panel_id
-    LEFT JOIN specialities s ON s.id = ip.speciality_id
-    WHERE ipm.doctor_id = ${doctorId} AND ip.is_active = TRUE
-    LIMIT 1
-  `);
-  const activePanel = panelQuery.rows[0] as {
+  const panelQuery = userRole === "doctor"
+    ? await readDb.execute(sql`
+        SELECT ip.id as panel_id, ip.name as panel_name, ip.speciality_id,
+               ip.is_mind_matter, ipm.marks_entry_enabled,
+               s.name as speciality_name
+        FROM interview_panel_members ipm
+        JOIN interview_panels ip ON ip.id = ipm.panel_id
+        LEFT JOIN specialities s ON s.id = ip.speciality_id
+        WHERE ipm.doctor_id = ${doctorId} AND ip.is_active = TRUE AND ip.is_mock = ${isMockMode}
+        ORDER BY ip.is_mind_matter DESC, ip.id ASC
+      `)
+    : await readDb.execute(sql`
+        SELECT ip.id as panel_id, ip.name as panel_name, ip.speciality_id,
+               ip.is_mind_matter, TRUE as marks_entry_enabled,
+               s.name as speciality_name
+        FROM interview_panels ip
+        LEFT JOIN specialities s ON s.id = ip.speciality_id
+        WHERE ip.is_active = TRUE AND ip.is_mock = ${isMockMode}
+        ORDER BY ip.is_mind_matter DESC, ip.id ASC
+      `);
+
+  const allActivePanels = panelQuery.rows as Array<{
     panel_id: number;
     panel_name: string;
     speciality_id: number | null;
+    is_mind_matter: boolean | number;
+    marks_entry_enabled: boolean | number;
     speciality_name: string | null;
-  } | undefined;
+  }>;
+
+  const activePanel = (requestedPanelId
+    ? allActivePanels.find((p) => Number(p.panel_id) === requestedPanelId)
+    : undefined) ?? allActivePanels[0];
 
   let totalAssigned = 0;
   let totalCompleted = 0;
@@ -346,21 +367,40 @@ router.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor"), async 
   let avgInterviewMinutes: number | null = null;
   let panelName: string | null = null;
   let specialityName: string | null = null;
+  const panelId = activePanel?.panel_id ?? null;
+  const panelSpecialityId = activePanel?.speciality_id ?? null;
+  const isMindMatterPanel = activePanel?.is_mind_matter === true || activePanel?.is_mind_matter === 1;
+  const marksEntryEnabled = userRole === "super_admin" || activePanel?.marks_entry_enabled === true || activePanel?.marks_entry_enabled === 1;
 
   if (activePanel) {
     panelName = activePanel.panel_name;
     specialityName = activePanel.speciality_name;
 
-    const queueCountQuery = await readDb.execute(sql`
-      SELECT COUNT(*) as total,
-             SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_count
-      FROM panel_queue
-      WHERE panel_id = ${activePanel.panel_id}
-    `);
-    const row = queueCountQuery.rows[0] as { total: string; completed_count: string } | undefined;
-    totalAssigned = Number(row?.total ?? 0);
-    totalCompleted = Number(row?.completed_count ?? 0);
-    remaining = Math.max(0, totalAssigned - totalCompleted);
+    if (isMindMatterPanel) {
+      const mmCountQuery = await readDb.execute(sql`
+        SELECT COUNT(*) as total,
+               SUM(CASE WHEN (c.psychometric_score IS NOT NULL AND c.psychometric_score != '')
+                          OR EXISTS (SELECT 1 FROM interview_scores ist WHERE ist.candidate_id = c.id AND ist.speciality_id IS NULL)
+                        THEN 1 ELSE 0 END) as completed_count
+        FROM candidates c
+        WHERE c.status != 'rejected' AND c.is_mock = ${isMockMode}
+      `);
+      const row = mmCountQuery.rows[0] as { total: string; completed_count: string } | undefined;
+      totalAssigned = Number(row?.total ?? 0);
+      totalCompleted = Number(row?.completed_count ?? 0);
+      remaining = Math.max(0, totalAssigned - totalCompleted);
+    } else {
+      const queueCountQuery = await readDb.execute(sql`
+        SELECT COUNT(*) as total,
+               SUM(CASE WHEN status IN ('done', 'completed') THEN 1 ELSE 0 END) as completed_count
+        FROM panel_queue
+        WHERE panel_id = ${activePanel.panel_id}
+      `);
+      const row = queueCountQuery.rows[0] as { total: string; completed_count: string } | undefined;
+      totalAssigned = Number(row?.total ?? 0);
+      totalCompleted = Number(row?.completed_count ?? 0);
+      remaining = Math.max(0, totalAssigned - totalCompleted);
+    }
   } else {
     const assignRows = await readDb.execute(sql`
       SELECT COUNT(*) as total,
@@ -374,29 +414,88 @@ router.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor"), async 
     remaining = Math.max(0, totalAssigned - totalCompleted);
   }
 
-  const avgQuery = await readDb.execute(sql`
-    SELECT AVG(EXTRACT(EPOCH FROM (submitted_at - created_at)) / 60) as avg_minutes
-    FROM interview_scores
-    WHERE doctor_id = ${doctorId}
-  `);
-  const avgRow = avgQuery.rows[0] as { avg_minutes: string | null } | undefined;
-  if (avgRow?.avg_minutes) {
-    avgInterviewMinutes = Math.round(Number(avgRow.avg_minutes) * 10) / 10;
+  try {
+    const avgQuery = userRole === "doctor"
+      ? await readDb.execute(sql`
+          SELECT AVG(EXTRACT(EPOCH FROM (ist.submitted_at - pq.called_at)) / 60) as avg_minutes
+          FROM interview_scores ist
+          JOIN panel_queue pq ON pq.candidate_id = ist.candidate_id
+          WHERE ist.doctor_id = ${doctorId}
+            AND pq.called_at IS NOT NULL
+            AND ist.submitted_at >= pq.called_at
+            AND EXTRACT(EPOCH FROM (ist.submitted_at - pq.called_at)) < 7200
+        `)
+      : await readDb.execute(sql`
+          SELECT AVG(EXTRACT(EPOCH FROM (ist.submitted_at - pq.called_at)) / 60) as avg_minutes
+          FROM interview_scores ist
+          JOIN panel_queue pq ON pq.candidate_id = ist.candidate_id
+          WHERE pq.called_at IS NOT NULL
+            AND ist.submitted_at >= pq.called_at
+            AND EXTRACT(EPOCH FROM (ist.submitted_at - pq.called_at)) < 7200
+        `);
+    const avgRow = avgQuery.rows[0] as { avg_minutes: string | null } | undefined;
+    if (avgRow?.avg_minutes != null && !isNaN(Number(avgRow.avg_minutes))) {
+      avgInterviewMinutes = Math.round(Number(avgRow.avg_minutes) * 10) / 10;
+    }
+  } catch {
+    avgInterviewMinutes = null;
   }
 
-  const recentScores = await readDb.execute(sql`
-    SELECT ist.id, ist.candidate_id, ist.score, ist.submitted_at,
-           c.full_name as candidate_name, c.candidate_code
-    FROM interview_scores ist
-    JOIN candidates c ON c.id = ist.candidate_id
-    WHERE ist.doctor_id = ${doctorId}
-    ORDER BY ist.submitted_at DESC
-    LIMIT 5
-  `);
+  const recentScores = userRole === "doctor"
+    ? await readDb.execute(sql`
+        SELECT ist.id, ist.candidate_id, ist.score, ist.submitted_at,
+               c.full_name as candidate_name, c.candidate_code
+        FROM interview_scores ist
+        JOIN candidates c ON c.id = ist.candidate_id
+        WHERE ist.doctor_id = ${doctorId} AND c.is_mock = ${isMockMode}
+        ORDER BY ist.submitted_at DESC
+        LIMIT 5
+      `)
+    : activePanel && isMindMatterPanel
+    ? await readDb.execute(sql`
+        SELECT ist.id, ist.candidate_id, ist.score, ist.submitted_at,
+               c.full_name as candidate_name, c.candidate_code
+        FROM interview_scores ist
+        JOIN candidates c ON c.id = ist.candidate_id
+        WHERE ist.speciality_id IS NULL AND c.is_mock = ${isMockMode}
+        ORDER BY ist.submitted_at DESC
+        LIMIT 5
+      `)
+    : activePanel && panelSpecialityId
+    ? await readDb.execute(sql`
+        SELECT ist.id, ist.candidate_id, ist.score, ist.submitted_at,
+               c.full_name as candidate_name, c.candidate_code
+        FROM interview_scores ist
+        JOIN candidates c ON c.id = ist.candidate_id
+        WHERE ist.speciality_id = ${panelSpecialityId} AND c.is_mock = ${isMockMode}
+        ORDER BY ist.submitted_at DESC
+        LIMIT 5
+      `)
+    : await readDb.execute(sql`
+        SELECT ist.id, ist.candidate_id, ist.score, ist.submitted_at,
+               c.full_name as candidate_name, c.candidate_code
+        FROM interview_scores ist
+        JOIN candidates c ON c.id = ist.candidate_id
+        WHERE c.is_mock = ${isMockMode}
+        ORDER BY ist.submitted_at DESC
+        LIMIT 5
+      `);
 
   res.json({
+    panelId,
     panelName,
+    specialityId: panelSpecialityId,
     specialityName,
+    isMindMatterPanel,
+    marksEntryEnabled,
+    panels: allActivePanels.map((p) => ({
+      panelId: Number(p.panel_id),
+      panelName: String(p.panel_name ?? ""),
+      specialityId: p.speciality_id != null ? Number(p.speciality_id) : null,
+      specialityName: p.speciality_name ?? null,
+      isMindMatter: p.is_mind_matter === true || p.is_mind_matter === 1,
+      marksEntryEnabled: userRole === "super_admin" || p.marks_entry_enabled === true || p.marks_entry_enabled === 1,
+    })),
     totalAssigned,
     totalCompleted,
     remaining,
