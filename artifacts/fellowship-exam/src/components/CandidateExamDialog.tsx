@@ -292,6 +292,20 @@ export function CandidateExamDialog({
 
   const handleUploadLorFile = async (docType: "LOR1" | "LOR2" | "OTHER", file: File) => {
     if (!candidateId) return;
+
+    if (docType === "LOR1" || docType === "LOR2") {
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      const isPdf = ext === "pdf" || file.type === "application/pdf" || file.type === "application/x-pdf";
+      if (!isPdf) {
+        toast({
+          title: "Invalid File Type",
+          description: "Only PDF files (.pdf) are accepted for Letters of Recommendation.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     setUploadingLor(docType);
     try {
       // 1. Request upload URL
@@ -1083,7 +1097,7 @@ export function CandidateExamDialog({
                             <label className="cursor-pointer">
                               <input
                                 type="file"
-                                accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
+                                accept=".pdf,application/pdf"
                                 className="hidden"
                                 onChange={(e) => {
                                   const f = e.target.files?.[0];
@@ -1131,7 +1145,7 @@ export function CandidateExamDialog({
                             <label className="cursor-pointer">
                               <input
                                 type="file"
-                                accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
+                                accept=".pdf,application/pdf"
                                 className="hidden"
                                 onChange={(e) => {
                                   const f = e.target.files?.[0];

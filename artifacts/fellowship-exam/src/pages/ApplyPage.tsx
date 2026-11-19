@@ -291,15 +291,77 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
     });
   };
 
+  const isLorField = (fieldId: string, fieldDef?: any) => {
+    const id = (fieldDef?.id || fieldId || "").toLowerCase();
+    const mapping = (fieldDef?.mapping || "").toLowerCase();
+    const label = (fieldDef?.label || "").toLowerCase();
+    return id.includes("lor") || mapping.includes("lor") || label.includes("lor") || label.includes("recommendation");
+  };
+
+  const isPhotoField = (fieldId: string, fieldDef?: any) => {
+    const id = (fieldDef?.id || fieldId || "").toLowerCase();
+    const mapping = (fieldDef?.mapping || "").toLowerCase();
+    const label = (fieldDef?.label || "").toLowerCase();
+    return (
+      id.includes("photo") ||
+      mapping.includes("photo") ||
+      label.includes("passport") ||
+      label.includes("photograph") ||
+      (label.includes("photo") && !label.includes("payment"))
+    );
+  };
+
   const onFileChange = (field: string, file: File | null) => {
-    if (file) {
-      setFiles(prev => ({ ...prev, [field]: file }));
-      setErrors(prev => {
+    if (!file) {
+      setFiles(prev => {
         const next = { ...prev };
         delete next[field];
         return next;
       });
+      return;
     }
+
+    const fieldDef = formInfo?.sectionsConfig?.flatMap((s: any) => s.fields || []).find((f: any) => f.id === field);
+    const ext = (file.name.split('.').pop() || "").toLowerCase();
+    const mime = (file.type || "").toLowerCase();
+
+    if (isLorField(field, fieldDef)) {
+      const isPdf = ext === "pdf" || mime === "application/pdf" || mime === "application/x-pdf";
+      if (!isPdf) {
+        setErrors(prev => ({
+          ...prev,
+          [field]: "Only PDF files (.pdf) are accepted for Letters of Recommendation (LOR)."
+        }));
+        setFiles(prev => {
+          const next = { ...prev };
+          delete next[field];
+          return next;
+        });
+        return;
+      }
+    } else if (isPhotoField(field, fieldDef)) {
+      const isJpgExt = ext === "jpg" || ext === "jpeg";
+      const isJpgMime = !mime || mime === "image/jpeg" || mime === "image/jpg";
+      if (!isJpgExt || !isJpgMime) {
+        setErrors(prev => ({
+          ...prev,
+          [field]: "Only JPEG/JPG images (.jpg, .jpeg) are accepted for Passport Photograph."
+        }));
+        setFiles(prev => {
+          const next = { ...prev };
+          delete next[field];
+          return next;
+        });
+        return;
+      }
+    }
+
+    setFiles(prev => ({ ...prev, [field]: file }));
+    setErrors(prev => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
   };
 
   const copyToClipboard = (text: string, fieldKey: string) => {
@@ -404,9 +466,27 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
 
       if (isVisible && !isNonInput) {
         if (f.type === 'file') {
-          if (!files[f.id]) {
+          const file = files[f.id];
+          if (!file) {
             newErrors[f.id] = `${f.label} is required`;
             hasError = true;
+          } else {
+            const ext = (file.name.split('.').pop() || "").toLowerCase();
+            const mime = (file.type || "").toLowerCase();
+            if (isLorField(f.id, f)) {
+              const isPdf = ext === "pdf" || mime === "application/pdf" || mime === "application/x-pdf";
+              if (!isPdf) {
+                newErrors[f.id] = `Only PDF files (.pdf) are accepted for ${f.label}`;
+                hasError = true;
+              }
+            } else if (isPhotoField(f.id, f)) {
+              const isJpgExt = ext === "jpg" || ext === "jpeg";
+              const isJpgMime = !mime || mime === "image/jpeg" || mime === "image/jpg";
+              if (!isJpgExt || !isJpgMime) {
+                newErrors[f.id] = `Only JPEG/JPG images (.jpg, .jpeg) are accepted for ${f.label}`;
+                hasError = true;
+              }
+            }
           }
         } else {
           const val = form[f.id];
@@ -1046,38 +1126,56 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
                         </Label>
                       )}
 
-                      {field.type === 'file' && (
-                        <div className={`relative border-2 border-dashed rounded-2xl p-10 transition-all ${files[field.id] ? 'border-emerald-400 bg-emerald-50/20' : errors[field.id] ? 'border-red-300 bg-red-50/20' : 'border-slate-200 hover:border-orange-500 hover:bg-orange-50/5 bg-slate-50/30'}`}>
-                          <input
-                            type="file"
-                            name={field.id}
-                            onChange={(e) => onFileChange(field.id, e.target.files?.[0] || null)}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                            accept="*/*"
-                          />
-                          <div className="text-center">
-                            {files[field.id] ? (
-                              <>
-                                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                                  <CheckCircle2 className="w-6 h-6 text-green-600" />
-                                </div>
-                                <p className="text-sm font-bold text-green-700">{files[field.id].name}</p>
-                                <p className="text-xs text-green-600 mt-1">File selected & ready for automatic formatting</p>
-                              </>
-                            ) : (
-                              <>
-                                <div className="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-3">
-                                  <Loader2 className="w-6 h-6 text-slate-400" />
-                                </div>
-                                <p className="text-sm font-medium text-slate-600">Click to upload or drag & drop</p>
-                                <p className="text-xs text-slate-400 mt-1">
-                                  All file formats (PDF, JPG, PNG, DOC, DOCX, images) and all file sizes supported
-                                </p>
-                              </>
-                            )}
+                      {field.type === 'file' && (() => {
+                        const isLor = isLorField(field.id, field);
+                        const isPhoto = isPhotoField(field.id, field);
+                        const acceptTypes = isLor
+                          ? ".pdf,application/pdf"
+                          : isPhoto
+                          ? ".jpg,.jpeg,image/jpeg,image/jpg"
+                          : "*/*";
+                        const helperText = isLor
+                          ? "PDF format only (.pdf) — Max 15MB"
+                          : isPhoto
+                          ? "JPEG / JPG format only (.jpg, .jpeg) — Max 10MB"
+                          : "Supported file formats: PDF, JPG, PNG";
+
+                        return (
+                          <div className={`relative border-2 border-dashed rounded-2xl p-8 transition-all ${files[field.id] ? 'border-emerald-400 bg-emerald-50/20' : errors[field.id] ? 'border-red-300 bg-red-50/20' : 'border-slate-200 hover:border-orange-500 hover:bg-orange-50/5 bg-slate-50/30'}`}>
+                            <input
+                              type="file"
+                              name={field.id}
+                              onChange={(e) => onFileChange(field.id, e.target.files?.[0] || null)}
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              accept={acceptTypes}
+                            />
+                            <div className="text-center">
+                              {files[field.id] ? (
+                                <>
+                                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <CheckCircle2 className="w-6 h-6 text-green-600" />
+                                  </div>
+                                  <p className="text-sm font-bold text-green-700">{files[field.id].name}</p>
+                                  <p className="text-xs text-green-600 font-medium mt-1">
+                                    {isLor ? "✓ Valid PDF Document Ready" : isPhoto ? "✓ Valid JPEG/JPG Photo Ready" : "✓ File Selected"}
+                                  </p>
+                                  <p className="text-[11px] text-slate-400 mt-2 underline">Click or drag & drop to replace</p>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <Upload className="w-6 h-6 text-slate-500" />
+                                  </div>
+                                  <p className="text-sm font-medium text-slate-700">Click to upload or drag & drop</p>
+                                  <p className="text-xs text-slate-500 font-semibold mt-1">
+                                    {helperText}
+                                  </p>
+                                </>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      )}{field.type === 'info' && (
+                        );
+                      })()}{field.type === 'info' && (
                         <div className="bg-blue-50 border-l-4 border-[#000080] p-6 rounded-r-xl shadow-sm">
                           <div className="flex items-start gap-4">
                             <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">

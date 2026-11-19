@@ -585,6 +585,24 @@ function FileFieldEditor({ label, currentUrl, onUploaded }: { label: string; cur
 
   const handleFile = async (file: File) => {
     setError(null);
+
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (isLor) {
+      if (ext !== 'pdf' && file.type !== 'application/pdf') {
+        setError('Only PDF files (.pdf) are allowed for Letters of Recommendation.');
+        return;
+      }
+    } else if (isPhoto) {
+      if (ext !== 'jpg' && ext !== 'jpeg') {
+        setError('Only JPEG/JPG images (.jpg, .jpeg) are allowed for Passport Photograph.');
+        return;
+      }
+      if (file.type && !['image/jpeg', 'image/jpg'].includes(file.type.toLowerCase())) {
+        setError('Only JPEG/JPG images (.jpg, .jpeg) are allowed for Passport Photograph.');
+        return;
+      }
+    }
+
     setUploading(true);
     try {
       const token = localStorage.getItem('fellowship_token');
@@ -653,7 +671,7 @@ function FileFieldEditor({ label, currentUrl, onUploaded }: { label: string; cur
           ref={inputRef}
           type="file"
           className="hidden"
-          accept={isLor ? '.pdf,.jpg,.jpeg,.png,.webp,application/pdf' : isPhoto ? '.jpg,.jpeg,.png,.webp,.heic,image/*' : '.pdf,.jpg,.jpeg,.png,.webp,image/*'}
+          accept={isLor ? '.pdf,application/pdf' : isPhoto ? '.jpg,.jpeg,image/jpeg,image/jpg' : '.pdf,.jpg,.jpeg,.png,.webp,image/*'}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
         />
         {uploading ? (
@@ -668,7 +686,7 @@ function FileFieldEditor({ label, currentUrl, onUploaded }: { label: string; cur
           <p className="text-xs text-slate-500 font-medium">
             {uploadedName ? '✓ Replace again?' : currentUrl ? `Click to replace ${label}` : `Click to upload ${label}`}
             <span className="block text-[10px] mt-1 text-slate-400">
-              {isLor ? 'PDF, JPG, PNG (Images auto-formatted to standard PDF)' : isPhoto ? 'JPG, PNG, WebP (Auto-cropped to passport size)' : 'PDF, JPG, PNG (Auto-compressed)'}
+              {isLor ? 'PDF format only (.pdf)' : isPhoto ? 'JPEG / JPG format only (.jpg, .jpeg)' : 'PDF, JPG, PNG (Auto-compressed)'}
             </span>
           </p>
         )}

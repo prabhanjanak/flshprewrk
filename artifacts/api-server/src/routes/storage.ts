@@ -17,6 +17,32 @@ router.post("/storage/uploads/request-url", requireAuth, async (req: Request, re
     res.status(400).json({ error: "Missing or invalid required fields: name, contentType" });
     return;
   }
+
+  const ext = (name.split('.').pop() ?? "").toLowerCase();
+  const isLor = /lor|recommendation/i.test(name) || (typeof (req.body as any)?.docType === "string" && /lor/i.test((req.body as any).docType));
+  const isPhoto = /photo|passport/i.test(name) || (typeof (req.body as any)?.docType === "string" && /photo/i.test((req.body as any).docType));
+
+  if (isLor) {
+    if (ext !== "pdf") {
+      res.status(400).json({ error: "Only PDF files (.pdf) are accepted for Letters of Recommendation (LOR)" });
+      return;
+    }
+    if (contentType && !contentType.includes("pdf") && contentType !== "application/octet-stream") {
+      res.status(400).json({ error: "Only PDF files (.pdf) are accepted for Letters of Recommendation (LOR)" });
+      return;
+    }
+  }
+
+  if (isPhoto) {
+    if (ext !== "jpg" && ext !== "jpeg") {
+      res.status(400).json({ error: "Only JPEG/JPG images (.jpg, .jpeg) are accepted for Passport Photograph" });
+      return;
+    }
+    if (contentType && !["image/jpeg", "image/jpg", "application/octet-stream"].includes(contentType.toLowerCase())) {
+      res.status(400).json({ error: "Only JPEG/JPG images (.jpg, .jpeg) are accepted for Passport Photograph" });
+      return;
+    }
+  }
   try {
     const isReplit = !!process.env.REPL_ID;
     if (!isReplit) {

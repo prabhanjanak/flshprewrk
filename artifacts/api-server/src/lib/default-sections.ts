@@ -134,14 +134,14 @@ export const DEFAULT_SECTIONS = [
   {
     id: "lor",
     title: "LETTER OF RECOMMENDATION (LOR)",
-    description: "Upload two LORs from the last 6 months (PDF).",
+    description: "Upload two LORs from the last 6 months (PDF format only).",
     enabled: true,
     fields: [
-      { id: "lor1Url", type: "file", label: "LOR 1 PDF", required: true, isStandard: true, mapping: "lor1Url" },
+      { id: "lor1Url", type: "file", label: "LOR 1 PDF (PDF only)", required: true, isStandard: true, mapping: "lor1Url" },
       { id: "lor1RefName", type: "text", label: "Name & Designation of Reference 1", required: true, isStandard: true, mapping: "lor1RefName" },
       { id: "lor1RefContact", type: "text", label: "Contact number of Reference 1", required: true, isStandard: true, mapping: "lor1RefContact" },
       { id: "lor1RefEmail", type: "text", label: "Email ID of Reference 1", required: true, isStandard: true, mapping: "lor1RefEmail" },
-      { id: "lor2Url", type: "file", label: "LOR 2 PDF", required: true, isStandard: true, mapping: "lor2Url" },
+      { id: "lor2Url", type: "file", label: "LOR 2 PDF (PDF only)", required: true, isStandard: true, mapping: "lor2Url" },
       { id: "lor2RefName", type: "text", label: "Name & Designation of Reference 2", required: true, isStandard: true, mapping: "lor2RefName" },
       { id: "lor2RefContact", type: "text", label: "Contact number of Reference 2", required: true, isStandard: true, mapping: "lor2RefContact" },
       { id: "lor2RefEmail", type: "text", label: "Email ID of Reference 2", required: true, isStandard: true, mapping: "lor2RefEmail" }
@@ -153,7 +153,7 @@ export const DEFAULT_SECTIONS = [
     description: "Final information and documents.",
     enabled: true,
     fields: [
-      { id: "photoUrl", type: "file", label: "Passport Size Photograph", required: true, isStandard: true, mapping: "photoUrl" },
+      { id: "photoUrl", type: "file", label: "Passport Size Photograph (JPEG/JPG only)", required: true, isStandard: true, mapping: "photoUrl" },
       { id: "declarationAccepted", type: "checkbox", label: "I hereby declare that the information provided is true to the best of my knowledge.", required: true, isStandard: true, mapping: "declarationAccepted" }
     ]
   }

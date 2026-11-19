@@ -1078192,14 +1078192,14 @@ var init_default_sections = __esm({
       {
         id: "lor",
         title: "LETTER OF RECOMMENDATION (LOR)",
-        description: "Upload two LORs from the last 6 months (PDF).",
+        description: "Upload two LORs from the last 6 months (PDF format only).",
         enabled: true,
         fields: [
-          { id: "lor1Url", type: "file", label: "LOR 1 PDF", required: true, isStandard: true, mapping: "lor1Url" },
+          { id: "lor1Url", type: "file", label: "LOR 1 PDF (PDF only)", required: true, isStandard: true, mapping: "lor1Url" },
           { id: "lor1RefName", type: "text", label: "Name & Designation of Reference 1", required: true, isStandard: true, mapping: "lor1RefName" },
           { id: "lor1RefContact", type: "text", label: "Contact number of Reference 1", required: true, isStandard: true, mapping: "lor1RefContact" },
           { id: "lor1RefEmail", type: "text", label: "Email ID of Reference 1", required: true, isStandard: true, mapping: "lor1RefEmail" },
-          { id: "lor2Url", type: "file", label: "LOR 2 PDF", required: true, isStandard: true, mapping: "lor2Url" },
+          { id: "lor2Url", type: "file", label: "LOR 2 PDF (PDF only)", required: true, isStandard: true, mapping: "lor2Url" },
           { id: "lor2RefName", type: "text", label: "Name & Designation of Reference 2", required: true, isStandard: true, mapping: "lor2RefName" },
           { id: "lor2RefContact", type: "text", label: "Contact number of Reference 2", required: true, isStandard: true, mapping: "lor2RefContact" },
           { id: "lor2RefEmail", type: "text", label: "Email ID of Reference 2", required: true, isStandard: true, mapping: "lor2RefEmail" }
@@ -1078211,7 +1078211,7 @@ var init_default_sections = __esm({
         description: "Final information and documents.",
         enabled: true,
         fields: [
-          { id: "photoUrl", type: "file", label: "Passport Size Photograph", required: true, isStandard: true, mapping: "photoUrl" },
+          { id: "photoUrl", type: "file", label: "Passport Size Photograph (JPEG/JPG only)", required: true, isStandard: true, mapping: "photoUrl" },
           { id: "declarationAccepted", type: "checkbox", label: "I hereby declare that the information provided is true to the best of my knowledge.", required: true, isStandard: true, mapping: "declarationAccepted" }
         ]
       }
@@ -1106379,7 +1106379,13 @@ async function saveBase64FileIfPresent(dataUrl, candidateName, fieldName) {
   try {
     const matches = dataUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
     if (!matches || matches.length !== 3) return dataUrl;
-    const contentType = matches[1];
+    const contentType = matches[1].toLowerCase();
+    if (fieldName.startsWith("lor") && !contentType.includes("pdf")) {
+      throw new Error(`Only PDF files (.pdf) are accepted for Letters of Recommendation (${fieldName})`);
+    }
+    if (fieldName === "photo" && !contentType.includes("jpeg") && !contentType.includes("jpg")) {
+      throw new Error("Only JPEG/JPG images (.jpg, .jpeg) are accepted for Passport Photograph");
+    }
     const buffer = Buffer.from(matches[2], "base64");
     const ext2 = contentType.includes("pdf") ? "pdf" : contentType.includes("png") ? "png" : "jpg";
     const folderName = candidateName ? candidateName.trim().replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_") : "candidate";
@@ -1108435,15 +1108441,34 @@ var init_application_forms2 = __esm({
       if (!name2 || typeof name2 !== "string" || !name2.trim()) {
         return res.status(400).json({ error: "Missing required field: name" });
       }
-      const cleanContentType = contentType && typeof contentType === "string" ? contentType : "application/octet-stream";
+      const ext2 = (name2.split(".").pop() ?? "").toLowerCase();
+      const isLor = fieldName && /lor|recommendation/i.test(fieldName) || /lor/i.test(name2);
+      const isPhoto = fieldName && /photo|passport/i.test(fieldName) || /photo|passport/i.test(name2);
+      if (isLor) {
+        if (ext2 !== "pdf") {
+          return res.status(400).json({ error: "Only PDF files (.pdf) are accepted for Letters of Recommendation (LOR)" });
+        }
+        if (contentType && !contentType.includes("pdf") && contentType !== "application/octet-stream") {
+          return res.status(400).json({ error: "Only PDF files (.pdf) are accepted for Letters of Recommendation (LOR)" });
+        }
+      }
+      if (isPhoto) {
+        if (ext2 !== "jpg" && ext2 !== "jpeg") {
+          return res.status(400).json({ error: "Only JPEG/JPG images (.jpg, .jpeg) are accepted for Passport Photograph" });
+        }
+        if (contentType && !["image/jpeg", "image/jpg", "application/octet-stream"].includes(contentType.toLowerCase())) {
+          return res.status(400).json({ error: "Only JPEG/JPG images (.jpg, .jpeg) are accepted for Passport Photograph" });
+        }
+      }
+      const cleanContentType = contentType && typeof contentType === "string" ? contentType : isLor ? "application/pdf" : isPhoto ? "image/jpeg" : "application/octet-stream";
       try {
         const isReplit = !!process.env.REPL_ID;
         if (!isReplit) {
           const objectId = Math.random().toString(36).substring(2, 10);
-          const ext2 = name2.split(".").pop() ?? "bin";
+          const ext3 = name2.split(".").pop() ?? "bin";
           const sanitizedName = name2.split(".")[0].replace(/[^a-zA-Z0-9]/g, "_");
           let folderName = candidateName ? candidateName.trim().replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_") : "Unknown_Candidate";
-          const filename = `${sanitizedName}_${objectId}.${ext2}`;
+          const filename = `${sanitizedName}_${objectId}.${ext3}`;
           const uploadURL2 = `/api/apply/${token}/local-upload/${folderName}/${filename}`;
           const objectPath2 = `/objects/uploads/${folderName}/${filename}`;
           return res.json({ uploadURL: uploadURL2, objectPath: objectPath2, metadata: { name: name2.trim(), size, contentType: cleanContentType } });
@@ -1108685,6 +1108710,27 @@ var init_application_forms2 = __esm({
         for (const f3 of fileFields) {
           const val = subData[f3] || body[f3];
           if (val && !subData[f3]) subData[f3] = val;
+        }
+        const checkIsPdf = (url3) => {
+          if (!url3) return true;
+          if (url3.startsWith("data:")) return url3.startsWith("data:application/pdf") || url3.startsWith("data:application/x-pdf");
+          const clean = url3.split("?")[0].toLowerCase();
+          return clean.endsWith(".pdf");
+        };
+        const checkIsJpg = (url3) => {
+          if (!url3) return true;
+          if (url3.startsWith("data:")) return url3.startsWith("data:image/jpeg") || url3.startsWith("data:image/jpg");
+          const clean = url3.split("?")[0].toLowerCase();
+          return clean.endsWith(".jpg") || clean.endsWith(".jpeg");
+        };
+        if (subData.lor1Url && !checkIsPdf(subData.lor1Url)) {
+          return res.status(400).json({ error: "Only PDF files (.pdf) are accepted for LOR 1" });
+        }
+        if (subData.lor2Url && !checkIsPdf(subData.lor2Url)) {
+          return res.status(400).json({ error: "Only PDF files (.pdf) are accepted for LOR 2" });
+        }
+        if (subData.photoUrl && !checkIsJpg(subData.photoUrl)) {
+          return res.status(400).json({ error: "Only JPEG/JPG images (.jpg, .jpeg) are accepted for Passport Photograph" });
         }
         const candidateName = subData.fullName || "candidate";
         if (subData.lor1Url && subData.lor1Url.startsWith("data:")) {
@@ -1140579,13 +1140625,36 @@ router24.post("/storage/uploads/request-url", requireAuth, async (req, res) => {
     res.status(400).json({ error: "Missing or invalid required fields: name, contentType" });
     return;
   }
+  const ext2 = (name2.split(".").pop() ?? "").toLowerCase();
+  const isLor = /lor|recommendation/i.test(name2) || typeof req.body?.docType === "string" && /lor/i.test(req.body.docType);
+  const isPhoto = /photo|passport/i.test(name2) || typeof req.body?.docType === "string" && /photo/i.test(req.body.docType);
+  if (isLor) {
+    if (ext2 !== "pdf") {
+      res.status(400).json({ error: "Only PDF files (.pdf) are accepted for Letters of Recommendation (LOR)" });
+      return;
+    }
+    if (contentType && !contentType.includes("pdf") && contentType !== "application/octet-stream") {
+      res.status(400).json({ error: "Only PDF files (.pdf) are accepted for Letters of Recommendation (LOR)" });
+      return;
+    }
+  }
+  if (isPhoto) {
+    if (ext2 !== "jpg" && ext2 !== "jpeg") {
+      res.status(400).json({ error: "Only JPEG/JPG images (.jpg, .jpeg) are accepted for Passport Photograph" });
+      return;
+    }
+    if (contentType && !["image/jpeg", "image/jpg", "application/octet-stream"].includes(contentType.toLowerCase())) {
+      res.status(400).json({ error: "Only JPEG/JPG images (.jpg, .jpeg) are accepted for Passport Photograph" });
+      return;
+    }
+  }
   try {
     const isReplit = !!process.env.REPL_ID;
     if (!isReplit) {
       const objectId = Math.random().toString(36).substring(2, 10);
-      const ext2 = name2.split(".").pop() ?? "bin";
+      const ext3 = name2.split(".").pop() ?? "bin";
       const sanitizedName = name2.split(".")[0].replace(/[^a-zA-Z0-9]/g, "_");
-      const filename = `${sanitizedName}_${objectId}.${ext2}`;
+      const filename = `${sanitizedName}_${objectId}.${ext3}`;
       const uploadURL2 = `/api/storage/local-upload/${filename}`;
       const objectPath2 = `/objects/uploads/${filename}`;
       return res.json({ uploadURL: uploadURL2, objectPath: objectPath2, metadata: { name: name2.trim(), size, contentType } });

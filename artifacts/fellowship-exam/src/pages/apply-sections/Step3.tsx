@@ -39,13 +39,13 @@ export default function Step3({
                 {err("lor1RefEmail")}
               </div>
               <div className="sm:col-span-2 space-y-1.5">
-                <Label>Upload LOR 1 <span className="text-destructive">*</span> <span className="text-muted-foreground text-xs">(PDF, JPG, PNG — images auto-formatted to standard PDF)</span></Label>
+                <Label>Upload LOR 1 <span className="text-destructive">*</span> <span className="text-muted-foreground text-xs">(PDF format only — .pdf)</span></Label>
                 <label className={`flex items-center gap-3 border-2 border-dashed rounded-lg p-3 cursor-pointer transition-colors ${lor1File ? "border-green-500/50 bg-green-500/10 dark:bg-green-500/20" : "border-border hover:border-primary/50"}`}>
-                  <input type="file" accept=".pdf,application/pdf,image/jpeg,image/jpg,image/png,image/webp" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLorFile(f, "lor1"); }} />
+                  <input type="file" accept=".pdf,application/pdf" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLorFile(f, "lor1"); }} />
                   {lor1File ? (
                     <><FileText className="h-5 w-5 text-green-600 shrink-0" /><span className="text-sm truncate">{lor1File.name}</span><button type="button" onClick={(e) => { e.preventDefault(); setLor1File(null); }} className="ml-auto text-muted-foreground hover:text-destructive"><XIcon className="h-4 w-4" /></button></>
                   ) : (
-                    <><Upload className="h-5 w-5 text-muted-foreground shrink-0" /><span className="text-sm text-muted-foreground">Select PDF or Image</span></>
+                    <><Upload className="h-5 w-5 text-muted-foreground shrink-0" /><span className="text-sm text-muted-foreground">Select PDF file</span></>
                   )}
                 </label>
                 {lor1Error && <p className="text-xs text-destructive">{lor1Error}</p>}
@@ -75,13 +75,13 @@ export default function Step3({
                 {err("lor2RefEmail")}
               </div>
               <div className="sm:col-span-2 space-y-1.5">
-                <Label>Upload LOR 2 <span className="text-destructive">*</span> <span className="text-muted-foreground text-xs">(PDF, JPG, PNG — images auto-formatted to standard PDF)</span></Label>
+                <Label>Upload LOR 2 <span className="text-destructive">*</span> <span className="text-muted-foreground text-xs">(PDF format only — .pdf)</span></Label>
                 <label className={`flex items-center gap-3 border-2 border-dashed rounded-lg p-3 cursor-pointer transition-colors ${lor2File ? "border-green-500/50 bg-green-500/10 dark:bg-green-500/20" : "border-border hover:border-primary/50"}`}>
-                  <input type="file" accept=".pdf,application/pdf,image/jpeg,image/jpg,image/png,image/webp" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLorFile(f, "lor2"); }} />
+                  <input type="file" accept=".pdf,application/pdf" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLorFile(f, "lor2"); }} />
                   {lor2File ? (
                     <><FileText className="h-5 w-5 text-green-600 shrink-0" /><span className="text-sm truncate">{lor2File.name}</span><button type="button" onClick={(e) => { e.preventDefault(); setLor2File(null); }} className="ml-auto text-muted-foreground hover:text-destructive"><XIcon className="h-4 w-4" /></button></>
                   ) : (
-                    <><Upload className="h-5 w-5 text-muted-foreground shrink-0" /><span className="text-sm text-muted-foreground">Select PDF or Image</span></>
+                    <><Upload className="h-5 w-5 text-muted-foreground shrink-0" /><span className="text-sm text-muted-foreground">Select PDF file</span></>
                   )}
                 </label>
                 {lor2Error && <p className="text-xs text-destructive">{lor2Error}</p>}
@@ -150,13 +150,13 @@ export default function Step3({
             </div>
 
             <div className="space-y-1.5">
-              <Label>Passport Photo <span className="text-destructive">*</span> <span className="text-muted-foreground text-xs">(JPG, PNG, WebP — auto-cropped to passport format)</span></Label>
+              <Label>Passport Photo <span className="text-destructive">*</span> <span className="text-muted-foreground text-xs">(JPEG / JPG only — .jpg, .jpeg)</span></Label>
               <label className={`flex items-center gap-3 border-2 border-dashed rounded-lg p-3 cursor-pointer transition-colors ${photoFile ? "border-green-500/50 bg-green-500/10 dark:bg-green-500/20" : "border-border hover:border-primary/50"}`}>
-                <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/*" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoFile(f); }} />
+                <input type="file" accept="image/jpeg,image/jpg,.jpg,.jpeg" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoFile(f); }} />
                 {photoFile ? (
                   <><ImageIcon className="h-5 w-5 text-green-600 shrink-0" /><span className="text-sm truncate">{photoFile.name}</span><button type="button" onClick={(e) => { e.preventDefault(); setPhotoFile(null); }} className="ml-auto text-muted-foreground hover:text-destructive"><XIcon className="h-4 w-4" /></button></>
                 ) : (
-                  <><Upload className="h-5 w-5 text-muted-foreground shrink-0" /><span className="text-sm text-muted-foreground">Select passport photo</span></>
+                  <><Upload className="h-5 w-5 text-muted-foreground shrink-0" /><span className="text-sm text-muted-foreground">Select JPEG/JPG photo</span></>
                 )}
               </label>
               {photoError && <p className="text-xs text-destructive">{photoError}</p>}

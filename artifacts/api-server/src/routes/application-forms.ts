@@ -2517,8 +2517,29 @@ router.post("/apply/:token/request-upload-url", async (req, res) => {
     return res.status(400).json({ error: "Missing required field: name" });
   }
 
-  // Accept ANY file format and ANY size — no restriction
-  const cleanContentType = contentType && typeof contentType === "string" ? contentType : "application/octet-stream";
+  const ext = (name.split('.').pop() ?? "").toLowerCase();
+  const isLor = (fieldName && /lor|recommendation/i.test(fieldName)) || /lor/i.test(name);
+  const isPhoto = (fieldName && /photo|passport/i.test(fieldName)) || /photo|passport/i.test(name);
+
+  if (isLor) {
+    if (ext !== "pdf") {
+      return res.status(400).json({ error: "Only PDF files (.pdf) are accepted for Letters of Recommendation (LOR)" });
+    }
+    if (contentType && !contentType.includes("pdf") && contentType !== "application/octet-stream") {
+      return res.status(400).json({ error: "Only PDF files (.pdf) are accepted for Letters of Recommendation (LOR)" });
+    }
+  }
+
+  if (isPhoto) {
+    if (ext !== "jpg" && ext !== "jpeg") {
+      return res.status(400).json({ error: "Only JPEG/JPG images (.jpg, .jpeg) are accepted for Passport Photograph" });
+    }
+    if (contentType && !["image/jpeg", "image/jpg", "application/octet-stream"].includes(contentType.toLowerCase())) {
+      return res.status(400).json({ error: "Only JPEG/JPG images (.jpg, .jpeg) are accepted for Passport Photograph" });
+    }
+  }
+
+  const cleanContentType = contentType && typeof contentType === "string" ? contentType : (isLor ? "application/pdf" : isPhoto ? "image/jpeg" : "application/octet-stream");
 
   try {
     const isReplit = !!process.env.REPL_ID;
@@ -2745,7 +2766,15 @@ async function saveBase64FileIfPresent(dataUrl: string | undefined, candidateNam
   try {
     const matches = dataUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
     if (!matches || matches.length !== 3) return dataUrl;
-    const contentType = matches[1];
+    const contentType = matches[1].toLowerCase();
+
+    if (fieldName.startsWith("lor") && !contentType.includes("pdf")) {
+      throw new Error(`Only PDF files (.pdf) are accepted for Letters of Recommendation (${fieldName})`);
+    }
+    if (fieldName === "photo" && !contentType.includes("jpeg") && !contentType.includes("jpg")) {
+      throw new Error("Only JPEG/JPG images (.jpg, .jpeg) are accepted for Passport Photograph");
+    }
+
     const buffer = Buffer.from(matches[2], "base64");
     const ext = contentType.includes("pdf") ? "pdf" : (contentType.includes("png") ? "png" : "jpg");
     const folderName = candidateName ? candidateName.trim().replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_") : "candidate";
@@ -2846,6 +2875,30 @@ router.post("/apply/:token", async (req, res) => {
     for (const f of fileFields) {
       const val = subData[f] || body[f];
       if (val && !subData[f]) subData[f] = val;
+    }
+
+    // Strictly validate file types for LOR (PDF only) and Passport photo (JPEG/JPG only)
+    const checkIsPdf = (url?: string | null) => {
+      if (!url) return true;
+      if (url.startsWith("data:")) return url.startsWith("data:application/pdf") || url.startsWith("data:application/x-pdf");
+      const clean = url.split("?")[0].toLowerCase();
+      return clean.endsWith(".pdf");
+    };
+    const checkIsJpg = (url?: string | null) => {
+      if (!url) return true;
+      if (url.startsWith("data:")) return url.startsWith("data:image/jpeg") || url.startsWith("data:image/jpg");
+      const clean = url.split("?")[0].toLowerCase();
+      return clean.endsWith(".jpg") || clean.endsWith(".jpeg");
+    };
+
+    if (subData.lor1Url && !checkIsPdf(subData.lor1Url)) {
+      return res.status(400).json({ error: "Only PDF files (.pdf) are accepted for LOR 1" });
+    }
+    if (subData.lor2Url && !checkIsPdf(subData.lor2Url)) {
+      return res.status(400).json({ error: "Only PDF files (.pdf) are accepted for LOR 2" });
+    }
+    if (subData.photoUrl && !checkIsJpg(subData.photoUrl)) {
+      return res.status(400).json({ error: "Only JPEG/JPG images (.jpg, .jpeg) are accepted for Passport Photograph" });
     }
 
     // Convert any Base64 data URLs into persistent files
