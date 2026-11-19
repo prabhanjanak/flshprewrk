@@ -1064,9 +1064,37 @@ async function seedAndHealBaselineData(): Promise<void> {
       ? janForm.sectionsConfig
       : DEFAULT_SECTIONS;
 
-    // Ensure Cornea Preferred Center includes Jaipur
+    // Ensure Cornea Preferred Center includes Jaipur and instructions have latest document format rules
     if (Array.isArray(existingSections)) {
       for (const sec of existingSections) {
+        if (sec.id === "instructions" || (sec.title && sec.title.toLowerCase().includes("instruction"))) {
+          if (sec.fields) {
+            for (const field of sec.fields) {
+              if (field.id === "intro_text") {
+                const defaultIntro = (DEFAULT_SECTIONS[0]?.fields?.[0] as any)?.defaultValue;
+                if (defaultIntro) {
+                  (field as any).defaultValue = defaultIntro;
+                }
+              }
+            }
+          }
+        }
+        if (sec.id === "lor") {
+          sec.description = "Upload two LORs from the last 6 months (PDF format only).";
+          if (sec.fields) {
+            for (const field of sec.fields) {
+              if (field.id === "lor1Url") field.label = "LOR 1 PDF (PDF only)";
+              if (field.id === "lor2Url") field.label = "LOR 2 PDF (PDF only)";
+            }
+          }
+        }
+        if (sec.id === "final") {
+          if (sec.fields) {
+            for (const field of sec.fields) {
+              if (field.id === "photoUrl") field.label = "Passport Size Photograph (JPEG/JPG only)";
+            }
+          }
+        }
         if (sec.fields) {
           for (const field of sec.fields) {
             if (field.id === "unit_cornea" && Array.isArray(field.options)) {

@@ -3,7 +3,8 @@ import { loadDraft, saveDraft, clearDraft } from "../lib/draftStore";
 import logoUrl from "../assets/seh_sav_logo_1777703794142.jpg";
 import {
   Loader2, AlertCircle, CheckCircle2, ChevronRight, ChevronLeft, ChevronDown,
-  CreditCard, Building2, Copy, Check, Upload, ArrowRightLeft, ShieldCheck, QrCode
+  CreditCard, Building2, Copy, Check, Upload, ArrowRightLeft, ShieldCheck, QrCode,
+  FileText, Image as ImageIcon
 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -1111,6 +1112,40 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
                     </p>
                   </div>
                 </div>
+
+                {(currentSection.id === "instructions" || currentSection.title?.toLowerCase().includes("instruction")) && (
+                  <div className="mt-4 p-5 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl shadow-sm space-y-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-[#000080] text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                        📁
+                      </div>
+                      <h3 className="text-sm font-black text-blue-950 uppercase tracking-wide">
+                        Mandatory Document Upload Format Requirements
+                      </h3>
+                    </div>
+                    <p className="text-xs text-blue-900 font-medium leading-relaxed">
+                      Applicants must ensure their documents are prepared strictly in the required format before proceeding:
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div className="bg-white/95 border-2 border-red-200 rounded-xl p-3.5 flex items-start gap-3 shadow-xs">
+                        <FileText className="w-6 h-6 text-red-600 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs font-bold text-slate-900">Letters of Recommendation (LOR 1 & LOR 2)</p>
+                          <p className="text-[12px] font-black text-red-600 mt-0.5">Strictly PDF format only (.pdf)</p>
+                          <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">Max 15MB each. Image files (JPG, PNG) or Word documents will be rejected.</p>
+                        </div>
+                      </div>
+                      <div className="bg-white/95 border-2 border-emerald-200 rounded-xl p-3.5 flex items-start gap-3 shadow-xs">
+                        <ImageIcon className="w-6 h-6 text-emerald-600 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs font-bold text-slate-900">Passport Photograph</p>
+                          <p className="text-[12px] font-black text-emerald-600 mt-0.5">Strictly JPEG / JPG format only (.jpg, .jpeg)</p>
+                          <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">Max 10MB. Clear frontal color photo. PNG, PDF, or other formats will be rejected.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <CardContent className="p-6 md:p-8 space-y-8">

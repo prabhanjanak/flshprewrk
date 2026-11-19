@@ -1078067,7 +1078067,7 @@ var init_default_sections = __esm({
             id: "intro_text",
             type: "info",
             label: "Entrance & Induction Schedule \u2014 January Intake",
-            defaultValue: "<b>1. Important Examination & Induction Dates:</b><br/>\u2022 <b>07.12.2026, Monday:</b> Retina Fellowship Entrance & Selection (Bengaluru)<br/>\u2022 <b>08.12.2026, Tuesday:</b> Anterior Segment Fellowship Entrance & Selection (Bengaluru)<br/>\u2022 <b>07.01.2027 & 08.01.2027 (Thursday & Friday):</b> Mandatory Induction for New Fellows (Bengaluru)<br/>\u2022 <b>11.01.2027, Monday:</b> New Fellows Reporting at respective Hospital Units<br/><br/><b>2. Multiple Sub-specialties:</b> Candidates can apply for multiple Sub-specialties in a single application form. Separate fees apply for each specialization (Rs. 2750/- per specialization).<br/><br/><b>3. Selection Process:</b> Selection involves an objective assessment of theoretical knowledge (MCQ pattern), OSCE, and skills evaluation with an interview by a panel of faculty.<br/><br/><b>4. Eligibility & Age Limit:</b> The age limit is 35 years. Applicants appearing for interviews must have cleared the results of PG (MS/MD) and DNB (Theory & Practical). Candidates awaiting PG results are not eligible.<br/><br/><b>5. Government Bond / Rural Service:</b> Applicants under Government bond or Compulsory Rural Service must submit a 'No Objection Certificate' during the examination.<br/><br/><b>6. State Medical Council NOC:</b> Selected fellows must submit NOC from their State Medical Council within 3 days of accepting the Fellowship Offer.<br/><br/><b>7. Required Documents:</b> Basic & post-graduate educational certificates, current valid medical registration license, complete CV, passport-size photograph, and two Letters of Recommendation."
+            defaultValue: "<b>1. Important Examination & Induction Dates:</b><br/>\u2022 <b>07.12.2026, Monday:</b> Retina Fellowship Entrance & Selection (Bengaluru)<br/>\u2022 <b>08.12.2026, Tuesday:</b> Anterior Segment Fellowship Entrance & Selection (Bengaluru)<br/>\u2022 <b>07.01.2027 & 08.01.2027 (Thursday & Friday):</b> Mandatory Induction for New Fellows (Bengaluru)<br/>\u2022 <b>11.01.2027, Monday:</b> New Fellows Reporting at respective Hospital Units<br/><br/><b>2. Multiple Sub-specialties:</b> Candidates can apply for multiple Sub-specialties in a single application form. Separate fees apply for each specialization (Rs. 2750/- per specialization).<br/><br/><b>3. Selection Process:</b> Selection involves an objective assessment of theoretical knowledge (MCQ pattern), OSCE, and skills evaluation with an interview by a panel of faculty.<br/><br/><b>4. Eligibility & Age Limit:</b> The age limit is 35 years. Applicants appearing for interviews must have cleared the results of PG (MS/MD) and DNB (Theory & Practical). Candidates awaiting PG results are not eligible.<br/><br/><b>5. Government Bond / Rural Service:</b> Applicants under Government bond or Compulsory Rural Service must submit a 'No Objection Certificate' during the examination.<br/><br/><b>6. State Medical Council NOC:</b> Selected fellows must submit NOC from their State Medical Council within 3 days of accepting the Fellowship Offer.<br/><br/><b>7. Mandatory Document Upload Specifications:</b><br/>\u2022 <b>Letters of Recommendation (LOR 1 & LOR 2):</b> Must be uploaded strictly in <b>PDF format only (.pdf)</b> from referees within the last 6 months (Max 15MB each). Non-PDF files (images, Word documents, etc.) will be rejected by the system.<br/>\u2022 <b>Passport-size Photograph:</b> Must be uploaded strictly in <b>JPEG or JPG format only (.jpg, .jpeg)</b> (Max 10MB). Image files must be clear and recent. PNG, PDF, and other file formats will be rejected by the system.<br/>\u2022 <b>Other Required Documents:</b> Basic & post-graduate educational certificates, current valid medical registration license, and complete CV."
           }
         ]
       },
@@ -1108615,6 +1108615,25 @@ var init_application_forms2 = __esm({
             })
           }));
         } catch (_) {
+        }
+      }
+      if (Array.isArray(sectionsConfig)) {
+        const defaultIntro = DEFAULT_SECTIONS[0]?.fields?.[0]?.defaultValue;
+        if (defaultIntro) {
+          sectionsConfig = sectionsConfig.map((sec) => {
+            if (sec.id === "instructions" || sec.title && sec.title.toLowerCase().includes("instruction")) {
+              return {
+                ...sec,
+                fields: sec.fields?.map((f3) => {
+                  if (f3.id === "intro_text") {
+                    return { ...f3, defaultValue: defaultIntro };
+                  }
+                  return f3;
+                })
+              };
+            }
+            return sec;
+          });
         }
       }
       res.json({
@@ -1144128,6 +1144147,34 @@ async function seedAndHealBaselineData() {
     const existingSections = Array.isArray(janForm.sectionsConfig) && janForm.sectionsConfig.length > 0 ? janForm.sectionsConfig : DEFAULT_SECTIONS;
     if (Array.isArray(existingSections)) {
       for (const sec of existingSections) {
+        if (sec.id === "instructions" || sec.title && sec.title.toLowerCase().includes("instruction")) {
+          if (sec.fields) {
+            for (const field of sec.fields) {
+              if (field.id === "intro_text") {
+                const defaultIntro = DEFAULT_SECTIONS[0]?.fields?.[0]?.defaultValue;
+                if (defaultIntro) {
+                  field.defaultValue = defaultIntro;
+                }
+              }
+            }
+          }
+        }
+        if (sec.id === "lor") {
+          sec.description = "Upload two LORs from the last 6 months (PDF format only).";
+          if (sec.fields) {
+            for (const field of sec.fields) {
+              if (field.id === "lor1Url") field.label = "LOR 1 PDF (PDF only)";
+              if (field.id === "lor2Url") field.label = "LOR 2 PDF (PDF only)";
+            }
+          }
+        }
+        if (sec.id === "final") {
+          if (sec.fields) {
+            for (const field of sec.fields) {
+              if (field.id === "photoUrl") field.label = "Passport Size Photograph (JPEG/JPG only)";
+            }
+          }
+        }
         if (sec.fields) {
           for (const field of sec.fields) {
             if (field.id === "unit_cornea" && Array.isArray(field.options)) {

@@ -2710,6 +2710,27 @@ router.get("/apply/:token", async (req, res) => {
     } catch (_) {}
   }
 
+  // Ensure instructions section reflects latest document format instructions
+  if (Array.isArray(sectionsConfig)) {
+    const defaultIntro = (DEFAULT_SECTIONS[0]?.fields?.[0] as any)?.defaultValue;
+    if (defaultIntro) {
+      sectionsConfig = sectionsConfig.map((sec) => {
+        if (sec.id === "instructions" || (sec.title && sec.title.toLowerCase().includes("instruction"))) {
+          return {
+            ...sec,
+            fields: sec.fields?.map((f: any) => {
+              if (f.id === "intro_text") {
+                return { ...f, defaultValue: defaultIntro };
+              }
+              return f;
+            })
+          };
+        }
+        return sec;
+      });
+    }
+  }
+
   res.json({
     ...form,
     programName: program?.name ?? null,
