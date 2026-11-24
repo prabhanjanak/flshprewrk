@@ -17,6 +17,8 @@ import { Grid3x3 } from "lucide-react";
 interface DoctorStats {
   panelId?: number | null;
   panelName: string | null;
+  roomNumber?: string | null;
+  examDate?: string | null;
   specialityId?: number | null;
   specialityName: string | null;
   isMindMatterPanel?: boolean;
@@ -24,6 +26,8 @@ interface DoctorStats {
   panels?: Array<{
     panelId: number;
     panelName: string;
+    roomNumber?: string | null;
+    examDate?: string | null;
     specialityId: number | null;
     specialityName: string | null;
     isMindMatter: boolean;
@@ -86,42 +90,60 @@ export default function DoctorDashboardPage({ onOpenExamination }: { onOpenExami
           <div className="space-y-3">
             <div className="flex items-center gap-2 bg-orange-50 rounded-full px-3.5 py-1 border border-orange-100 w-fit">
               <Stethoscope className="h-3.5 w-3.5 text-orange-600" />
-              <span className="text-[10px] font-bold text-orange-800 uppercase tracking-widest">Doctor / Interviewer Portal</span>
+              <span className="text-[10px] font-bold text-orange-800 uppercase tracking-widest">
+                Station Evaluation Portal · {stats?.examDate || "Entrance Exam"}
+              </span>
             </div>
             <h1 className="text-3xl md:text-4xl font-black tracking-tight text-slate-900 leading-tight">
-              Welcome, Dr. {user?.fullName?.split(" ")[0]}
+              {stats?.panelName || "Interview Station"}
             </h1>
+            <div className="flex items-center gap-2 flex-wrap pt-1">
+              {stats?.roomNumber && (
+                <Badge className="bg-[#000080] text-white px-3 py-1 font-bold text-xs uppercase tracking-wider">
+                  Room: {stats.roomNumber}
+                </Badge>
+              )}
+              {stats?.examDate && (
+                <Badge variant="outline" className="border-indigo-200 text-indigo-700 bg-indigo-50 px-3 py-1 font-bold text-xs">
+                  Date: {stats.examDate}
+                </Badge>
+              )}
+              {stats?.specialityName && (
+                <Badge variant="outline" className="border-emerald-200 text-emerald-700 bg-emerald-50 px-3 py-1 font-bold text-xs">
+                  Specialty: {stats.specialityName}
+                </Badge>
+              )}
+              {stats?.isMindMatterPanel && (
+                <Badge className="bg-amber-500 text-white px-3 py-1 font-bold text-xs uppercase">
+                  Mind Matters Station (Max 10)
+                </Badge>
+              )}
+              <Badge variant="outline" className="border-slate-300 text-slate-700 bg-slate-50 px-3 py-1 font-bold text-xs">
+                Consensus Mark: 1 Score per Station
+              </Badge>
+            </div>
             <p className="text-sm text-slate-500 font-semibold max-w-xl leading-relaxed">
-              Your personal candidate examination and interview dashboard. Access candidate application dossiers, enter psychometry marks and applied specialization scores.
+              Official scoring portal for this interview station. Access candidate dossiers, review diagnostic & surgical experience, and enter consensus marks on behalf of this station.
             </p>
-            {stats?.panelName && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-xl px-4 py-2 w-fit">
-                  <LayoutDashboard className="h-4 w-4" />
-                  <span className="text-xs font-bold uppercase tracking-wider">
-                    Panel: {stats.panelName}
-                    {stats.specialityName && <span className="ml-2 text-indigo-500">— {stats.specialityName}</span>}
-                  </span>
+            {stats?.panels && stats.panels.length > 1 && (
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Switch Station / Panel:</span>
+                  {stats.panels.map((p) => (
+                    <button
+                      key={p.panelId}
+                      type="button"
+                      onClick={() => setSelectedPanelId(p.panelId)}
+                      className={`px-3 py-1 rounded-lg text-[11px] font-bold border transition-all ${
+                        stats.panelId === p.panelId
+                          ? "bg-indigo-600 text-white border-indigo-700 shadow-xs"
+                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      {p.panelName}{p.roomNumber ? ` (${p.roomNumber})` : ""}{p.isMindMatter ? " [MM]" : p.specialityName ? ` [${p.specialityName}]` : ""}
+                    </button>
+                  ))}
                 </div>
-                {stats.panels && stats.panels.length > 1 && (
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Switch Panel:</span>
-                    {stats.panels.map((p) => (
-                      <button
-                        key={p.panelId}
-                        type="button"
-                        onClick={() => setSelectedPanelId(p.panelId)}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all ${
-                          stats.panelId === p.panelId
-                            ? "bg-indigo-600 text-white border-indigo-700"
-                            : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                        }`}
-                      >
-                        {p.panelName}{p.isMindMatter ? " (MM)" : p.specialityName ? ` (${p.specialityName})` : ""}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -371,6 +393,8 @@ export default function DoctorDashboardPage({ onOpenExamination }: { onOpenExami
             candidateId={selectedCandidateId}
             open={!!selectedCandidateId}
             onClose={() => setSelectedCandidateId(null)}
+            stationName={stats?.panelName ?? null}
+            roomNumber={stats?.roomNumber ?? null}
             panelSpecialityId={stats?.specialityId ?? null}
             panelSpecialityName={stats?.specialityName ?? null}
             isMindMatterPanel={stats?.isMindMatterPanel ?? false}

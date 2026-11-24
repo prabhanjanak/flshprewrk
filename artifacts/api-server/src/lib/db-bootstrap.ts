@@ -350,6 +350,7 @@ async function createAllTables(): Promise<void> {
       room_number TEXT NOT NULL,
       program_id INTEGER REFERENCES programs(id),
       speciality_id INTEGER REFERENCES specialities(id),
+      exam_date TEXT,
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
       is_mock BOOLEAN NOT NULL DEFAULT FALSE,
       is_mind_matter BOOLEAN NOT NULL DEFAULT FALSE,
@@ -761,6 +762,7 @@ async function synchronizeColumns(): Promise<void> {
     "ALTER TABLE interview_panels ADD COLUMN IF NOT EXISTS speciality_id INTEGER REFERENCES specialities(id)",
     "ALTER TABLE interview_panels ADD COLUMN IF NOT EXISTS is_mock BOOLEAN NOT NULL DEFAULT FALSE",
     "ALTER TABLE interview_panels ADD COLUMN IF NOT EXISTS is_mind_matter BOOLEAN NOT NULL DEFAULT FALSE",
+    "ALTER TABLE interview_panels ADD COLUMN IF NOT EXISTS exam_date TEXT",
 
     // interview_panel_members
     "ALTER TABLE interview_panel_members ADD COLUMN IF NOT EXISTS marks_entry_enabled BOOLEAN NOT NULL DEFAULT FALSE",
@@ -1416,7 +1418,147 @@ async function seedAndHealBaselineData(): Promise<void> {
     logger.warn({ err }, "[DB-BOOTSTRAP] Specialities deduplication notice (non-fatal)");
   }
 
+  // Seed Official Interview Stations & Tablet Logins for January 2027 intake
+  try {
+    await seedOfficialStationsAndLogins(jan27Prog.id);
+  } catch (err: any) {
+    logger.error({ err }, "[DB-BOOTSTRAP] Failed to seed official stations (non-fatal)");
+  }
+
   logger.info("[DB-BOOTSTRAP] Baseline data seeding and state rework completed.");
+}
+
+export const STATION_PASSWORD_HASH = "$2b$10$RLBEB1tY9W0HeW/uiELgDOVL2P/Od79JDz3N53D3wGHdaNJEkIm.a"; // Station@2026
+
+export const OFFICIAL_STATIONS = [
+  // ── 07.12.2026 (Retina & Mind Matters) ──────────────────────────────
+  { date: "07.12.2026", stationName: "Vitreo Retina 1", room: "Class Room 1", specialityName: "Vitreo Retina", isMindMatter: false, email: "station.vr1@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Vitreo Retina 2", room: "Class Room 2", specialityName: "Vitreo Retina", isMindMatter: false, email: "station.vr2@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Medical Retina 1", room: "Anatomy Lab", specialityName: "Medical Retina", isMindMatter: false, email: "station.mr1@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Medical Retina 2", room: "Demo Room", specialityName: "Medical Retina", isMindMatter: false, email: "station.mr2@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Mind Matters 1", room: "Board Room", specialityName: null, isMindMatter: true, email: "station.mm1@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Mind Matters 2", room: "Research Directors Room", specialityName: null, isMindMatter: true, email: "station.mm2@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Mind Matters 3", room: "Clinical Research Room", specialityName: null, isMindMatter: true, email: "station.mm3@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Mind Matters 4", room: "Principals Room", specialityName: null, isMindMatter: true, email: "station.mm4@sankaraeye.com" },
+
+  // ── 08.12.2026 (Anterior Segment & Mind Matters) ─────────────────────
+  { date: "08.12.2026", stationName: "Cornea 1", room: "Class Room 1", specialityName: "Cornea", isMindMatter: false, email: "station.cornea1@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Cornea 2", room: "Class Room 2", specialityName: "Cornea", isMindMatter: false, email: "station.cornea2@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Phaco Refractive 1", room: "Vision Rehab Comp Skills Lab", specialityName: "Phaco Refractive", isMindMatter: false, email: "station.phaco1@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Phaco Refractive 2", room: "Vision Rehab Recording Lab", specialityName: "Phaco Refractive", isMindMatter: false, email: "station.phaco2@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Glaucoma", room: "Seminar Hall", specialityName: "Glaucoma", isMindMatter: false, email: "station.glaucoma@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Pediatric Ophthalmology", room: "Anatomy Lab", specialityName: "Pediatric Ophthalmology", isMindMatter: false, email: "station.pediatric@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Oculoplasty", room: "Demo Room", specialityName: "Oculoplasty", isMindMatter: false, email: "station.oculoplasty@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "IOL 1", room: "Anatomy Lab", specialityName: "IOL Fellowship", isMindMatter: false, email: "station.iol1@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "IOL 2", room: "Demo Room", specialityName: "IOL Fellowship", isMindMatter: false, email: "station.iol2@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "IOL 3", room: "Seminar Hall", specialityName: "IOL Fellowship", isMindMatter: false, email: "station.iol3@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "IOL 4", room: "Class Room 2", specialityName: "IOL Fellowship", isMindMatter: false, email: "station.iol4@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "IOL 5", room: "Class Room 1", specialityName: "IOL Fellowship", isMindMatter: false, email: "station.iol5@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Mind Matters 1", room: "Board Room", specialityName: null, isMindMatter: true, email: "station.mm1@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Mind Matters 2", room: "Research Directors Room", specialityName: null, isMindMatter: true, email: "station.mm2@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Mind Matters 3", room: "Clinical Research Room", specialityName: null, isMindMatter: true, email: "station.mm3@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Mind Matters 4", room: "Principals Room", specialityName: null, isMindMatter: true, email: "station.mm4@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Mind Matters 5", room: "Vision Rehab Recording Lab", specialityName: null, isMindMatter: true, email: "station.mm5@sankaraeye.com" },
+];
+
+async function seedOfficialStationsAndLogins(programId: number): Promise<void> {
+  logger.info("[DB-BOOTSTRAP] Seeding Official Interview Stations & Logins...");
+
+  const allSpecs = await db.select().from(specialitiesTable).where(eq(specialitiesTable.programId, programId));
+  const specMap = new Map<string, number>();
+  for (const s of allSpecs) {
+    specMap.set(s.name.toLowerCase().trim(), s.id);
+  }
+
+  const candidatesResult = await db.execute(sql`SELECT id FROM candidates WHERE status != 'rejected' AND is_mock = FALSE ORDER BY full_name ASC`);
+  const candidateIds = (candidatesResult.rows as Array<{ id: number }>).map(r => Number(r.id));
+
+  for (const st of OFFICIAL_STATIONS) {
+    const [existingUser] = await db.select().from(usersTable).where(eq(usersTable.email, st.email));
+    let userId: number;
+    if (existingUser) {
+      userId = existingUser.id;
+      await db.update(usersTable)
+        .set({
+          role: "doctor",
+          fullName: st.stationName,
+          passwordHash: STATION_PASSWORD_HASH,
+          active: true,
+          forcePasswordReset: false,
+        })
+        .where(eq(usersTable.id, userId));
+    } else {
+      const [newUser] = await db.insert(usersTable).values({
+        email: st.email,
+        fullName: st.stationName,
+        passwordHash: STATION_PASSWORD_HASH,
+        role: "doctor",
+        active: true,
+        forcePasswordReset: false,
+      } as any).returning();
+      userId = newUser!.id;
+    }
+
+    let specId: number | null = null;
+    if (st.specialityName) {
+      const normName = st.specialityName.toLowerCase().trim();
+      specId = specMap.get(normName) ?? null;
+      if (!specId) {
+        for (const [sName, sId] of specMap.entries()) {
+          if (sName.includes(normName) || normName.includes(sName)) {
+            specId = sId;
+            break;
+          }
+        }
+      }
+    }
+
+    const existingPanels = (await db.execute(sql`
+      SELECT id, name, room_number, exam_date FROM interview_panels
+      WHERE name = ${st.stationName} AND room_number = ${st.room} AND (exam_date = ${st.date} OR exam_date IS NULL)
+      LIMIT 1
+    `)).rows as Array<{ id: number }>;
+
+    let panelId: number;
+    if (existingPanels.length > 0) {
+      panelId = Number(existingPanels[0].id);
+      await db.execute(sql`
+        UPDATE interview_panels
+        SET program_id = ${programId},
+            speciality_id = ${specId},
+            is_mind_matter = ${st.isMindMatter},
+            exam_date = ${st.date},
+            is_active = TRUE
+        WHERE id = ${panelId}
+      `);
+    } else {
+      const inserted = (await db.execute(sql`
+        INSERT INTO interview_panels (name, room_number, exam_date, program_id, speciality_id, is_mind_matter, is_active, is_mock)
+        VALUES (${st.stationName}, ${st.room}, ${st.date}, ${programId}, ${specId}, ${st.isMindMatter}, TRUE, FALSE)
+        RETURNING id
+      `)).rows as Array<{ id: number }>;
+      panelId = Number(inserted[0].id);
+    }
+
+    await db.execute(sql`
+      INSERT INTO interview_panel_members (panel_id, doctor_id, is_main, marks_entry_enabled)
+      VALUES (${panelId}, ${userId}, TRUE, TRUE)
+      ON CONFLICT (panel_id, doctor_id) DO UPDATE SET is_main = TRUE, marks_entry_enabled = TRUE
+    `);
+
+    if (st.isMindMatter && candidateIds.length > 0) {
+      for (let pos = 0; pos < candidateIds.length; pos++) {
+        const cId = candidateIds[pos];
+        await db.execute(sql`
+          INSERT INTO panel_queue (panel_id, candidate_id, queue_position, status)
+          VALUES (${panelId}, ${cId}, ${pos}, 'waiting')
+          ON CONFLICT (panel_id, candidate_id) DO NOTHING
+        `).catch(() => {});
+      }
+    }
+  }
+
+  logger.info(`[DB-BOOTSTRAP] ✅ Seeded ${OFFICIAL_STATIONS.length} Official Stations & Station Logins.`);
 }
 
 /**

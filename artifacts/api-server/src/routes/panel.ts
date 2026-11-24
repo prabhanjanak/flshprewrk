@@ -19,16 +19,16 @@ db.execute(sql`ALTER TABLE interview_panels ADD COLUMN IF NOT EXISTS is_mind_mat
 async function getPanels(isMockMode: boolean = false, programId?: number | null) {
   const query = programId
     ? sql`
-        SELECT ip.id, ip.name, ip.room_number, ip.program_id, ip.speciality_id, ip.is_active, ip.is_mind_matter, ip.created_at
+        SELECT ip.id, ip.name, ip.room_number, ip.exam_date, ip.program_id, ip.speciality_id, ip.is_active, ip.is_mind_matter, ip.created_at
         FROM interview_panels ip
         WHERE ip.is_mock = ${isMockMode} AND (ip.program_id = ${programId} OR ip.program_id IS NULL)
-        ORDER BY ip.room_number
+        ORDER BY ip.exam_date ASC, ip.room_number ASC, ip.name ASC
       `
     : sql`
-        SELECT ip.id, ip.name, ip.room_number, ip.program_id, ip.speciality_id, ip.is_active, ip.is_mind_matter, ip.created_at
+        SELECT ip.id, ip.name, ip.room_number, ip.exam_date, ip.program_id, ip.speciality_id, ip.is_active, ip.is_mind_matter, ip.created_at
         FROM interview_panels ip
         WHERE ip.is_mock = ${isMockMode}
-        ORDER BY ip.room_number
+        ORDER BY ip.exam_date ASC, ip.room_number ASC, ip.name ASC
       `;
 
   const panels = (await db.execute(query)).rows as Array<Record<string, unknown>>;
@@ -44,6 +44,7 @@ async function getPanels(isMockMode: boolean = false, programId?: number | null)
     id: p["id"],
     name: p["name"],
     roomNumber: p["room_number"],
+    examDate: p["exam_date"],
     programId: p["program_id"],
     specialityId: p["speciality_id"],
     isActive: p["is_active"],
@@ -87,17 +88,17 @@ router.post("/panels",
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
   async (req, res) => {
-    const { name, roomNumber, programId, specialityId, doctorIds, mainDoctorId, isMindMatter } = req.body as {
+    const { name, roomNumber, programId, specialityId, doctorIds, mainDoctorId, isMindMatter, examDate } = req.body as {
       name: string; roomNumber: string; programId?: number; specialityId?: number;
-      doctorIds?: number[]; mainDoctorId?: number; isMindMatter?: boolean;
+      doctorIds?: number[]; mainDoctorId?: number; isMindMatter?: boolean; examDate?: string;
     };
     if (!name || !roomNumber) return res.status(400).json({ error: "name and roomNumber required" });
 
     const isMock = (req as any).isMockMode ?? false;
     const finalSpecId = isMindMatter ? null : (specialityId ?? null);
     const [panel] = (await db.execute(sql`
-      INSERT INTO interview_panels (name, room_number, program_id, speciality_id, is_mind_matter, is_mock)
-      VALUES (${name}, ${roomNumber}, ${programId ?? null}, ${finalSpecId}, ${isMindMatter ?? false}, ${isMock})
+      INSERT INTO interview_panels (name, room_number, exam_date, program_id, speciality_id, is_mind_matter, is_mock)
+      VALUES (${name}, ${roomNumber}, ${examDate ?? null}, ${programId ?? null}, ${finalSpecId}, ${isMindMatter ?? false}, ${isMock})
       RETURNING *
     `)).rows as Array<Record<string, unknown>>;
 
@@ -142,14 +143,15 @@ router.patch("/panels/:id",
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
   async (req, res) => {
     const id = Number(req.params["id"]);
-    const { name, roomNumber, isActive, specialityId, isMindMatter, doctorIds, mainDoctorId } = req.body as {
+    const { name, roomNumber, isActive, specialityId, isMindMatter, doctorIds, mainDoctorId, examDate } = req.body as {
       name?: string; roomNumber?: string; isActive?: boolean; specialityId?: number | null; isMindMatter?: boolean;
-      doctorIds?: number[]; mainDoctorId?: number | null;
+      doctorIds?: number[]; mainDoctorId?: number | null; examDate?: string;
     };
     const isMock = (req as any).isMockMode ?? false;
     const parts: string[] = [];
     if (name !== undefined) parts.push(`name = '${name.replace(/'/g, "''")}'`);
     if (roomNumber !== undefined) parts.push(`room_number = '${roomNumber.replace(/'/g, "''")}'`);
+    if (examDate !== undefined) parts.push(`exam_date = ${examDate ? `'${examDate.replace(/'/g, "''")}'` : "NULL"}`);
     if (isActive !== undefined) parts.push(`is_active = ${isActive}`);
     
     if (isMindMatter !== undefined) {

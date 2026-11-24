@@ -329,7 +329,7 @@ router.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor", "super_
 
   const panelQuery = userRole === "doctor"
     ? await readDb.execute(sql`
-        SELECT ip.id as panel_id, ip.name as panel_name, ip.speciality_id,
+        SELECT ip.id as panel_id, ip.name as panel_name, ip.room_number, ip.exam_date, ip.speciality_id,
                ip.is_mind_matter, ipm.marks_entry_enabled,
                s.name as speciality_name
         FROM interview_panel_members ipm
@@ -339,7 +339,7 @@ router.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor", "super_
         ORDER BY ip.is_mind_matter DESC, ip.id ASC
       `)
     : await readDb.execute(sql`
-        SELECT ip.id as panel_id, ip.name as panel_name, ip.speciality_id,
+        SELECT ip.id as panel_id, ip.name as panel_name, ip.room_number, ip.exam_date, ip.speciality_id,
                ip.is_mind_matter, TRUE as marks_entry_enabled,
                s.name as speciality_name
         FROM interview_panels ip
@@ -351,6 +351,8 @@ router.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor", "super_
   const allActivePanels = panelQuery.rows as Array<{
     panel_id: number;
     panel_name: string;
+    room_number?: string | null;
+    exam_date?: string | null;
     speciality_id: number | null;
     is_mind_matter: boolean | number;
     marks_entry_enabled: boolean | number;
@@ -484,6 +486,8 @@ router.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor", "super_
   res.json({
     panelId,
     panelName,
+    roomNumber: activePanel?.room_number ?? null,
+    examDate: activePanel?.exam_date ?? null,
     specialityId: panelSpecialityId,
     specialityName,
     isMindMatterPanel,
@@ -491,6 +495,8 @@ router.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor", "super_
     panels: allActivePanels.map((p) => ({
       panelId: Number(p.panel_id),
       panelName: String(p.panel_name ?? ""),
+      roomNumber: p.room_number ? String(p.room_number) : null,
+      examDate: p.exam_date ? String(p.exam_date) : null,
       specialityId: p.speciality_id != null ? Number(p.speciality_id) : null,
       specialityName: p.speciality_name ?? null,
       isMindMatter: p.is_mind_matter === true || p.is_mind_matter === 1,

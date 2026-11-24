@@ -1005,7 +1005,7 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
                   {[
                     `Please note your Application Reference (#${submissionId}) and Payment ID (${paymentVerified?.paymentId || "Verified"}) for all future correspondence.`,
                     "Our academic admissions committee will review your educational qualifications, registration certificate, and recommendation letters.",
-                    `Entrance examination schedule, written test syllabus, and interview call details will be communicated directly to your email (${form.email || "registered email"}).`,
+                    `Entrance examination schedule and interview call details will be communicated directly to your email (${form.email || "registered email"}).`,
                     "Admissions Office Desk: radhika@sankaraeye.com | Phone: +91 9666677505 / +91 80 2854 2727 (Bangalore Unit)."
                   ].map((step, idx) => (
                     <div key={idx} className="flex items-start gap-2.5">

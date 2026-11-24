@@ -54563,6 +54563,7 @@ var init_panels = __esm({
       isActive: boolean("is_active").notNull().default(true),
       isMock: boolean("is_mock").notNull().default(false),
       isMindMatter: boolean("is_mind_matter").notNull().default(false),
+      examDate: text("exam_date"),
       createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
     });
     interviewPanelMembersTable = pgTable("interview_panel_members", {
@@ -1110695,6 +1110696,54 @@ var init_candidates2 = __esm({
         res.status(500).json({ error: err.message || "An unexpected database error occurred while updating marks." });
       }
     });
+    router8.post("/candidates/batch-mcq-marks", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+      try {
+        const { updates } = req.body;
+        if (!Array.isArray(updates) || updates.length === 0) {
+          return res.status(400).json({ error: "Invalid updates array." });
+        }
+        const now = /* @__PURE__ */ new Date();
+        const userId = req.user.userId;
+        const ipAddress = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "127.0.0.1").split(",")[0].trim();
+        let updatedCount = 0;
+        for (const item of updates) {
+          if (item.mcqScore !== null && item.mcqScore !== void 0) {
+            if (item.mcqScore < 0 || item.mcqScore > 50) {
+              return res.status(400).json({ error: `MCQ score for candidate #${item.candidateId} must be between 0 and 50.` });
+            }
+          }
+          const [cand] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, item.candidateId));
+          if (cand) {
+            const newScoreStr = item.mcqScore !== null && item.mcqScore !== void 0 ? String(item.mcqScore) : null;
+            await db.update(candidatesTable).set({ mcqScore: newScoreStr, updatedAt: now }).where(eq(candidatesTable.id, item.candidateId));
+            await db.execute(sql`
+          UPDATE batch_candidates 
+          SET mcq_score = ${item.mcqScore} 
+          WHERE candidate_id = ${item.candidateId}
+        `).catch(() => {
+            });
+            if (String(cand.mcqScore) !== String(newScoreStr)) {
+              await db.insert(auditLogsTable).values({
+                userId,
+                userEmail: req.user.email,
+                userName: req.user?.fullName || req.user.email,
+                action: "MARK_MODIFY",
+                tableName: "candidates",
+                recordId: item.candidateId,
+                details: `Batch entered MCQ score for ${cand.fullName} (${cand.candidateCode}): ${newScoreStr ?? "Cleared"} (previous: ${cand.mcqScore ?? "None"})`,
+                ipAddress
+              }).catch(() => {
+              });
+            }
+            updatedCount++;
+          }
+        }
+        res.json({ success: true, updatedCount });
+      } catch (err) {
+        console.error("[candidates-batch-mcq-marks] error:", err);
+        res.status(500).json({ error: "Failed to update MCQ scores: " + err.message });
+      }
+    });
     router8.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "doctor"), async (req, res) => {
       try {
         const candidateId = Number(req.params["candidateId"]);
@@ -1136467,14 +1136516,14 @@ router15.get("/interviews/assignments", requireAuth, requireRole("doctor", "supe
   const requestedPanelId = req.query["panelId"] ? Number(req.query["panelId"]) : null;
   const isMockMode = Boolean(req.isMockMode);
   const panelQuery = userRole === "doctor" ? await db.execute(sql`
-        SELECT ip.id as panel_id, ip.speciality_id, s.name as speciality_name, ip.name as panel_name, ip.is_mind_matter
+        SELECT ip.id as panel_id, ip.speciality_id, s.name as speciality_name, ip.name as panel_name, ip.room_number, ip.exam_date, ip.is_mind_matter
         FROM interview_panel_members ipm
         JOIN interview_panels ip ON ip.id = ipm.panel_id
         LEFT JOIN specialities s ON s.id = ip.speciality_id
         WHERE ipm.doctor_id = ${userId} AND ip.is_active = TRUE AND ip.is_mock = ${isMockMode}
         ORDER BY ip.is_mind_matter DESC, ip.id ASC
       `) : await db.execute(sql`
-        SELECT ip.id as panel_id, ip.speciality_id, s.name as speciality_name, ip.name as panel_name, ip.is_mind_matter
+        SELECT ip.id as panel_id, ip.speciality_id, s.name as speciality_name, ip.name as panel_name, ip.room_number, ip.exam_date, ip.is_mind_matter
         FROM interview_panels ip
         LEFT JOIN specialities s ON s.id = ip.speciality_id
         WHERE ip.is_active = TRUE AND ip.is_mock = ${isMockMode}
@@ -1136624,6 +1136673,9 @@ router15.get("/interviews/assignments", requireAuth, requireRole("doctor", "supe
       submissionId: q["submission_id"] ? Number(q["submission_id"]) : null,
       photoUrl: q["photo_url"] ? String(q["photo_url"]) : null,
       unitName: null,
+      panelName: activePanel?.panel_name ?? null,
+      roomNumber: activePanel?.room_number ?? null,
+      examDate: activePanel?.exam_date ?? null,
       scheduledAt: null,
       status: isCompleted ? "completed" : "pending",
       existingScore: sc
@@ -1137607,15 +1137659,15 @@ db.execute(sql`ALTER TABLE interview_panels ADD COLUMN IF NOT EXISTS is_mind_mat
 });
 async function getPanels(isMockMode = false, programId) {
   const query = programId ? sql`
-        SELECT ip.id, ip.name, ip.room_number, ip.program_id, ip.speciality_id, ip.is_active, ip.is_mind_matter, ip.created_at
+        SELECT ip.id, ip.name, ip.room_number, ip.exam_date, ip.program_id, ip.speciality_id, ip.is_active, ip.is_mind_matter, ip.created_at
         FROM interview_panels ip
         WHERE ip.is_mock = ${isMockMode} AND (ip.program_id = ${programId} OR ip.program_id IS NULL)
-        ORDER BY ip.room_number
+        ORDER BY ip.exam_date ASC, ip.room_number ASC, ip.name ASC
       ` : sql`
-        SELECT ip.id, ip.name, ip.room_number, ip.program_id, ip.speciality_id, ip.is_active, ip.is_mind_matter, ip.created_at
+        SELECT ip.id, ip.name, ip.room_number, ip.exam_date, ip.program_id, ip.speciality_id, ip.is_active, ip.is_mind_matter, ip.created_at
         FROM interview_panels ip
         WHERE ip.is_mock = ${isMockMode}
-        ORDER BY ip.room_number
+        ORDER BY ip.exam_date ASC, ip.room_number ASC, ip.name ASC
       `;
   const panels = (await db.execute(query)).rows;
   const members = (await db.execute(sql`
@@ -1137628,6 +1137680,7 @@ async function getPanels(isMockMode = false, programId) {
     id: p["id"],
     name: p["name"],
     roomNumber: p["room_number"],
+    examDate: p["exam_date"],
     programId: p["program_id"],
     specialityId: p["speciality_id"],
     isActive: p["is_active"],
@@ -1137666,13 +1137719,13 @@ router16.post(
   requireAuth,
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
   async (req, res) => {
-    const { name: name2, roomNumber, programId, specialityId, doctorIds, mainDoctorId, isMindMatter } = req.body;
+    const { name: name2, roomNumber, programId, specialityId, doctorIds, mainDoctorId, isMindMatter, examDate } = req.body;
     if (!name2 || !roomNumber) return res.status(400).json({ error: "name and roomNumber required" });
     const isMock = req.isMockMode ?? false;
     const finalSpecId = isMindMatter ? null : specialityId ?? null;
     const [panel] = (await db.execute(sql`
-      INSERT INTO interview_panels (name, room_number, program_id, speciality_id, is_mind_matter, is_mock)
-      VALUES (${name2}, ${roomNumber}, ${programId ?? null}, ${finalSpecId}, ${isMindMatter ?? false}, ${isMock})
+      INSERT INTO interview_panels (name, room_number, exam_date, program_id, speciality_id, is_mind_matter, is_mock)
+      VALUES (${name2}, ${roomNumber}, ${examDate ?? null}, ${programId ?? null}, ${finalSpecId}, ${isMindMatter ?? false}, ${isMock})
       RETURNING *
     `)).rows;
     if (doctorIds?.length) {
@@ -1137719,11 +1137772,12 @@ router16.patch(
   requireRole("super_admin", "program_admin", "central_exam_coordinator"),
   async (req, res) => {
     const id = Number(req.params["id"]);
-    const { name: name2, roomNumber, isActive, specialityId, isMindMatter, doctorIds, mainDoctorId } = req.body;
+    const { name: name2, roomNumber, isActive, specialityId, isMindMatter, doctorIds, mainDoctorId, examDate } = req.body;
     const isMock = req.isMockMode ?? false;
     const parts = [];
     if (name2 !== void 0) parts.push(`name = '${name2.replace(/'/g, "''")}'`);
     if (roomNumber !== void 0) parts.push(`room_number = '${roomNumber.replace(/'/g, "''")}'`);
+    if (examDate !== void 0) parts.push(`exam_date = ${examDate ? `'${examDate.replace(/'/g, "''")}'` : "NULL"}`);
     if (isActive !== void 0) parts.push(`is_active = ${isActive}`);
     if (isMindMatter !== void 0) {
       parts.push(`is_mind_matter = ${isMindMatter}`);
@@ -1139378,7 +1139432,7 @@ router19.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor", "supe
   const isMockMode = Boolean(req.isMockMode);
   const requestedPanelId = req.query["panelId"] ? Number(req.query["panelId"]) : null;
   const panelQuery = userRole === "doctor" ? await readDb.execute(sql`
-        SELECT ip.id as panel_id, ip.name as panel_name, ip.speciality_id,
+        SELECT ip.id as panel_id, ip.name as panel_name, ip.room_number, ip.exam_date, ip.speciality_id,
                ip.is_mind_matter, ipm.marks_entry_enabled,
                s.name as speciality_name
         FROM interview_panel_members ipm
@@ -1139387,7 +1139441,7 @@ router19.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor", "supe
         WHERE ipm.doctor_id = ${doctorId} AND ip.is_active = TRUE AND ip.is_mock = ${isMockMode}
         ORDER BY ip.is_mind_matter DESC, ip.id ASC
       `) : await readDb.execute(sql`
-        SELECT ip.id as panel_id, ip.name as panel_name, ip.speciality_id,
+        SELECT ip.id as panel_id, ip.name as panel_name, ip.room_number, ip.exam_date, ip.speciality_id,
                ip.is_mind_matter, TRUE as marks_entry_enabled,
                s.name as speciality_name
         FROM interview_panels ip
@@ -1139507,6 +1139561,8 @@ router19.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor", "supe
   res.json({
     panelId,
     panelName,
+    roomNumber: activePanel?.room_number ?? null,
+    examDate: activePanel?.exam_date ?? null,
     specialityId: panelSpecialityId,
     specialityName,
     isMindMatterPanel,
@@ -1139514,6 +1139570,8 @@ router19.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor", "supe
     panels: allActivePanels.map((p) => ({
       panelId: Number(p.panel_id),
       panelName: String(p.panel_name ?? ""),
+      roomNumber: p.room_number ? String(p.room_number) : null,
+      examDate: p.exam_date ? String(p.exam_date) : null,
       specialityId: p.speciality_id != null ? Number(p.speciality_id) : null,
       specialityName: p.speciality_name ?? null,
       isMindMatter: p.is_mind_matter === true || p.is_mind_matter === 1,
@@ -1143527,6 +1143585,7 @@ async function createAllTables() {
       room_number TEXT NOT NULL,
       program_id INTEGER REFERENCES programs(id),
       speciality_id INTEGER REFERENCES specialities(id),
+      exam_date TEXT,
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
       is_mock BOOLEAN NOT NULL DEFAULT FALSE,
       is_mind_matter BOOLEAN NOT NULL DEFAULT FALSE,
@@ -1143889,6 +1143948,7 @@ async function synchronizeColumns() {
     "ALTER TABLE interview_panels ADD COLUMN IF NOT EXISTS speciality_id INTEGER REFERENCES specialities(id)",
     "ALTER TABLE interview_panels ADD COLUMN IF NOT EXISTS is_mock BOOLEAN NOT NULL DEFAULT FALSE",
     "ALTER TABLE interview_panels ADD COLUMN IF NOT EXISTS is_mind_matter BOOLEAN NOT NULL DEFAULT FALSE",
+    "ALTER TABLE interview_panels ADD COLUMN IF NOT EXISTS exam_date TEXT",
     // interview_panel_members
     "ALTER TABLE interview_panel_members ADD COLUMN IF NOT EXISTS marks_entry_enabled BOOLEAN NOT NULL DEFAULT FALSE",
     "ALTER TABLE interview_panel_members ADD COLUMN IF NOT EXISTS is_main BOOLEAN NOT NULL DEFAULT FALSE",
@@ -1144449,7 +1144509,131 @@ async function seedAndHealBaselineData() {
   } catch (err) {
     logger.warn({ err }, "[DB-BOOTSTRAP] Specialities deduplication notice (non-fatal)");
   }
+  try {
+    await seedOfficialStationsAndLogins(jan27Prog.id);
+  } catch (err) {
+    logger.error({ err }, "[DB-BOOTSTRAP] Failed to seed official stations (non-fatal)");
+  }
   logger.info("[DB-BOOTSTRAP] Baseline data seeding and state rework completed.");
+}
+var STATION_PASSWORD_HASH = "$2b$10$RLBEB1tY9W0HeW/uiELgDOVL2P/Od79JDz3N53D3wGHdaNJEkIm.a";
+var OFFICIAL_STATIONS = [
+  // ── 07.12.2026 (Retina & Mind Matters) ──────────────────────────────
+  { date: "07.12.2026", stationName: "Vitreo Retina 1", room: "Class Room 1", specialityName: "Vitreo Retina", isMindMatter: false, email: "station.vr1@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Vitreo Retina 2", room: "Class Room 2", specialityName: "Vitreo Retina", isMindMatter: false, email: "station.vr2@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Medical Retina 1", room: "Anatomy Lab", specialityName: "Medical Retina", isMindMatter: false, email: "station.mr1@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Medical Retina 2", room: "Demo Room", specialityName: "Medical Retina", isMindMatter: false, email: "station.mr2@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Mind Matters 1", room: "Board Room", specialityName: null, isMindMatter: true, email: "station.mm1@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Mind Matters 2", room: "Research Directors Room", specialityName: null, isMindMatter: true, email: "station.mm2@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Mind Matters 3", room: "Clinical Research Room", specialityName: null, isMindMatter: true, email: "station.mm3@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Mind Matters 4", room: "Principals Room", specialityName: null, isMindMatter: true, email: "station.mm4@sankaraeye.com" },
+  // ── 08.12.2026 (Anterior Segment & Mind Matters) ─────────────────────
+  { date: "08.12.2026", stationName: "Cornea 1", room: "Class Room 1", specialityName: "Cornea", isMindMatter: false, email: "station.cornea1@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Cornea 2", room: "Class Room 2", specialityName: "Cornea", isMindMatter: false, email: "station.cornea2@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Phaco Refractive 1", room: "Vision Rehab Comp Skills Lab", specialityName: "Phaco Refractive", isMindMatter: false, email: "station.phaco1@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Phaco Refractive 2", room: "Vision Rehab Recording Lab", specialityName: "Phaco Refractive", isMindMatter: false, email: "station.phaco2@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Glaucoma", room: "Seminar Hall", specialityName: "Glaucoma", isMindMatter: false, email: "station.glaucoma@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Pediatric Ophthalmology", room: "Anatomy Lab", specialityName: "Pediatric Ophthalmology", isMindMatter: false, email: "station.pediatric@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Oculoplasty", room: "Demo Room", specialityName: "Oculoplasty", isMindMatter: false, email: "station.oculoplasty@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "IOL 1", room: "Anatomy Lab", specialityName: "IOL Fellowship", isMindMatter: false, email: "station.iol1@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "IOL 2", room: "Demo Room", specialityName: "IOL Fellowship", isMindMatter: false, email: "station.iol2@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "IOL 3", room: "Seminar Hall", specialityName: "IOL Fellowship", isMindMatter: false, email: "station.iol3@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "IOL 4", room: "Class Room 2", specialityName: "IOL Fellowship", isMindMatter: false, email: "station.iol4@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "IOL 5", room: "Class Room 1", specialityName: "IOL Fellowship", isMindMatter: false, email: "station.iol5@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Mind Matters 1", room: "Board Room", specialityName: null, isMindMatter: true, email: "station.mm1@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Mind Matters 2", room: "Research Directors Room", specialityName: null, isMindMatter: true, email: "station.mm2@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Mind Matters 3", room: "Clinical Research Room", specialityName: null, isMindMatter: true, email: "station.mm3@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Mind Matters 4", room: "Principals Room", specialityName: null, isMindMatter: true, email: "station.mm4@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Mind Matters 5", room: "Vision Rehab Recording Lab", specialityName: null, isMindMatter: true, email: "station.mm5@sankaraeye.com" }
+];
+async function seedOfficialStationsAndLogins(programId) {
+  logger.info("[DB-BOOTSTRAP] Seeding Official Interview Stations & Logins...");
+  const allSpecs = await db.select().from(specialitiesTable).where(eq(specialitiesTable.programId, programId));
+  const specMap = /* @__PURE__ */ new Map();
+  for (const s2 of allSpecs) {
+    specMap.set(s2.name.toLowerCase().trim(), s2.id);
+  }
+  const candidatesResult = await db.execute(sql`SELECT id FROM candidates WHERE status != 'rejected' AND is_mock = FALSE ORDER BY full_name ASC`);
+  const candidateIds = candidatesResult.rows.map((r2) => Number(r2.id));
+  for (const st of OFFICIAL_STATIONS) {
+    const [existingUser] = await db.select().from(usersTable).where(eq(usersTable.email, st.email));
+    let userId;
+    if (existingUser) {
+      userId = existingUser.id;
+      await db.update(usersTable).set({
+        role: "doctor",
+        fullName: st.stationName,
+        passwordHash: STATION_PASSWORD_HASH,
+        active: true,
+        forcePasswordReset: false
+      }).where(eq(usersTable.id, userId));
+    } else {
+      const [newUser] = await db.insert(usersTable).values({
+        email: st.email,
+        fullName: st.stationName,
+        passwordHash: STATION_PASSWORD_HASH,
+        role: "doctor",
+        active: true,
+        forcePasswordReset: false
+      }).returning();
+      userId = newUser.id;
+    }
+    let specId = null;
+    if (st.specialityName) {
+      const normName2 = st.specialityName.toLowerCase().trim();
+      specId = specMap.get(normName2) ?? null;
+      if (!specId) {
+        for (const [sName, sId] of specMap.entries()) {
+          if (sName.includes(normName2) || normName2.includes(sName)) {
+            specId = sId;
+            break;
+          }
+        }
+      }
+    }
+    const existingPanels = (await db.execute(sql`
+      SELECT id, name, room_number, exam_date FROM interview_panels
+      WHERE name = ${st.stationName} AND room_number = ${st.room} AND (exam_date = ${st.date} OR exam_date IS NULL)
+      LIMIT 1
+    `)).rows;
+    let panelId;
+    if (existingPanels.length > 0) {
+      panelId = Number(existingPanels[0].id);
+      await db.execute(sql`
+        UPDATE interview_panels
+        SET program_id = ${programId},
+            speciality_id = ${specId},
+            is_mind_matter = ${st.isMindMatter},
+            exam_date = ${st.date},
+            is_active = TRUE
+        WHERE id = ${panelId}
+      `);
+    } else {
+      const inserted = (await db.execute(sql`
+        INSERT INTO interview_panels (name, room_number, exam_date, program_id, speciality_id, is_mind_matter, is_active, is_mock)
+        VALUES (${st.stationName}, ${st.room}, ${st.date}, ${programId}, ${specId}, ${st.isMindMatter}, TRUE, FALSE)
+        RETURNING id
+      `)).rows;
+      panelId = Number(inserted[0].id);
+    }
+    await db.execute(sql`
+      INSERT INTO interview_panel_members (panel_id, doctor_id, is_main, marks_entry_enabled)
+      VALUES (${panelId}, ${userId}, TRUE, TRUE)
+      ON CONFLICT (panel_id, doctor_id) DO UPDATE SET is_main = TRUE, marks_entry_enabled = TRUE
+    `);
+    if (st.isMindMatter && candidateIds.length > 0) {
+      for (let pos = 0; pos < candidateIds.length; pos++) {
+        const cId = candidateIds[pos];
+        await db.execute(sql`
+          INSERT INTO panel_queue (panel_id, candidate_id, queue_position, status)
+          VALUES (${panelId}, ${cId}, ${pos}, 'waiting')
+          ON CONFLICT (panel_id, candidate_id) DO NOTHING
+        `).catch(() => {
+        });
+      }
+    }
+  }
+  logger.info(`[DB-BOOTSTRAP] \u2705 Seeded ${OFFICIAL_STATIONS.length} Official Stations & Station Logins.`);
 }
 async function bootstrapDatabase() {
   const startTime = Date.now();

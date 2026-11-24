@@ -16,12 +16,13 @@ import {
   LayoutGrid, Plus, Settings, Users, ArrowRight, CheckCircle2,
   Clock, DoorOpen, UserCheck, X, FileText, Loader2,
   GripVertical, ExternalLink, ShieldAlert,
-  AlertTriangle, HelpCircle, Grid3x3, Sparkles
+  AlertTriangle, HelpCircle, Grid3x3, Sparkles, Calendar
 } from "lucide-react";
 import { useToast } from "../hooks/use-toast";
 import { getCleanObjectPath } from "../lib/utils";
 import { CandidateExamDialog } from "../components/CandidateExamDialog";
 import { SeatMatrixModal } from "../components/SeatMatrixModal";
+import { McqMarksTab } from "../components/McqMarksTab";
 
 interface DoctorRow {
   doctorId: number; doctorName: string; doctorEmail: string;
@@ -78,6 +79,7 @@ interface Panel {
   specialityId?: number | null;
   isActive: boolean; createdAt: string; members: PanelMember[];
   isMindMatter?: boolean;
+  examDate?: string | null;
 }
 
 interface QueueEntry {
@@ -502,6 +504,8 @@ export function DoctorView({ toast, qc }: { toast: ReturnType<typeof import("../
         candidateId={examCandidateId}
         open={!!examCandidateId}
         onClose={() => setExamCandidateId(null)}
+        stationName={myStatus?.panelName ?? null}
+        roomNumber={myStatus?.roomNumber ?? null}
         panelSpecialityId={myStatus?.specialityId}
         panelSpecialityName={myStatus?.specialityName}
         isMindMatterPanel={isMindMatterDoctor}
@@ -863,7 +867,7 @@ export function DoctorView({ toast, qc }: { toast: ReturnType<typeof import("../
 /* ─── Admin / CEC View ─── */
 function AdminView({ toast, qc, isCEC }: { toast: ReturnType<typeof import("../hooks/use-toast").useToast>["toast"]; qc: ReturnType<typeof useQueryClient>; isCEC: boolean }) {
   const { activeProgram, activeProgramId } = useProgram();
-  const [activeTab, setActiveTab] = useState<"panels" | "live" | "scores" | "marksheet">("panels");
+  const [activeTab, setActiveTab] = useState<"panels" | "live" | "mcq" | "scores" | "marksheet">("panels");
   const [assignDoctorId, setAssignDoctorId] = useState<number | null>(null);
   const [assignCandidateId, setAssignCandidateId] = useState("");
   const [assignScheduled, setAssignScheduled] = useState("");
@@ -996,10 +1000,11 @@ function AdminView({ toast, qc, isCEC }: { toast: ReturnType<typeof import("../h
   const _ = isCEC; // suppress unused warning
 
   const tabs = [
-    { key: "panels" as const, label: "Interview Panels", icon: LayoutGrid },
-    { key: "live" as const, label: "Live Status", icon: Activity },
-    { key: "scores" as const, label: `Scores (${scores.length})`, icon: Star },
+    { key: "panels" as const, label: "Interview Stations", icon: LayoutGrid },
+    { key: "live" as const, label: "Live Queue", icon: Activity },
+    { key: "mcq" as const, label: "MCQ Marks Entry", icon: Sparkles },
     { key: "marksheet" as const, label: "Mark Sheet", icon: FileText },
+    { key: "scores" as const, label: `Scores (${scores.length})`, icon: Star },
   ];
 
   return (
@@ -1013,8 +1018,8 @@ function AdminView({ toast, qc, isCEC }: { toast: ReturnType<typeof import("../h
               <Stethoscope className="h-4 w-4" />
               <span>Assessment Cycle</span>
             </div>
-            <h1 className="text-4xl font-extrabold tracking-tight">Interviews & Panels</h1>
-            <p className="text-orange-100/80 max-w-md">Orchestrate interview panels, monitor live session progress, and review faculty assessments.</p>
+            <h1 className="text-4xl font-extrabold tracking-tight">Interviews & Stations</h1>
+            <p className="text-orange-100/80 max-w-md">Orchestrate interview stations, enter written MCQ entrance marks, monitor live room queues, and review evaluations.</p>
           </div>
           <div className="flex flex-wrap gap-2 bg-black/10 p-1.5 rounded-2xl backdrop-blur-md">
             {tabs.map((t) => (
@@ -1032,9 +1037,14 @@ function AdminView({ toast, qc, isCEC }: { toast: ReturnType<typeof import("../h
         </div>
       </div>
 
-      {/* ── INTERVIEW PANELS ── */}
+      {/* ── INTERVIEW PANELS / STATIONS ── */}
       {activeTab === "panels" && (
         <PanelsTab toast={toast} qc={qc} candidates={candidates} specialities={specialities} panels={panels} panelsLoading={panelsLoading} />
+      )}
+
+      {/* ── MCQ MARKS ENTRY ── */}
+      {activeTab === "mcq" && (
+        <McqMarksTab toast={toast} qc={qc} candidates={candidates} specialities={specialities} />
       )}
 
       {/* ── LIVE STATUS ── */}
@@ -1416,8 +1426,10 @@ function PanelsTab({ toast, qc, candidates, specialities, panels, panelsLoading 
   // Drag-and-drop state
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [dateFilter, setDateFilter] = useState<string>("all");
 
   const isLoading = panelsLoading;
+  const filteredPanels = panels.filter((p) => dateFilter === "all" || p.examDate === dateFilter);
 
 
   const { data: doctorUsers = [] } = useQuery<DoctorUser[]>({
@@ -1659,35 +1671,84 @@ function PanelsTab({ toast, qc, candidates, specialities, panels, panelsLoading 
         <div className="grid gap-5 lg:grid-cols-3">
           {/* Panel list */}
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1">Panels</p>
-            {panels.map((p) => (
+            <div className="flex items-center justify-between px-1">
+              <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Stations / Panels</p>
+              <span className="text-[10px] text-slate-500 font-semibold">{filteredPanels.length} total</span>
+            </div>
+
+            {/* Date filter toggle */}
+            <div className="flex items-center gap-1.5 pb-1">
+              <button
+                type="button"
+                onClick={() => setDateFilter("all")}
+                className={`px-2 py-1 text-[11px] font-bold rounded-md transition-all ${
+                  dateFilter === "all"
+                    ? "bg-slate-900 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                All ({panels.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setDateFilter("07.12.2026")}
+                className={`px-2 py-1 text-[11px] font-bold rounded-md transition-all ${
+                  dateFilter === "07.12.2026"
+                    ? "bg-indigo-600 text-white shadow-xs"
+                    : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                }`}
+              >
+                07 Dec ({panels.filter((p) => p.examDate === "07.12.2026").length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setDateFilter("08.12.2026")}
+                className={`px-2 py-1 text-[11px] font-bold rounded-md transition-all ${
+                  dateFilter === "08.12.2026"
+                    ? "bg-indigo-600 text-white shadow-xs"
+                    : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                }`}
+              >
+                08 Dec ({panels.filter((p) => p.examDate === "08.12.2026").length})
+              </button>
+            </div>
+
+            {filteredPanels.map((p) => (
               <button
                 key={p.id}
                 onClick={() => setSelectedPanelId(p.id)}
-                className={`w-full text-left rounded-lg border p-3 transition-all ${
+                className={`w-full text-left rounded-xl border p-3 transition-all ${
                   selectedPanelId === p.id
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/40 bg-card"
+                    ? "border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-500"
+                    : "border-slate-200 hover:border-slate-300 bg-white"
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <p className="font-semibold text-sm flex items-center gap-1.5">
+                  <div className="space-y-0.5">
+                    <p className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
                       {p.name}
                       {p.isMindMatter && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-800 border border-amber-200 uppercase tracking-wider">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black bg-amber-100 text-amber-800 border border-amber-200 uppercase tracking-wider">
                           MM
                         </span>
                       )}
                     </p>
-                    <p className="text-xs text-muted-foreground">Room {p.roomNumber}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-xs text-slate-500 font-medium">Room: {p.roomNumber}</p>
+                      {p.examDate && (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded">
+                          <Calendar className="h-2.5 w-2.5 text-indigo-500" />
+                          {p.examDate}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
-                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${p.isActive ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400" : "bg-muted text-muted-foreground"}`}>
+                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${p.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
                       <span className={`h-1.5 w-1.5 rounded-full ${p.isActive ? "bg-emerald-500" : "bg-gray-400"}`} />
                       {p.isActive ? "Active" : "Inactive"}
                     </span>
-                    <span className="text-[10px] text-muted-foreground">{p.members.length} doctors</span>
+                    <span className="text-[10px] text-slate-500 font-medium">1 tablet login</span>
                   </div>
                 </div>
               </button>
@@ -1702,12 +1763,18 @@ function PanelsTab({ toast, qc, candidates, specialities, panels, panelsLoading 
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <DoorOpen className="h-4 w-4" /> Room {selectedPanel.roomNumber}
-                        <span className="text-base font-normal text-muted-foreground">— {selectedPanel.name}</span>
+                      <CardTitle className="flex items-center gap-2 text-base flex-wrap">
+                        <DoorOpen className="h-4 w-4 text-orange-600" /> Room: {selectedPanel.roomNumber}
+                        <span className="text-base font-bold text-slate-900">— {selectedPanel.name}</span>
+                        {selectedPanel.examDate && (
+                          <Badge variant="outline" className="border-indigo-200 text-indigo-700 bg-indigo-50 text-[10px] font-bold">
+                            <Calendar className="h-3 w-3 mr-1 text-indigo-500" />
+                            {selectedPanel.examDate}
+                          </Badge>
+                        )}
                         {selectedPanel.isMindMatter && (
                           <Badge className="bg-amber-100 text-amber-800 border-amber-200 font-bold uppercase tracking-wider text-[9px] hover:bg-amber-100">
-                            Mind Matter Panel
+                            Mind Matter Station
                           </Badge>
                         )}
                       </CardTitle>

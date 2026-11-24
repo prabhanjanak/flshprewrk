@@ -1348,6 +1348,62 @@ router.patch("/candidates/:candidateId/marks", requireAuth, requireRole("super_a
   }
 });
 
+// Admin / Coordinator: Batch manual MCQ marks entry
+router.post("/candidates/batch-mcq-marks", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator"), async (req, res) => {
+  try {
+    const { updates } = req.body as { updates: Array<{ candidateId: number; mcqScore: number | null }> };
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({ error: "Invalid updates array." });
+    }
+
+    const now = new Date();
+    const userId = req.user!.userId;
+    const ipAddress = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "127.0.0.1").split(",")[0]!.trim();
+    let updatedCount = 0;
+
+    for (const item of updates) {
+      if (item.mcqScore !== null && item.mcqScore !== undefined) {
+        if (item.mcqScore < 0 || item.mcqScore > 50) {
+          return res.status(400).json({ error: `MCQ score for candidate #${item.candidateId} must be between 0 and 50.` });
+        }
+      }
+
+      const [cand] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, item.candidateId));
+      if (cand) {
+        const newScoreStr = item.mcqScore !== null && item.mcqScore !== undefined ? String(item.mcqScore) : null;
+        await db.update(candidatesTable)
+          .set({ mcqScore: newScoreStr, updatedAt: now })
+          .where(eq(candidatesTable.id, item.candidateId));
+
+        await db.execute(sql`
+          UPDATE batch_candidates 
+          SET mcq_score = ${item.mcqScore} 
+          WHERE candidate_id = ${item.candidateId}
+        `).catch(() => {});
+
+        if (String(cand.mcqScore) !== String(newScoreStr)) {
+          await db.insert(auditLogsTable).values({
+            userId,
+            userEmail: req.user!.email,
+            userName: (req.user as any)?.fullName || req.user!.email,
+            action: "MARK_MODIFY",
+            tableName: "candidates",
+            recordId: item.candidateId,
+            details: `Batch entered MCQ score for ${cand.fullName} (${cand.candidateCode}): ${newScoreStr ?? "Cleared"} (previous: ${cand.mcqScore ?? "None"})`,
+            ipAddress,
+          } as any).catch(() => {});
+        }
+        updatedCount++;
+      }
+    }
+
+    res.json({ success: true, updatedCount });
+  } catch (err: any) {
+    console.error("[candidates-batch-mcq-marks] error:", err);
+    res.status(500).json({ error: "Failed to update MCQ scores: " + err.message });
+  }
+});
+
 // Doctor / Coordinator: unified interview assessment, remarks, and selection outcome
 router.post("/candidates/:candidateId/doctor-marks", requireAuth, requireRole("super_admin", "program_admin", "central_exam_coordinator", "exam_coordinator", "doctor"), async (req, res) => {
   try {

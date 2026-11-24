@@ -42,6 +42,8 @@ interface CandidateExamDialogProps {
   onSaved?: () => void;
   panelSpecialityId?: number | null;
   panelSpecialityName?: string | null;
+  stationName?: string | null;
+  roomNumber?: string | null;
   isMindMatterPanel?: boolean;
   marksEntryEnabled?: boolean;
 }
@@ -58,6 +60,8 @@ export function CandidateExamDialog({
   onSaved,
   panelSpecialityId,
   panelSpecialityName,
+  stationName,
+  roomNumber,
   isMindMatterPanel = false,
   marksEntryEnabled = true,
 }: CandidateExamDialogProps) {
@@ -1249,14 +1253,22 @@ export function CandidateExamDialog({
             <div className="lg:col-span-5 bg-white flex flex-col overflow-hidden border-l border-slate-200">
               <div className="p-4 border-b border-slate-200 bg-slate-50/80 shrink-0 flex items-center justify-between">
                 <div>
-                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
-                    <Stethoscope className="h-4 w-4 text-orange-600" />
-                    {isMindMatterPanel ? "Mind Matter Station Evaluation" : "Specialty Interview Evaluation"}
-                  </h3>
-                  <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                      <Stethoscope className="h-4 w-4 text-orange-600" />
+                      {stationName || (isMindMatterPanel ? "Mind Matter Station Evaluation" : "Specialty Interview Evaluation")}
+                    </h3>
+                    {roomNumber && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-orange-100 text-orange-800 border border-orange-200 px-2 py-0.5 rounded-full">
+                        <MapPin className="h-3 w-3 text-orange-600" />
+                        Room: {roomNumber}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-semibold mt-1">
                     {isMindMatterPanel 
-                      ? "Score out of 10 · 1 doctor enters consensus mark on behalf of Mind Matter panel" 
-                      : "Consensus score out of 50 · 1 doctor enters for panel (no averaging)"}
+                      ? "Score out of 10 · 1 consensus mark entered on room tablet/laptop" 
+                      : "Consensus score out of 50 · 1 score entered for station room (Tablet/Laptop)"}
                   </p>
                 </div>
                 <Badge className={

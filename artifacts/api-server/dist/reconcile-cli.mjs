@@ -26176,6 +26176,7 @@ var init_panels = __esm({
       isActive: boolean("is_active").notNull().default(true),
       isMock: boolean("is_mock").notNull().default(false),
       isMindMatter: boolean("is_mind_matter").notNull().default(false),
+      examDate: text("exam_date"),
       createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
     });
     interviewPanelMembersTable = pgTable("interview_panel_members", {

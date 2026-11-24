@@ -33,7 +33,7 @@ router.get("/interviews/assignments", requireAuth, requireRole("doctor", "super_
   // 1. Identify active panel(s) for this doctor, or all active panels for super_admin / oversight roles
   const panelQuery = userRole === "doctor"
     ? await db.execute(sql`
-        SELECT ip.id as panel_id, ip.speciality_id, s.name as speciality_name, ip.name as panel_name, ip.is_mind_matter
+        SELECT ip.id as panel_id, ip.speciality_id, s.name as speciality_name, ip.name as panel_name, ip.room_number, ip.exam_date, ip.is_mind_matter
         FROM interview_panel_members ipm
         JOIN interview_panels ip ON ip.id = ipm.panel_id
         LEFT JOIN specialities s ON s.id = ip.speciality_id
@@ -41,13 +41,13 @@ router.get("/interviews/assignments", requireAuth, requireRole("doctor", "super_
         ORDER BY ip.is_mind_matter DESC, ip.id ASC
       `)
     : await db.execute(sql`
-        SELECT ip.id as panel_id, ip.speciality_id, s.name as speciality_name, ip.name as panel_name, ip.is_mind_matter
+        SELECT ip.id as panel_id, ip.speciality_id, s.name as speciality_name, ip.name as panel_name, ip.room_number, ip.exam_date, ip.is_mind_matter
         FROM interview_panels ip
         LEFT JOIN specialities s ON s.id = ip.speciality_id
         WHERE ip.is_active = TRUE AND ip.is_mock = ${isMockMode}
         ORDER BY ip.is_mind_matter DESC, ip.id ASC
       `);
-  const activePanels = panelQuery.rows as Array<{ panel_id: number; speciality_id: number | null; speciality_name: string | null; panel_name: string; is_mind_matter?: boolean }>;
+  const activePanels = panelQuery.rows as Array<{ panel_id: number; speciality_id: number | null; speciality_name: string | null; panel_name: string; room_number?: string | null; exam_date?: string | null; is_mind_matter?: boolean }>;
   const activePanel = (requestedPanelId
     ? activePanels.find((p) => Number(p.panel_id) === requestedPanelId)
     : undefined) ?? activePanels[0];
@@ -210,6 +210,9 @@ router.get("/interviews/assignments", requireAuth, requireRole("doctor", "super_
       submissionId: q["submission_id"] ? Number(q["submission_id"]) : null,
       photoUrl: q["photo_url"] ? String(q["photo_url"]) : null,
       unitName: null,
+      panelName: activePanel?.panel_name ?? null,
+      roomNumber: activePanel?.room_number ?? null,
+      examDate: activePanel?.exam_date ?? null,
       scheduledAt: null,
       status: isCompleted ? "completed" : "pending",
       existingScore: sc,
