@@ -1136594,17 +1136594,31 @@ router15.get("/interviews/assignments", requireAuth, requireRole("doctor", "supe
         ORDER BY pq.queue_position ASC, pq.created_at ASC
       `)).rows;
     }
+    const targetSpecName = (activePanel?.speciality_name ?? "").toLowerCase().trim();
     const prefRows = (await db.execute(sql`
       SELECT DISTINCT c.id as candidate_id, c.id as queue_id, 'pending' as queue_status, 9999 as queue_position,
              c.full_name, c.candidate_code, c.email, c.phone, c.qualification, c.college_name, c.status as candidate_status,
              c.psychometric_score,
              sub.id as submission_id, sub.pg_qualifications, sub.specialization, sub.photo_url
       FROM candidates c
-      LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
+      LEFT JOIN application_submissions sub ON (sub.candidate_id = c.id OR LOWER(sub.email) = LOWER(c.email))
       WHERE c.status != 'rejected' AND c.is_mock = ${isMockMode}
         AND (
           EXISTS (SELECT 1 FROM candidate_preferences cp WHERE cp.candidate_id = c.id AND cp.speciality_id = ${specialityId})
           OR EXISTS (SELECT 1 FROM applications a WHERE a.candidate_id = c.id AND a.speciality_id = ${specialityId})
+          OR (
+            sub.specialization IS NOT NULL AND (
+              LOWER(sub.specialization) LIKE '%' || LOWER(${targetSpecName}) || '%'
+              OR (${targetSpecName} = 'vitreo retina' AND (LOWER(sub.specialization) LIKE '%vitreo%' OR LOWER(sub.specialization) LIKE '%vr%'))
+              OR (${targetSpecName} = 'medical retina' AND (LOWER(sub.specialization) LIKE '%medical retina%' OR LOWER(sub.specialization) LIKE '%mr%'))
+              OR (${targetSpecName} = 'pediatric ophthalmology' AND (LOWER(sub.specialization) LIKE '%pediatric%' OR LOWER(sub.specialization) LIKE '%paediatric%' OR LOWER(sub.specialization) LIKE '%ped%'))
+              OR (${targetSpecName} = 'phaco refractive' AND (LOWER(sub.specialization) LIKE '%phaco%' OR LOWER(sub.specialization) LIKE '%pr%'))
+              OR (${targetSpecName} = 'iol fellowship' AND (LOWER(sub.specialization) LIKE '%iol%' OR LOWER(sub.specialization) LIKE '%cataract%'))
+              OR (${targetSpecName} = 'cornea' AND LOWER(sub.specialization) LIKE '%cornea%')
+              OR (${targetSpecName} = 'glaucoma' AND LOWER(sub.specialization) LIKE '%glaucoma%')
+              OR (${targetSpecName} = 'oculoplasty' AND (LOWER(sub.specialization) LIKE '%oculo%' OR LOWER(sub.specialization) LIKE '%op%'))
+            )
+          )
         )
       ORDER BY c.full_name ASC
     `)).rows;
@@ -1136615,6 +1136629,17 @@ router15.get("/interviews/assignments", requireAuth, requireRole("doctor", "supe
       if (!seenCands.has(cid)) {
         seenCands.add(cid);
         queueEntries.push(row);
+      }
+    }
+    if (panelId && qRows.length === 0 && queueEntries.length > 0) {
+      for (let pos = 0; pos < queueEntries.length; pos++) {
+        const cid = Number(queueEntries[pos]["candidate_id"]);
+        await db.execute(sql`
+          INSERT INTO panel_queue (panel_id, candidate_id, queue_position, status)
+          VALUES (${panelId}, ${cid}, ${pos}, 'waiting')
+          ON CONFLICT (panel_id, candidate_id) DO NOTHING
+        `).catch(() => {
+        });
       }
     }
   } else {
@@ -1139517,6 +1139542,46 @@ router19.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor", "supe
       totalAssigned = Number(row?.total ?? 0);
       totalCompleted = Number(row?.completed_count ?? 0);
       remaining = Math.max(0, totalAssigned - totalCompleted);
+      if (panelSpecialityId) {
+        const targetSpec = (activePanel.speciality_name || "").toLowerCase().trim();
+        const specCountQuery = await readDb.execute(sql`
+          SELECT COUNT(DISTINCT c.id) as total,
+                 SUM(CASE WHEN EXISTS (
+                   SELECT 1 FROM interview_scores ist 
+                   WHERE ist.candidate_id = c.id AND ist.speciality_id = ${panelSpecialityId}
+                 ) THEN 1 ELSE 0 END) as completed_count
+          FROM candidates c
+          LEFT JOIN application_submissions sub ON (sub.candidate_id = c.id OR LOWER(sub.email) = LOWER(c.email))
+          WHERE c.status != 'rejected' AND c.is_mock = ${isMockMode}
+            AND (
+              EXISTS (SELECT 1 FROM candidate_preferences cp WHERE cp.candidate_id = c.id AND cp.speciality_id = ${panelSpecialityId})
+              OR EXISTS (SELECT 1 FROM applications a WHERE a.candidate_id = c.id AND a.speciality_id = ${panelSpecialityId})
+              OR (
+                sub.specialization IS NOT NULL AND (
+                  LOWER(sub.specialization) LIKE '%' || LOWER(${targetSpec}) || '%'
+                  OR (${targetSpec} = 'vitreo retina' AND (LOWER(sub.specialization) LIKE '%vitreo%' OR LOWER(sub.specialization) LIKE '%vr%'))
+                  OR (${targetSpec} = 'medical retina' AND (LOWER(sub.specialization) LIKE '%medical retina%' OR LOWER(sub.specialization) LIKE '%mr%'))
+                  OR (${targetSpec} = 'pediatric ophthalmology' AND (LOWER(sub.specialization) LIKE '%pediatric%' OR LOWER(sub.specialization) LIKE '%paediatric%' OR LOWER(sub.specialization) LIKE '%ped%'))
+                  OR (${targetSpec} = 'phaco refractive' AND (LOWER(sub.specialization) LIKE '%phaco%' OR LOWER(sub.specialization) LIKE '%pr%'))
+                  OR (${targetSpec} = 'iol fellowship' AND (LOWER(sub.specialization) LIKE '%iol%' OR LOWER(sub.specialization) LIKE '%cataract%'))
+                  OR (${targetSpec} = 'cornea' AND LOWER(sub.specialization) LIKE '%cornea%')
+                  OR (${targetSpec} = 'glaucoma' AND LOWER(sub.specialization) LIKE '%glaucoma%')
+                  OR (${targetSpec} = 'oculoplasty' AND (LOWER(sub.specialization) LIKE '%oculo%' OR LOWER(sub.specialization) LIKE '%op%'))
+                )
+              )
+            )
+        `);
+        const specRow = specCountQuery.rows[0];
+        const directTotal = Number(specRow?.total ?? 0);
+        const directCompleted = Number(specRow?.completed_count ?? 0);
+        if (directTotal > totalAssigned) {
+          totalAssigned = directTotal;
+        }
+        if (directCompleted > totalCompleted) {
+          totalCompleted = directCompleted;
+        }
+        remaining = Math.max(0, totalAssigned - totalCompleted);
+      }
     }
   } else {
     const assignRows = await readDb.execute(sql`
@@ -1144665,6 +1144730,47 @@ async function seedOfficialStationsAndLogins(programId) {
           INSERT INTO panel_queue (panel_id, candidate_id, queue_position, status)
           VALUES (${panelId}, ${cId}, ${pos}, 'waiting')
           ON CONFLICT (panel_id, candidate_id) DO NOTHING
+        `).catch(() => {
+        });
+      }
+    } else if (!st.isMindMatter && specId) {
+      const targetSpecName = (st.specialityName || "").toLowerCase().trim();
+      const specMatchedCandidates = (await db.execute(sql`
+        SELECT DISTINCT c.id, c.full_name
+        FROM candidates c
+        LEFT JOIN application_submissions sub ON (sub.candidate_id = c.id OR LOWER(sub.email) = LOWER(c.email))
+        WHERE c.status != 'rejected' AND c.is_mock = FALSE
+          AND (
+            EXISTS (SELECT 1 FROM candidate_preferences cp WHERE cp.candidate_id = c.id AND cp.speciality_id = ${specId})
+            OR EXISTS (SELECT 1 FROM applications a WHERE a.candidate_id = c.id AND a.speciality_id = ${specId})
+            OR (
+              sub.specialization IS NOT NULL AND (
+                LOWER(sub.specialization) LIKE '%' || LOWER(${targetSpecName}) || '%'
+                OR (${targetSpecName} = 'vitreo retina' AND (LOWER(sub.specialization) LIKE '%vitreo%' OR LOWER(sub.specialization) LIKE '%vr%'))
+                OR (${targetSpecName} = 'medical retina' AND (LOWER(sub.specialization) LIKE '%medical retina%' OR LOWER(sub.specialization) LIKE '%mr%'))
+                OR (${targetSpecName} = 'pediatric ophthalmology' AND (LOWER(sub.specialization) LIKE '%pediatric%' OR LOWER(sub.specialization) LIKE '%paediatric%' OR LOWER(sub.specialization) LIKE '%ped%'))
+                OR (${targetSpecName} = 'phaco refractive' AND (LOWER(sub.specialization) LIKE '%phaco%' OR LOWER(sub.specialization) LIKE '%pr%'))
+                OR (${targetSpecName} = 'iol fellowship' AND (LOWER(sub.specialization) LIKE '%iol%' OR LOWER(sub.specialization) LIKE '%cataract%'))
+                OR (${targetSpecName} = 'cornea' AND LOWER(sub.specialization) LIKE '%cornea%')
+                OR (${targetSpecName} = 'glaucoma' AND LOWER(sub.specialization) LIKE '%glaucoma%')
+                OR (${targetSpecName} = 'oculoplasty' AND (LOWER(sub.specialization) LIKE '%oculo%' OR LOWER(sub.specialization) LIKE '%op%'))
+              )
+            )
+          )
+        ORDER BY c.full_name ASC
+      `)).rows;
+      for (let pos = 0; pos < specMatchedCandidates.length; pos++) {
+        const cId = Number(specMatchedCandidates[pos].id);
+        await db.execute(sql`
+          INSERT INTO panel_queue (panel_id, candidate_id, queue_position, status)
+          VALUES (${panelId}, ${cId}, ${pos}, 'waiting')
+          ON CONFLICT (panel_id, candidate_id) DO NOTHING
+        `).catch(() => {
+        });
+        await db.execute(sql`
+          INSERT INTO candidate_preferences (candidate_id, speciality_id, preference_order)
+          VALUES (${cId}, ${specId}, 1)
+          ON CONFLICT DO NOTHING
         `).catch(() => {
         });
       }

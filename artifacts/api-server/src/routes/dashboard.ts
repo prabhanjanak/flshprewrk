@@ -405,6 +405,48 @@ router.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor", "super_
       totalAssigned = Number(row?.total ?? 0);
       totalCompleted = Number(row?.completed_count ?? 0);
       remaining = Math.max(0, totalAssigned - totalCompleted);
+
+      // If panel_queue was not yet populated or smaller, count all matching candidates for this speciality directly
+      if (panelSpecialityId) {
+        const targetSpec = (activePanel.speciality_name || "").toLowerCase().trim();
+        const specCountQuery = await readDb.execute(sql`
+          SELECT COUNT(DISTINCT c.id) as total,
+                 SUM(CASE WHEN EXISTS (
+                   SELECT 1 FROM interview_scores ist 
+                   WHERE ist.candidate_id = c.id AND ist.speciality_id = ${panelSpecialityId}
+                 ) THEN 1 ELSE 0 END) as completed_count
+          FROM candidates c
+          LEFT JOIN application_submissions sub ON (sub.candidate_id = c.id OR LOWER(sub.email) = LOWER(c.email))
+          WHERE c.status != 'rejected' AND c.is_mock = ${isMockMode}
+            AND (
+              EXISTS (SELECT 1 FROM candidate_preferences cp WHERE cp.candidate_id = c.id AND cp.speciality_id = ${panelSpecialityId})
+              OR EXISTS (SELECT 1 FROM applications a WHERE a.candidate_id = c.id AND a.speciality_id = ${panelSpecialityId})
+              OR (
+                sub.specialization IS NOT NULL AND (
+                  LOWER(sub.specialization) LIKE '%' || LOWER(${targetSpec}) || '%'
+                  OR (${targetSpec} = 'vitreo retina' AND (LOWER(sub.specialization) LIKE '%vitreo%' OR LOWER(sub.specialization) LIKE '%vr%'))
+                  OR (${targetSpec} = 'medical retina' AND (LOWER(sub.specialization) LIKE '%medical retina%' OR LOWER(sub.specialization) LIKE '%mr%'))
+                  OR (${targetSpec} = 'pediatric ophthalmology' AND (LOWER(sub.specialization) LIKE '%pediatric%' OR LOWER(sub.specialization) LIKE '%paediatric%' OR LOWER(sub.specialization) LIKE '%ped%'))
+                  OR (${targetSpec} = 'phaco refractive' AND (LOWER(sub.specialization) LIKE '%phaco%' OR LOWER(sub.specialization) LIKE '%pr%'))
+                  OR (${targetSpec} = 'iol fellowship' AND (LOWER(sub.specialization) LIKE '%iol%' OR LOWER(sub.specialization) LIKE '%cataract%'))
+                  OR (${targetSpec} = 'cornea' AND LOWER(sub.specialization) LIKE '%cornea%')
+                  OR (${targetSpec} = 'glaucoma' AND LOWER(sub.specialization) LIKE '%glaucoma%')
+                  OR (${targetSpec} = 'oculoplasty' AND (LOWER(sub.specialization) LIKE '%oculo%' OR LOWER(sub.specialization) LIKE '%op%'))
+                )
+              )
+            )
+        `);
+        const specRow = specCountQuery.rows[0] as { total: string; completed_count: string } | undefined;
+        const directTotal = Number(specRow?.total ?? 0);
+        const directCompleted = Number(specRow?.completed_count ?? 0);
+        if (directTotal > totalAssigned) {
+          totalAssigned = directTotal;
+        }
+        if (directCompleted > totalCompleted) {
+          totalCompleted = directCompleted;
+        }
+        remaining = Math.max(0, totalAssigned - totalCompleted);
+      }
     }
   } else {
     const assignRows = await readDb.execute(sql`

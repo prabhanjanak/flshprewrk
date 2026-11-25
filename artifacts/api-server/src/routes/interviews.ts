@@ -93,17 +93,31 @@ router.get("/interviews/assignments", requireAuth, requireRole("doctor", "super_
       `)).rows as Array<Record<string, unknown>>;
     }
 
+    const targetSpecName = (activePanel?.speciality_name ?? "").toLowerCase().trim();
     const prefRows = (await db.execute(sql`
       SELECT DISTINCT c.id as candidate_id, c.id as queue_id, 'pending' as queue_status, 9999 as queue_position,
              c.full_name, c.candidate_code, c.email, c.phone, c.qualification, c.college_name, c.status as candidate_status,
              c.psychometric_score,
              sub.id as submission_id, sub.pg_qualifications, sub.specialization, sub.photo_url
       FROM candidates c
-      LEFT JOIN application_submissions sub ON LOWER(sub.email) = LOWER(c.email)
+      LEFT JOIN application_submissions sub ON (sub.candidate_id = c.id OR LOWER(sub.email) = LOWER(c.email))
       WHERE c.status != 'rejected' AND c.is_mock = ${isMockMode}
         AND (
           EXISTS (SELECT 1 FROM candidate_preferences cp WHERE cp.candidate_id = c.id AND cp.speciality_id = ${specialityId})
           OR EXISTS (SELECT 1 FROM applications a WHERE a.candidate_id = c.id AND a.speciality_id = ${specialityId})
+          OR (
+            sub.specialization IS NOT NULL AND (
+              LOWER(sub.specialization) LIKE '%' || LOWER(${targetSpecName}) || '%'
+              OR (${targetSpecName} = 'vitreo retina' AND (LOWER(sub.specialization) LIKE '%vitreo%' OR LOWER(sub.specialization) LIKE '%vr%'))
+              OR (${targetSpecName} = 'medical retina' AND (LOWER(sub.specialization) LIKE '%medical retina%' OR LOWER(sub.specialization) LIKE '%mr%'))
+              OR (${targetSpecName} = 'pediatric ophthalmology' AND (LOWER(sub.specialization) LIKE '%pediatric%' OR LOWER(sub.specialization) LIKE '%paediatric%' OR LOWER(sub.specialization) LIKE '%ped%'))
+              OR (${targetSpecName} = 'phaco refractive' AND (LOWER(sub.specialization) LIKE '%phaco%' OR LOWER(sub.specialization) LIKE '%pr%'))
+              OR (${targetSpecName} = 'iol fellowship' AND (LOWER(sub.specialization) LIKE '%iol%' OR LOWER(sub.specialization) LIKE '%cataract%'))
+              OR (${targetSpecName} = 'cornea' AND LOWER(sub.specialization) LIKE '%cornea%')
+              OR (${targetSpecName} = 'glaucoma' AND LOWER(sub.specialization) LIKE '%glaucoma%')
+              OR (${targetSpecName} = 'oculoplasty' AND (LOWER(sub.specialization) LIKE '%oculo%' OR LOWER(sub.specialization) LIKE '%op%'))
+            )
+          )
         )
       ORDER BY c.full_name ASC
     `)).rows as Array<Record<string, unknown>>;
@@ -115,6 +129,18 @@ router.get("/interviews/assignments", requireAuth, requireRole("doctor", "super_
       if (!seenCands.has(cid)) {
         seenCands.add(cid);
         queueEntries.push(row);
+      }
+    }
+
+    // Auto-backfill panel_queue if empty
+    if (panelId && qRows.length === 0 && queueEntries.length > 0) {
+      for (let pos = 0; pos < queueEntries.length; pos++) {
+        const cid = Number(queueEntries[pos]["candidate_id"]);
+        await db.execute(sql`
+          INSERT INTO panel_queue (panel_id, candidate_id, queue_position, status)
+          VALUES (${panelId}, ${cid}, ${pos}, 'waiting')
+          ON CONFLICT (panel_id, candidate_id) DO NOTHING
+        `).catch(() => {});
       }
     }
   } else {

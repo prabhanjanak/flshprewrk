@@ -8,8 +8,10 @@ import {
   Users, CheckCircle2, Clock, Target, Stethoscope,
   TrendingUp, Award, Loader2, RefreshCw, Info,
   CalendarCheck, LayoutDashboard, AlertCircle, ArrowRight,
+  Search,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 import { CandidateExamDialog } from "../components/CandidateExamDialog";
 import { SeatMatrixModal } from "../components/SeatMatrixModal";
 import { Grid3x3 } from "lucide-react";
@@ -53,6 +55,8 @@ export default function DoctorDashboardPage({ onOpenExamination }: { onOpenExami
   const [selectedCandidateId, setSelectedCandidateId] = useState<number | null>(null);
   const [selectedPanelId, setSelectedPanelId] = useState<number | null>(null);
   const [seatMatrixOpen, setSeatMatrixOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "completed">("all");
 
   const { data: stats, isLoading, refetch, isFetching } = useQuery<DoctorStats>({
     queryKey: ["doctor-stats", selectedPanelId],
@@ -62,6 +66,36 @@ export default function DoctorDashboardPage({ onOpenExamination }: { onOpenExami
       ),
     refetchInterval: 30000,
     retry: false,
+  });
+
+  const effectivePanelId = selectedPanelId || stats?.panelId;
+
+  const { data: assignments = [], isLoading: assignmentsLoading, refetch: refetchAssignments } = useQuery<any[]>({
+    queryKey: ["doctor-assignments", effectivePanelId],
+    queryFn: () =>
+      api.get<any[]>(
+        effectivePanelId ? `/interviews/assignments?panelId=${effectivePanelId}` : "/interviews/assignments"
+      ),
+    enabled: !!stats?.panelName,
+    refetchInterval: 10000,
+  });
+
+  const pendingAssignmentsCount = assignments.filter((a) => !a.existingScore).length;
+  const completedAssignmentsCount = assignments.filter((a) => !!a.existingScore).length;
+
+  const filteredAssignments = assignments.filter((a) => {
+    const term = searchTerm.toLowerCase().trim();
+    const matchesSearch =
+      !term ||
+      (a.candidateName || "").toLowerCase().includes(term) ||
+      (a.candidateCode || "").toLowerCase().includes(term) ||
+      (a.qualification || "").toLowerCase().includes(term) ||
+      (a.collegeName || "").toLowerCase().includes(term);
+
+    if (!matchesSearch) return false;
+    if (statusFilter === "pending") return !a.existingScore;
+    if (statusFilter === "completed") return !!a.existingScore;
+    return true;
   });
 
   const handleOpenExamination = () => {
@@ -364,6 +398,183 @@ export default function DoctorDashboardPage({ onOpenExamination }: { onOpenExami
             </div>
           </div>
 
+          {/* ── STATION CANDIDATE ROSTER ──────────────────────────── */}
+          <div className="bg-white rounded-[28px] border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-slate-50/50">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-black text-base uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                    <Users className="h-5 w-5 text-orange-600" />
+                    Station Candidate Roster — {stats?.specialityName || stats?.panelName || "Speciality"}
+                  </h3>
+                  <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200 text-xs font-black">
+                    {assignments.length} Total Applicants
+                  </Badge>
+                </div>
+                <p className="text-xs text-slate-500 font-medium mt-1">
+                  Candidates who applied for this specialization. Click &ldquo;Examine &amp; Enter Score&rdquo; to review dossier and submit consensus mark.
+                </p>
+              </div>
+
+              {/* Filters & Search */}
+              <div className="flex items-center gap-2.5 flex-wrap w-full md:w-auto">
+                {/* Search */}
+                <div className="relative flex-1 sm:w-64">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    placeholder="Search candidate, roll no..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="h-9 pl-9 text-xs rounded-xl border-slate-200 bg-white font-medium"
+                  />
+                </div>
+
+                {/* Status Toggle Buttons */}
+                <div className="flex items-center bg-slate-200/80 p-0.5 rounded-xl border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("all")}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                      statusFilter === "all"
+                        ? "bg-white text-slate-900 shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    All ({assignments.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("pending")}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                      statusFilter === "pending"
+                        ? "bg-amber-500 text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Pending ({pendingAssignmentsCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("completed")}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                      statusFilter === "completed"
+                        ? "bg-emerald-600 text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Evaluated ({completedAssignmentsCount})
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Candidates Table */}
+            {assignmentsLoading ? (
+              <div className="flex items-center justify-center py-16 text-slate-400 gap-2">
+                <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
+                <span className="text-xs font-bold">Loading candidate roster for this station...</span>
+              </div>
+            ) : filteredAssignments.length === 0 ? (
+              <div className="text-center py-16 bg-slate-50/30">
+                <Users className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+                <p className="font-bold text-slate-700 text-sm">
+                  {searchTerm || statusFilter !== "all" ? "No matching candidates found" : "No candidates listed for this speciality yet"}
+                </p>
+                <p className="text-xs text-slate-400 mt-1">
+                  {searchTerm || statusFilter !== "all" ? "Try clearing search or filters" : "Candidates who apply for this speciality will appear here automatically"}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-slate-100/70 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                      <th className="text-left px-5 py-3">Candidate</th>
+                      <th className="text-left px-4 py-3">Candidate Code</th>
+                      <th className="text-left px-4 py-3">Qualification / College</th>
+                      <th className="text-left px-4 py-3">Speciality Applied</th>
+                      <th className="text-center px-4 py-3">Status / Score</th>
+                      <th className="text-right px-5 py-3">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {filteredAssignments.map((c) => {
+                      const isDone = !!c.existingScore;
+                      return (
+                        <tr key={c.candidateId} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="px-5 py-3.5">
+                            <div className="flex items-center gap-3">
+                              {c.photoUrl ? (
+                                <img
+                                  src={c.photoUrl}
+                                  alt={c.candidateName}
+                                  className="w-10 h-10 rounded-full object-cover border border-slate-200 shadow-2xs"
+                                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 text-white font-black text-xs flex items-center justify-center shadow-2xs">
+                                  {c.candidateName.substring(0, 2).toUpperCase()}
+                                </div>
+                              )}
+                              <div>
+                                <p className="font-bold text-slate-900 text-sm leading-snug">
+                                  {c.candidateName}
+                                </p>
+                                <p className="text-[11px] text-slate-500 font-medium">
+                                  {c.email} {c.phone ? `· ${c.phone}` : ""}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <span className="font-mono font-bold text-xs bg-slate-100 text-slate-800 px-2 py-0.5 rounded-md border border-slate-200">
+                              {c.candidateCode}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <p className="font-bold text-slate-800">{c.qualification || "MBBS / MS / DNB"}</p>
+                            <p className="text-[11px] text-slate-500 truncate max-w-xs">{c.collegeName || "—"}</p>
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <Badge variant="outline" className="text-[10px] font-bold border-indigo-200 text-indigo-700 bg-indigo-50/60">
+                              {c.specialityName || stats?.specialityName || "Applied Speciality"}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            {isDone ? (
+                              <Badge className="bg-emerald-100 text-emerald-800 border border-emerald-300 font-black text-xs px-2.5 py-1">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                {c.existingScore.score} / {stats?.isMindMatterPanel ? 10 : 50}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300 font-bold text-[11px] px-2.5 py-0.5">
+                                Pending
+                              </Badge>
+                            )}
+                          </td>
+                          <td className="px-5 py-3.5 text-right">
+                            <Button
+                              size="sm"
+                              onClick={() => setSelectedCandidateId(c.candidateId)}
+                              className={`h-8 px-3.5 rounded-lg text-xs font-bold gap-1.5 shadow-2xs ${
+                                isDone
+                                  ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
+                                  : "bg-orange-600 hover:bg-orange-700 text-white font-black"
+                              }`}
+                            >
+                              <Stethoscope className="h-3.5 w-3.5" />
+                              {isDone ? "Review / Edit Score" : "Examine & Enter Score"}
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
           {/* ── INFO BANNER ──────────────────────────────────────────── */}
           <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 rounded-[28px] p-6 text-white shadow-md relative overflow-hidden border border-white/10">
             <div className="absolute top-0 right-0 w-48 h-48 bg-orange-500/10 rounded-full -mr-16 -mt-16 blur-2xl" />
@@ -383,7 +594,7 @@ export default function DoctorDashboardPage({ onOpenExamination }: { onOpenExami
                 onClick={handleOpenExamination}
                 className="bg-orange-600 hover:bg-orange-700 text-white font-black text-xs uppercase tracking-wider px-5 h-10 rounded-xl shrink-0 gap-2"
               >
-                Go to Examination List
+                Go to Full Queue View
                 <ArrowRight className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -399,7 +610,10 @@ export default function DoctorDashboardPage({ onOpenExamination }: { onOpenExami
             panelSpecialityName={stats?.specialityName ?? null}
             isMindMatterPanel={stats?.isMindMatterPanel ?? false}
             marksEntryEnabled={stats?.marksEntryEnabled ?? true}
-            onSaved={() => refetch()}
+            onSaved={() => {
+              refetch();
+              refetchAssignments();
+            }}
           />
 
           <SeatMatrixModal
