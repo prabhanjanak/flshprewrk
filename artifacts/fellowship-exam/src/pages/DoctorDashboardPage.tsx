@@ -140,7 +140,7 @@ export default function DoctorDashboardPage({ onOpenExamination }: { onOpenExami
                           : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
                       }`}
                     >
-                      {p.panelName}{p.roomNumber ? ` (${p.roomNumber})` : ""}{p.isMindMatter ? " [MM]" : p.specialityName ? ` [${p.specialityName}]` : ""}
+                      {p.panelName}{p.roomNumber ? ` (${p.roomNumber})` : ""}{p.examDate ? ` · ${p.examDate}` : ""}{p.isMindMatter ? " [MM]" : p.specialityName ? ` [${p.specialityName}]` : ""}
                     </button>
                   ))}
                 </div>

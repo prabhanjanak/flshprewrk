@@ -148,6 +148,7 @@ async function createAllTables(): Promise<void> {
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       email TEXT NOT NULL UNIQUE,
+      username TEXT,
       password_hash TEXT NOT NULL,
       salutation TEXT,
       full_name TEXT NOT NULL,
@@ -684,6 +685,7 @@ async function synchronizeColumns(): Promise<void> {
 
   const columnMigrations = [
     // users
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS salutation TEXT",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS employee_id TEXT",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS designation TEXT",
@@ -1432,33 +1434,33 @@ export const STATION_PASSWORD_HASH = "$2b$10$RLBEB1tY9W0HeW/uiELgDOVL2P/Od79JDz3
 
 export const OFFICIAL_STATIONS = [
   // ── 07.12.2026 (Retina & Mind Matters) ──────────────────────────────
-  { date: "07.12.2026", stationName: "Vitreo Retina 1", room: "Class Room 1", specialityName: "Vitreo Retina", isMindMatter: false, email: "station.vr1@sankaraeye.com" },
-  { date: "07.12.2026", stationName: "Vitreo Retina 2", room: "Class Room 2", specialityName: "Vitreo Retina", isMindMatter: false, email: "station.vr2@sankaraeye.com" },
-  { date: "07.12.2026", stationName: "Medical Retina 1", room: "Anatomy Lab", specialityName: "Medical Retina", isMindMatter: false, email: "station.mr1@sankaraeye.com" },
-  { date: "07.12.2026", stationName: "Medical Retina 2", room: "Demo Room", specialityName: "Medical Retina", isMindMatter: false, email: "station.mr2@sankaraeye.com" },
-  { date: "07.12.2026", stationName: "Mind Matters 1", room: "Board Room", specialityName: null, isMindMatter: true, email: "station.mm1@sankaraeye.com" },
-  { date: "07.12.2026", stationName: "Mind Matters 2", room: "Research Directors Room", specialityName: null, isMindMatter: true, email: "station.mm2@sankaraeye.com" },
-  { date: "07.12.2026", stationName: "Mind Matters 3", room: "Clinical Research Room", specialityName: null, isMindMatter: true, email: "station.mm3@sankaraeye.com" },
-  { date: "07.12.2026", stationName: "Mind Matters 4", room: "Principals Room", specialityName: null, isMindMatter: true, email: "station.mm4@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Vitreo Retina 1", room: "Class Room 1", specialityName: "Vitreo Retina", isMindMatter: false, username: "vr1", email: "station.vr1@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Vitreo Retina 2", room: "Class Room 2", specialityName: "Vitreo Retina", isMindMatter: false, username: "vr2", email: "station.vr2@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Medical Retina 1", room: "Anatomy Lab", specialityName: "Medical Retina", isMindMatter: false, username: "mr1", email: "station.mr1@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Medical Retina 2", room: "Demo Room", specialityName: "Medical Retina", isMindMatter: false, username: "mr2", email: "station.mr2@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Mind Matters 1", room: "Board Room", specialityName: null, isMindMatter: true, username: "mm1", email: "station.mm1@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Mind Matters 2", room: "Research Directors Room", specialityName: null, isMindMatter: true, username: "mm2", email: "station.mm2@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Mind Matters 3", room: "Clinical Research Room", specialityName: null, isMindMatter: true, username: "mm3", email: "station.mm3@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Mind Matters 4", room: "Principals Room", specialityName: null, isMindMatter: true, username: "mm4", email: "station.mm4@sankaraeye.com" },
 
   // ── 08.12.2026 (Anterior Segment & Mind Matters) ─────────────────────
-  { date: "08.12.2026", stationName: "Cornea 1", room: "Class Room 1", specialityName: "Cornea", isMindMatter: false, email: "station.cornea1@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Cornea 2", room: "Class Room 2", specialityName: "Cornea", isMindMatter: false, email: "station.cornea2@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Phaco Refractive 1", room: "Vision Rehab Comp Skills Lab", specialityName: "Phaco Refractive", isMindMatter: false, email: "station.phaco1@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Phaco Refractive 2", room: "Vision Rehab Recording Lab", specialityName: "Phaco Refractive", isMindMatter: false, email: "station.phaco2@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Glaucoma", room: "Seminar Hall", specialityName: "Glaucoma", isMindMatter: false, email: "station.glaucoma@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Pediatric Ophthalmology", room: "Anatomy Lab", specialityName: "Pediatric Ophthalmology", isMindMatter: false, email: "station.pediatric@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Oculoplasty", room: "Demo Room", specialityName: "Oculoplasty", isMindMatter: false, email: "station.oculoplasty@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "IOL 1", room: "Anatomy Lab", specialityName: "IOL Fellowship", isMindMatter: false, email: "station.iol1@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "IOL 2", room: "Demo Room", specialityName: "IOL Fellowship", isMindMatter: false, email: "station.iol2@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "IOL 3", room: "Seminar Hall", specialityName: "IOL Fellowship", isMindMatter: false, email: "station.iol3@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "IOL 4", room: "Class Room 2", specialityName: "IOL Fellowship", isMindMatter: false, email: "station.iol4@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "IOL 5", room: "Class Room 1", specialityName: "IOL Fellowship", isMindMatter: false, email: "station.iol5@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Mind Matters 1", room: "Board Room", specialityName: null, isMindMatter: true, email: "station.mm1@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Mind Matters 2", room: "Research Directors Room", specialityName: null, isMindMatter: true, email: "station.mm2@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Mind Matters 3", room: "Clinical Research Room", specialityName: null, isMindMatter: true, email: "station.mm3@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Mind Matters 4", room: "Principals Room", specialityName: null, isMindMatter: true, email: "station.mm4@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Mind Matters 5", room: "Vision Rehab Recording Lab", specialityName: null, isMindMatter: true, email: "station.mm5@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Cornea 1", room: "Class Room 1", specialityName: "Cornea", isMindMatter: false, username: "cornea1", email: "station.cornea1@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Cornea 2", room: "Class Room 2", specialityName: "Cornea", isMindMatter: false, username: "cornea2", email: "station.cornea2@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Phaco Refractive 1", room: "Vision Rehab Comp Skills Lab", specialityName: "Phaco Refractive", isMindMatter: false, username: "phaco1", email: "station.phaco1@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Phaco Refractive 2", room: "Vision Rehab Recording Lab", specialityName: "Phaco Refractive", isMindMatter: false, username: "phaco2", email: "station.phaco2@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Glaucoma", room: "Seminar Hall", specialityName: "Glaucoma", isMindMatter: false, username: "glaucoma", email: "station.glaucoma@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Pediatric Ophthalmology", room: "Anatomy Lab", specialityName: "Pediatric Ophthalmology", isMindMatter: false, username: "pediatric", email: "station.pediatric@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Oculoplasty", room: "Demo Room", specialityName: "Oculoplasty", isMindMatter: false, username: "oculoplasty", email: "station.oculoplasty@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "IOL 1", room: "Anatomy Lab", specialityName: "IOL Fellowship", isMindMatter: false, username: "iol1", email: "station.iol1@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "IOL 2", room: "Demo Room", specialityName: "IOL Fellowship", isMindMatter: false, username: "iol2", email: "station.iol2@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "IOL 3", room: "Seminar Hall", specialityName: "IOL Fellowship", isMindMatter: false, username: "iol3", email: "station.iol3@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "IOL 4", room: "Class Room 2", specialityName: "IOL Fellowship", isMindMatter: false, username: "iol4", email: "station.iol4@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "IOL 5", room: "Class Room 1", specialityName: "IOL Fellowship", isMindMatter: false, username: "iol5", email: "station.iol5@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Mind Matters 1", room: "Board Room", specialityName: null, isMindMatter: true, username: "mm1", email: "station.mm1@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Mind Matters 2", room: "Research Directors Room", specialityName: null, isMindMatter: true, username: "mm2", email: "station.mm2@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Mind Matters 3", room: "Clinical Research Room", specialityName: null, isMindMatter: true, username: "mm3", email: "station.mm3@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Mind Matters 4", room: "Principals Room", specialityName: null, isMindMatter: true, username: "mm4", email: "station.mm4@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Mind Matters 5", room: "Vision Rehab Recording Lab", specialityName: null, isMindMatter: true, username: "mm5", email: "station.mm5@sankaraeye.com" },
 ];
 
 async function seedOfficialStationsAndLogins(programId: number): Promise<void> {
@@ -1474,7 +1476,9 @@ async function seedOfficialStationsAndLogins(programId: number): Promise<void> {
   const candidateIds = (candidatesResult.rows as Array<{ id: number }>).map(r => Number(r.id));
 
   for (const st of OFFICIAL_STATIONS) {
-    const [existingUser] = await db.select().from(usersTable).where(eq(usersTable.email, st.email));
+    const [existingUser] = await db.select().from(usersTable).where(
+      or(eq(usersTable.email, st.email), eq(usersTable.username, st.username))
+    );
     let userId: number;
     if (existingUser) {
       userId = existingUser.id;
@@ -1482,6 +1486,8 @@ async function seedOfficialStationsAndLogins(programId: number): Promise<void> {
         .set({
           role: "doctor",
           fullName: st.stationName,
+          username: st.username,
+          employeeId: st.username,
           passwordHash: STATION_PASSWORD_HASH,
           active: true,
           forcePasswordReset: false,
@@ -1490,6 +1496,8 @@ async function seedOfficialStationsAndLogins(programId: number): Promise<void> {
     } else {
       const [newUser] = await db.insert(usersTable).values({
         email: st.email,
+        username: st.username,
+        employeeId: st.username,
         fullName: st.stationName,
         passwordHash: STATION_PASSWORD_HASH,
         role: "doctor",

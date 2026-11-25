@@ -25698,6 +25698,7 @@ var init_users = __esm({
     usersTable = pgTable("users", {
       id: serial("id").primaryKey(),
       email: text("email").notNull().unique(),
+      username: text("username"),
       passwordHash: text("password_hash").notNull(),
       salutation: text("salutation"),
       fullName: text("full_name").notNull(),

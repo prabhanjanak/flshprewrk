@@ -195,19 +195,19 @@ export default function LoginPage() {
                   </AnimatePresence>
 
                   <div className="space-y-4">
-                    {/* Email Input */}
+                    {/* User ID / Email Input */}
                     <div className="space-y-1.5">
                       <Label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest text-slate-600 pl-1">
-                        Credential ID / Email Address
+                        User ID / Credential ID
                       </Label>
                       <div className="relative">
                         <div className="absolute left-3.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500">
-                          <Mail className="w-4 h-4" />
+                          <UserCheck className="w-4 h-4" />
                         </div>
                         <Input
                           id="email"
-                          type="email"
-                          placeholder="name@sankaraeye.com"
+                          type="text"
+                          placeholder="User ID (e.g. vr1, cornea1) or Email"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           required

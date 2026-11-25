@@ -359,9 +359,12 @@ router.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor", "super_
     speciality_name: string | null;
   }>;
 
+  const todayStr = new Date().toLocaleDateString("en-GB").replace(/\//g, ".");
   const activePanel = (requestedPanelId
     ? allActivePanels.find((p) => Number(p.panel_id) === requestedPanelId)
-    : undefined) ?? allActivePanels[0];
+    : undefined)
+    ?? allActivePanels.find((p) => p.exam_date === todayStr)
+    ?? allActivePanels[0];
 
   let totalAssigned = 0;
   let totalCompleted = 0;

@@ -54085,6 +54085,7 @@ var init_users = __esm({
     usersTable = pgTable("users", {
       id: serial("id").primaryKey(),
       email: text("email").notNull().unique(),
+      username: text("username"),
       passwordHash: text("password_hash").notNull(),
       salutation: text("salutation"),
       fullName: text("full_name").notNull(),
@@ -1135154,6 +1135155,7 @@ async function formatUser(user) {
   return {
     id: user.id,
     email: user.email,
+    username: user["username"] ?? null,
     salutation: user.salutation ?? null,
     fullName: user.fullName,
     employeeId: user.employeeId ?? null,
@@ -1135168,30 +1135170,56 @@ async function formatUser(user) {
   };
 }
 router2.post("/auth/login", async (req, res) => {
-  const { email: email3, password, networkIp, deviceInfo: clientDeviceInfo } = req.body;
-  if (!email3 || !password) {
-    res.status(400).json({ error: "Email and password required" });
+  const { email: email3, username, userId: rawUserId, password, networkIp, deviceInfo: clientDeviceInfo } = req.body;
+  const identifier = (email3 || username || rawUserId || "").trim();
+  if (!identifier || !password) {
+    res.status(400).json({ error: "User ID / Email and password required" });
     return;
   }
-  const lowered = email3.toLowerCase().trim();
-  if (!lowered.endsWith("@sankaraeye.com")) {
-    res.status(403).json({ error: "Only @sankaraeye.com accounts are allowed" });
+  const lowered = identifier.toLowerCase();
+  const cleanId = lowered.replace(/^station[._-]/, "").replace(/[^a-z0-9]/g, "");
+  const usersResult = await db.execute(sql`
+    SELECT * FROM users
+    WHERE LOWER(email) = ${lowered}
+       OR (username IS NOT NULL AND LOWER(username) IN (${lowered}, ${cleanId}))
+       OR (employee_id IS NOT NULL AND LOWER(employee_id) IN (${lowered}, ${cleanId}))
+       OR (LOWER(email) = ${lowered + "@sankaraeye.com"})
+       OR (LOWER(email) = ${"station." + lowered + "@sankaraeye.com"})
+       OR (LOWER(email) = ${"station." + cleanId + "@sankaraeye.com"})
+    LIMIT 1
+  `);
+  const userRow = usersResult.rows[0];
+  if (!userRow) {
+    res.status(401).json({ error: "Invalid User ID or password" });
     return;
   }
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.email, lowered));
-  if (!user) {
-    res.status(401).json({ error: "Invalid email or password" });
-    return;
-  }
-  if (!user.active) {
+  if (!userRow.active) {
     res.status(403).json({ error: "Account is disabled" });
     return;
   }
-  const ok = await comparePassword(password, user.passwordHash);
+  const ok = await comparePassword(password, userRow.password_hash || userRow.passwordHash);
   if (!ok) {
-    res.status(401).json({ error: "Invalid email or password" });
+    res.status(401).json({ error: "Invalid User ID or password" });
     return;
   }
+  const user = {
+    id: Number(userRow.id),
+    email: userRow.email,
+    username: userRow.username,
+    salutation: userRow.salutation,
+    fullName: userRow.full_name || userRow.fullName,
+    employeeId: userRow.employee_id || userRow.employeeId,
+    designation: userRow.designation,
+    gender: userRow.gender,
+    avatarSeed: userRow.avatar_seed || userRow.avatarSeed,
+    role: userRow.role,
+    unitId: userRow.unit_id ? Number(userRow.unit_id) : null,
+    programId: userRow.program_id ? Number(userRow.program_id) : null,
+    active: Boolean(userRow.active),
+    forcePasswordReset: Boolean(userRow.force_password_reset || userRow.forcePasswordReset),
+    createdAt: userRow.created_at,
+    updatedAt: userRow.updated_at
+  };
   const token = signToken({ userId: user.id, email: user.email, role: user.role });
   const fallbackIp = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "127.0.0.1").split(",")[0].trim();
   const ipAddress = networkIp && networkIp.trim() ? networkIp.trim() : fallbackIp;
@@ -1135209,7 +1135237,7 @@ router2.post("/auth/login", async (req, res) => {
     userEmail: user.email,
     userName: user.fullName,
     action: "LOGIN",
-    details: `Successfully logged in. IP: ${ipAddress}, Agent: ${deviceInfo}`,
+    details: `Successfully logged in via (${identifier}). IP: ${ipAddress}, Agent: ${deviceInfo}`,
     ipAddress
   });
   res.json({ token, user: await formatUser(user) });
@@ -1139450,7 +1139478,8 @@ router19.get("/dashboard/doctor-stats", requireAuth, requireRole("doctor", "supe
         ORDER BY ip.is_mind_matter DESC, ip.id ASC
       `);
   const allActivePanels = panelQuery.rows;
-  const activePanel = (requestedPanelId ? allActivePanels.find((p) => Number(p.panel_id) === requestedPanelId) : void 0) ?? allActivePanels[0];
+  const todayStr = (/* @__PURE__ */ new Date()).toLocaleDateString("en-GB").replace(/\//g, ".");
+  const activePanel = (requestedPanelId ? allActivePanels.find((p) => Number(p.panel_id) === requestedPanelId) : void 0) ?? allActivePanels.find((p) => p.exam_date === todayStr) ?? allActivePanels[0];
   let totalAssigned = 0;
   let totalCompleted = 0;
   let remaining = 0;
@@ -1143409,6 +1143438,7 @@ async function createAllTables() {
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       email TEXT NOT NULL UNIQUE,
+      username TEXT,
       password_hash TEXT NOT NULL,
       salutation TEXT,
       full_name TEXT NOT NULL,
@@ -1143877,6 +1143907,7 @@ async function synchronizeColumns() {
   logger.info("[DB-BOOTSTRAP] Synchronizing table columns (ADD COLUMN IF NOT EXISTS)...");
   const columnMigrations = [
     // users
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS salutation TEXT",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS employee_id TEXT",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS designation TEXT",
@@ -1144519,32 +1144550,32 @@ async function seedAndHealBaselineData() {
 var STATION_PASSWORD_HASH = "$2b$10$RLBEB1tY9W0HeW/uiELgDOVL2P/Od79JDz3N53D3wGHdaNJEkIm.a";
 var OFFICIAL_STATIONS = [
   // ── 07.12.2026 (Retina & Mind Matters) ──────────────────────────────
-  { date: "07.12.2026", stationName: "Vitreo Retina 1", room: "Class Room 1", specialityName: "Vitreo Retina", isMindMatter: false, email: "station.vr1@sankaraeye.com" },
-  { date: "07.12.2026", stationName: "Vitreo Retina 2", room: "Class Room 2", specialityName: "Vitreo Retina", isMindMatter: false, email: "station.vr2@sankaraeye.com" },
-  { date: "07.12.2026", stationName: "Medical Retina 1", room: "Anatomy Lab", specialityName: "Medical Retina", isMindMatter: false, email: "station.mr1@sankaraeye.com" },
-  { date: "07.12.2026", stationName: "Medical Retina 2", room: "Demo Room", specialityName: "Medical Retina", isMindMatter: false, email: "station.mr2@sankaraeye.com" },
-  { date: "07.12.2026", stationName: "Mind Matters 1", room: "Board Room", specialityName: null, isMindMatter: true, email: "station.mm1@sankaraeye.com" },
-  { date: "07.12.2026", stationName: "Mind Matters 2", room: "Research Directors Room", specialityName: null, isMindMatter: true, email: "station.mm2@sankaraeye.com" },
-  { date: "07.12.2026", stationName: "Mind Matters 3", room: "Clinical Research Room", specialityName: null, isMindMatter: true, email: "station.mm3@sankaraeye.com" },
-  { date: "07.12.2026", stationName: "Mind Matters 4", room: "Principals Room", specialityName: null, isMindMatter: true, email: "station.mm4@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Vitreo Retina 1", room: "Class Room 1", specialityName: "Vitreo Retina", isMindMatter: false, username: "vr1", email: "station.vr1@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Vitreo Retina 2", room: "Class Room 2", specialityName: "Vitreo Retina", isMindMatter: false, username: "vr2", email: "station.vr2@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Medical Retina 1", room: "Anatomy Lab", specialityName: "Medical Retina", isMindMatter: false, username: "mr1", email: "station.mr1@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Medical Retina 2", room: "Demo Room", specialityName: "Medical Retina", isMindMatter: false, username: "mr2", email: "station.mr2@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Mind Matters 1", room: "Board Room", specialityName: null, isMindMatter: true, username: "mm1", email: "station.mm1@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Mind Matters 2", room: "Research Directors Room", specialityName: null, isMindMatter: true, username: "mm2", email: "station.mm2@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Mind Matters 3", room: "Clinical Research Room", specialityName: null, isMindMatter: true, username: "mm3", email: "station.mm3@sankaraeye.com" },
+  { date: "07.12.2026", stationName: "Mind Matters 4", room: "Principals Room", specialityName: null, isMindMatter: true, username: "mm4", email: "station.mm4@sankaraeye.com" },
   // ── 08.12.2026 (Anterior Segment & Mind Matters) ─────────────────────
-  { date: "08.12.2026", stationName: "Cornea 1", room: "Class Room 1", specialityName: "Cornea", isMindMatter: false, email: "station.cornea1@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Cornea 2", room: "Class Room 2", specialityName: "Cornea", isMindMatter: false, email: "station.cornea2@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Phaco Refractive 1", room: "Vision Rehab Comp Skills Lab", specialityName: "Phaco Refractive", isMindMatter: false, email: "station.phaco1@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Phaco Refractive 2", room: "Vision Rehab Recording Lab", specialityName: "Phaco Refractive", isMindMatter: false, email: "station.phaco2@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Glaucoma", room: "Seminar Hall", specialityName: "Glaucoma", isMindMatter: false, email: "station.glaucoma@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Pediatric Ophthalmology", room: "Anatomy Lab", specialityName: "Pediatric Ophthalmology", isMindMatter: false, email: "station.pediatric@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Oculoplasty", room: "Demo Room", specialityName: "Oculoplasty", isMindMatter: false, email: "station.oculoplasty@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "IOL 1", room: "Anatomy Lab", specialityName: "IOL Fellowship", isMindMatter: false, email: "station.iol1@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "IOL 2", room: "Demo Room", specialityName: "IOL Fellowship", isMindMatter: false, email: "station.iol2@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "IOL 3", room: "Seminar Hall", specialityName: "IOL Fellowship", isMindMatter: false, email: "station.iol3@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "IOL 4", room: "Class Room 2", specialityName: "IOL Fellowship", isMindMatter: false, email: "station.iol4@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "IOL 5", room: "Class Room 1", specialityName: "IOL Fellowship", isMindMatter: false, email: "station.iol5@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Mind Matters 1", room: "Board Room", specialityName: null, isMindMatter: true, email: "station.mm1@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Mind Matters 2", room: "Research Directors Room", specialityName: null, isMindMatter: true, email: "station.mm2@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Mind Matters 3", room: "Clinical Research Room", specialityName: null, isMindMatter: true, email: "station.mm3@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Mind Matters 4", room: "Principals Room", specialityName: null, isMindMatter: true, email: "station.mm4@sankaraeye.com" },
-  { date: "08.12.2026", stationName: "Mind Matters 5", room: "Vision Rehab Recording Lab", specialityName: null, isMindMatter: true, email: "station.mm5@sankaraeye.com" }
+  { date: "08.12.2026", stationName: "Cornea 1", room: "Class Room 1", specialityName: "Cornea", isMindMatter: false, username: "cornea1", email: "station.cornea1@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Cornea 2", room: "Class Room 2", specialityName: "Cornea", isMindMatter: false, username: "cornea2", email: "station.cornea2@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Phaco Refractive 1", room: "Vision Rehab Comp Skills Lab", specialityName: "Phaco Refractive", isMindMatter: false, username: "phaco1", email: "station.phaco1@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Phaco Refractive 2", room: "Vision Rehab Recording Lab", specialityName: "Phaco Refractive", isMindMatter: false, username: "phaco2", email: "station.phaco2@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Glaucoma", room: "Seminar Hall", specialityName: "Glaucoma", isMindMatter: false, username: "glaucoma", email: "station.glaucoma@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Pediatric Ophthalmology", room: "Anatomy Lab", specialityName: "Pediatric Ophthalmology", isMindMatter: false, username: "pediatric", email: "station.pediatric@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Oculoplasty", room: "Demo Room", specialityName: "Oculoplasty", isMindMatter: false, username: "oculoplasty", email: "station.oculoplasty@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "IOL 1", room: "Anatomy Lab", specialityName: "IOL Fellowship", isMindMatter: false, username: "iol1", email: "station.iol1@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "IOL 2", room: "Demo Room", specialityName: "IOL Fellowship", isMindMatter: false, username: "iol2", email: "station.iol2@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "IOL 3", room: "Seminar Hall", specialityName: "IOL Fellowship", isMindMatter: false, username: "iol3", email: "station.iol3@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "IOL 4", room: "Class Room 2", specialityName: "IOL Fellowship", isMindMatter: false, username: "iol4", email: "station.iol4@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "IOL 5", room: "Class Room 1", specialityName: "IOL Fellowship", isMindMatter: false, username: "iol5", email: "station.iol5@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Mind Matters 1", room: "Board Room", specialityName: null, isMindMatter: true, username: "mm1", email: "station.mm1@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Mind Matters 2", room: "Research Directors Room", specialityName: null, isMindMatter: true, username: "mm2", email: "station.mm2@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Mind Matters 3", room: "Clinical Research Room", specialityName: null, isMindMatter: true, username: "mm3", email: "station.mm3@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Mind Matters 4", room: "Principals Room", specialityName: null, isMindMatter: true, username: "mm4", email: "station.mm4@sankaraeye.com" },
+  { date: "08.12.2026", stationName: "Mind Matters 5", room: "Vision Rehab Recording Lab", specialityName: null, isMindMatter: true, username: "mm5", email: "station.mm5@sankaraeye.com" }
 ];
 async function seedOfficialStationsAndLogins(programId) {
   logger.info("[DB-BOOTSTRAP] Seeding Official Interview Stations & Logins...");
@@ -1144556,13 +1144587,17 @@ async function seedOfficialStationsAndLogins(programId) {
   const candidatesResult = await db.execute(sql`SELECT id FROM candidates WHERE status != 'rejected' AND is_mock = FALSE ORDER BY full_name ASC`);
   const candidateIds = candidatesResult.rows.map((r2) => Number(r2.id));
   for (const st of OFFICIAL_STATIONS) {
-    const [existingUser] = await db.select().from(usersTable).where(eq(usersTable.email, st.email));
+    const [existingUser] = await db.select().from(usersTable).where(
+      or(eq(usersTable.email, st.email), eq(usersTable.username, st.username))
+    );
     let userId;
     if (existingUser) {
       userId = existingUser.id;
       await db.update(usersTable).set({
         role: "doctor",
         fullName: st.stationName,
+        username: st.username,
+        employeeId: st.username,
         passwordHash: STATION_PASSWORD_HASH,
         active: true,
         forcePasswordReset: false
@@ -1144570,6 +1144605,8 @@ async function seedOfficialStationsAndLogins(programId) {
     } else {
       const [newUser] = await db.insert(usersTable).values({
         email: st.email,
+        username: st.username,
+        employeeId: st.username,
         fullName: st.stationName,
         passwordHash: STATION_PASSWORD_HASH,
         role: "doctor",

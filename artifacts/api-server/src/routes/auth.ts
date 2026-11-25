@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db, usersTable, unitsTable, userSessionsTable, auditLogsTable } from "@workspace/db";
 import { signToken, hashPassword, comparePassword } from "../lib/auth";
 import { requireAuth, requireRole } from "../middleware/auth";
@@ -15,6 +15,7 @@ async function formatUser(user: typeof usersTable.$inferSelect) {
   return {
     id: user.id,
     email: user.email,
+    username: (user as Record<string, unknown>)["username"] as string | null ?? null,
     salutation: user.salutation ?? null,
     fullName: user.fullName,
     employeeId: user.employeeId ?? null,
@@ -30,36 +31,67 @@ async function formatUser(user: typeof usersTable.$inferSelect) {
 }
 
 router.post("/auth/login", async (req, res) => {
-  const { email, password, networkIp, deviceInfo: clientDeviceInfo } = req.body as {
-    email: string;
+  const { email, username, userId: rawUserId, password, networkIp, deviceInfo: clientDeviceInfo } = req.body as {
+    email?: string;
+    username?: string;
+    userId?: string;
     password: string;
     networkIp?: string;
     deviceInfo?: string;
   };
-  if (!email || !password) {
-    res.status(400).json({ error: "Email and password required" });
+  const identifier = (email || username || rawUserId || "").trim();
+  if (!identifier || !password) {
+    res.status(400).json({ error: "User ID / Email and password required" });
     return;
   }
-  const lowered = email.toLowerCase().trim();
-  if (!lowered.endsWith("@sankaraeye.com")) {
-    res.status(403).json({ error: "Only @sankaraeye.com accounts are allowed" });
+  const lowered = identifier.toLowerCase();
+  const cleanId = lowered.replace(/^station[._-]/, "").replace(/[^a-z0-9]/g, "");
+
+  const usersResult = await db.execute(sql`
+    SELECT * FROM users
+    WHERE LOWER(email) = ${lowered}
+       OR (username IS NOT NULL AND LOWER(username) IN (${lowered}, ${cleanId}))
+       OR (employee_id IS NOT NULL AND LOWER(employee_id) IN (${lowered}, ${cleanId}))
+       OR (LOWER(email) = ${lowered + "@sankaraeye.com"})
+       OR (LOWER(email) = ${"station." + lowered + "@sankaraeye.com"})
+       OR (LOWER(email) = ${"station." + cleanId + "@sankaraeye.com"})
+    LIMIT 1
+  `);
+
+  const userRow = (usersResult.rows as any[])[0];
+  if (!userRow) {
+    res.status(401).json({ error: "Invalid User ID or password" });
     return;
   }
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.email, lowered));
-  if (!user) {
-    res.status(401).json({ error: "Invalid email or password" });
-    return;
-  }
-  if (!user.active) {
+  if (!userRow.active) {
     res.status(403).json({ error: "Account is disabled" });
     return;
   }
-  const ok = await comparePassword(password, user.passwordHash);
+  const ok = await comparePassword(password, userRow.password_hash || userRow.passwordHash);
   if (!ok) {
-    res.status(401).json({ error: "Invalid email or password" });
+    res.status(401).json({ error: "Invalid User ID or password" });
     return;
   }
   
+  const user = {
+    id: Number(userRow.id),
+    email: userRow.email,
+    username: userRow.username,
+    salutation: userRow.salutation,
+    fullName: userRow.full_name || userRow.fullName,
+    employeeId: userRow.employee_id || userRow.employeeId,
+    designation: userRow.designation,
+    gender: userRow.gender,
+    avatarSeed: userRow.avatar_seed || userRow.avatarSeed,
+    role: userRow.role,
+    unitId: userRow.unit_id ? Number(userRow.unit_id) : null,
+    programId: userRow.program_id ? Number(userRow.program_id) : null,
+    active: Boolean(userRow.active),
+    forcePasswordReset: Boolean(userRow.force_password_reset || userRow.forcePasswordReset),
+    createdAt: userRow.created_at,
+    updatedAt: userRow.updated_at,
+  } as typeof usersTable.$inferSelect;
+
   const token = signToken({ userId: user.id, email: user.email, role: user.role });
 
   // Store active session in database
@@ -83,7 +115,7 @@ router.post("/auth/login", async (req, res) => {
     userEmail: user.email,
     userName: user.fullName,
     action: "LOGIN",
-    details: `Successfully logged in. IP: ${ipAddress}, Agent: ${deviceInfo}`,
+    details: `Successfully logged in via (${identifier}). IP: ${ipAddress}, Agent: ${deviceInfo}`,
     ipAddress,
   });
 
