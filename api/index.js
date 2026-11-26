@@ -1141172,6 +1141172,108 @@ router25.post("/payment/verify", async (req, res) => {
     res.status(500).json({ error: error40.message || "Verification failed" });
   }
 });
+router25.post("/payment/check-status", async (req, res) => {
+  try {
+    const { orderId, paymentId, email: email3, phone, token = "JAN2027" } = req.body || {};
+    const LIVE_KEY_ID = "rzp_live_ddDz3Yp0860GqG";
+    const LIVE_SECRET = "LGVG9K6XjOwpHnfjfGMmgwxZ";
+    let razorpayKeyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || LIVE_KEY_ID;
+    let razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET || LIVE_SECRET;
+    try {
+      const all = await db.select().from(paymentSettingsTable).where(eq(paymentSettingsTable.isActive, true));
+      const setting = all.find((s2) => s2.programId === null) || all[0];
+      if (setting?.razorpayKeyId && !setting.razorpayKeyId.startsWith("rzp_test")) {
+        razorpayKeyId = setting.razorpayKeyId;
+      }
+      if (setting?.razorpayKeySecret && !setting.razorpayKeySecret.startsWith("test_")) {
+        razorpayKeySecret = setting.razorpayKeySecret;
+      }
+    } catch (_) {
+    }
+    const instance = new import_razorpay.default({
+      key_id: razorpayKeyId,
+      key_secret: razorpayKeySecret
+    });
+    if (orderId && typeof orderId === "string" && orderId.startsWith("order_")) {
+      try {
+        const orderPayments = await instance.orders.fetchPayments(orderId);
+        const captured = orderPayments?.items?.find((p) => p.status === "captured");
+        if (captured) {
+          return res.json({
+            success: true,
+            paid: true,
+            paymentId: captured.id,
+            orderId: captured.order_id,
+            amount: captured.amount ? Math.round(captured.amount / 100) : 2750,
+            method: captured.method,
+            email: captured.email,
+            contact: captured.contact,
+            rrn: captured.acquirer_data?.rrn || null
+          });
+        }
+      } catch (err) {
+        console.warn("fetchPayments by orderId error:", err.message);
+      }
+    }
+    if (paymentId && typeof paymentId === "string" && paymentId.startsWith("pay_")) {
+      try {
+        const payment = await instance.payments.fetch(paymentId);
+        if (payment && payment.status === "captured") {
+          return res.json({
+            success: true,
+            paid: true,
+            paymentId: payment.id,
+            orderId: payment.order_id,
+            amount: payment.amount ? Math.round(payment.amount / 100) : 2750,
+            method: payment.method,
+            email: payment.email,
+            contact: payment.contact,
+            rrn: payment.acquirer_data?.rrn || null
+          });
+        }
+      } catch (err) {
+        console.warn("fetch by paymentId error:", err.message);
+      }
+    }
+    if (email3 || phone) {
+      try {
+        const normEmail = (email3 || "").toLowerCase().trim();
+        const normPhone = (phone || "").replace(/[^0-9]/g, "").slice(-10);
+        const batch = await instance.payments.all({ count: 50 });
+        const items = batch?.items || [];
+        const found = items.find((p) => {
+          if (p.status !== "captured") return false;
+          if (normEmail && p.email?.toLowerCase().trim() === normEmail) return true;
+          if (normPhone && normPhone.length >= 7 && p.contact?.replace(/[^0-9]/g, "").slice(-10) === normPhone) return true;
+          return false;
+        });
+        if (found) {
+          return res.json({
+            success: true,
+            paid: true,
+            paymentId: found.id,
+            orderId: found.order_id,
+            amount: found.amount ? Math.round(found.amount / 100) : 2750,
+            method: found.method,
+            email: found.email,
+            contact: found.contact,
+            rrn: found.acquirer_data?.rrn || null
+          });
+        }
+      } catch (err) {
+        console.warn("check by email/phone error:", err.message);
+      }
+    }
+    return res.json({
+      success: true,
+      paid: false,
+      message: "No captured payment found yet. If amount was debited, it may take 1-2 minutes for bank confirmation."
+    });
+  } catch (error40) {
+    console.error("Check status error:", error40);
+    res.status(500).json({ error: error40.message || "Failed to check payment status" });
+  }
+});
 var payment_default = router25;
 
 // src/routes/exam-management.ts

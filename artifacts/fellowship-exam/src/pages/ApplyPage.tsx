@@ -146,6 +146,17 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
   const [copiedBankField, setCopiedBankField] = useState<string | null>(null);
 
+  // Recovery & mobile UPI resilience state
+  const [isCheckingPayment, setIsCheckingPayment] = useState(false);
+  const [paymentCheckMsg, setPaymentCheckMsg] = useState<string | null>(null);
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(`active_order_${token}`) || null;
+    } catch {
+      return null;
+    }
+  });
+
   // Safe Razorpay Script Loader
   useEffect(() => {
     if (typeof (window as any).Razorpay === "function") return;
@@ -613,6 +624,13 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
         return;
       }
 
+      if (orderData.order?.id) {
+        setActiveOrderId(orderData.order.id);
+        try {
+          localStorage.setItem(`active_order_${token}`, orderData.order.id);
+        } catch (_) {}
+      }
+
       // If simulated or test mode without live credentials
       if (orderData.mock === true) {
         const simPaymentId = `pay_sim_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
@@ -665,41 +683,14 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
             const verifyData = await verifyRes.json();
             if (!verifyRes.ok) throw new Error(verifyData.error || "Payment verification failed");
 
-            // Show payment confirmation screen
+            // Show payment confirmation screen & auto-submit
             const verifiedPaymentId = response.razorpay_payment_id || ("PAY_" + Date.now());
-            const verifiedState = {
-              paymentId: verifiedPaymentId,
-              finalForm: { ...finalForm, paymentMode: "Razorpay Online", paidAmount: orderData.totalAmount || calculatedAmount },
-              verifyResponse: verifyData,
-            };
-            setPaymentVerified(verifiedState);
-
-            await saveDraft(token, { form, step, files, paymentVerified: verifiedState });
-            localStorage.setItem(`payment_verified_${token}`, JSON.stringify(verifiedState));
-
-            // Immediate auto-submit so candidate is never stuck
-            try {
-              const autoSubmitRes = await fetch(`${API}/apply/${token}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...finalForm, payment_id: verifiedPaymentId, paymentMode: "Razorpay Online", paidAmount: orderData.totalAmount || calculatedAmount }),
-              });
-              const autoText = await autoSubmitRes.text();
-              const autoData = JSON.parse(autoText);
-              if (autoSubmitRes.ok && autoData?.submissionId) {
-                setSubmissionId(String(autoData.submissionId));
-                setSubmitted(true);
-                localStorage.removeItem(`fellowship_draft_${token}`);
-                localStorage.removeItem(`payment_verified_${token}`);
-                await clearDraft(token);
-                window.scrollTo(0, 0);
-                return;
-              }
-            } catch (autoErr) {
-              console.warn("Auto-submit deferred to confirmation screen:", autoErr);
-            }
-
-            window.scrollTo(0, 0);
+            await completeSubmissionWithVerifiedPayment(
+              verifiedPaymentId,
+              orderData.totalAmount || calculatedAmount,
+              verifyData,
+              finalForm
+            );
           } catch (e: any) {
             setSubmitError(e.message);
           } finally {
@@ -713,9 +704,40 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
         },
         theme: { color: "#000080" },
         modal: {
-          ondismiss: () => {
+          ondismiss: async () => {
             setSubmitting(false);
-            setSubmitError("Payment modal was closed before completing payment. Please click 'Pay via Razorpay' to complete your application fee.");
+            // On mobile devices, switching to UPI apps (Google Pay, PhonePe) causes the modal to dismiss before returning.
+            // Automatically query gateway to see if the user completed the payment in UPI.
+            setIsCheckingPayment(true);
+            setPaymentCheckMsg("Checking if UPI payment was completed in your banking app...");
+            try {
+              const res = await fetch(`${API}/payment/check-status`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  orderId: orderData.order.id,
+                  email: finalForm.email,
+                  phone: finalForm.phone,
+                  token,
+                }),
+              });
+              const data = await res.json();
+              if (data.paid && data.paymentId) {
+                await completeSubmissionWithVerifiedPayment(
+                  data.paymentId,
+                  data.amount || orderData.totalAmount || calculatedAmount,
+                  data,
+                  finalForm
+                );
+                return;
+              }
+            } catch (err) {
+              console.warn("Auto payment status check error:", err);
+            } finally {
+              setIsCheckingPayment(false);
+            }
+
+            setSubmitError("Payment modal was closed. If money was debited from your bank/UPI account, DO NOT pay again. Click 'Verify Debited Payment' below to confirm.");
           }
         }
       };
@@ -725,6 +747,99 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
     } catch (e: any) {
       setSubmitError(e.message || "Online payment error. Please click 'Pay via Razorpay' to retry.");
       setSubmitting(false);
+    }
+  };
+
+  const completeSubmissionWithVerifiedPayment = async (
+    verifiedPaymentId: string,
+    paidAmount: number,
+    verifyData: any,
+    targetForm?: Record<string, any>
+  ) => {
+    const fForm = targetForm || form;
+    const verifiedState = {
+      paymentId: verifiedPaymentId,
+      finalForm: { ...fForm, paymentMode: "Razorpay Online", paidAmount },
+      verifyResponse: verifyData,
+    };
+    setPaymentVerified(verifiedState);
+    await saveDraft(token, { form, step, files, paymentVerified: verifiedState });
+    try {
+      localStorage.setItem(`payment_verified_${token}`, JSON.stringify(verifiedState));
+    } catch (_) {}
+
+    try {
+      const autoSubmitRes = await fetch(`${API}/apply/${token}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...fForm,
+          payment_id: verifiedPaymentId,
+          paymentMode: "Razorpay Online",
+          paidAmount,
+        }),
+      });
+      const autoText = await autoSubmitRes.text();
+      const autoData = JSON.parse(autoText);
+      if (autoSubmitRes.ok && autoData?.submissionId) {
+        setSubmissionId(String(autoData.submissionId));
+        setSubmitted(true);
+        try {
+          localStorage.removeItem(`fellowship_draft_${token}`);
+          localStorage.removeItem(`payment_verified_${token}`);
+          localStorage.removeItem(`active_order_${token}`);
+        } catch (_) {}
+        await clearDraft(token);
+        window.scrollTo(0, 0);
+        return true;
+      }
+    } catch (autoErr) {
+      console.warn("Auto-submit deferred to confirmation screen:", autoErr);
+    }
+    window.scrollTo(0, 0);
+    return false;
+  };
+
+  const checkAndVerifyPaymentStatus = async (customOrderId?: string, customPaymentId?: string) => {
+    setIsCheckingPayment(true);
+    setPaymentCheckMsg("Verifying transaction with Razorpay & Bank gateway...");
+    setSubmitError(null);
+
+    const orderToCheck = customOrderId || activeOrderId || (typeof window !== "undefined" ? localStorage.getItem(`active_order_${token}`) : null);
+    const emailToCheck = form.email;
+    const phoneToCheck = form.phone;
+
+    try {
+      const res = await fetch(`${API}/payment/check-status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: orderToCheck,
+          paymentId: customPaymentId,
+          email: emailToCheck,
+          phone: phoneToCheck,
+          token,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.paid && data.paymentId) {
+        setPaymentCheckMsg(`Payment verified! Reference: ${data.paymentId}. Submitting application...`);
+        await completeSubmissionWithVerifiedPayment(
+          data.paymentId,
+          data.amount || calculatedAmount,
+          data
+        );
+        return true;
+      } else {
+        setPaymentCheckMsg(data.message || "Payment not yet confirmed by your bank. If money was debited, please wait 1-2 minutes and click 'Verify Debited Payment' again.");
+        return false;
+      }
+    } catch (e: any) {
+      setPaymentCheckMsg("Unable to contact payment verification service. Please retry in a moment.");
+      return false;
+    } finally {
+      setIsCheckingPayment(false);
     }
   };
 
@@ -1653,10 +1768,53 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
                   </div>
                 )}
 
-                {submitError && (
-                  <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-                    <p className="text-sm font-medium text-red-800">{submitError}</p>
+                {(submitError || paymentCheckMsg || isCheckingPayment || activeOrderId) && (
+                  <div className="p-4 bg-amber-50/95 border-2 border-amber-300 rounded-xl space-y-3 mt-3 shadow-xs">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                      <div className="space-y-1 w-full">
+                        <p className="text-sm font-bold text-amber-950">
+                          Money debited from your bank or UPI app?
+                        </p>
+                        <p className="text-xs text-amber-900 leading-relaxed">
+                          <strong>DO NOT pay again.</strong> On mobile phones, switching to Google Pay, PhonePe, or Paytm may cause the browser popup to close. If your money was debited, click the button below to instantly verify your payment with Razorpay and complete your application.
+                        </p>
+
+                        {submitError && !paymentCheckMsg && (
+                          <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs font-medium text-red-800 mt-2">
+                            {submitError}
+                          </div>
+                        )}
+
+                        {paymentCheckMsg && (
+                          <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-semibold text-blue-900 mt-2 flex items-center gap-2">
+                            {isCheckingPayment && <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-700" />}
+                            <span>{paymentCheckMsg}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="pt-1 flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => checkAndVerifyPaymentStatus()}
+                        disabled={isCheckingPayment || submitting}
+                        className="bg-[#000080] hover:bg-[#000060] text-white font-bold text-xs h-10 px-4 rounded-xl shadow-sm flex items-center gap-2 active:scale-95 cursor-pointer"
+                      >
+                        {isCheckingPayment ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin text-white" />
+                            Checking with Gateway...
+                          </>
+                        ) : (
+                          <>
+                            <ShieldCheck className="w-4 h-4 text-emerald-300" />
+                            Verify Debited Payment (Instant)
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>
