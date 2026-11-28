@@ -808,6 +808,9 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
     const orderToCheck = customOrderId || activeOrderId || (typeof window !== "undefined" ? localStorage.getItem(`active_order_${token}`) : null);
     const emailToCheck = form.email;
     const phoneToCheck = form.phone;
+    const specCount = Array.isArray(form.specialization) ? form.specialization.length : 1;
+    const unitFee = paymentConfig ? paymentConfig.amount / 100 : 2750;
+    const expectedAmount = unitFee * specCount;
 
     try {
       const res = await fetch(`${API}/payment/check-status`, {
@@ -827,7 +830,7 @@ export default function ApplyPage({ token, isManualEntry }: { token: string; isM
         setPaymentCheckMsg(`Payment verified! Reference: ${data.paymentId}. Submitting application...`);
         await completeSubmissionWithVerifiedPayment(
           data.paymentId,
-          data.amount || calculatedAmount,
+          data.amount || expectedAmount,
           data
         );
         return true;
