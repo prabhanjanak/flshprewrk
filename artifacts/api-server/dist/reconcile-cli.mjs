@@ -26637,7 +26637,7 @@ async function main() {
   console.log("   RAZORPAY AUTOMATIC PAYMENT RECOVERY TOOL      ");
   console.log("   Sankara Academy of Vision \u2014 Fellowship 2027   ");
   console.log("=================================================\n");
-  const { db: db2, applicationFormsTable: applicationFormsTable2, applicationSubmissionsTable: applicationSubmissionsTable2, paymentSettingsTable: paymentSettingsTable2 } = await Promise.resolve().then(() => (init_src(), src_exports));
+  const { db: db2, applicationFormsTable: applicationFormsTable2, applicationSubmissionsTable: applicationSubmissionsTable2, paymentSettingsTable: paymentSettingsTable2, candidatesTable: candidatesTable2 } = await Promise.resolve().then(() => (init_src(), src_exports));
   const { eq: eq2 } = await Promise.resolve().then(() => (init_drizzle_orm(), drizzle_orm_exports));
   const allSettings = await db2.select().from(paymentSettingsTable2).where(eq2(paymentSettingsTable2.isActive, true));
   const setting = allSettings[0];
@@ -26686,9 +26686,14 @@ async function main() {
     const payerEmail = item.email || `candidate_${paymentId.slice(-6)}@sankaraeye.com`;
     const payerContact = item.contact || null;
     const notes = item.notes || {};
-    const payerName = notes.fullName || notes.name || payerEmail.split("@")[0].replace(/[._]/g, " ").toUpperCase();
+    let payerName = notes.fullName || notes.name || payerEmail.split("@")[0].replace(/[._]/g, " ").toUpperCase();
+    if (payerEmail.toLowerCase().includes("vahilayala")) {
+      payerName = "Dr. Vahilayala Mandala";
+    }
     let specialization = '["IOL"]';
-    if (notes.specialization) {
+    if (payerEmail.toLowerCase().includes("vahilayala") || paymentId === "pay_U4lytn45uyPkrY") {
+      specialization = JSON.stringify(["Vitreo Retina", "Medical Retina", "Cornea", "Phaco Refractive"]);
+    } else if (notes.specialization) {
       specialization = typeof notes.specialization === "string" ? notes.specialization : JSON.stringify(notes.specialization);
     } else if (amountInRs >= 5500) {
       specialization = '["Retina", "Anterior Segment"]';
@@ -26708,6 +26713,20 @@ async function main() {
       reviewNotes: `Recovered via automated Razorpay reconciliation. Original payment date: ${new Date(item.created_at * 1e3).toISOString()}`,
       submittedAt: new Date(item.created_at * 1e3)
     }).returning();
+    try {
+      const [cand] = await db2.select().from(candidatesTable2).where(eq2(candidatesTable2.email, payerEmail));
+      if (!cand) {
+        await db2.insert(candidatesTable2).values({
+          programId: form.programId,
+          fullName: payerName,
+          email: payerEmail,
+          phone: payerContact,
+          status: "pending",
+          photoUrl: null
+        });
+      }
+    } catch (_) {
+    }
     console.log(`     \u2705 Successfully created application submission #${created.id} for "${payerName}"!
 `);
     recovered++;

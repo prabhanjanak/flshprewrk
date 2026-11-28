@@ -1298,6 +1298,74 @@ async function seedAndHealBaselineData(): Promise<void> {
     logger.warn({ err }, "[DB-BOOTSTRAP] Non-fatal candidate healing notice");
   }
 
+  // ── Auto-reconcile captured payment for applicant Vahilayalamandala ──
+  try {
+    const [existingVahila] = await db
+      .select()
+      .from(applicationSubmissionsTable)
+      .where(
+        or(
+          eq(applicationSubmissionsTable.email, "vahilayalamandala@gmail.com"),
+          eq(applicationSubmissionsTable.paymentId, "pay_U4lytn45uyPkrY")
+        )
+      );
+
+    if (!existingVahila) {
+      let [form] = await db
+        .select()
+        .from(applicationFormsTable)
+        .where(eq(applicationFormsTable.token, "JAN2027"));
+      if (!form) {
+        [form] = await db
+          .select()
+          .from(applicationFormsTable)
+          .where(eq(applicationFormsTable.isActive, true))
+          .limit(1);
+      }
+      if (form) {
+        const [insertedSub] = await db
+          .insert(applicationSubmissionsTable)
+          .values({
+            formId: form.id,
+            status: "pending",
+            fullName: "Dr. Vahilayala Mandala",
+            email: "vahilayalamandala@gmail.com",
+            phone: "+919676232589",
+            specialization: JSON.stringify(["Vitreo Retina", "Medical Retina", "Cornea", "Phaco Refractive"]),
+            paymentId: "pay_U4lytn45uyPkrY",
+            paymentMode: "Razorpay Online",
+            paidAmount: 11000,
+            source: "internal",
+            readyForReview: true,
+            reviewNotes: "Official online payment captured via Razorpay (Order: order_U4lykWAqKVtVZn, UPI: 9676232589@axl, RRN: 499220740126).",
+            submittedAt: new Date(1795689331 * 1000),
+          } as any)
+          .returning();
+
+        logger.info(`[DB-BOOTSTRAP] Successfully reflected applicant Vahilayalamandala (#${insertedSub.id}) in backend database.`);
+
+        const [existingCand] = await db
+          .select()
+          .from(candidatesTable)
+          .where(eq(candidatesTable.email, "vahilayalamandala@gmail.com"));
+
+        if (!existingCand) {
+          await db.insert(candidatesTable).values({
+            programId: form.programId,
+            fullName: "Dr. Vahilayala Mandala",
+            email: "vahilayalamandala@gmail.com",
+            phone: "+919676232589",
+            status: "pending",
+            photoUrl: null,
+          } as any);
+          logger.info("[DB-BOOTSTRAP] Created candidate record for Vahilayalamandala in candidates table.");
+        }
+      }
+    }
+  } catch (err: any) {
+    logger.warn({ err }, "[DB-BOOTSTRAP] Applicant reconciliation notice for Vahilayalamandala");
+  }
+
   // Dynamic Specialities Deduplication
   try {
     const specsRes = await db.execute(sql`SELECT id, name, code, program_id FROM specialities`);

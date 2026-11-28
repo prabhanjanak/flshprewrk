@@ -50,7 +50,7 @@ async function main() {
   console.log("=================================================\n");
 
   // Dynamically import DB after environment is populated
-  const { db, applicationFormsTable, applicationSubmissionsTable, paymentSettingsTable } = await import("@workspace/db");
+  const { db, applicationFormsTable, applicationSubmissionsTable, paymentSettingsTable, candidatesTable } = await import("@workspace/db");
   const { eq } = await import("drizzle-orm");
 
   // 1. Fetch active Razorpay settings
@@ -116,11 +116,16 @@ async function main() {
     const payerEmail = item.email || `candidate_${paymentId.slice(-6)}@sankaraeye.com`;
     const payerContact = item.contact || null;
     const notes = (item.notes as any) || {};
-    const payerName = notes.fullName || notes.name || payerEmail.split("@")[0].replace(/[._]/g, " ").toUpperCase();
-    
+    let payerName = notes.fullName || notes.name || payerEmail.split("@")[0].replace(/[._]/g, " ").toUpperCase();
+    if (payerEmail.toLowerCase().includes("vahilayala")) {
+      payerName = "Dr. Vahilayala Mandala";
+    }
+
     // Determine specializations from amount or notes
     let specialization = '["IOL"]';
-    if (notes.specialization) {
+    if (payerEmail.toLowerCase().includes("vahilayala") || paymentId === "pay_U4lytn45uyPkrY") {
+      specialization = JSON.stringify(["Vitreo Retina", "Medical Retina", "Cornea", "Phaco Refractive"]);
+    } else if (notes.specialization) {
       specialization = typeof notes.specialization === "string" ? notes.specialization : JSON.stringify(notes.specialization);
     } else if (amountInRs >= 5500) {
       specialization = '["Retina", "Anterior Segment"]';
@@ -141,6 +146,21 @@ async function main() {
       reviewNotes: `Recovered via automated Razorpay reconciliation. Original payment date: ${new Date(item.created_at * 1000).toISOString()}`,
       submittedAt: new Date(item.created_at * 1000),
     } as any).returning();
+
+    // Ensure candidate entry exists in candidatesTable
+    try {
+      const [cand] = await db.select().from(candidatesTable).where(eq(candidatesTable.email, payerEmail));
+      if (!cand) {
+        await db.insert(candidatesTable).values({
+          programId: form.programId,
+          fullName: payerName,
+          email: payerEmail,
+          phone: payerContact,
+          status: "pending",
+          photoUrl: null,
+        } as any);
+      }
+    } catch (_) {}
 
     console.log(`     ✅ Successfully created application submission #${created.id} for "${payerName}"!\n`);
     recovered++;
